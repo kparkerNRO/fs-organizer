@@ -1,7 +1,6 @@
 import click
 import os
 import re
-import shutil
 import zipfile
 import pprint
 
@@ -21,6 +20,12 @@ creator_removes = {
     "MAD Cartographer": "",
     "MikWewa": "$5 Map Rewards",
     "Tom Cartos": "Tier 2+",
+}
+
+type_suffixes = {"Print", "VTT"}
+exceptions = {"The Clean": "Clean", "The": ""}
+replace_exceptions = {
+    "ItW": "",
 }
 
 
@@ -69,12 +74,8 @@ def _get_creator_index(parts):
     return 0
 
 
-exceptions = {"The Clean": "Clean", "The": ""}
-replace_exceptions = {"ItW": ""}
-
-
 def clean_base_name(base_name, source_dir, parent_len=0):
-    # print(f"starting with '{source_dir}/{base_name}'")
+    # print(f"starting with '{source_dir}' - '{base_name}'")
 
     if not base_name:
         return ""
@@ -111,14 +112,14 @@ def clean_base_name(base_name, source_dir, parent_len=0):
         if creator in str(source_dir) and removes != "":
             out_dir_name = _strip_part_from_base(out_dir_name, removes)
 
-    # remove file dimensions
-    out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
-
     # remove "part" naming
     out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
     out_dir_name = re.sub("\s*Part\s*\d*", "", out_dir_name)
     out_dir_name = re.sub("\/\s*\d+\s*", "", out_dir_name)
     out_dir_name = out_dir_name.strip(" ()")
+
+    # remove file dimensions
+    # out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
 
     # remove special case exceptions
     for exception, replace in exceptions.items():
@@ -134,8 +135,7 @@ def clean_base_name(base_name, source_dir, parent_len=0):
     out_dir_name = re.sub("^#?\d{0,2}\s*", "", out_dir_name)
     out_dir_name = re.sub("#?\d{0,2}\s*$", "", out_dir_name)
 
-    # cleanup number only entries
-    # out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
+    # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)
 
     # cleanup whitespace
     out_dir_name = out_dir_name.replace("(", " ")
@@ -144,10 +144,13 @@ def clean_base_name(base_name, source_dir, parent_len=0):
     out_dir_name = re.sub("-\s+-", " ", out_dir_name)
     out_dir_name = out_dir_name.strip(PATH_EXTRAS)
 
+    # cleanup number only entries
+    out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
+
     if len(out_dir_name) == 1:
         out_dir_name = ""
 
-    # print(f"ending with '{source_dir}/{base_name}'")
+    # print(f"ending with '{source_dir}' - '{out_dir_name}'\n")
 
     return out_dir_name
 
@@ -250,9 +253,6 @@ def _get_max_token_overlap(tokens, name_to_comp):
     return working_token
 
 
-type_suffixes = {"Print", "VTT"}
-
-
 def _split_suffix(base_name):
     f_suffix = None
     f_name = base_name
@@ -264,13 +264,20 @@ def _split_suffix(base_name):
     return f_suffix, f_name
 
 
-def _parse_name(name, final_token, has_suffix, use_suffix=True):
+def _parse_name(name, final_token, has_suffix, use_suffix=False):
     next_name = _strip_part_from_base(name, final_token)
     next_name = next_name.strip(PATH_EXTRAS)
     # print(f"next name: '{next_name}'")
     if next_name == "":
+
+        # if we _dont_ want to take the suffix into account
+        # always
         if not (has_suffix and use_suffix):
             next_name = "Base"
+
+        # print(f"Given: {name} /token: {final_token} -> '{next_name}'")
+    # print(f"Has suffix: {has_suffix}. Uses it? {use_suffix}")
+
     # print(f"next name: \t'{next_name}'")
 
     return next_name
@@ -314,6 +321,8 @@ def group_similar_folders(path):
 
             tmp_suffix, next_name = _split_suffix(working_name)
             has_suffix = tmp_suffix is not None
+            if tmp_suffix is None:
+                tmp_suffix = ""
 
             if final_token and next_name.startswith(final_token):
                 token_map[final_token].add(working_name)
@@ -357,6 +366,20 @@ def group_similar_folders(path):
                 token_map[key] |= token_map[key2]
                 token_map[key2] = {}
 
+    # if everyone is a base, no one is
+    for key, files in token_map.items():
+        files_in_set = [names_to_replace[file] for file in files]
+        all_base = [v[2] == "Base" if len(v) == 3 else False for v in files_in_set]
+        res = all(all_base)
+
+        # print(f"Sets to process {files_in_set}")
+        # print(f"All base {all_base}")
+        # print(f"Results {res}")
+
+        if res:
+            for item in files_in_set:
+                item[2] = ""
+
     if len(token_map) > 0:
         print()
         print(path)
@@ -371,13 +394,15 @@ def group_similar_folders(path):
 
 def organize_folders(
     path: Path, final_path: Path, should_execute: bool, start_path_len=0
-):
+) -> list[Path]:
     # print(f"Path: {path}")
     names_to_replace = group_similar_folders(path)
     printed_rename = False
 
+    duplicate_files = []
     for subfile in path.iterdir():
         if subfile.is_dir():
+
             # print(f"subfile: {subfile}")
             # print(f"working path: {final_path}")
 
@@ -394,7 +419,7 @@ def organize_folders(
             cleaned_name = os.path.join(*proc_paths)
 
             next_name = final_path / cleaned_name
-            organize_folders(subfile, next_name, should_execute)
+            duplicate_files.extend(organize_folders(subfile, next_name, should_execute))
 
             # see if the subdir is empty, and if so, delete it
             next_sub_dir = _get_files_in_dir(subfile)
@@ -412,7 +437,24 @@ def organize_folders(
                     if not final_path.exists():
                         final_path.mkdir(parents=True, exist_ok=True)
                     file_path = final_path / subfile.name
-                    subfile.rename(file_path)
+                    if file_path.exists():
+                        print(f"Found a duplicate file: {file_path}")
+                        duplicate_files.append(file_path)
+                    else:
+                        subfile.rename(file_path)
+
+    return duplicate_files
+
+
+def print_dir(path: Path):
+    for subfile in path.iterdir():
+        if subfile.is_dir():
+            if subfile.name == ".ts":
+                continue
+            print_dir(subfile)
+            print()
+        else:
+            print(subfile)
 
 
 @click.command()
@@ -420,15 +462,23 @@ def organize_folders(
 @click.option("--zip", is_flag=True, default=False)
 # @click.option("--creators", is_flag=True, default=False)
 @click.option("--exec", is_flag=True, default=False)
-def list_path(path, zip, exec):
-    """Simple program that greets NAME for a total of COUNT times."""
+@click.option("--print", is_flag=True, default=False)
+def list_path(path, zip, exec, print):
     path_obj = Path(path)
 
     if zip:
         extract_zip_files(path_obj, exec)
+    elif print:
+        print_dir(path_obj)
     else:
         start_len = len(path_obj.parts) - 2
-        organize_folders(path_obj, Path(path), exec, start_len)
+        duplicates = organize_folders(path_obj, Path(path), exec, start_len)
+
+        if duplicates:
+            print()
+            print("------ Duplicates -------")
+            for file in duplicates:
+                print(file)
 
 
 if __name__ == "__main__":
