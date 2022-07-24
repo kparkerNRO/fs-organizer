@@ -6,6 +6,8 @@ import pprint
 
 from pathlib import Path
 
+from common import delete_empty_dir, print_path_operation, try_move_file, VIEW_TYPES
+
 PATH_EXTRAS = " -,()/"
 
 creator_removes = {
@@ -22,27 +24,16 @@ creator_removes = {
     "Tom Cartos": "Tier 2+",
 }
 
-type_suffixes = {"Print", "VTT"}
 exceptions = {"The Clean": "Clean", "The": ""}
 replace_exceptions = {
     "ItW": "",
 }
 
 
-def _get_files_in_dir(dir):
-    if isinstance(dir, str):
-        dir = Path(dir)
-    return [p for p in dir.iterdir()]
+
 
 
 def _strip_part_from_base(base_name, part):
-    # parts = base_name.split(part)
-    # if len(parts) > 1:
-    #     output = parts[0].strip(PATH_EXTRAS) + " " + parts[1].strip(PATH_EXTRAS)
-    # else:
-    #     output = parts[0].strip(PATH_EXTRAS)
-    # clean_output = [part.strip(PATH_EXTRAS) for part in parts]
-    # output = " ".join(clean_output)
 
     output = base_name.replace(part, "")
     output = re.sub("\s+", " ", output)
@@ -50,17 +41,6 @@ def _strip_part_from_base(base_name, part):
     output = output.strip()
 
     return output
-
-
-def _print_path_operation(operator, from_path, to_path=None, should_execute=False):
-    if not should_execute:
-        print(f"would {operator}:\n\t'{from_path}'")
-        if to_path:
-            print(f"\t\tto \n\t'{to_path}'")
-    else:
-        print(f"{operator}ing:\n\t{from_path}")
-        if to_path:
-            print(f"\t\tto \n\t'{to_path}'")
 
 
 def _get_creator_index(parts):
@@ -217,7 +197,7 @@ def extract_zip(zip_file: Path, should_execute=True):
                     print(f"moving \n\t{path} \nto \n\t{final_path}")
                     path.rename(final_path)
         else:
-            _print_path_operation("extract", zip_file, should_execute=should_execute)
+            print_path_operation("extract", zip_file, should_execute=should_execute)
             if should_execute:
                 extract_zip_without_hidden_files(zipref, final_path)
 
@@ -256,7 +236,7 @@ def _get_max_token_overlap(tokens, name_to_comp):
 def _split_suffix(base_name):
     f_suffix = None
     f_name = base_name
-    for suffix in type_suffixes:
+    for suffix in VIEW_TYPES:
         if base_name.endswith(suffix):
             f_suffix = suffix.strip()
             f_name = _strip_part_from_base(base_name, suffix)
@@ -393,14 +373,14 @@ def group_similar_folders(path):
 
 
 def organize_folders(
-    path: Path, final_path: Path, should_execute: bool, start_path_len=0
+    true_path: Path, working_path: Path, should_execute: bool, start_path_len=0
 ) -> list[Path]:
     # print(f"Path: {path}")
-    names_to_replace = group_similar_folders(path)
+    names_to_replace = group_similar_folders(true_path)
     printed_rename = False
 
     duplicate_files = []
-    for subfile in path.iterdir():
+    for subfile in true_path.iterdir():
         if subfile.is_dir():
 
             # print(f"subfile: {subfile}")
@@ -413,35 +393,25 @@ def organize_folders(
             sub_paths = names_to_replace[sub_name]
             # print(f"Cleaning {sub_paths} in \n\t{final_path}")
             proc_paths = [
-                clean_base_name(sub_path, final_path, start_path_len)
+                clean_base_name(sub_path, working_path, start_path_len)
                 for sub_path in sub_paths
             ]
             cleaned_name = os.path.join(*proc_paths)
 
-            next_name = final_path / cleaned_name
+            next_name = working_path / cleaned_name
             duplicate_files.extend(organize_folders(subfile, next_name, should_execute))
 
             # see if the subdir is empty, and if so, delete it
-            next_sub_dir = _get_files_in_dir(subfile)
-            if len(next_sub_dir) == 0:
-                print(f"would delete {subfile}")
-                if should_execute:
-                    subfile.rmdir()
+            delete_empty_dir(subfile, should_execute)
         else:
-            if path != final_path:
+            if true_path != working_path:
                 if not printed_rename:
-                    _print_path_operation("rename", path, final_path, should_execute)
+                    print_path_operation(
+                        "rename", true_path, working_path, should_execute
+                    )
                     printed_rename = True
 
-                if should_execute:
-                    if not final_path.exists():
-                        final_path.mkdir(parents=True, exist_ok=True)
-                    file_path = final_path / subfile.name
-                    if file_path.exists():
-                        print(f"Found a duplicate file: {file_path}")
-                        duplicate_files.append(file_path)
-                    else:
-                        subfile.rename(file_path)
+                return try_move_file(subfile, working_path, should_execute)
 
     return duplicate_files
 

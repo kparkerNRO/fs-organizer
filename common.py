@@ -1,0 +1,41 @@
+from pathlib import Path
+
+VIEW_TYPES = {"Print", "VTT"}
+
+
+def _get_files_in_dir(dir):
+    if isinstance(dir, str):
+        dir = Path(dir)
+    return [p for p in dir.iterdir()]
+
+
+def delete_empty_dir(dir: Path, should_execute):
+    next_sub_dir = _get_files_in_dir(dir)
+    if len(next_sub_dir) == 0:
+        print(f"would delete {dir}")
+        if should_execute:
+            dir.rmdir()
+
+
+def print_path_operation(operator, from_path, to_path=None, should_execute=False):
+    if not should_execute:
+        print(f"would {operator}:\n\t'{from_path}'")
+        if to_path:
+            print(f"\t\tto \n\t'{to_path}'")
+    else:
+        print(f"{operator[:-1]}ing:\n\t{from_path}")
+        if to_path:
+            print(f"\t\tto \n\t'{to_path}'")
+
+
+def try_move_file(source_file: Path, target_dir, should_execute):
+    print_path_operation("move", source_file, target_dir)
+    if should_execute:
+        if not target_dir.exists():
+            target_dir.mkdir(parents=True, exist_ok=True)
+        file_path = target_dir / source_file.name
+        if file_path.exists():
+            print(f"Found a duplicate file: \n{source_file}\n\tto\n{target_dir}")
+            return (source_file, file_path)
+        else:
+            source_file.rename(file_path)
