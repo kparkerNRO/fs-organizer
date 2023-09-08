@@ -30,10 +30,15 @@ creator_removes = {
     "Tom Cartos": "Tier 2+",
 }
 
-exceptions = {"The Clean": "Clean", "The": ""}
+file_name_exceptions = {"The Clean": "Clean", "The": ""}
 replace_exceptions = {
     "ItW": "",
 }
+grouping_exceptions = (
+    "City of",
+    "Lair of the",
+    "Tower of",
+)
 
 
 def _strip_part_from_base(base_name, part):
@@ -49,7 +54,7 @@ def _strip_part_from_base(base_name, part):
     return output
 
 
-def _get_max_token_overlap(tokens, name_to_comp):
+def _get_max_common_string(tokens, name_to_comp):
     base_token = tokens[0]
     working_token = base_token
 
@@ -64,7 +69,7 @@ def _get_max_token_overlap(tokens, name_to_comp):
     return working_token
 
 
-def _split_suffix(base_name):
+def _split_view_type(base_name):
     """
     Trims out standard view type suffixes from a filename
     """
@@ -78,27 +83,33 @@ def _split_suffix(base_name):
     return f_suffix, f_name
 
 
-def _parse_name(name, final_token, has_suffix, use_suffix=False):
+def _process_file_name(name, final_token, has_suffix, use_suffix=False):
     """
     Generate the new file name after cleaning off extra tokens.
     If there is no new file name, return "base"
     """
     next_name = _strip_part_from_base(name, final_token)
     next_name = next_name.strip(PATH_EXTRAS)
-    # print(f"next name: '{next_name}'")
     if next_name == "":
-
         # if we _dont_ want to take the suffix into account
-        # always
         if not (has_suffix and use_suffix):
             next_name = "Base"
 
         # print(f"Given: {name} /token: {final_token} -> '{next_name}'")
-    # print(f"Has suffix: {has_suffix}. Uses it? {use_suffix}")
 
+    # print(f"Has suffix: {has_suffix}. Uses it? {use_suffix}")
     # print(f"next name: \t'{next_name}'")
 
     return next_name
+
+
+def generate_path(view_type, token, working_name):
+    """
+    joins the components of a grouping path, stripping out any cases
+    where one of the supplied variables is '' or None
+    """
+    base_path = [view_type, token, working_name]
+    return [x for x in base_path if x]
 
 
 def group_similar_folders(folder: VirtualFolder):
@@ -110,111 +121,106 @@ def group_similar_folders(folder: VirtualFolder):
     """
     # map basename to file, and only work on the base names
     pathnames_to_path = {
-        subpath.source_path.name: subpath for subpath in folder.subfolders.values()
+        subpath.name: subpath for subpath in folder.subfolders.values()
     }
-    base_paths = list(pathnames_to_path.keys())
-    # print(f"Grouping {path}")
+    paths_to_process = list(pathnames_to_path.keys())
 
-    names_to_replace = {subpath: [subpath] for subpath in base_paths}
-    token_map = dict()
+    names_to_replacement = {subpath: [subpath] for subpath in paths_to_process}
+    token_to_filenames = dict()
 
     for base_name, file in pathnames_to_path.items():
         if not file.is_dir():
             continue
 
-        if not base_name in base_paths:
+        # handle the data structure mismatch where one's already been removed
+        if not base_name in paths_to_process:
             continue
 
-        base_paths.remove(base_name)
+        paths_to_process.remove(base_name)
         # print(f"processing {base_name}")
 
-        working_path = []
-
         # pull out the type suffix
-        working_suffix, new_name = _split_suffix(base_name)
-        if working_suffix:
-            working_path.append(working_suffix)
+        initial_suffix, parsed_base_name = _split_view_type(base_name)
 
-        tokens = new_name.split(" ")
+        tokens = parsed_base_name.split(" ")
         first_token = tokens[0]
-        final_token = None
+        working_token = None
 
         # iterate through the names, and find any matches
-        for working_name in base_paths:
+        for working_name in paths_to_process:
             if not pathnames_to_path[working_name].is_dir():
                 continue
 
-            tmp_suffix, next_name = _split_suffix(working_name)
-            has_suffix = tmp_suffix is not None
-            if tmp_suffix is None:
-                tmp_suffix = ""
+            working_suffix, next_name = _split_view_type(working_name)
+            has_suffix = working_suffix is not None
 
-            if final_token and next_name.startswith(final_token):
-                token_map[final_token].add(working_name)
-                next_name = _parse_name(next_name, final_token, has_suffix)
-                names_to_replace[working_name] = [tmp_suffix, final_token, next_name]
+            if working_token and next_name.startswith(working_token):
+                # working case: store a new token match
+                token_to_filenames[working_token].add(working_name)
+
+                root_name = _process_file_name(next_name, working_token, has_suffix)
+                names_to_replacement[working_name] = generate_path(
+                    working_suffix, working_token, root_name
+                )
 
             elif next_name.startswith(first_token):
-                computed_token = _get_max_token_overlap(tokens, next_name)
-                if computed_token != first_token and computed_token not in (
-                    "City of",
-                    "Lair of the",
+                # base case, initialize a new token
+                computed_token = _get_max_common_string(tokens, next_name)
+
+                # if only the first word overlaps, don't group
+                # if the token is in the exceptions list, don't group
+                if (
+                    computed_token != first_token
+                    and computed_token not in grouping_exceptions
                 ):
-                    final_token = computed_token
-                    # print(f"selecting token {computed_token}")
-                    token_map[final_token] = {base_name, working_name}
+                    # if we've found a token with overlap, save it
+                    working_token = computed_token
 
-                    next_name = _parse_name(next_name, final_token, has_suffix)
-                    names_to_replace[working_name] = [
-                        tmp_suffix,
-                        final_token,
-                        next_name,
-                    ]
+                    # record that we have a matching token
+                    token_to_filenames[working_token] = {base_name, working_name}
 
-                    new_name = _parse_name(
-                        new_name, final_token, working_suffix is not None
+                    # store the new path name mapping
+                    root_name = _process_file_name(next_name, working_token, has_suffix)
+                    names_to_replacement[working_name] = generate_path(
+                        working_suffix, working_token, root_name
                     )
-                    names_to_replace[base_name] = working_path + [final_token, new_name]
+
+                    # store the existing path name mapping
+                    parsed_base_name = _process_file_name(
+                        parsed_base_name, working_token, initial_suffix is not None
+                    )
+                    names_to_replacement[base_name] = generate_path(
+                        initial_suffix, working_token, parsed_base_name
+                    )
+            elif has_suffix:
+                pass
+                # special case - group the suffix data even if there isn't an overlapping token
+                # names_to_replace[base_name] = generate_path(initial_suffix, "", parsed_base_name)
+                # names_to_replace[working_name] = generate_path(working_suffix, "", root_name)
 
         # at the end of an iteration, remove all the matches from the working list
-        if final_token:
-            for entry in token_map[final_token]:
-                if entry in base_paths:
-                    base_paths.remove(entry)
+        if working_token:
+            for entry in token_to_filenames[working_token]:
+                if entry in paths_to_process:
+                    paths_to_process.remove(entry)
 
     # at the end of the set, see if we accidentally grabbed two overlapping sets
-    for key in token_map.keys():
-        for key2 in token_map.keys():
-            if key in key2 and not key == key2:
-                for base_name in token_map[key2]:
-                    names_to_replace[2] = key
-                token_map[key] |= token_map[key2]
-                token_map[key2] = {}
+    for token1 in token_to_filenames.keys():
+        for token2 in token_to_filenames.keys():
+            # if this isn't itself, and the main token is a subset of the other token
+            if token1 in token2 and not token1 == token2:
+                # replace the longer token with the shorter one in the replacement array
+                delta = token2.replace(token1, "")
+                for filename in token_to_filenames[token2]:
+                    working_path = names_to_replacement[filename]
+                    working_path[-1] = (delta + " " + working_path[-1]).strip()
+                    working_path[-2] = token1
 
-    # if everyone is a base, no one is
-    for key, files in token_map.items():
-        files_in_set = [names_to_replace[file] for file in files]
-        all_base = [v[2] == "Base" if len(v) == 3 else False for v in files_in_set]
-        res = all(all_base)
+                # empty the longer token and transfer it's contents to the shorter one
+                token_to_filenames[token1] |= token_to_filenames[token2]
+                token_to_filenames[token2] = {}
 
-        # print(f"Sets to process {files_in_set}")
-        # print(f"All base {all_base}")
-        # print(f"Results {res}")
-
-        if res:
-            for item in files_in_set:
-                item[2] = ""
-
-    # if len(token_map) > 0:
-    #     print()
-    #     print(folder.name)
-    #     print("Will group the following folders:")
-    #     pprint(token_map)
-
-    # print("actual renames")
-    # pprint(names_to_replace)
-
-    return names_to_replace
+    return names_to_replacement
 
 
 def organize_groups(virtual_fs: VirtualFolder):
@@ -409,7 +415,7 @@ def clean_filename(base_name, full_path):
     out_dir_name = out_dir_name.strip(" ()")
 
     # remove special case exceptions
-    for exception, replace in exceptions.items():
+    for exception, replace in file_name_exceptions.items():
         if out_dir_name == exception:
             out_dir_name = replace
             break
@@ -515,7 +521,13 @@ def flatten_base_entries(virtual_fs):
 
 
 def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
+    """
+    reorganizes the file system so that more frequently used terms
+    are closer to the bottom
 
+    the goal of this function is to more-or-less standardize the
+    folder structure
+    """
     root = virtual_fs
 
     # promote any grandchildren who outrank the child
@@ -523,7 +535,6 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
     for index_name, subfile in root.subfolders.items():
         if subfile.is_dir():
             file_score = terms_counter[subfile.name]
-            # grandchildren_to_remove = set()
             for grand_index_name, grandsubfile in subfile.subfolders.items():
                 if grandsubfile.is_dir():
                     grandname = grandsubfile.name
@@ -556,13 +567,7 @@ def organize_fs(source: Path):
 
     print("Step 0: build the virtual FS")
     virtual_fs = build_folder_structure(source)
-
-    # step 1: group folders + files by similar terms (eg day, night, clean, etc)
-    print("Step 1: group files")
-    virtual_fs = organize_groups(virtual_fs)
-    virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
     # step 2: remove redundant terms and folders
     print("\n\n------------")
@@ -570,19 +575,30 @@ def organize_fs(source: Path):
     virtual_fs = clean_folder_names(virtual_fs, virtual_fs.name)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
+
+    # step 1: group folders + files by similar terms (eg day, night, clean, etc)
+    print("Step 1: group files")
+    virtual_fs = organize_groups(virtual_fs)
+    virtual_fs = reorganize_virtualfs(virtual_fs)
+    print(f"Total files: {virtual_fs.count_files()}")
+    # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+
+    
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
     print("\n\n------------")
     print("Step 2.5: remove excess base folders")
     virtual_fs = flatten_base_entries(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
     # step 3: organize the folders by term likelyhood
     print("\n\n------------")
     print("Step 3: reorganize")
     term_counter = defaultdict(int)
     count_terms(virtual_fs, term_counter)
+    print(json.dumps(term_counter, indent=4))
+
     virtual_fs = reorganize_tree(virtual_fs, term_counter)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
@@ -596,7 +612,6 @@ def organize_fs(source: Path):
 @click.option("--exec", is_flag=True, default=False)
 @click.option("--print_out", is_flag=True, default=False)
 def organize(path, exec, print_out):
-
     path_obj = Path(path)
     organize_fs(path_obj)
 
