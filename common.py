@@ -1,6 +1,6 @@
 from pathlib import Path
 
-VIEW_TYPES = {"Print", "VTT"}
+VIEW_TYPES = {"Print", "VTT", "Key & Design Notes"}
 
 
 def _get_files_in_dir(dir):
@@ -11,7 +11,7 @@ def _get_files_in_dir(dir):
 
 def delete_empty_dir(dir: Path, should_execute):
     next_sub_dir = _get_files_in_dir(dir)
-    if len(next_sub_dir) == 0:
+    if len(next_sub_dir) == 0 and (not "_" in str(dir)):
         print(f"would delete {dir}")
         if should_execute:
             dir.rmdir()
@@ -29,7 +29,7 @@ def print_path_operation(operator, from_path, to_path=None, should_execute=False
 
 
 def try_move_file(source_file: Path, target_dir, should_execute):
-    print_path_operation("move", source_file, target_dir)
+    # print_path_operation("move", source_file, target_dir)
     if should_execute:
         if not target_dir.exists():
             target_dir.mkdir(parents=True, exist_ok=True)

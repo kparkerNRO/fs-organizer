@@ -30,11 +30,11 @@ replace_exceptions = {
 }
 
 
-
-
-
 def _strip_part_from_base(base_name, part):
-
+    """
+    Removes a string "part" from the file name, removing any spaces or additional
+    folders (eg, avoids returning <path>//<name>)
+    """
     output = base_name.replace(part, "")
     output = re.sub("\s+", " ", output)
     output = re.sub("\/\/", "/", output)
@@ -64,7 +64,7 @@ def clean_base_name(base_name, source_dir, parent_len=0):
 
     # remove myairbrigde tags
     if "myairbridge" in base_name:
-        out_dir_name = base_name.strip("myairbridge-")
+        out_dir_name = base_name.replace("myairbridge-", "")
 
     # convert underscores into spaces or 's'
     if "_" in base_name and base_name != "_Unsorted":
@@ -143,7 +143,11 @@ def extract_zip_without_hidden_files(zipref, final_path):
         if member.startswith("__MACOSX") or ".DS_Store" in member:
             continue
         # print(f"Extracting {member}")
-        zipref.extract(member, final_path)
+        try:
+            zipref.extract(member, final_path)
+        except zipfile.BadZipFile:
+            print(f"Bad Zip file for file {member}")
+            continue
 
 
 def merge_directories(source_path: Path, dest_path: Path):
@@ -201,13 +205,14 @@ def extract_zip(zip_file: Path, should_execute=True):
             if should_execute:
                 extract_zip_without_hidden_files(zipref, final_path)
 
-        zip_file.unlink()
+        # if should_execute:
+        # zip_file.unlink()
     print()
     return final_path
 
 
 def extract_zip_files(path: Path, should_execute: bool):
-    print(f"Looking for zips in {path}")
+    # print(f"Looking for zips in {path}")
     for p in path.iterdir():
         if p.is_dir():
 
@@ -215,7 +220,8 @@ def extract_zip_files(path: Path, should_execute: bool):
         else:
             if p.suffix == ".zip":
                 zip_path = extract_zip(p, should_execute)
-                extract_zip_files(zip_path, should_execute)
+                if should_execute:
+                    extract_zip_files(zip_path, should_execute)
 
 
 def _get_max_token_overlap(tokens, name_to_comp):
@@ -377,26 +383,32 @@ def organize_folders(
 ) -> list[Path]:
     # print(f"Path: {path}")
     names_to_replace = group_similar_folders(true_path)
+    # pprint.pprint(names_to_replace)
+
     printed_rename = False
 
     duplicate_files = []
     for subfile in true_path.iterdir():
         if subfile.is_dir():
 
-            # print(f"subfile: {subfile}")
+            print(f"subfile: {subfile}")
             # print(f"working path: {final_path}")
 
             sub_name = subfile.name
-            # print(sub_name)
-            # print(names_to_replace)
+            print(sub_name)
 
             sub_paths = names_to_replace[sub_name]
-            # print(f"Cleaning {sub_paths} in \n\t{final_path}")
+            # print(f"Cleaning {sub_paths}")
+            pprint.pprint(sub_paths)
             proc_paths = [
                 clean_base_name(sub_path, working_path, start_path_len)
                 for sub_path in sub_paths
             ]
             cleaned_name = os.path.join(*proc_paths)
+
+            print(cleaned_name)
+            print()
+
 
             next_name = working_path / cleaned_name
             duplicate_files.extend(organize_folders(subfile, next_name, should_execute))
@@ -411,7 +423,13 @@ def organize_folders(
                     )
                     printed_rename = True
 
-                return try_move_file(subfile, working_path, should_execute)
+                if result := try_move_file(subfile, working_path, should_execute):
+                    duplicate_files.append(result)
+
+        # if printed_rename:
+        #     cont = input("Keep going? y/n")
+        #     if cont.lower() == "n":
+        #         exit()
 
     return duplicate_files
 
@@ -428,27 +446,33 @@ def print_dir(path: Path):
 
 
 @click.command()
-@click.option("--path")
+@click.argument("path")
 @click.option("--zip", is_flag=True, default=False)
 # @click.option("--creators", is_flag=True, default=False)
 @click.option("--exec", is_flag=True, default=False)
-@click.option("--print", is_flag=True, default=False)
-def list_path(path, zip, exec, print):
+@click.option("--print_out", is_flag=True, default=False)
+def list_path(path, zip, exec, print_out):
+    # Pass 1 - unzip files
+    # pass 2 - cleanup path names
+    # pass 3 - re-organize folders, move final categorization to the bottom layer
     path_obj = Path(path)
+    duplicates = []
 
     if zip:
         extract_zip_files(path_obj, exec)
-    elif print:
-        print_dir(path_obj)
     else:
         start_len = len(path_obj.parts) - 2
         duplicates = organize_folders(path_obj, Path(path), exec, start_len)
 
-        if duplicates:
-            print()
-            print("------ Duplicates -------")
-            for file in duplicates:
-                print(file)
+    if print_out:
+        print_dir(path_obj)
+
+    if duplicates:
+        print()
+        print("------ Duplicates -------")
+        for file in duplicates:
+            print(f"tried to move:\n\t'{file[0]}'")
+            print(f"\t\tto \n\t'{file[1]}'")
 
 
 if __name__ == "__main__":

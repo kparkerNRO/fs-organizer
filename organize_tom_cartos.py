@@ -3,7 +3,6 @@
 
 # last pass through - if there are any folders that have just a "base" folder in them
 # or a "base" + "clean", remove the base folder
-from fileinput import filename
 from pathlib import Path
 
 import click
@@ -13,9 +12,21 @@ from common import VIEW_TYPES, delete_empty_dir, print_path_operation, try_move_
 
 def reorder_file_types(file: Path, working_path: list[str], target_index):
     if file.name in VIEW_TYPES:
-        working_path.insert(target_index, file.name)
-        return True
+        if target_index < len(working_path):
+            working_path.insert(target_index, file.name)
+            return True
     return False
+
+
+def reorder_path(working_paths: list, target_index, view_set=VIEW_TYPES):
+    for file_type in view_set:
+        try:
+            index = working_paths.index(file_type)
+            if index != target_index:
+                working_paths.remove(file_type)
+                working_paths.insert(target_index, file_type)
+        except ValueError:
+            pass
 
 
 def should_keep_entry(subfile, siblings) -> bool:
@@ -27,11 +38,8 @@ def should_keep_entry(subfile, siblings) -> bool:
         return False
 
     # OR if there are only two directories
-    elif len(siblings) == 2:  # possibly only if one is "clean"
-        return False
-
-    elif "Clean" in siblings:
-        return False
+    # elif len(siblings) == 2 and "Clean" in siblings:
+    #     return False
 
     return True
 
@@ -72,12 +80,17 @@ def organize_tom_cartos(
 
             delete_empty_dir(subfile, should_execute)
         else:
-            if not printed_rename:
-                # print(true_path)
-                output_path = base_path / Path(*working_path)
+            reorder_path(working_path, reorder_index+1, {"Base", "Clean", "Base Winter", "Winter Clean"})
+            reorder_path(working_path, reorder_index)
+            output_path = base_path / Path(*working_path)
 
             if true_path != output_path:
-                print_path_operation("rename", true_path, output_path, should_execute)
+                if not printed_rename:
+                    # print(true_path)
+                    print_path_operation(
+                        "rename", true_path, output_path, should_execute
+                    )
+
                 printed_rename = True
 
                 if result := try_move_file(subfile, output_path, should_execute):
@@ -127,7 +140,7 @@ def process_duplicates(path):
 def _do_the_work(path, exec):
     path_obj = Path(path)
     parts = list(path_obj.parts)
-    start_len = 2
+    start_len = 1
     parts = []
     duplicates = organize_tom_cartos(path_obj, path_obj, parts, exec, start_len)
 
