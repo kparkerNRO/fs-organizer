@@ -369,13 +369,12 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder):
     return new_root
 
 
-def clean_filename(base_name, full_path):
+def clean_filename(base_name):
     """
     Handles a bunch of standardized cleanup for junk that ends up in folder names
     """
     # print(f"\tstarting with '{full_path}' - '{base_name}'")
     out_dir_name = base_name
-    source_dir = Path(full_path)
     # remove myairbrigde tags
     if "myairbridge" in base_name:
         out_dir_name = base_name.replace("myairbridge-", "")
@@ -387,20 +386,6 @@ def clean_filename(base_name, full_path):
 
         else:
             out_dir_name = base_name.replace("_", " ")
-
-    # process duplicate entries in the path
-    parts = source_dir.parts
-    # if not parent_len:
-    #     index = _get_creator_index(parts)
-    # else:
-    #     index = parent_len
-    # creator_parts = list(parts)[index:]
-
-    for part in parts:
-        if part in parts:
-            # print(f"Stripping {part} from {out_dir_name}")
-            out_dir_name = _strip_part_from_base(out_dir_name, part)
-            # print(f"got {out_dir_name}")
 
     # remove any creator-specific removals
     for _, removes in creator_removes.items():
@@ -448,7 +433,7 @@ def clean_filename(base_name, full_path):
     return out_dir_name
 
 
-def clean_folder_names(virtual_fs, working_path):
+def clean_folder_names(virtual_fs):
     """
     Standardize file names and remove duplicate terms from the path
     """
@@ -457,13 +442,52 @@ def clean_folder_names(virtual_fs, working_path):
         if subfile.is_dir():
             # print(f"cleaning {subfile.name} in '{working_path}'")
             sub_name = subfile.name
-            cleaned_name = clean_filename(sub_name, working_path)
+            cleaned_name = clean_filename(sub_name)
             # print(f"\t{cleaned_name}")
             subfile.name = cleaned_name
-            clean_folder_names(subfile, os.path.join(working_path, sub_name))
+            clean_folder_names(subfile)
+
 
     return virtual_fs
 
+def clean_path(base_name, full_path):
+    out_dir_name = base_name
+    source_dir = Path(full_path)
+    parts = source_dir.parts
+
+    # process duplicate entries in the path
+    for part in parts:
+        if part in parts:
+            # print(f"Stripping {part} from {out_dir_name}")
+            out_dir_name = _strip_part_from_base(out_dir_name, part)
+            # print(f"got {out_dir_name}")
+
+    # cleanup whitespace
+    out_dir_name = out_dir_name.replace("(", " ")
+    out_dir_name = re.sub("\s+", " ", out_dir_name)
+    out_dir_name = re.sub("--", " ", out_dir_name)
+    out_dir_name = re.sub("-\s+-", " ", out_dir_name)
+    out_dir_name = out_dir_name.strip(PATH_EXTRAS)
+
+    # cleanup number only entries
+    out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
+
+    if len(out_dir_name) == 1:
+        out_dir_name = ""
+
+    return out_dir_name
+
+def remove_duplicate_folder_terms(virtual_fs, working_path):
+    for subfile in virtual_fs.subfolders.values():
+        if subfile.is_dir():
+            # print(f"cleaning {subfile.name} in '{working_path}'")
+            sub_name = subfile.name
+            cleaned_name = clean_path(sub_name, working_path)
+            # print(f"\t{cleaned_name}")
+            subfile.name = cleaned_name
+            remove_duplicate_folder_terms(subfile, os.path.join(working_path, sub_name))
+
+    return virtual_fs
 
 def count_terms(virtual_fs, terms_counter):
     """
@@ -569,15 +593,15 @@ def organize_fs(source: Path):
     virtual_fs = build_folder_structure(source)
     print(f"Total files: {virtual_fs.count_files()}")
 
-    # step 2: remove redundant terms and folders
+    # step 1: cleanup filenames
     print("\n\n------------")
-    print("Step 2: clean files")
-    virtual_fs = clean_folder_names(virtual_fs, virtual_fs.name)
+    print("Step 1: clean files")
+    virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
 
-    # step 1: group folders + files by similar terms (eg day, night, clean, etc)
-    print("Step 1: group files")
+    # step 2: group folders + files by similar terms (eg day, night, clean, etc)
+    print("Step 2: group files")
     virtual_fs = organize_groups(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
@@ -585,9 +609,15 @@ def organize_fs(source: Path):
 
     
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    # step 3: cleanup redundant file names
+    print("\n\n------------")
+    print("Step 3: clean files")
+    virtual_fs = remove_duplicate_folder_terms(virtual_fs, virtual_fs.name)
+    virtual_fs = reorganize_virtualfs(virtual_fs)
+    print(f"Total files: {virtual_fs.count_files()}")
 
     print("\n\n------------")
-    print("Step 2.5: remove excess base folders")
+    print("Step 3.5: remove excess base folders")
     virtual_fs = flatten_base_entries(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
