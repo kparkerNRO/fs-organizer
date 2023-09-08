@@ -1,5 +1,5 @@
 from pathlib import Path
-
+import filecmp
 
 class InsertException(Exception):
     pass
@@ -55,23 +55,25 @@ class VirtualFolder:
             raise InsertException
         return self.subfolders[path.name]
 
-    def add_virtual_subfolder(self, virtual_path):
+    def add_virtual_subfolder(self, virtual_path, overwrite_files = False, ignore_duplicates=True):
         if virtual_path.name not in self.subfolders:
             self.subfolders[virtual_path.name] = virtual_path
         else:
+            duplicate_path = self.subfolders[virtual_path.name]
             if isinstance(virtual_path, VirtualFolder):
                 for subfolder in virtual_path.subfolders.values():
-                    self.subfolders[virtual_path.name].add_virtual_subfolder(subfolder)
+                    duplicate_path.add_virtual_subfolder(subfolder)
             else:
-                raise InsertException
+                compare = filecmp.cmp(virtual_path.source_path, duplicate_path.source_path)
+                if not compare:
+                    raise InsertException
+                else:
+                    print("files are identical, ignoring overwrite")
         return self.subfolders[virtual_path.name]
 
     def add_file(self, path: Path):
-        if path.name not in self.subfolders:
-            self.subfolders[path.name] = VirtualFile(path)
-        else:
-            raise InsertException
-        return self.subfolders[path.name]
+        return self.add_virtual_subfolder(VirtualFile(path))
+        
 
     def get_subfolders_dict(self):
         subfolder_dict = {}

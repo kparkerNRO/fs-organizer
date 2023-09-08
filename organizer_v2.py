@@ -1,5 +1,5 @@
 from collections import defaultdict
-from virtual_folder import VirtualFile, build_folder_structure, VirtualFolder
+from virtual_folder import InsertException, VirtualFile, build_folder_structure, VirtualFolder
 from pathlib import Path
 import click
 import os
@@ -456,29 +456,43 @@ def count_terms(virtual_fs, terms_counter):
             terms_counter[subfile.name] += 1
             count_terms(subfile, terms_counter)
 
+def promote_grandchildren(root_folder:VirtualFolder, subfolder_name: str, grandchildren_to_promote:list):
+    """
+    promotes the named grandchildren from the supplied subfolder to the root folder
+    if the subfolder is empty after promotion, deletes it from the root folder
+    """
+    subfolder = root_folder.subfolders[subfolder_name]
+    granchildren = {grandname:subfolder.subfolders[grandname] for grandname in grandchildren_to_promote}
+    for grandname, grandchild in granchildren.items():
+            root_folder.add_virtual_subfolder(grandchild)
+
+
+    for grandname in grandchildren_to_promote:
+        subfolder.subfolders.pop(grandname)
+
+    if len(subfolder.subfolders) == 0:
+        root_folder.subfolders.pop(subfolder_name)
+    
 
 def flatten_base_entries(virtual_fs):
     """
     "base" folders should be at the bottom of the stack. If they
     containe subfolders, those folders should be promoted
     """
-    folders_to_promote = []
+    folders_to_promote = defaultdict(list)
 
-    for subfile in virtual_fs.subfolders.values():
-        keys_to_drop = set()
+    for sub_name, subfile in virtual_fs.subfolders.items():
         if subfile.is_dir():
             if subfile.name == "Base" and isinstance(subfile, VirtualFolder):
                 for key, grandfile in subfile.subfolders.items():
                     if grandfile.is_dir():
-                        folders_to_promote.append(grandfile)
-                        keys_to_drop.add(key)
+                        folders_to_promote[sub_name].append(key)
+                        
             flatten_base_entries(subfile)
             
-            for key in keys_to_drop:
-                subfile.subfolders.pop(key)
-    
-    for folder in folders_to_promote:
-        virtual_fs.add_virtual_subfolder(folder)
+            
+    for subfile, grandchildren in folders_to_promote.items():
+        promote_grandchildren(virtual_fs, subfile, grandchildren)
 
 
 
@@ -486,69 +500,40 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
 
     root = virtual_fs
 
-    new_children = defaultdict(list)
-    children_to_remove = set()
+    folders_to_promote = defaultdict(list) # subfile_name -> list of grandchildren
 
     # promote any grandchildren who outrank the child
     for index_name, subfile in root.subfolders.items():
         if subfile.is_dir():
             file_score = terms_counter[subfile.name]
-            grandchildren_to_remove = set()
+            # grandchildren_to_remove = set()
             for grand_index_name, grandsubfile in subfile.subfolders.items():
                 if grandsubfile.is_dir():
                     grandname = grandsubfile.name
                     grandscore = terms_counter[grandname]
                     if grandscore < file_score:
                         # promote the grandchild to a child, and insert a new generation
-                        new_children[grandname].append(grandsubfile)
                         grandsubfile.insert_intermediate_folder(subfile.name)
-                        grandchildren_to_remove.add(grand_index_name)
-            for granchild in grandchildren_to_remove:
-                subfile.subfolders.pop(granchild)
-            if len(subfile.subfolders) == 0:
-                # child is now an empty folder, and we remove it
-                children_to_remove.add(index_name)
-
-    for child in children_to_remove:
-        root.subfolders.pop(child)
-
-    # for our new children, merge any duplicate folder names
-    flattend_children = []
-    for _, new_child in new_children.items():
-        if len(new_child) > 1:
-            # subfiles = [subfile for child in new_child for subfile in child.subfiles.values()]
-            # flat_list = [item for sublist in list_of_lists for item in sublist]
-
-            subfiles = [child.subfolders.values() for child in new_child]
-            subfiles = [item for sublist in subfiles for item in sublist]
-            replaced_child = VirtualFolder(new_child[0].source_path, new_child[0].name)
-            for subfile in subfiles:
-                replaced_child.add_virtual_subfolder(subfile)
-            flattend_children.append(replaced_child)
-        else:
-            flattend_children.append(new_child[0])
-
-    # add the new children to our list
-    for new_child in flattend_children:
-        root.add_virtual_subfolder(new_child)
+                        folders_to_promote[index_name].append(grand_index_name)
+    for subfile_name, grandchildren in folders_to_promote.items():
+        promote_grandchildren(root, subfile_name, grandchildren)
 
     # recurse through the children
-    children_to_remove = set()
-    children_to_add = set()
-    for subfile in root.subfolders.values():
+
+    folders_to_promote = defaultdict(list) # subfile_name -> list of grandchildren
+
+    # recurse through the subfiles
+    for subname, subfile in root.subfolders.items():
         if subfile.is_dir():
             reorganize_tree(subfile, terms_counter)
 
             # after re-organizing, if there's only one folder at the next
             # level, remove it
             if len(subfile.subfolders) == 1:
-                children_to_add.add(list(subfile.subfolders.values())[0])
-                children_to_remove.add(subfile.name)
-
-    for remove in children_to_remove:
-        root.subfolders.pop(remove)
-    for add in children_to_add:
-        root.add_virtual_subfolder(add)
+                grandname, grandchild = list(subfile.subfolders.items())[0]
+                if isinstance(grandchild, VirtualFolder):
+                    great_grandchildren = list(grandchild.subfolders.keys())
+                    promote_grandchildren(subfile, grandname, great_grandchildren)
 
 
 def organize_fs(source: Path):
@@ -569,7 +554,12 @@ def organize_fs(source: Path):
     print("Step 2: clean files")
     clean_folder_names(virtual_fs, virtual_fs.name)
     virtual_fs = reorganize_virtualfs(virtual_fs)
-    # flatten_base_entries(virtual_fs)
+    print(f"Total files: {virtual_fs.count_files()}")
+    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+
+    print("\n\n------------")
+    print("Step 2.5: remove excess base folders")
+    flatten_base_entries(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
