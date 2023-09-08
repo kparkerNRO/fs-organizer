@@ -1,6 +1,7 @@
 from pathlib import Path
 import filecmp
 
+
 class InsertException(Exception):
     pass
 
@@ -55,7 +56,9 @@ class VirtualFolder:
             raise InsertException
         return self.subfolders[path.name]
 
-    def add_virtual_subfolder(self, virtual_path, overwrite_files = False, ignore_duplicates=True):
+    def add_virtual_subfolder(
+        self, virtual_path, overwrite_files=False, ignore_duplicates=True
+    ):
         if virtual_path.name not in self.subfolders:
             self.subfolders[virtual_path.name] = virtual_path
         else:
@@ -64,21 +67,19 @@ class VirtualFolder:
                 for subfolder in virtual_path.subfolders.values():
                     duplicate_path.add_virtual_subfolder(subfolder)
             else:
-                compare = filecmp.cmp(virtual_path.source_path, duplicate_path.source_path)
+                compare = filecmp.cmp(
+                    virtual_path.source_path, duplicate_path.source_path
+                )
                 if not compare:
                     raise InsertException
-                else:
-                    print("files are identical, ignoring overwrite")
         return self.subfolders[virtual_path.name]
 
     def add_file(self, path: Path):
         return self.add_virtual_subfolder(VirtualFile(path))
-        
 
     def get_subfolders_dict(self):
         subfolder_dict = {}
         for subfolder_name, subfolder in self.subfolders.items():
-            # if isinstance(subfolder, VirtualFolder):
             subfolder_dict[subfolder.name] = subfolder.get_subfolders_dict()
         return subfolder_dict
 
@@ -91,10 +92,6 @@ class VirtualFolder:
         return output_dict
 
     def insert_intermediate_folder(self, name):
-        # TODO check to see if the intermediate name is actually
-        # in the subfiles already
-        # if name in self.subfolders:
-        #     return
         intermediate_folder = VirtualFolder(path=None, name=name)
         intermediate_folder.subfolders = self.subfolders
         self.subfolders = {name: intermediate_folder}

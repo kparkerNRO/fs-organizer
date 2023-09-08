@@ -1,5 +1,10 @@
 from collections import defaultdict
-from virtual_folder import InsertException, VirtualFile, build_folder_structure, VirtualFolder
+from virtual_folder import (
+    InsertException,
+    VirtualFile,
+    build_folder_structure,
+    VirtualFolder,
+)
 from pathlib import Path
 import click
 import os
@@ -229,6 +234,8 @@ def organize_groups(virtual_fs: VirtualFolder):
             subfile.name = cleaned_name
             organize_groups(subfile)
 
+    return virtual_fs
+
 
 def list_to_dict(dict_out, lst, file):
     """
@@ -449,30 +456,41 @@ def clean_folder_names(virtual_fs, working_path):
             subfile.name = cleaned_name
             clean_folder_names(subfile, os.path.join(working_path, sub_name))
 
+    return virtual_fs
+
 
 def count_terms(virtual_fs, terms_counter):
+    """
+    recursively count the number of times each term appears in the
+    folder structure
+    """
     for subfile in virtual_fs.subfolders.values():
         if subfile.is_dir():
             terms_counter[subfile.name] += 1
             count_terms(subfile, terms_counter)
 
-def promote_grandchildren(root_folder:VirtualFolder, subfolder_name: str, grandchildren_to_promote:list):
+
+def promote_grandchildren(
+    root_folder: VirtualFolder, subfolder_name: str, grandchildren_to_promote: list
+):
     """
     promotes the named grandchildren from the supplied subfolder to the root folder
     if the subfolder is empty after promotion, deletes it from the root folder
     """
     subfolder = root_folder.subfolders[subfolder_name]
-    granchildren = {grandname:subfolder.subfolders[grandname] for grandname in grandchildren_to_promote}
+    granchildren = {
+        grandname: subfolder.subfolders[grandname]
+        for grandname in grandchildren_to_promote
+    }
     for grandname, grandchild in granchildren.items():
-            root_folder.add_virtual_subfolder(grandchild)
-
+        root_folder.add_virtual_subfolder(grandchild)
 
     for grandname in grandchildren_to_promote:
         subfolder.subfolders.pop(grandname)
 
     if len(subfolder.subfolders) == 0:
         root_folder.subfolders.pop(subfolder_name)
-    
+
 
 def flatten_base_entries(virtual_fs):
     """
@@ -487,22 +505,21 @@ def flatten_base_entries(virtual_fs):
                 for key, grandfile in subfile.subfolders.items():
                     if grandfile.is_dir():
                         folders_to_promote[sub_name].append(key)
-                        
+
             flatten_base_entries(subfile)
-            
-            
+
     for subfile, grandchildren in folders_to_promote.items():
         promote_grandchildren(virtual_fs, subfile, grandchildren)
 
+    return virtual_fs
 
 
 def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
 
     root = virtual_fs
 
-    folders_to_promote = defaultdict(list) # subfile_name -> list of grandchildren
-
     # promote any grandchildren who outrank the child
+    folders_to_promote = defaultdict(list)  # subfile_name -> list of grandchildren
     for index_name, subfile in root.subfolders.items():
         if subfile.is_dir():
             file_score = terms_counter[subfile.name]
@@ -519,10 +536,7 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
         promote_grandchildren(root, subfile_name, grandchildren)
 
     # recurse through the children
-
-    folders_to_promote = defaultdict(list) # subfile_name -> list of grandchildren
-
-    # recurse through the subfiles
+    folders_to_promote = defaultdict(list)  # subfile_name -> list of grandchildren
     for subname, subfile in root.subfolders.items():
         if subfile.is_dir():
             reorganize_tree(subfile, terms_counter)
@@ -534,6 +548,7 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
                 if isinstance(grandchild, VirtualFolder):
                     great_grandchildren = list(grandchild.subfolders.keys())
                     promote_grandchildren(subfile, grandname, great_grandchildren)
+    return virtual_fs
 
 
 def organize_fs(source: Path):
@@ -544,7 +559,7 @@ def organize_fs(source: Path):
 
     # step 1: group folders + files by similar terms (eg day, night, clean, etc)
     print("Step 1: group files")
-    organize_groups(virtual_fs)
+    virtual_fs = organize_groups(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
@@ -552,14 +567,14 @@ def organize_fs(source: Path):
     # step 2: remove redundant terms and folders
     print("\n\n------------")
     print("Step 2: clean files")
-    clean_folder_names(virtual_fs, virtual_fs.name)
+    virtual_fs = clean_folder_names(virtual_fs, virtual_fs.name)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
     print("\n\n------------")
     print("Step 2.5: remove excess base folders")
-    flatten_base_entries(virtual_fs)
+    virtual_fs = flatten_base_entries(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
@@ -568,7 +583,7 @@ def organize_fs(source: Path):
     print("Step 3: reorganize")
     term_counter = defaultdict(int)
     count_terms(virtual_fs, term_counter)
-    reorganize_tree(virtual_fs, term_counter)
+    virtual_fs = reorganize_tree(virtual_fs, term_counter)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
