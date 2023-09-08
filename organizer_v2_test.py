@@ -17,7 +17,7 @@ def build_virtual_fs_recursive(root_node: VirtualFolder, structure: dict):
         if data:
             build_virtual_fs_recursive(folder, data)
         else:
-            folder.add_file(Path("."))
+            folder.add_file(Path("./testfile.txt"))
 
 
 def build_virtual_fs(structure: dict):
@@ -126,23 +126,81 @@ class TestOrganizeGroups:
         expected_results = {
             "root": {
                 "A wild/test one": {
-                    "test data/1": {"": ""},
-                    "test data/2": {"": ""},
+                    "test data/1": {"testfile.txt": ""},
+                    "test data/2": {"testfile.txt": ""},
                 },
                 "A wild/test three": {
-                    "test data/1": {"": ""},
-                    "test data/2": {"": ""},
+                    "test data/1": {"testfile.txt": ""},
+                    "test data/2": {"testfile.txt": ""},
                 },
                 "A wild/two": {
-                    "test data/1": {"": ""},
-                    "test data/2": {"": ""},
+                    "test data/1": {"testfile.txt": ""},
+                    "test data/2": {"testfile.txt": ""},
                 },
                 "A wild/four": {
-                    "test data/1": {"": ""},
-                    "test data/2": {"": ""},
+                    "test data/1": {"testfile.txt": ""},
+                    "test data/2": {"testfile.txt": ""},
                 },
             }
         }
 
         assert output_structure == expected_results
 
+
+class TestReorganizeFs:
+    def test_basic(self):
+        test_structure = {
+            "A wild/test one": {
+                "test data/1": {},
+                "test data/2": {},
+            },
+            "A wild/test three": {
+                "test data/1": {},
+                "test data/2": {},
+            },
+            "A wild/two": {
+                "test data/1": {},
+                "test data/2": {},
+            },
+            "A wild/four": {
+                "test data/1": {},
+                "test data/2": {},
+            },
+        }
+
+        expected_results = {
+            "root": {
+                "A wild": {
+                    "test one": {
+                        "test data": {
+                            "1": {"testfile.txt": ""},
+                            "2": {"testfile.txt": ""},
+                        }
+                    },
+                    "test three": {
+                        "test data": {
+                            "1": {"testfile.txt": ""},
+                            "2": {"testfile.txt": ""},
+                        }
+                    },
+                    "two": {
+                        "test data": {
+                            "1": {"testfile.txt": ""},
+                            "2": {"testfile.txt": ""},
+                        }
+                    },
+                    "four": {
+                        "test data": {
+                            "1": {"testfile.txt": ""},
+                            "2": {"testfile.txt": ""},
+                        }
+                    },
+                }
+            }
+        }
+
+        test_fs = build_virtual_fs(test_structure)
+        results = organizer.reorganize_virtualfs(test_fs)
+        output_structure = results.get_folders_dict()
+
+        assert output_structure == expected_results
