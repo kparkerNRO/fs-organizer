@@ -286,14 +286,15 @@ def dict_to_virtualfs_nodes(input_dict: dict):
     returns a list of VirtualFolder nodes
     """
 
-    # pprint(input_dict)
     output_list = []
     for name, data in input_dict.items():
         if isinstance(data, (VirtualFile, VirtualFolder)):
             if isinstance(data, VirtualFolder):
-                root_folder = update_virtual_folder(data, name)
-                if not root_folder:
-                    continue
+                root_folder = VirtualFolder(data.source_path, name)
+
+                for _, folder in data.subfolders.items():
+                    root_folder.add_virtual_subfolder(folder)
+
             else:
                 root_folder = VirtualFile(data.source_path)
 
@@ -310,7 +311,7 @@ def dict_to_virtualfs_nodes(input_dict: dict):
     return output_list
 
 
-def reorganize_virtualfs(virtual_fs: VirtualFolder):
+def reorganize_virtualfs_old(virtual_fs: VirtualFolder):
     """
     creates a new virtual fs based on the existing one, where
     folder names that include a path seperator get exploded into
@@ -330,13 +331,13 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder):
             list_to_dict(new_structure[head], tail, subfile)
         # if the subfile name is an empty string, 
         # we should promote the grandchild to this level
-        # or something's gone very wrong
         elif not subfile.name:
             if isinstance(subfile, VirtualFolder):
                 for grandfile in subfile.subfolders.values():
-                    new_grandfile = reorganize_virtualfs(grandfile)
+                    new_grandfile = reorganize_virtualfs_old(grandfile)
                     new_structure[new_grandfile.name] = new_grandfile
             else:
+                # or something's gone very wrong
                 raise FSException(grandfile)
         else:
             new_structure[subfile.name] = subfile
@@ -347,10 +348,44 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder):
     new_root = VirtualFolder(virtual_fs.source_path, virtual_fs.name)
     for new_subfolder in new_fs_list:
         if isinstance(new_subfolder, VirtualFolder):
-            new_subfolder = reorganize_virtualfs(new_subfolder)
+            new_subfolder = reorganize_virtualfs_old(new_subfolder)
         new_root.add_virtual_subfolder(new_subfolder)
 
     return new_root
+
+def reorganize_virtualfs(virtual_fs: VirtualFolder, new_root: VirtualFolder = None):
+    
+    if not new_root:
+        new_root = VirtualFolder(virtual_fs.source_path, virtual_fs.name)
+
+    for subname, subfile in virtual_fs.subfolders.items():
+        if isinstance(subfile, VirtualFile):
+            new_root.add_virtual_subfolder(subfile)
+        elif not subfile.name:
+            reorganize_virtualfs(subfile, new_root)
+        else:
+            working_folder = new_root
+
+            if os.sep in subfile.name:
+                parts = subfile.name.split(os.sep)
+                for part in parts:
+                    if part not in working_folder.subfolders:
+                        new_folder = VirtualFolder(None, part)
+                        working_folder.add_virtual_subfolder(new_folder)
+                    working_folder = working_folder.subfolders[part]
+            
+            else:
+                if subfile.name not in working_folder.subfolders:
+                    new_folder = VirtualFolder(None, subfile.name)
+                    working_folder.add_virtual_subfolder(new_folder)
+                working_folder = working_folder.subfolders[subfile.name]
+
+            
+            reorganize_virtualfs(subfile, working_folder)
+
+    return new_root
+
+
 
 
 def clean_filename(base_name):
@@ -509,6 +544,8 @@ def promote_grandchildren(
     if len(subfolder.subfolders) == 0:
         root_folder.subfolders.pop(subfolder_name)
 
+    return grandnames_to_remove
+
 
 def remove_extra_folders(virtual_fs):
     """
@@ -542,8 +579,16 @@ def remove_extra_folders(virtual_fs):
 
                 remove_extra_folders(subfile)
 
+        unpromoted_folders = []
         for subfile, grandchildren in folders_to_promote.items():
-            promote_grandchildren(virtual_fs, subfile, grandchildren)
+            promoted_grandchildren = promote_grandchildren(virtual_fs, subfile, grandchildren)
+            if len(promoted_grandchildren) != len (grandchildren):
+                # promotion failed, and we need to not count this directory
+                current_unpromoted = [x for x in grandchildren if x not in promoted_grandchildren]
+                unpromoted_folders.extend(current_unpromoted)
+
+        for unpromoted in unpromoted_folders:
+            folders_to_promote.pop(unpromoted)
 
         # remove any empty directories
         for subname in empty_subfolders:

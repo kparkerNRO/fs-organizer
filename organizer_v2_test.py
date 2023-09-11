@@ -1,5 +1,6 @@
+import tempfile
 from pytest import skip
-from virtual_folder import VirtualFolder
+from virtual_folder import VirtualFile, VirtualFolder
 import organizer_v2 as organizer
 import logging
 from pathlib import Path
@@ -12,15 +13,39 @@ log.setLevel("INFO")
 TESTFILE_DICT = {"testfile.txt": ""}
 
 
+def create_virtual_file(input, key=""):
+    if isinstance(input, str):
+        vf = VirtualFile(Path(input))
+    if isinstance(input, Path):
+        vf = VirtualFile(input)
+    if isinstance(input, VirtualFile):
+        vf = input
+
+    if key:
+        vf.name = key
+
+    return vf
+
+
 def build_virtual_fs_recursive(root_node: VirtualFolder, structure: dict):
+    if isinstance(structure, VirtualFile):
+        return structure
+
     for key, data in structure.items():
         folder = VirtualFolder(path=None, name=key)
         root_node.add_virtual_subfolder(folder)
-        if isinstance(data, str):
-            folder.add_file(Path(data))
+        if isinstance(data, (str, Path, VirtualFile)):
+            root_node.subfolders.pop(key, None)
+            virtual_node = create_virtual_file(data, key)
+            root_node.add_virtual_subfolder(virtual_node)
         elif isinstance(data, set):
             for entry in data:
-                folder.add_file(Path(entry))
+                if isinstance(data, (Path, VirtualFile)):
+                    root_node.subfolders.pop(key, None)
+                    virtual_node = create_virtual_file(entry)
+                    root_node.add_virtual_subfolder(virtual_node)
+                else:
+                    folder.add_file(Path(entry))
         elif data is None:
             continue
         elif data:
@@ -29,8 +54,8 @@ def build_virtual_fs_recursive(root_node: VirtualFolder, structure: dict):
             folder.add_file(Path("./testfile.txt"))
 
 
-def build_virtual_fs(structure: dict):
-    folder = VirtualFolder(path=None, name="root")
+def build_virtual_fs(structure: dict, root_name="root"):
+    folder = VirtualFolder(path=None, name=root_name)
     build_virtual_fs_recursive(folder, structure)
     return folder
 
@@ -377,6 +402,50 @@ class TestReorganizeFs:
 
         assert output_structure == expected_results
 
+    def test_no_splitting(self):
+        test_structure = {"test_data": {"one": {"two": "two"}}}
+
+        expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
+
+        test_fs = build_virtual_fs(test_structure)
+        results = organizer.reorganize_virtualfs(test_fs)
+        output_structure = results.get_folders_dict()
+
+        assert output_structure == expected_results
+
+    def test_mixed_splitting(self):
+        test_structure = {"test_data": {"one/three": {"two": "two"}}}
+
+        expected_results = {"root": {"test_data": {"one": {"three": {"two": ""}}}}}
+
+        test_fs = build_virtual_fs(test_structure)
+        results = organizer.reorganize_virtualfs(test_fs)
+        output_structure = results.get_folders_dict()
+
+        assert output_structure == expected_results
+
+    def test_empty_name(self):
+        test_structure = {"test_data": {"one": {"": {"two": "two"}}}}
+
+        expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
+
+        test_fs = build_virtual_fs(test_structure)
+        results = organizer.reorganize_virtualfs(test_fs)
+        output_structure = results.get_folders_dict()
+
+        assert output_structure == expected_results
+
+    def test_multi_level_empty_name(self):
+        test_structure = {"test_data": {"one": {"": {"" :{"two": "two"}}}}}
+
+        expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
+
+        test_fs = build_virtual_fs(test_structure)
+        results = organizer.reorganize_virtualfs(test_fs)
+        output_structure = results.get_folders_dict()
+
+        assert output_structure == expected_results
+
 
 class TestReorganizeTree:
     def test_inversion(self):
@@ -476,6 +545,7 @@ class TestReorganizeTree:
 
         assert result_tree == expected_result
 
+
 class TestRemoveExtraFolders:
     def test_promote_base_subfolder(self):
         test_structure = {
@@ -505,10 +575,7 @@ class TestRemoveExtraFolders:
 
     def test_leave_base_with_files(self):
         test_structure = {
-            "test": {
-                    "base": {"one", "two"}, 
-                    "test2": {"sample_file": {}}
-                 }
+            "test": {"base": {"one", "two"}, "test2": {"sample_file": {}}}
         }
 
         expected_output = {
@@ -522,32 +589,38 @@ class TestRemoveExtraFolders:
         assert result_tree == expected_output
 
     def test_promote_base_subfolder_plus_companion(self):
-        test_structure = {
-            "test": {
-                "base": {
-                    "first": {"sample_file": "one", "sample_file2": "three"},
-                    "second_sample": "two",
-                },
-            }
-        }
+        with tempfile.NamedTemporaryFile() as file, tempfile.NamedTemporaryFile() as file2:
+            filePath = Path(file.name)
+            basename = filePath.name
 
-        expected_output = {
-            "root": {
+            filePath2 = Path(file2.name)
+            basename2 = filePath2.name
+            test_structure = {
                 "test": {
-                    "first": {
-                        "sample_file": {"one": ""},
-                        "sample_file2": {"three": ""},
+                    "base": {
+                        "first": {"sample_file": filePath, "sample_file2": filePath2},
+                        "second_sample": filePath,
                     },
-                    "second_sample": {"two": ""},
                 }
             }
-        }
 
-        virtual_fs = build_virtual_fs(test_structure)
-        result = organizer.remove_extra_folders(virtual_fs)
-        result_tree = result.get_folders_dict()
+            expected_output = {
+                "root": {
+                    "test": {
+                        "first": {
+                            "sample_file": "",
+                            "sample_file2": "",
+                        },
+                        "second_sample": "",
+                    }
+                }
+            }
 
-        assert result_tree == expected_output
+            virtual_fs = build_virtual_fs(test_structure)
+            result = organizer.remove_extra_folders(virtual_fs)
+            result_tree = result.get_folders_dict()
+
+            assert result_tree == expected_output
 
     def test_promote_base_subfolder_plus_file(self):
         test_structure = {
@@ -630,13 +703,84 @@ class TestRemoveExtraFolders:
 
         assert result_tree == expected_output
 
-class TestPromoteGrandchildren:
+    def test_nested_bases(self):
+        test_structure = {
+            "base": {
+                "base": {"base": {"sample_file": {}}},
+                "test2": {},
+            },
+            "test1": {},
+        }
 
+        expected_output = {
+            "test": {
+                "base": {
+                    "base": {"sample_file": TESTFILE_DICT},
+                    "test2": TESTFILE_DICT,
+                },
+                "test1": TESTFILE_DICT,
+            }
+        }
+
+        virtual_fs = build_virtual_fs(test_structure, "test")
+        result = organizer.remove_extra_folders(virtual_fs)
+        result_tree = result.get_folders_dict()
+
+        assert result_tree == expected_output
+
+
+class TestPromoteGrandchildren:
     def test_base(self):
-        pass
+        test_data = {"child": {"grandfile1", "grandfile2"}}
+
+        expected = {"root": {"grandfile1": "", "grandfile2": ""}}
+
+        virtual_fs = build_virtual_fs(test_data)
+        organizer.promote_grandchildren(
+            virtual_fs, "child", ["grandfile1", "grandfile2"]
+        )
+        result_tree = virtual_fs.get_folders_dict()
+
+        assert result_tree == expected
 
     def test_duplicate_file(self):
-        pass
+        with tempfile.NamedTemporaryFile() as file:
+            filename = file.name
+            filePath = Path(filename)
+            basenname = filePath.name
+            test_data = {
+                "child": {filePath},
+            }
+
+            expected = {"root": {basenname: ""}}
+
+            virtual_fs = build_virtual_fs(test_data)
+            virtual_fs.add_file(filePath)
+
+            organizer.promote_grandchildren(virtual_fs, "child", [basenname])
+            result_tree = virtual_fs.get_folders_dict()
+
+            assert result_tree == expected
 
     def test_duplicate_filename(self):
-        pass
+        with tempfile.NamedTemporaryFile() as file1, tempfile.NamedTemporaryFile() as file2:
+            filename = file1.name
+            filePath = Path(filename)
+            basenname = filePath.name
+
+            # write some junk data so they're different files
+            file1.write(b"test")
+            file1.flush()
+
+            dupe_file = VirtualFile(Path(file2.name))
+            dupe_file.name = basenname
+            test_data = {"child": {basenname: filePath}, basenname: dupe_file}
+
+            expected = {"root": {"child": {basenname: ""}, basenname: ""}}
+
+            virtual_fs = build_virtual_fs(test_data)
+
+            organizer.promote_grandchildren(virtual_fs, "child", [basenname])
+            result_tree = virtual_fs.get_folders_dict()
+
+            assert result_tree == expected

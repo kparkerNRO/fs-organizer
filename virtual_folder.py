@@ -39,10 +39,10 @@ class VirtualFile:
 
 
 class VirtualFolder:
-    def __init__(self, path: Path, name: str = ""):
+    def __init__(self, path: Path, name: str = None):
         self.source_path = path
 
-        if name:
+        if name is not None:
             self.name = name
         else:
             self.name = path.name
@@ -68,7 +68,8 @@ class VirtualFolder:
             if isinstance(virtual_path, VirtualFolder):
                 # merge subfolders if the name is a duplicate
                 for subfolder in virtual_path.subfolders.values():
-                    duplicate_path.add_virtual_subfolder(subfolder)
+                        duplicate_path.add_virtual_subfolder(subfolder)
+
             else:
                 # check to see if the files are duplicates. If so
                 # we can ignore the insertion
