@@ -39,6 +39,7 @@ grouping_exceptions = (
     "Lair of the",
     "Tower of",
     "The ruins of",
+    "The"
 )
 
 class FSException(Exception):
@@ -176,8 +177,7 @@ def group_similar_folders(folder: VirtualFolder):
                 if (
                     # computed_token != first_token
                     # and
-                    computed_token
-                    not in grouping_exceptions
+                    computed_token not in grouping_exceptions
                 ):
                     # if we've found a token with overlap, save it
                     working_token = computed_token
@@ -226,6 +226,17 @@ def group_similar_folders(folder: VirtualFolder):
                 token_to_filenames[token1] |= token_to_filenames[token2]
                 token_to_filenames[token2] = {}
 
+    # if everyone is a base, no one is
+    for _, files in token_to_filenames.items():
+        files_in_set = [names_to_replacement[file] for file in files]
+        all_base = [v[-1] == "Base" for v in files_in_set]
+        res = all(all_base)
+
+        if res:
+            for item in files_in_set:
+                if len(item) > 1:
+                    item.remove("Base")            
+
     return names_to_replacement
 
 
@@ -241,6 +252,7 @@ def organize_groups(virtual_fs: VirtualFolder):
         if subfile.is_dir():
             sub_name = subfile.name
             sub_paths = names_to_replace[sub_name]
+            
             cleaned_name = os.path.join(*sub_paths)
 
             subfile.name = cleaned_name
@@ -658,13 +670,18 @@ def organize_fs(source: Path):
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
+    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+
 
     # step 2: group folders + files by similar terms (eg day, night, clean, etc)
     print("Step 2: group files", flush=True)
     virtual_fs = organize_groups(virtual_fs)
+    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+
+
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(True), indent=4))
+    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
     # step 3: cleanup redundant file names
@@ -674,14 +691,14 @@ def organize_fs(source: Path):
     virtual_fs = reorganize_virtualfs(virtual_fs)
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
-    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
     print(f"Total files: {virtual_fs.count_files()}")
 
     print("\n\n------------")
     print("Step 3.5: remove excess base folders", flush=True)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # step 3: organize the folders by term likelyhood
     print("\n\n------------")
@@ -693,7 +710,7 @@ def organize_fs(source: Path):
     virtual_fs = reorganize_tree(virtual_fs, term_counter)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(True), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # step 4: profit?
 
