@@ -41,6 +41,9 @@ grouping_exceptions = (
     "The ruins of",
 )
 
+class FSException(Exception):
+    def __init__(self, invalid_file) -> None:
+        self.invalid_file = invalid_file
 
 def _strip_part_from_base(base_name, part):
     """
@@ -250,36 +253,18 @@ def list_to_dict(dict_out, lst, file):
     """
     convert a list into a heirarchical dictionary
     """
-    # print(dict_out)
     if not lst:
         return file
     else:
         head, *tail = lst
-        # print(head)
-        # print(tail)
         dict_out[head] = list_to_dict({}, tail, file)
 
-        # pprint(dict_out)
-        # print()
         return dict_out
 
 
 def update_virtual_folder(data: VirtualFolder, name):
     root_folder = VirtualFolder(data.source_path, name)
 
-    # if there is only one subfolder, drop the subfolder, and
-    # move its contents up
-    # if len(data.subfolders) == 1:
-    #     next_value = list(data.subfolders.values())[0]
-    #     if isinstance(next_value, VirtualFile):
-    #         root_folder.add_virtual_subfolder(next_value)
-    #     else:
-    #         for _, folder in next_value.subfolders.items():
-    #             root_folder.add_virtual_subfolder(folder)
-    # elif len(data.subfolders) == 0:
-    #     # if there are no subfolders, drop the entry entirely
-    #     return None
-    # else:
     for _, folder in data.subfolders.items():
         root_folder.add_virtual_subfolder(folder)
 
@@ -304,8 +289,6 @@ def dict_to_virtualfs_nodes(input_dict: dict):
     # pprint(input_dict)
     output_list = []
     for name, data in input_dict.items():
-        # print(f"Key: {key}")
-        # print(f"Values: {values}")
         if isinstance(data, (VirtualFile, VirtualFolder)):
             if isinstance(data, VirtualFolder):
                 root_folder = update_virtual_folder(data, name)
@@ -345,15 +328,16 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder):
             parts = subfile.name.split(os.sep)
             head, *tail = parts
             list_to_dict(new_structure[head], tail, subfile)
-        # if the subfile name is an empty string, it's either a weird file
-        # or we should promote the grandchild to this level
+        # if the subfile name is an empty string, 
+        # we should promote the grandchild to this level
+        # or something's gone very wrong
         elif not subfile.name:
             if isinstance(subfile, VirtualFolder):
                 for grandfile in subfile.subfolders.values():
                     new_grandfile = reorganize_virtualfs(grandfile)
                     new_structure[new_grandfile.name] = new_grandfile
             else:
-                new_structure["Unknown"] = grandfile
+                raise FSException(grandfile)
         else:
             new_structure[subfile.name] = subfile
 
@@ -373,7 +357,6 @@ def clean_filename(base_name):
     """
     Handles a bunch of standardized cleanup for junk that ends up in folder names
     """
-    # print(f"\tstarting with '{full_path}' - '{base_name}'")
     out_dir_name = base_name
     # remove myairbrigde tags
     if "myairbridge" in base_name:
@@ -428,22 +411,19 @@ def clean_filename(base_name):
     if len(out_dir_name) == 1:
         out_dir_name = ""
 
-    # print(f"\treturning '{out_dir_name}'")
 
     return out_dir_name
 
 
-def clean_folder_names(virtual_fs):
+def clean_folder_names(virtual_fs:VirtualFolder):
     """
     Standardize file names and remove duplicate terms from the path
     """
 
     for subfile in virtual_fs.subfolders.values():
         if subfile.is_dir():
-            # print(f"cleaning {subfile.name} in '{working_path}'")
             sub_name = subfile.name
             cleaned_name = clean_filename(sub_name)
-            # print(f"\t{cleaned_name}")
             subfile.name = cleaned_name
             clean_folder_names(subfile)
 
@@ -455,12 +435,13 @@ def clean_path(base_name, full_path):
     source_dir = Path(full_path)
     parts = source_dir.parts
 
+    if base_name == "Base":
+        return base_name
+
     # process duplicate entries in the path
     for part in parts:
         if part in parts:
-            # print(f"Stripping {part} from {out_dir_name}")
             out_dir_name = _strip_part_from_base(out_dir_name, part)
-            # print(f"got {out_dir_name}")
 
     # cleanup whitespace
     out_dir_name = out_dir_name.replace("(", " ")
@@ -481,13 +462,11 @@ def clean_path(base_name, full_path):
 def remove_duplicate_folder_terms(virtual_fs, working_path):
     for subfile in virtual_fs.subfolders.values():
         if subfile.is_dir():
-            # print(f"cleaning {subfile.name} in '{working_path}'")
             sub_name = subfile.name
             cleaned_name = clean_path(sub_name, working_path)
-            # print(f"\t{cleaned_name}")
             subfile.name = cleaned_name
             remove_duplicate_folder_terms(subfile, os.path.join(working_path, sub_name))
-
+    
     return virtual_fs
 
 
@@ -524,7 +503,7 @@ def promote_grandchildren(
             print(f"\t{e.source_path}")
             print(f"\t{e.target_path}")
 
-    for grandname in grandchildren_to_promote:
+    for grandname in grandnames_to_remove:
         subfolder.subfolders.pop(grandname)
 
     if len(subfolder.subfolders) == 0:
@@ -554,13 +533,12 @@ def remove_extra_folders(virtual_fs):
                         if grandfile.is_dir():
                             folders_to_promote[sub_name].append(key)
                 elif len(subfile.subfolders) == 1:
-                    if len(subfile.subfolders) == 1:
-                        grandname, grandchild = list(subfile.subfolders.items())[0]
-                        if isinstance(grandchild, VirtualFolder):
-                            great_grandchildren = list(grandchild.subfolders.keys())
-                            promote_grandchildren(subfile, grandname, great_grandchildren)
+                    grandname, grandchild = list(subfile.subfolders.items())[0]
+                    if isinstance(grandchild, VirtualFolder):
+                        great_grandchildren = list(grandchild.subfolders.keys())
+                        promote_grandchildren(subfile, grandname, great_grandchildren)
                 elif len(subfile.subfolders) == 0:
-                        empty_subfolders.append(subfile)
+                        empty_subfolders.append(sub_name)
 
                 remove_extra_folders(subfile)
 
@@ -625,55 +603,52 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
 def organize_fs(source: Path):
     import json
 
-    print("Step 0: build the virtual FS")
+    print("Step 0: build the virtual FS", flush=True)
     virtual_fs = build_folder_structure(source)
     print(f"Total files: {virtual_fs.count_files()}")
 
     # step 1: cleanup filenames
     print("\n\n------------")
-    print("Step 1: clean files")
+    print("Step 1: clean files", flush=True)
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
 
     # step 2: group folders + files by similar terms (eg day, night, clean, etc)
-    print("Step 2: group files")
+    print("Step 2: group files", flush=True)
     virtual_fs = organize_groups(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(True), indent=4))
 
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
     # step 3: cleanup redundant file names
     print("\n\n------------")
-    print("Step 3: clean files again")
+    print("Step 3: clean files again", flush=True)
     virtual_fs = remove_duplicate_folder_terms(virtual_fs, virtual_fs.name)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
+    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
     print(f"Total files: {virtual_fs.count_files()}")
 
     print("\n\n------------")
-    print("Step 3.5: remove excess base folders")
+    print("Step 3.5: remove excess base folders", flush=True)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
 
     # step 3: organize the folders by term likelyhood
     print("\n\n------------")
-    print("Step 3: reorganize")
+    print("Step 4: reorganize", flush=True)
     term_counter = defaultdict(int)
     count_terms(virtual_fs, term_counter)
-    print(json.dumps(term_counter, indent=4))
+    # print(json.dumps(term_counter, indent=4))
 
     virtual_fs = reorganize_tree(virtual_fs, term_counter)
     virtual_fs = remove_extra_folders(virtual_fs)
-    first_reorg = virtual_fs.get_folders_dict(False)
-    # print(json.dumps(first_reorg, indent=4))
-
-    virtual_fs = reorganize_tree(virtual_fs, term_counter)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(False), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(True), indent=4))
 
     # step 4: profit?
 
