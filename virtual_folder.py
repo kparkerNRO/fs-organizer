@@ -3,7 +3,9 @@ import filecmp
 
 
 class InsertException(Exception):
-    pass
+    def __init__(self, source_path: Path, target_path: Path):
+        self.source_path = source_path
+        self.target_path = target_path
 
 
 class VirtualFile:
@@ -17,10 +19,10 @@ class VirtualFile:
     def is_file(self):
         return True
 
-    def get_subfolders_dict(self):
+    def get_subfolders_dict(self, show_files=True):
         return ""
 
-    def get_folders_dict(self):
+    def get_folders_dict(self, show_files=True):
         return self.name
 
     def __str__(self) -> str:
@@ -28,6 +30,9 @@ class VirtualFile:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def __eq__(self, __value: object) -> bool:
+        return self.name == __value.name
 
     def count_files(self):
         return 1
@@ -71,19 +76,25 @@ class VirtualFolder:
                     virtual_path.source_path, duplicate_path.source_path
                 )
                 if not compare:
-                    raise InsertException
+                    raise InsertException(
+                        virtual_path.source_path, duplicate_path.source_path
+                    )
         return self.subfolders[virtual_path.name]
 
-    def get_subfolders_dict(self):
+    def get_subfolders_dict(self, show_files=True):
         subfolder_dict = {}
         for subfolder_name, subfolder in self.subfolders.items():
-            subfolder_dict[subfolder.name] = subfolder.get_subfolders_dict()
+            if (not show_files) and isinstance(subfolder, VirtualFile):
+                continue
+            subfolder_dict[subfolder.name] = subfolder.get_subfolders_dict(show_files)
         return subfolder_dict
 
-    def get_folders_dict(self):
+    def get_folders_dict(self, show_files=True):
         subfolder_dict = {}
         for subfolder in self.subfolders.values():
-            subfolder_dict[subfolder.name] = subfolder.get_subfolders_dict()
+            if (not show_files) and isinstance(subfolder, VirtualFile):
+                continue
+            subfolder_dict[subfolder.name] = subfolder.get_subfolders_dict(show_files)
 
         output_dict = {self.name: subfolder_dict}
         return output_dict
@@ -105,6 +116,18 @@ class VirtualFolder:
 
     def __repr__(self) -> str:
         return self.__str__()
+
+    def __eq__(self, value: object) -> bool:
+        if self.name == value.name and len(self.subfolders) == len(value.subfolders):
+            subfolder_matches = 0
+            for name, subfolder in self.subfolders.items():
+                if name not in value.subfolders or subfolder != value.subfolders[name]:
+                    return False
+                else:
+                    subfolder_matches += 1
+            return subfolder_matches == len(self.subfolders)
+
+        return False
 
 
 def build_folder_structure(root_path: Path):
