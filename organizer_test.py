@@ -1,6 +1,6 @@
 import tempfile
 from virtual_folder import VirtualFile, VirtualFolder
-import organizer_v2 as organizer_v2
+import organizer as organizer
 import logging
 from pathlib import Path
 import json
@@ -71,7 +71,7 @@ class TestOrganizeGroups:
 
     def run_group_similar_folders(self, expected_results):
         test_fs = self.generate_test_data(expected_results)
-        grouped_folders = organizer_v2.group_similar_folders(test_fs)
+        grouped_folders = organizer.group_similar_folders(test_fs)
 
         assert grouped_folders == expected_results
 
@@ -125,7 +125,7 @@ class TestOrganizeGroups:
         }
 
         test_fs = self.generate_test_data(expected_results)
-        grouped_folders = organizer_v2.organize_groups(test_fs)
+        grouped_folders = organizer.organize_groups(test_fs)
 
         new_names = {
             old_name: node.name for old_name, node in grouped_folders.subfolders.items()
@@ -154,7 +154,7 @@ class TestOrganizeGroups:
         }
 
         test_fs = build_virtual_fs(test_structure)
-        grouped_folders = organizer_v2.organize_groups(test_fs)
+        grouped_folders = organizer.organize_groups(test_fs)
         output_structure = grouped_folders.get_folders_dict()
 
         expected_results = {
@@ -200,7 +200,7 @@ class TestDictToVirtualFs:
 
         expected_results = list(test_structure.values())
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
         assert results == expected_results
 
     def test_empty_folder(self):
@@ -209,7 +209,7 @@ class TestDictToVirtualFs:
         }
 
         expected_results = list(test_structure.values())
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
         assert results == expected_results
 
     # def test_only_one_subfolder(self):
@@ -245,7 +245,7 @@ class TestDictToVirtualFs:
             "out": virtual_fs,
         }
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
 
         expected_results = [output]
 
@@ -269,7 +269,7 @@ class TestDictToVirtualFs:
         output_child.add_virtual_subfolder(child1)
         output_child.add_virtual_subfolder(child2)
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
 
         result_tree = results[0].get_folders_dict()
         expected_tree = output.get_folders_dict()
@@ -298,7 +298,7 @@ class TestDictToVirtualFs:
         output_g2.add_virtual_subfolder(child1)
         output_g2.add_virtual_subfolder(child2)
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
         result_tree = results[0].get_folders_dict()
         expected_tree = output.get_folders_dict()
 
@@ -315,7 +315,7 @@ class TestDictToVirtualFs:
             }
         }
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
         result_tree = results[0].get_folders_dict()
 
         expected_structure = {"test": {"first": TESTFILE_DICT, "second": TESTFILE_DICT}}
@@ -339,7 +339,7 @@ class TestDictToVirtualFs:
             }
         }
 
-        results = organizer_v2.dict_to_virtualfs_nodes(test_structure)
+        results = organizer.dict_to_virtualfs_nodes(test_structure)
         result_tree = results[0].get_folders_dict()
 
         expected_structure = {
@@ -405,7 +405,7 @@ class TestReorganizeFs:
         }
 
         test_fs = build_virtual_fs(test_structure)
-        results = organizer_v2.reorganize_virtualfs(test_fs)
+        results = organizer.reorganize_virtualfs(test_fs)
         output_structure = results.get_folders_dict()
 
         assert output_structure == expected_results
@@ -416,7 +416,7 @@ class TestReorganizeFs:
         expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
 
         test_fs = build_virtual_fs(test_structure)
-        results = organizer_v2.reorganize_virtualfs(test_fs)
+        results = organizer.reorganize_virtualfs(test_fs)
         output_structure = results.get_folders_dict()
 
         assert output_structure == expected_results
@@ -427,7 +427,7 @@ class TestReorganizeFs:
         expected_results = {"root": {"test_data": {"one": {"three": {"two": ""}}}}}
 
         test_fs = build_virtual_fs(test_structure)
-        results = organizer_v2.reorganize_virtualfs(test_fs)
+        results = organizer.reorganize_virtualfs(test_fs)
         output_structure = results.get_folders_dict()
 
         assert output_structure == expected_results
@@ -438,7 +438,7 @@ class TestReorganizeFs:
         expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
 
         test_fs = build_virtual_fs(test_structure)
-        results = organizer_v2.reorganize_virtualfs(test_fs)
+        results = organizer.reorganize_virtualfs(test_fs)
         output_structure = results.get_folders_dict()
 
         assert output_structure == expected_results
@@ -449,7 +449,7 @@ class TestReorganizeFs:
         expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
 
         test_fs = build_virtual_fs(test_structure)
-        results = organizer_v2.reorganize_virtualfs(test_fs)
+        results = organizer.reorganize_virtualfs(test_fs)
         output_structure = results.get_folders_dict()
 
         assert output_structure == expected_results
@@ -463,7 +463,7 @@ class TestReorganizeTree:
         expected_result = {"root": {"d": {"c": {"b": {"a": TESTFILE_DICT}}}}}
 
         virtual_fs = build_virtual_fs(base_tree)
-        result = organizer_v2.reorganize_tree(virtual_fs, frequencies)
+        result = organizer.reorganize_tree(virtual_fs, frequencies)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_result
@@ -477,7 +477,7 @@ class TestReorganizeTree:
         }
 
         virtual_fs = build_virtual_fs(base_tree)
-        result = organizer_v2.reorganize_tree(virtual_fs, frequencies)
+        result = organizer.reorganize_tree(virtual_fs, frequencies)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_result
@@ -545,7 +545,7 @@ class TestReorganizeTree:
         }
 
         virtual_fs = build_virtual_fs(base_tree)
-        result = organizer_v2.reorganize_tree(virtual_fs, frequencies)
+        result = organizer.reorganize_tree(virtual_fs, frequencies)
         result_tree = result.get_folders_dict()
 
         print(json.dumps(result_tree, indent=4))
@@ -576,7 +576,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -591,7 +591,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -625,7 +625,7 @@ class TestRemoveExtraFolders:
             }
 
             virtual_fs = build_virtual_fs(test_structure)
-            result = organizer_v2.remove_extra_folders(virtual_fs)
+            result = organizer.remove_extra_folders(virtual_fs)
             result_tree = result.get_folders_dict()
 
             assert result_tree == expected_output
@@ -646,7 +646,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -661,7 +661,7 @@ class TestRemoveExtraFolders:
         expected_output = {"root": {"test": {"sample_file": TESTFILE_DICT}}}
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -683,7 +683,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -706,7 +706,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure)
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -731,7 +731,7 @@ class TestRemoveExtraFolders:
         }
 
         virtual_fs = build_virtual_fs(test_structure, "test")
-        result = organizer_v2.remove_extra_folders(virtual_fs)
+        result = organizer.remove_extra_folders(virtual_fs)
         result_tree = result.get_folders_dict()
 
         assert result_tree == expected_output
@@ -744,7 +744,7 @@ class TestPromoteGrandchildren:
         expected = {"root": {"grandfile1": "", "grandfile2": ""}}
 
         virtual_fs = build_virtual_fs(test_data)
-        organizer_v2.promote_grandchildren(
+        organizer.promote_grandchildren(
             virtual_fs, "child", ["grandfile1", "grandfile2"]
         )
         result_tree = virtual_fs.get_folders_dict()
@@ -765,7 +765,7 @@ class TestPromoteGrandchildren:
             virtual_fs = build_virtual_fs(test_data)
             virtual_fs.add_file(filePath)
 
-            organizer_v2.promote_grandchildren(virtual_fs, "child", [basenname])
+            organizer.promote_grandchildren(virtual_fs, "child", [basenname])
             result_tree = virtual_fs.get_folders_dict()
 
             assert result_tree == expected
@@ -788,7 +788,7 @@ class TestPromoteGrandchildren:
 
             virtual_fs = build_virtual_fs(test_data)
 
-            organizer_v2.promote_grandchildren(virtual_fs, "child", [basenname])
+            organizer.promote_grandchildren(virtual_fs, "child", [basenname])
             result_tree = virtual_fs.get_folders_dict()
 
             assert result_tree == expected
