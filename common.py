@@ -2,6 +2,8 @@ from pathlib import Path
 
 VIEW_TYPES = {"Print", "VTT", "Key & Design Notes"}
 
+class FileMoveException(Exception):
+    pass
 
 def _get_files_in_dir(dir):
     if isinstance(dir, str):
@@ -39,3 +41,22 @@ def try_move_file(source_file: Path, target_dir, should_execute):
             return (source_file, file_path)
         else:
             source_file.rename(file_path)
+
+
+def merge_directories(source_path: Path, dest_path: Path):
+    if source_path == dest_path:
+        return
+
+    print(f"moving files from \n\t{source_path} \nto \n\t{dest_path}")
+    for subfile in source_path.iterdir():
+        subfile_name = subfile.name
+        if subfile_name == source_path.name:
+            merge_directories(subfile, dest_path)
+        else:
+            new_home = dest_path / subfile.name
+            if new_home.exists() and new_home.is_dir():
+                merge_directories(source_path / subfile.name, new_home)
+            else:
+                subfile.rename(new_home)
+
+    source_path.rmdir()

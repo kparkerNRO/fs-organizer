@@ -6,7 +6,10 @@ import pprint
 
 from pathlib import Path
 
-from common import delete_empty_dir, print_path_operation, try_move_file, VIEW_TYPES
+from common import FileMoveException, merge_directories, print_path_operation, try_move_file
+from filename_utils import clean_filename, clean_path
+
+from enum import Enum
 
 PATH_EXTRAS = " -,()/"
 
@@ -28,6 +31,8 @@ exceptions = {"The Clean": "Clean", "The": ""}
 replace_exceptions = {
     "ItW": "",
 }
+
+ZipBackupState = Enum("ZipBackupState", ["KEEP", "MOVE", "DELETE"])
 
 
 def _strip_part_from_base(base_name, part):
@@ -54,7 +59,7 @@ def _get_creator_index(parts):
     return 0
 
 
-def clean_base_name(base_name, source_dir, parent_len=0):
+def _clean_base_name(base_name, source_dir, parent_len=0):
     # print(f"starting with '{source_dir}' - '{base_name}'")
 
     if not base_name:
@@ -99,7 +104,7 @@ def clean_base_name(base_name, source_dir, parent_len=0):
     out_dir_name = out_dir_name.strip(" ()")
 
     # remove file dimensions
-    # out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
+    out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
 
     # remove special case exceptions
     for exception, replace in exceptions.items():
@@ -142,7 +147,6 @@ def extract_zip_without_hidden_files(zipref, final_path):
     for member in zipref.namelist():
         if member.startswith("__MACOSX") or ".DS_Store" in member:
             continue
-        # print(f"Extracting {member}")
         try:
             zipref.extract(member, final_path)
         except zipfile.BadZipFile:
@@ -150,26 +154,7 @@ def extract_zip_without_hidden_files(zipref, final_path):
             continue
 
 
-def merge_directories(source_path: Path, dest_path: Path):
-    if source_path == dest_path:
-        return
-
-    print(f"moving files from \n\t{source_path} \nto \n\t{dest_path}")
-    for subfile in source_path.iterdir():
-        subfile_name = subfile.name
-        if subfile_name == source_path.name:
-            merge_directories(subfile, dest_path)
-        else:
-            new_home = dest_path / subfile.name
-            if new_home.exists() and new_home.is_dir():
-                merge_directories(source_path / subfile.name, new_home)
-            else:
-                subfile.rename(new_home)
-
-    source_path.rmdir()
-
-
-def extract_zip(zip_file: Path, should_execute=True):
+def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
     """
     Extracts a zip file to a similarly named directory and deletes the zip file
     """
@@ -180,11 +165,14 @@ def extract_zip(zip_file: Path, should_execute=True):
     filename = os.path.splitext(zip_file.name)[0]
 
     # preprocess the name
-    out_dir_name = clean_base_name(filename, dir)
+    out_dir_name = clean_filename(
+        filename, creator_removes, exceptions, replace_exceptions
+    )
+    out_dir_name = clean_path(out_dir_name, str(dir))
     print(f"target dir: {out_dir_name}")
 
     # do the work
-    final_path = Path(dir, out_dir_name)
+    final_path = Path(out_dir, dir, out_dir_name)
 
     with zipfile.ZipFile(zip_file, "r") as zipref:
         zipPath = zipfile.Path(zipref)
@@ -204,35 +192,53 @@ def extract_zip(zip_file: Path, should_execute=True):
             print_path_operation("extract", zip_file, should_execute=should_execute)
             if should_execute:
                 extract_zip_without_hidden_files(zipref, final_path)
-
-        # if should_execute:
-        # zip_file.unlink()
-    print()
     return final_path
 
 
-def extract_zip_files(path: Path, should_execute: bool):
-    # print(f"Looking for zips in {path}")
+def extract_zip_files(
+    path: Path,
+    out_dir: str = "",
+    should_execute: bool = False,
+    zip_backup_state: ZipBackupState = ZipBackupState.KEEP,
+    zip_backup_dir: str = "",
+):
     for p in path.iterdir():
         if p.is_dir():
+            extract_zip_files(p, out_dir, should_execute)
+        elif p.suffix == ".zip":
+            # if the file contains zipfiles, unzip those too
+            zip_path = extract_zip(p, out_dir, should_execute)
+            if should_execute:
+                extract_zip_files(zip_path, out_dir, should_execute)
 
-            extract_zip_files(p, should_execute)
-        else:
-            if p.suffix == ".zip":
-                zip_path = extract_zip(p, should_execute)
-                if should_execute:
-                    extract_zip_files(zip_path, should_execute)
+                if zip_backup_state == ZipBackupState.KEEP:
+                    # do nothing
+                    pass
+                elif zip_backup_state == ZipBackupState.MOVE:
+                    # move the zip to the new directory, and remove the current one
+                    if not zip_backup_dir:
+                        raise FileMoveException(
+                            f"Cannot move zipfiles with no specified output directory"
+                        )
+                    try_move_file(p, Path(zip_backup_dir, p, should_execute))
+                elif zip_backup_state == ZipBackupState.DELETE:
+                    # remove the current one
+                    p.unlink()
+                else:
+                    raise FileMoveException(
+                        f"Unknown zip backup state {zip_backup_state}"
+                    )
 
 
-def print_dir(path: Path):
-    for subfile in path.iterdir():
-        if subfile.is_dir():
-            if subfile.name == ".ts":
-                continue
-            print_dir(subfile)
-            print()
-        else:
-            print(subfile)
+# def _print_dir(path: Path):
+#     for subfile in path.iterdir():
+#         if subfile.is_dir():
+#             if subfile.name == ".ts":
+#                 continue
+#             _print_dir(subfile)
+#             print()
+#         else:
+#             print(subfile)
 
 
 @click.command()
@@ -246,7 +252,7 @@ def list_path(path, zip, exec):
     path_obj = Path(path)
 
     if zip:
-        extract_zip_files(path_obj, exec)
+        extract_zip_files(path_obj, should_execute=exec)
 
 
 if __name__ == "__main__":
