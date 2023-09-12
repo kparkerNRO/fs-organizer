@@ -39,7 +39,10 @@ grouping_exceptions = (
     "Lair of the",
     "Tower of",
     "The ruins of",
-    "The"
+    "The",
+    "Bone",
+    "Wizard",
+    "War"
 )
 
 class FSException(Exception):
@@ -117,32 +120,18 @@ def generate_path(view_type, token, working_name):
     return [x for x in base_path if x]
 
 
-def group_similar_folders(folder: VirtualFolder):
-    """
-    calculates if any subfolders in the supplied folder can be grouped
-    into similar folders (eg: snow day and snow night become snow/day and snow/night)
-
-    returns a mapping of file name to new folder stucture
-    """
-    # map basename to file, and only work on the base names
-    pathnames_to_path = {
-        subpath.name: subpath for subpath in folder.subfolders.values()
-    }
-    paths_to_process = list(pathnames_to_path.keys())
-
-    names_to_replacement = {subpath: [subpath] for subpath in paths_to_process}
+def group_similar_names(names_to_group: list):
+    
+    names_to_replacement = {subpath: [subpath] for subpath in names_to_group}
     token_to_filenames = dict()
 
-    for base_name, file in pathnames_to_path.items():
-        if not file.is_dir():
-            continue
-
+    names_to_process = list(names_to_group)
+    for base_name in names_to_group:
         # handle the data structure mismatch where one's already been removed
-        if not base_name in paths_to_process:
+        if not base_name in names_to_process:
             continue
 
-        paths_to_process.remove(base_name)
-        # print(f"processing {base_name}")
+        names_to_process.remove(base_name)
 
         # pull out the type suffix
         initial_suffix, parsed_base_name = _split_view_type(base_name)
@@ -152,15 +141,13 @@ def group_similar_folders(folder: VirtualFolder):
         working_token = None
 
         # iterate through the names, and find any matches
-        for working_name in paths_to_process:
-            if not pathnames_to_path[working_name].is_dir():
-                continue
+        for working_name in names_to_process:
 
             working_suffix, next_name = _split_view_type(working_name)
             has_suffix = working_suffix is not None
 
             if working_token and next_name.startswith(working_token):
-                # working case: store a new token match
+                # main case: store a new token match
                 token_to_filenames[working_token].add(working_name)
 
                 root_name = _process_file_name(next_name, working_token, has_suffix)
@@ -172,11 +159,8 @@ def group_similar_folders(folder: VirtualFolder):
                 # base case, initialize a new token
                 computed_token = _get_max_common_string(tokens, next_name)
 
-                # if only the first word overlaps, don't group
                 # if the token is in the exceptions list, don't group
                 if (
-                    # computed_token != first_token
-                    # and
                     computed_token not in grouping_exceptions
                 ):
                     # if we've found a token with overlap, save it
@@ -200,17 +184,15 @@ def group_similar_folders(folder: VirtualFolder):
                     )
             elif has_suffix:
                 pass
-                # special case - group the suffix data even if there isn't an overlapping token
-                # names_to_replace[base_name] = generate_path(initial_suffix, "", parsed_base_name)
-                # names_to_replace[working_name] = generate_path(working_suffix, "", root_name)
 
         # at the end of an iteration, remove all the matches from the working list
         if working_token:
             for entry in token_to_filenames[working_token]:
-                if entry in paths_to_process:
-                    paths_to_process.remove(entry)
+                if entry in names_to_process:
+                    names_to_process.remove(entry)
 
     # at the end of the set, see if we accidentally grabbed two overlapping sets
+    tokens_to_revisit = {}
     for token1 in token_to_filenames.keys():
         for token2 in token_to_filenames.keys():
             # if this isn't itself, and the main token is a subset of the other token
@@ -224,7 +206,8 @@ def group_similar_folders(folder: VirtualFolder):
 
                 # empty the longer token and transfer it's contents to the shorter one
                 token_to_filenames[token1] |= token_to_filenames[token2]
-                token_to_filenames[token2] = {}
+                token_to_filenames[token2] = set()
+                tokens_to_revisit[token1] =token_to_filenames[token1]
 
     # if everyone is a base, no one is
     for _, files in token_to_filenames.items():
@@ -235,7 +218,42 @@ def group_similar_folders(folder: VirtualFolder):
         if res:
             for item in files_in_set:
                 if len(item) > 1:
-                    item.remove("Base")            
+                    item.remove("Base")  
+
+    return names_to_replacement, token_to_filenames
+
+    
+
+def group_similar_folders(folder: VirtualFolder):
+    """
+    calculates if any subfolders in the supplied folder can be grouped
+    into similar folders (eg: snow day and snow night become snow/day and snow/night)
+
+    returns a mapping of file name to new folder stucture
+    """
+    # extract out the directory names to work on
+    names_to_process = [subpath.name for subpath in folder.subfolders.values() if subpath.is_dir()]
+
+    # do the primary replacment
+    names_to_replacement, token_to_filenames = group_similar_names(names_to_process) 
+
+    # start getting spicy and grouping sub groups
+    num_tokens = len(token_to_filenames)
+    # while num_tokens > 0:
+    num_tokens = 0
+    for token, group in token_to_filenames.items():
+        if len(group) > 1:
+            next_group = {entry: names_to_replacement[entry][-1] for entry in group}
+            second_replace, tokens = group_similar_names(next_group.values())
+            extended_files = {}
+            for filename, next_key in next_group.items():
+                if len(second_replace[next_key]) > 1:
+                    # extended_files[filename] = names_to_replacement[filename][:-1].append(second_replace[next_key])
+                    working_name = names_to_replacement[filename][:-1]
+                    working_name.extend(second_replace[next_key])
+                    names_to_replacement[filename] = working_name
+                # num_tokens += len(token)
+            
 
     return names_to_replacement
 
@@ -676,29 +694,29 @@ def organize_fs(source: Path):
     # step 2: group folders + files by similar terms (eg day, night, clean, etc)
     print("Step 2: group files", flush=True)
     virtual_fs = organize_groups(virtual_fs)
-    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
 
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
     # step 3: cleanup redundant file names
     print("\n\n------------")
     print("Step 3: clean files again", flush=True)
     virtual_fs = remove_duplicate_folder_terms(virtual_fs, virtual_fs.name)
-    virtual_fs = reorganize_virtualfs(virtual_fs)
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
-    print(f"Total files: {virtual_fs.count_files()}")
+    # print(f"Total files: {virtual_fs.count_files()}")
 
     print("\n\n------------")
     print("Step 3.5: remove excess base folders", flush=True)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # step 3: organize the folders by term likelyhood
     print("\n\n------------")
@@ -717,10 +735,12 @@ def organize_fs(source: Path):
 
 @click.command()
 @click.argument("path")
-# @click.option("--creators", is_flag=True, default=False)
+# @click.option("--zip", is_flag=True, default=False)
 @click.option("--exec", is_flag=True, default=False)
 @click.option("--print_out", is_flag=True, default=False)
 def organize(path, exec, print_out):
+
+
     path_obj = Path(path)
     organize_fs(path_obj)
 

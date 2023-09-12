@@ -115,15 +115,15 @@ class TestOrganizeGroups:
 
     def test_base_handling(self):
         expected_results = {
-            "test data VTT": ["VTT", "test data", "Base"],
-            "test data Print": ["Print", "test data", "Base"],
+            "test data VTT": ["VTT", "test data"],
+            "test data Print": ["Print", "test data"],
         }
         self.run_group_similar_folders(expected_results)
 
     def test_organize_groups(self):
         expected_results = {
-            "test data VTT": "VTT/test data/Base",
-            "test data Print": "Print/test data/Base",
+            "test data VTT": "VTT/test data",
+            "test data Print": "Print/test data",
         }
 
         test_fs = self.generate_test_data(expected_results)
