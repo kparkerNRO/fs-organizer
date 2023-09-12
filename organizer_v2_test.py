@@ -106,8 +106,8 @@ class TestOrganizeGroups:
 
     def test_overlapping_groups(self):
         expected_results = {
-            "A wild test one": ["A wild", "test one"],
-            "A wild test three": ["A wild", "test three"],
+            "A wild test one": ["A wild", "test", "one"],
+            "A wild test three": ["A wild", "test", "three"],
             "A wild two": ["A wild", "two"],
             "A wild four": ["A wild", "four"],
         }
@@ -161,11 +161,11 @@ class TestOrganizeGroups:
 
         expected_results = {
             "root": {
-                "A wild/test one": {
+                "A wild/test/one": {
                     "test data/1": TESTFILE_DICT,
                     "test data/2": TESTFILE_DICT,
                 },
-                "A wild/test three": {
+                "A wild/test/three": {
                     "test data/1": TESTFILE_DICT,
                     "test data/2": TESTFILE_DICT,
                 },
@@ -181,6 +181,16 @@ class TestOrganizeGroups:
         }
 
         assert output_structure == expected_results
+
+    def test_nested_three_deep(self):
+        expected_results = {
+            "test data one": ["test data", "one"],
+            "test data two a": ["test data", "two", "a"],
+            "test data two three a": ["test data", "two", "three", "a"],
+            "test data two three plus": ["test data", "two", "three", "plus"],
+            "test data two three four": ["test data", "two", "three", "four"],
+        }
+        self.run_group_similar_folders(expected_results)
 
 
 class TestDictToVirtualFs:
@@ -436,7 +446,7 @@ class TestReorganizeFs:
         assert output_structure == expected_results
 
     def test_multi_level_empty_name(self):
-        test_structure = {"test_data": {"one": {"": {"" :{"two": "two"}}}}}
+        test_structure = {"test_data": {"one": {"": {"": {"two": "two"}}}}}
 
         expected_results = {"root": {"test_data": {"one": {"two": ""}}}}
 

@@ -42,12 +42,14 @@ grouping_exceptions = (
     "The",
     "Bone",
     "Wizard",
-    "War"
+    "War",
 )
+
 
 class FSException(Exception):
     def __init__(self, invalid_file) -> None:
         self.invalid_file = invalid_file
+
 
 def _strip_part_from_base(base_name, part):
     """
@@ -121,7 +123,6 @@ def generate_path(view_type, token, working_name):
 
 
 def group_similar_names(names_to_group: list):
-    
     names_to_replacement = {subpath: [subpath] for subpath in names_to_group}
     token_to_filenames = dict()
 
@@ -142,7 +143,6 @@ def group_similar_names(names_to_group: list):
 
         # iterate through the names, and find any matches
         for working_name in names_to_process:
-
             working_suffix, next_name = _split_view_type(working_name)
             has_suffix = working_suffix is not None
 
@@ -160,9 +160,7 @@ def group_similar_names(names_to_group: list):
                 computed_token = _get_max_common_string(tokens, next_name)
 
                 # if the token is in the exceptions list, don't group
-                if (
-                    computed_token not in grouping_exceptions
-                ):
+                if computed_token not in grouping_exceptions:
                     # if we've found a token with overlap, save it
                     working_token = computed_token
 
@@ -207,7 +205,7 @@ def group_similar_names(names_to_group: list):
                 # empty the longer token and transfer it's contents to the shorter one
                 token_to_filenames[token1] |= token_to_filenames[token2]
                 token_to_filenames[token2] = set()
-                tokens_to_revisit[token1] =token_to_filenames[token1]
+                tokens_to_revisit[token1] = token_to_filenames[token1]
 
     # if everyone is a base, no one is
     for _, files in token_to_filenames.items():
@@ -218,11 +216,39 @@ def group_similar_names(names_to_group: list):
         if res:
             for item in files_in_set:
                 if len(item) > 1:
-                    item.remove("Base")  
+                    item.remove("Base")
 
     return names_to_replacement, token_to_filenames
 
+
+def group_nested_folder(file_to_str_to_group:dict): # 23a -> 3a
     
+    lookback = {value: key for key, value in file_to_str_to_group.items()}
+    if len(file_to_str_to_group) == 0:
+        return {}
+
+    file_to_replacement, tokens_to_filename = group_similar_names(
+        file_to_str_to_group.values()
+    ) # 3a -> [3, a]
+
+    true_file_to_replacment = {key: file_to_replacement[value] for key, value in file_to_str_to_group.items()}
+    # 23a -> [3, a]
+    new_file_to_grouping  = true_file_to_replacment
+
+    for token, filenames in tokens_to_filename.items():
+        file_to_next_grouping = {file: file_to_replacement[file][-1] for file in filenames}
+        file_to_next_group = group_nested_folder(file_to_next_grouping) # 3a -> a
+        # for file, next_group in file_to_next_grouping.items():
+        #     new_file_to_grouping[file] = true_file_to_replacment[file][-1] + next_group
+
+        for file, group in file_to_next_group.items(): # 3a -> [a]
+            if len(group) > 1:
+                full_filename = lookback[file]
+                true_file_to_replacment[full_filename] = true_file_to_replacment[full_filename][:-1] + group
+
+    return new_file_to_grouping
+
+            
 
 def group_similar_folders(folder: VirtualFolder):
     """
@@ -232,30 +258,23 @@ def group_similar_folders(folder: VirtualFolder):
     returns a mapping of file name to new folder stucture
     """
     # extract out the directory names to work on
-    names_to_process = [subpath.name for subpath in folder.subfolders.values() if subpath.is_dir()]
+    names_to_process = [
+        subpath.name for subpath in folder.subfolders.values() if subpath.is_dir()
+    ]
 
     # do the primary replacment
-    names_to_replacement, token_to_filenames = group_similar_names(names_to_process) 
+    # names_to_replacement, token_to_filenames = group_similar_names(names_to_process)
+
+    # tokens_to_check = token_to_filenames
+    # num_tokens = len(tokens_to_check)
+    
 
     # start getting spicy and grouping sub groups
-    num_tokens = len(token_to_filenames)
-    # while num_tokens > 0:
-    num_tokens = 0
-    for token, group in token_to_filenames.items():
-        if len(group) > 1:
-            next_group = {entry: names_to_replacement[entry][-1] for entry in group}
-            second_replace, tokens = group_similar_names(next_group.values())
-            extended_files = {}
-            for filename, next_key in next_group.items():
-                if len(second_replace[next_key]) > 1:
-                    # extended_files[filename] = names_to_replacement[filename][:-1].append(second_replace[next_key])
-                    working_name = names_to_replacement[filename][:-1]
-                    working_name.extend(second_replace[next_key])
-                    names_to_replacement[filename] = working_name
-                # num_tokens += len(token)
-            
+    files_to_subgroup = {file:file for file in names_to_process}
+    # file_to_subgroup = {file: grouping[-1] for file, grouping in names_to_replacement.items()}
+    new_replacement = group_nested_folder(files_to_subgroup)
 
-    return names_to_replacement
+    return new_replacement
 
 
 def organize_groups(virtual_fs: VirtualFolder):
@@ -270,7 +289,7 @@ def organize_groups(virtual_fs: VirtualFolder):
         if subfile.is_dir():
             sub_name = subfile.name
             sub_paths = names_to_replace[sub_name]
-            
+
             cleaned_name = os.path.join(*sub_paths)
 
             subfile.name = cleaned_name
@@ -359,7 +378,7 @@ def reorganize_virtualfs_old(virtual_fs: VirtualFolder):
             parts = subfile.name.split(os.sep)
             head, *tail = parts
             list_to_dict(new_structure[head], tail, subfile)
-        # if the subfile name is an empty string, 
+        # if the subfile name is an empty string,
         # we should promote the grandchild to this level
         elif not subfile.name:
             if isinstance(subfile, VirtualFolder):
@@ -383,8 +402,8 @@ def reorganize_virtualfs_old(virtual_fs: VirtualFolder):
 
     return new_root
 
+
 def reorganize_virtualfs(virtual_fs: VirtualFolder, new_root: VirtualFolder = None):
-    
     if not new_root:
         new_root = VirtualFolder(virtual_fs.source_path, virtual_fs.name)
 
@@ -403,19 +422,16 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder, new_root: VirtualFolder = No
                         new_folder = VirtualFolder(None, part)
                         working_folder.add_virtual_subfolder(new_folder)
                     working_folder = working_folder.subfolders[part]
-            
+
             else:
                 if subfile.name not in working_folder.subfolders:
                     new_folder = VirtualFolder(None, subfile.name)
                     working_folder.add_virtual_subfolder(new_folder)
                 working_folder = working_folder.subfolders[subfile.name]
 
-            
             reorganize_virtualfs(subfile, working_folder)
 
     return new_root
-
-
 
 
 def clean_filename(base_name):
@@ -476,11 +492,10 @@ def clean_filename(base_name):
     if len(out_dir_name) == 1:
         out_dir_name = ""
 
-
     return out_dir_name
 
 
-def clean_folder_names(virtual_fs:VirtualFolder):
+def clean_folder_names(virtual_fs: VirtualFolder):
     """
     Standardize file names and remove duplicate terms from the path
     """
@@ -531,7 +546,7 @@ def remove_duplicate_folder_terms(virtual_fs, working_path):
             cleaned_name = clean_path(sub_name, working_path)
             subfile.name = cleaned_name
             remove_duplicate_folder_terms(subfile, os.path.join(working_path, sub_name))
-    
+
     return virtual_fs
 
 
@@ -585,7 +600,7 @@ def remove_extra_folders(virtual_fs):
     "base" folders should be at the bottom of the stack. If they
     containe subfolders, those folders should be promoted
     """
-    
+
     folders_moved = True
 
     while folders_moved:
@@ -605,16 +620,20 @@ def remove_extra_folders(virtual_fs):
                         great_grandchildren = list(grandchild.subfolders.keys())
                         promote_grandchildren(subfile, grandname, great_grandchildren)
                 elif len(subfile.subfolders) == 0:
-                        empty_subfolders.append(sub_name)
+                    empty_subfolders.append(sub_name)
 
                 remove_extra_folders(subfile)
 
         unpromoted_folders = []
         for subfile, grandchildren in folders_to_promote.items():
-            promoted_grandchildren = promote_grandchildren(virtual_fs, subfile, grandchildren)
-            if len(promoted_grandchildren) != len (grandchildren):
+            promoted_grandchildren = promote_grandchildren(
+                virtual_fs, subfile, grandchildren
+            )
+            if len(promoted_grandchildren) != len(grandchildren):
                 # promotion failed, and we need to not count this directory
-                current_unpromoted = [x for x in grandchildren if x not in promoted_grandchildren]
+                current_unpromoted = [
+                    x for x in grandchildren if x not in promoted_grandchildren
+                ]
                 unpromoted_folders.extend(current_unpromoted)
 
         for unpromoted in unpromoted_folders:
@@ -623,7 +642,7 @@ def remove_extra_folders(virtual_fs):
         # remove any empty directories
         for subname in empty_subfolders:
             virtual_fs.subfolders.pop(subname)
-        
+
         folders_moved = len(folders_to_promote) > 0 or len(empty_subfolders) > 0
 
     return virtual_fs
@@ -639,7 +658,7 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
     """
     root = virtual_fs
 
-    #this is wildly fucking inefficient but it works 
+    # this is wildly fucking inefficient but it works
 
     folders_moved = True
     while folders_moved:
@@ -690,12 +709,10 @@ def organize_fs(source: Path):
     print(f"Total files: {virtual_fs.count_files()}")
     # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
-
     # step 2: group folders + files by similar terms (eg day, night, clean, etc)
     print("Step 2: group files", flush=True)
     virtual_fs = organize_groups(virtual_fs)
     print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
-
 
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
@@ -739,8 +756,6 @@ def organize_fs(source: Path):
 @click.option("--exec", is_flag=True, default=False)
 @click.option("--print_out", is_flag=True, default=False)
 def organize(path, exec, print_out):
-
-
     path_obj = Path(path)
     organize_fs(path_obj)
 
