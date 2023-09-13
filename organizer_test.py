@@ -1,5 +1,5 @@
 import tempfile
-from common import ExecBackupState
+from common import FileBackupState
 from virtual_folder import VirtualFile, VirtualFolder
 import organizer as organizer
 import logging
@@ -798,7 +798,7 @@ class TestPromoteGrandchildren:
 class TestMoveFs:
     def setup_method(self):
         td = tempfile.TemporaryDirectory()
-        
+
         td_path = Path(td.name)
         test_path = td_path / "testdir"
         test_path.mkdir(exist_ok=True, mode=0o777)
@@ -808,7 +808,7 @@ class TestMoveFs:
         with open(testfile, "w") as tf:
             tf.write("test")
 
-        input_structure = {"test.txt":testfile}
+        input_structure = {"test.txt": testfile}
 
         virtual_fs = build_virtual_fs(input_structure, "testdir")
         virtual_fs.source_path = td_path
@@ -819,7 +819,6 @@ class TestMoveFs:
         self.testdir = td.name
         self.file_path = Path("testdir", "test.txt")
         self.testfile = testfile
-        
 
     def teardown_method(self):
         try:
@@ -827,7 +826,6 @@ class TestMoveFs:
         except:
             pass
 
-    
     def test_move_file(self):
         # move to td/test2/test/test.txt
         outdir = Path(self.testdir, "test2")
@@ -837,7 +835,7 @@ class TestMoveFs:
             virtual_fs=self.virtual_fs,
             output_dir=outdir,
             should_execute=True,
-            backup_state=ExecBackupState.MOVE,
+            backup_state=FileBackupState.MOVE,
         )
         assert final_path.exists()
         assert not self.testfile.exists()
@@ -851,7 +849,7 @@ class TestMoveFs:
             virtual_fs=self.virtual_fs,
             output_dir=outdir,
             should_execute=True,
-            backup_state=ExecBackupState.KEEP,
+            backup_state=FileBackupState.COPY,
         )
         assert final_path.exists()
         assert self.testfile.exists()
@@ -868,7 +866,7 @@ class TestMoveFs:
             virtual_fs=self.virtual_fs,
             output_dir=outdir,
             should_execute=True,
-            backup_state=ExecBackupState.DELETE,
+            backup_state=FileBackupState.IN_PLACE,
         )
         assert final_path.exists()
         assert not self.testfile.exists()

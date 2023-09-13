@@ -1,7 +1,7 @@
 from tempfile import TemporaryDirectory, TemporaryFile
 from zipfile import ZipFile
 from pathlib import Path
-from common import ExecBackupState, FileMoveException
+from common import ZipBackupState, FileMoveException
 import extract_zip
 import os
 import pytest
@@ -32,7 +32,9 @@ class TestExtractZip:
 
     def test_extract_delete_zip(self):
         extract_zip.extract_zip_files(
-            Path(self.tmpdir.name), should_execute=True, zip_backup_state=ExecBackupState.DELETE
+            Path(self.tmpdir.name),
+            should_execute=True,
+            zip_backup_state=ZipBackupState.DELETE,
         )
         outpath = Path(self.test_zip.parent, "test", "test.txt")
         assert outpath.exists()
@@ -42,7 +44,10 @@ class TestExtractZip:
         with TemporaryDirectory() as td:
             td_path = Path(td, "test2")
             extract_zip.extract_zip_files(
-                Path(self.tmpdir.name), zip_backup_dir=str(td_path), should_execute=True, zip_backup_state=ExecBackupState.MOVE
+                Path(self.tmpdir.name),
+                zip_backup_dir=str(td_path),
+                should_execute=True,
+                zip_backup_state=ZipBackupState.MOVE,
             )
             outpath = Path(td_path, "test.zip")
             file_path = Path(self.test_zip.parent, "test", "test.txt")
@@ -53,7 +58,9 @@ class TestExtractZip:
     def test_extract_move_no_output_folder(self):
         with pytest.raises(FileMoveException):
             extract_zip.extract_zip_files(
-                Path(self.tmpdir.name), should_execute=True, zip_backup_state=ExecBackupState.MOVE
+                Path(self.tmpdir.name),
+                should_execute=True,
+                zip_backup_state=ZipBackupState.MOVE,
             )
 
     def teardown_method(self):

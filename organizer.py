@@ -8,8 +8,13 @@ from virtual_folder import (
 from pathlib import Path
 import click
 import os
+from extract_zip import extract_zip_files
 
-from common import ExecBackupState, FileMoveException, try_move_file
+from common import (
+    FileBackupState, 
+    ZipBackupState, 
+    FileMoveException, 
+    try_move_file)
 
 from filename_utils import (
     split_view_type,
@@ -551,7 +556,7 @@ def move_file(
         # if we're moving files, delete empty directories as we go
         for parent in source_path.parents:
             subdirs = os.listdir(parent)
-            if len(subdirs)==0:
+            if len(subdirs) == 0:
                 parent.rmdir()
             else:
                 break
@@ -571,38 +576,42 @@ def move_folder(
             move_file(subfile, output_path, should_execute, should_copy)
         else:
             move_folder(subfile, output_path, should_execute, should_copy)
-            
 
 
 def move_fs(
     virtual_fs: VirtualFolder,
     output_dir="",
     should_execute=True,
-    backup_state=ExecBackupState.MOVE,
+    backup_state=FileBackupState.MOVE,
 ):
-    if backup_state == ExecBackupState.KEEP:  # copy
+    if backup_state == FileBackupState.COPY:  # copy
         if not output_dir:
             raise FileMoveException(
                 f"Cannot duplicate data with no specified output directory"
             )
         move_folder(virtual_fs, output_dir, should_execute, should_copy=True)
-    elif backup_state == ExecBackupState.MOVE:  # new folder
+    elif backup_state == FileBackupState.MOVE:  # new folder
         if not output_dir:
             raise FileMoveException(
                 f"Cannot move data with no specified output directory"
             )
         move_folder(virtual_fs, output_dir, should_execute, should_copy=False)
-    elif backup_state == ExecBackupState.DELETE:  # in place
+    elif backup_state == FileBackupState.IN_PLACE:  # in place
         if output_dir:
             print(
                 f"Folder re-org handed an output directory, but requested in-place"
                 + "modification. Will ignore output_dir."
             )
-        move_folder(virtual_fs, str(virtual_fs.source_path), should_execute, should_copy=False)
+        move_folder(
+            virtual_fs, str(virtual_fs.source_path), should_execute, should_copy=False
+        )
 
 
 def organize_fs(
-    source: Path, output_dir="", should_execute=False, backup_state=ExecBackupState.MOVE
+    source: Path,
+    output_dir="",
+    should_execute=False,
+    backup_state=FileBackupState.IN_PLACE,
 ):
     import json
 
@@ -662,32 +671,48 @@ def organize_fs(
 
 @click.command()
 @click.argument("path")
-# @click.option("--zip", is_flag=True, default=False)
-@click.option("--exec", is_flag=True, default=False)
-@click.option("--print_out", is_flag=True, default=False)
-def organize(path, exec, print_out):
+@click.option("--output", "-o", default=None)
+@click.option("--copy_data", "-c", is_flag=True, default=False)
+@click.option("--zip", "-z", is_flag=True, default=False)
+@click.option("--exec", "-e", is_flag=True, default=False)
+@click.option("--delete_zip" , "-d", is_flag=True, default=False)
+@click.option("--zip_backup_dir", default="")
+def organize(path, output,copy_data, zip, exec, delete_zip, zip_backup_dir):
     path_obj = Path(path)
-    organize_fs(path_obj, output_dir=".")
 
-    # # Pass 1 - unzip files
-    # # pass 2 - cleanup path names
-    # # pass 3 - re-organize folders, move final categorization to the bottom layer
-    # path_obj = Path(path)
-    # duplicates = []
+    # validate the inputs
+    if not output and not copy_data:
+        print("Invalid flag, copy_data. Output must also be specified")
+        return -1
 
-    # else:
-    #     start_len = len(path_obj.parts) - 2
-    #     duplicates = organize_folders(path_obj, Path(path), exec, start_len)
+    if zip:
+        zip_exec_format = ZipBackupState.KEEP
+        if delete_zip:
+            if zip_backup_dir:
+                zip_exec_format = ZipBackupState.MOVE
+            else:
+                zip_exec_format = ZipBackupState.DELETE
+        if output and zip_backup_dir:
+            ZipBackupState.MOVE
 
-    # if print_out:
-    #     print_dir(path_obj)
+        extract_zip_files(
+            path_obj,
+            should_execute=exec,
+            zip_backup_state=zip_exec_format,
+            zip_backup_dir=zip_backup_dir,
+        )
 
-    # if duplicates:
-    #     print()
-    #     print("------ Duplicates -------")
-    #     for file in duplicates:
-    #         print(f"tried to move:\n\t'{file[0]}'")
-    #         print(f"\t\tto \n\t'{file[1]}'")
+    
+    
+    # exec_format = FileBackupState.IN_PLACE    
+    # if output:
+    #     if copy_data:
+    #         exec_format = FileBackupState.COPY
+    #     else:
+    #         exec_format = FileBackupState.MOVE
+
+    # organize_fs(path_obj, output_dir=output, should_execute=exec,
+    #             backup_state=exec_format)
 
 
 if __name__ == "__main__":

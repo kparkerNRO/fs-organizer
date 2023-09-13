@@ -1,12 +1,16 @@
 from enum import Enum
 from pathlib import Path
 import shutil
-ExecBackupState = Enum("ExecBackupState", ["KEEP", "MOVE", "DELETE"])
+
+ZipBackupState = Enum("ExecBackupState", ["KEEP", "MOVE", "DELETE"])
+FileBackupState = Enum("FileBackupState", ["COPY", "MOVE", "IN_PLACE"])
 
 VIEW_TYPES = {"Print", "VTT", "Key & Design Notes"}
 
+
 class FileMoveException(Exception):
     pass
+
 
 def _get_files_in_dir(dir):
     if isinstance(dir, str):
@@ -33,7 +37,7 @@ def print_path_operation(operator, from_path, to_path=None, should_execute=False
             print(f"\t\tto \n\t'{to_path}'")
 
 
-def try_move_file(source_file: Path, target_dir:Path, should_execute, copy_file = False):
+def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file=False):
     # print_path_operation("move", source_file, target_dir)
     if should_execute:
         if not target_dir.exists():
@@ -44,7 +48,7 @@ def try_move_file(source_file: Path, target_dir:Path, should_execute, copy_file 
             return (source_file, file_path)
         else:
             if copy_file:
-                shutil.copy2(source_file,file_path)                
+                shutil.copy2(source_file, file_path)
             else:
                 source_file.rename(file_path)
 
