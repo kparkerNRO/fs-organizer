@@ -8,7 +8,7 @@ import pytest
 
 
 class TestExtractZip:
-    def setup(self):
+    def setup_method(self):
         self.tmpdir = TemporaryDirectory()
         test_zip_path = Path(self.tmpdir.name, "test.zip")
         with ZipFile(test_zip_path, "w") as zf:
@@ -56,7 +56,7 @@ class TestExtractZip:
                 Path(self.tmpdir.name), should_execute=True, zip_backup_state=ExecBackupState.MOVE
             )
 
-    def teardown(self):
+    def teardown_method(self):
         try:
             self.tmpdir.cleanup()
         except:

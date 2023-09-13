@@ -34,13 +34,13 @@ def build_virtual_fs_recursive(root_node: VirtualFolder, structure: dict):
         folder = VirtualFolder(path=None, name=key)
         root_node.add_virtual_subfolder(folder)
         if isinstance(data, (str, Path, VirtualFile)):
-            root_node.subfolders.pop(key, None)
+            root_node.contents.pop(key, None)
             virtual_node = create_virtual_file(data, key)
             root_node.add_virtual_subfolder(virtual_node)
         elif isinstance(data, set):
             for entry in data:
                 if isinstance(data, (Path, VirtualFile)):
-                    root_node.subfolders.pop(key, None)
+                    root_node.contents.pop(key, None)
                     virtual_node = create_virtual_file(entry)
                     root_node.add_virtual_subfolder(virtual_node)
                 else:
@@ -129,7 +129,7 @@ class TestOrganizeGroups:
         grouped_folders = organizer.organize_groups(test_fs)
 
         new_names = {
-            old_name: node.name for old_name, node in grouped_folders.subfolders.items()
+            old_name: node.name for old_name, node in grouped_folders.contents.items()
         }
 
         assert new_names == expected_results
@@ -217,7 +217,7 @@ class TestDictToVirtualFs:
     #     virtual_fs = VirtualFolder(None, "one")
     #     virtuals_child = build_placeholder_file("two")
     #     virtual_fs.add_virtual_subfolder(virtuals_child)
-    #     grandchild = list(virtuals_child.subfolders.values())[0]
+    #     grandchild = list(virtuals_child.contents.values())[0]
     #     output = VirtualFolder(None, "out")
     #     output.add_virtual_subfolder(grandchild)
 
@@ -796,31 +796,80 @@ class TestPromoteGrandchildren:
 
 
 class TestMoveFs:
+    def setup_method(self):
+        td = tempfile.TemporaryDirectory()
+        
+        td_path = Path(td.name)
+        test_path = td_path / "testdir"
+        test_path.mkdir(exist_ok=True, mode=0o777)
+
+        testfile = Path(test_path, "test.txt")
+
+        with open(testfile, "w") as tf:
+            tf.write("test")
+
+        input_structure = {"test.txt":testfile}
+
+        virtual_fs = build_virtual_fs(input_structure, "testdir")
+        virtual_fs.source_path = td_path
+
+        self.virtual_fs = virtual_fs
+
+        self.td = td
+        self.testdir = td.name
+        self.file_path = Path("testdir", "test.txt")
+        self.testfile = testfile
+        
+
+    def teardown_method(self):
+        try:
+            self.td.cleanup()
+        except:
+            pass
+
+    
     def test_move_file(self):
-        with tempfile.TemporaryDirectory() as td:
-            # td/test/test.txt
-            td_path = Path(td)
-            test_path = td_path / "testdir"
-            testfile = Path(test_path, "test.txt")
-            test_path.mkdir(exist_ok=True, mode=0o777)
+        # move to td/test2/test/test.txt
+        outdir = Path(self.testdir, "test2")
+        final_path = Path(self.testdir, "test2", self.file_path)
 
-            with open(testfile, "w") as tf:
-                tf.write("test")
+        organizer.move_fs(
+            virtual_fs=self.virtual_fs,
+            output_dir=outdir,
+            should_execute=True,
+            backup_state=ExecBackupState.MOVE,
+        )
+        assert final_path.exists()
+        assert not self.testfile.exists()
+        assert not self.testfile.parent.exists()
 
-            input_structure = {"testdir": "test.txt"}
+    def test_copy_file(self):
+        outdir = Path(self.testdir, "test2")
+        final_path = Path(self.testdir, "test2", self.file_path)
 
-            virtual_fs = build_virtual_fs(input_structure, td)
-            virtual_fs.source_path = td_path
+        organizer.move_fs(
+            virtual_fs=self.virtual_fs,
+            output_dir=outdir,
+            should_execute=True,
+            backup_state=ExecBackupState.KEEP,
+        )
+        assert final_path.exists()
+        assert self.testfile.exists()
 
-            # move to td/test2/test/test.txt
-            outdir = Path(td, "test2")
-            final_path = Path(outdir, "test", "test.txt")
+    def test_move_in_place(self):
+        outdir = Path(self.testdir, "test2")
 
-            organizer.move_fs(
-                virtual_fs=virtual_fs,
-                output_dir=outdir,
-                should_execute=True,
-                backup_state=ExecBackupState.MOVE,
-            )
-            assert final_path.exists()
-            assert not testfile.exists()
+        virtual_fs = self.virtual_fs
+        virtual_fs.insert_intermediate_folder("intermediate")
+        virtual_fs.name = "test2"
+        final_path = Path(self.testdir, "test2", "intermediate", "test.txt")
+
+        organizer.move_fs(
+            virtual_fs=self.virtual_fs,
+            output_dir=outdir,
+            should_execute=True,
+            backup_state=ExecBackupState.DELETE,
+        )
+        assert final_path.exists()
+        assert not self.testfile.exists()
+        assert not self.testfile.parent.exists()

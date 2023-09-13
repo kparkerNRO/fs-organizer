@@ -46,7 +46,7 @@ class VirtualFolder:
             self.name = name
         else:
             self.name = path.name
-        self.subfolders = {}
+        self.contents = {}
 
     def is_dir(self):
         return True
@@ -61,13 +61,13 @@ class VirtualFolder:
         return self.add_virtual_subfolder(VirtualFolder(path))
 
     def add_virtual_subfolder(self, virtual_path):
-        if virtual_path.name not in self.subfolders:
-            self.subfolders[virtual_path.name] = virtual_path
+        if virtual_path.name not in self.contents:
+            self.contents[virtual_path.name] = virtual_path
         else:
-            duplicate_path = self.subfolders[virtual_path.name]
+            duplicate_path = self.contents[virtual_path.name]
             if isinstance(virtual_path, VirtualFolder):
                 # merge subfolders if the name is a duplicate
-                for subfolder in virtual_path.subfolders.values():
+                for subfolder in virtual_path.contents.values():
                     duplicate_path.add_virtual_subfolder(subfolder)
 
             else:
@@ -80,12 +80,12 @@ class VirtualFolder:
                     raise InsertException(
                         virtual_path.source_path, duplicate_path.source_path
                     )
-        return self.subfolders[virtual_path.name]
+        return self.contents[virtual_path.name]
 
     def get_subfolders_dict(self, show_files=True, show_file_count=False):
         subfolder_dict = {}
         file_count = 0
-        for subfolder_name, subfolder in self.subfolders.items():
+        for subfolder_name, subfolder in self.contents.items():
             if isinstance(subfolder, VirtualFile):
                 file_count += 1
                 if not show_files:
@@ -100,7 +100,7 @@ class VirtualFolder:
     def get_folders_dict(self, show_files=True, show_file_count=False):
         subfolder_dict = {}
         file_count = 0
-        for subfolder in self.subfolders.values():
+        for subfolder in self.contents.values():
             if isinstance(subfolder, VirtualFile):
                 file_count += 1
                 if not show_files:
@@ -116,31 +116,31 @@ class VirtualFolder:
 
     def insert_intermediate_folder(self, name):
         intermediate_folder = VirtualFolder(path=None, name=name)
-        intermediate_folder.subfolders = self.subfolders
-        self.subfolders = {name: intermediate_folder}
+        intermediate_folder.contents = self.contents
+        self.contents = {name: intermediate_folder}
 
     def count_files(self):
         total = 0
-        for folder in self.subfolders.values():
+        for folder in self.contents.values():
             total += folder.count_files()
         return total
 
     def __str__(self) -> str:
-        # return self.name + " -> " + len(self.subfolders)
-        return f"Virtual Folder: {self.name} -> {len(self.subfolders)} files"
+        # return self.name + " -> " + len(self.contents)
+        return f"Virtual Folder: {self.name} -> {len(self.contents)} files"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def __eq__(self, value: object) -> bool:
-        if self.name == value.name and len(self.subfolders) == len(value.subfolders):
+        if self.name == value.name and len(self.contents) == len(value.contents):
             subfolder_matches = 0
-            for name, subfolder in self.subfolders.items():
-                if name not in value.subfolders or subfolder != value.subfolders[name]:
+            for name, subfolder in self.contents.items():
+                if name not in value.contents or subfolder != value.contents[name]:
                     return False
                 else:
                     subfolder_matches += 1
-            return subfolder_matches == len(self.subfolders)
+            return subfolder_matches == len(self.contents)
 
         return False
 
