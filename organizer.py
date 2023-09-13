@@ -9,6 +9,8 @@ from pathlib import Path
 import click
 import os
 
+from common import ExecBackupState, FileMoveException, try_move_file
+
 from filename_utils import (
     split_view_type,
     process_file_name,
@@ -24,7 +26,6 @@ creator_removes = {
     "The Reclusive Cartographer": "_MC",
     "Baileywiki": "",
     "Unknown": "",
-    # "Samples": "",
     "Caeora": "",
     "DWW": "",
     "MAD Cartographer": "",
@@ -375,7 +376,9 @@ def clean_folder_names(virtual_fs: VirtualFolder):
     for subfile in virtual_fs.subfolders.values():
         if subfile.is_dir():
             sub_name = subfile.name
-            cleaned_name = clean_filename(sub_name, creator_removes, file_name_exceptions, replace_exceptions)
+            cleaned_name = clean_filename(
+                sub_name, creator_removes, file_name_exceptions, replace_exceptions
+            )
             subfile.name = cleaned_name
             clean_folder_names(subfile)
 
@@ -537,7 +540,56 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
     return virtual_fs
 
 
-def organize_fs(source: Path):
+def move_file(
+    file: VirtualFile, dest_path: Path, should_execute=True, should_copy=False
+):
+    source_path = file.source_path
+    destination = Path(dest_path, file.name)
+    try_move_file(source_path, destination, should_execute, should_copy)
+
+
+def move_folder(
+    virtual_fs: VirtualFolder, output_dir="", should_execute=True, should_copy=False
+):
+    output_path = Path(output_dir, virtual_fs.name)
+
+    for _, subfile in virtual_fs.subfolders.items():
+        if subfile.is_file():
+            move_file(subfile, output_path, should_execute, should_copy)
+        else:
+            move_folder(subfile, output_path, should_execute, should_copy)
+
+
+def move_fs(
+    virtual_fs: VirtualFolder,
+    output_dir="",
+    should_execute=True,
+    backup_state=ExecBackupState.MOVE,
+):
+    if backup_state == ExecBackupState.KEEP:  # copy
+        if not output_dir:
+            raise FileMoveException(
+                f"Cannot duplicate data with no specified output directory"
+            )
+        move_folder(virtual_fs, output_dir, should_execute, should_copy=True)
+    elif backup_state == ExecBackupState.MOVE:  # new folder
+        if not output_dir:
+            raise FileMoveException(
+                f"Cannot move data with no specified output directory"
+            )
+        move_folder(virtual_fs, output_dir, should_execute, should_copy=False)
+    elif backup_state == ExecBackupState.DELETE:  # in place
+        if output_dir:
+            print(
+                f"Folder re-org handed an output directory, but requested in-place"
+                + "modification. Will ignore output_dir."
+            )
+        move_folder(virtual_fs, "", should_execute, should_copy=False)
+
+
+def organize_fs(
+    source: Path, output_dir="", should_execute=False, backup_state=ExecBackupState.MOVE
+):
     import json
 
     print("Step 0: build the virtual FS", flush=True)
@@ -590,7 +642,8 @@ def organize_fs(source: Path):
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
-    # step 4: profit?
+    # step 4: do the work
+    move_fs(virtual_fs, output_dir, should_execute, backup_state)
 
 
 @click.command()
@@ -600,7 +653,7 @@ def organize_fs(source: Path):
 @click.option("--print_out", is_flag=True, default=False)
 def organize(path, exec, print_out):
     path_obj = Path(path)
-    organize_fs(path_obj)
+    organize_fs(path_obj, output_dir=".")
 
     # # Pass 1 - unzip files
     # # pass 2 - cleanup path names

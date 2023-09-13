@@ -1,4 +1,7 @@
+from enum import Enum
 from pathlib import Path
+import shutil
+ExecBackupState = Enum("ExecBackupState", ["KEEP", "MOVE", "DELETE"])
 
 VIEW_TYPES = {"Print", "VTT", "Key & Design Notes"}
 
@@ -30,7 +33,7 @@ def print_path_operation(operator, from_path, to_path=None, should_execute=False
             print(f"\t\tto \n\t'{to_path}'")
 
 
-def try_move_file(source_file: Path, target_dir, should_execute):
+def try_move_file(source_file: Path, target_dir:Path, should_execute, copy_file = False):
     # print_path_operation("move", source_file, target_dir)
     if should_execute:
         if not target_dir.exists():
@@ -40,7 +43,10 @@ def try_move_file(source_file: Path, target_dir, should_execute):
             print(f"Found a duplicate file: \n{source_file}\n\tto\n{target_dir}")
             return (source_file, file_path)
         else:
-            source_file.rename(file_path)
+            if copy_file:
+                shutil.copy2(source_file,file_path)                
+            else:
+                source_file.rename(file_path)
 
 
 def merge_directories(source_path: Path, dest_path: Path):

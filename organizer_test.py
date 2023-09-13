@@ -1,4 +1,5 @@
 import tempfile
+from common import ExecBackupState
 from virtual_folder import VirtualFile, VirtualFolder
 import organizer as organizer
 import logging
@@ -792,3 +793,34 @@ class TestPromoteGrandchildren:
             result_tree = virtual_fs.get_folders_dict()
 
             assert result_tree == expected
+
+
+class TestMoveFs:
+    def test_move_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            # td/test/test.txt
+            td_path = Path(td)
+            test_path = td_path / "testdir"
+            testfile = Path(test_path, "test.txt")
+            test_path.mkdir(exist_ok=True, mode=0o777)
+
+            with open(testfile, "w") as tf:
+                tf.write("test")
+
+            input_structure = {"testdir": "test.txt"}
+
+            virtual_fs = build_virtual_fs(input_structure, td)
+            virtual_fs.source_path = td_path
+
+            # move to td/test2/test/test.txt
+            outdir = Path(td, "test2")
+            final_path = Path(outdir, "test", "test.txt")
+
+            organizer.move_fs(
+                virtual_fs=virtual_fs,
+                output_dir=outdir,
+                should_execute=True,
+                backup_state=ExecBackupState.MOVE,
+            )
+            assert final_path.exists()
+            assert not testfile.exists()

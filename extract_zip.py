@@ -6,10 +6,14 @@ import pprint
 
 from pathlib import Path
 
-from common import FileMoveException, merge_directories, print_path_operation, try_move_file
-from filename_utils import clean_filename, clean_path
-
-from enum import Enum
+from common import (
+    ExecBackupState,
+    FileMoveException,
+    merge_directories,
+    print_path_operation,
+    try_move_file,
+)
+from filename_utils import clean_filename, clean_path, strip_part_from_base
 
 PATH_EXTRAS = " -,()/"
 
@@ -31,21 +35,6 @@ exceptions = {"The Clean": "Clean", "The": ""}
 replace_exceptions = {
     "ItW": "",
 }
-
-ZipBackupState = Enum("ZipBackupState", ["KEEP", "MOVE", "DELETE"])
-
-
-def _strip_part_from_base(base_name, part):
-    """
-    Removes a string "part" from the file name, removing any spaces or additional
-    folders (eg, avoids returning <path>//<name>)
-    """
-    output = base_name.replace(part, "")
-    output = re.sub("\s+", " ", output)
-    output = re.sub("\/\/", "/", output)
-    output = output.strip()
-
-    return output
 
 
 def _get_creator_index(parts):
@@ -89,13 +78,13 @@ def _clean_base_name(base_name, source_dir, parent_len=0):
     for part in creator_parts:
         if part in out_dir_name:
             # print(f"Stripping {part} from {out_dir_name}")
-            out_dir_name = _strip_part_from_base(out_dir_name, part)
+            out_dir_name = strip_part_from_base(out_dir_name, part)
             # print(f"got {out_dir_name}")
 
     # remove any creator-specific removals
     for creator, removes in creator_removes.items():
         if creator in str(source_dir) and removes != "":
-            out_dir_name = _strip_part_from_base(out_dir_name, removes)
+            out_dir_name = strip_part_from_base(out_dir_name, removes)
 
     # remove "part" naming
     out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
@@ -158,7 +147,7 @@ def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
     """
     Extracts a zip file to a similarly named directory and deletes the zip file
     """
-    print(f"\npreparing to unzip {zip_file}")
+    print(f"\npreparing to unzip {zip_file} to {out_dir}")
 
     dir = zip_file.parent
     current_path = Path(dir)
@@ -172,7 +161,7 @@ def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
     print(f"target dir: {out_dir_name}")
 
     # do the work
-    final_path = Path(out_dir, dir, out_dir_name)
+    final_path = Path(out_dir, out_dir_name)
 
     with zipfile.ZipFile(zip_file, "r") as zipref:
         zipPath = zipfile.Path(zipref)
@@ -199,29 +188,45 @@ def extract_zip_files(
     path: Path,
     out_dir: str = "",
     should_execute: bool = False,
-    zip_backup_state: ZipBackupState = ZipBackupState.KEEP,
+    zip_backup_state: ExecBackupState = ExecBackupState.KEEP,
     zip_backup_dir: str = "",
 ):
+    if not out_dir:
+        out_dir = path
+    elif isinstance(out_dir, str):
+        out_dir = Path(out_dir)
+
+    if zip_backup_dir and isinstance(zip_backup_dir, str):
+        zip_backup_dir = Path(zip_backup_dir)
+        
+    out_dir.mkdir(exist_ok=True)
+
     for p in path.iterdir():
         if p.is_dir():
-            extract_zip_files(p, out_dir, should_execute)
+            out_dir = out_dir / p.name
+            zip_backup_dir = zip_backup_dir / p.name
+            extract_zip_files(
+                p, out_dir, should_execute, zip_backup_state, zip_backup_dir
+            )
         elif p.suffix == ".zip":
             # if the file contains zipfiles, unzip those too
             zip_path = extract_zip(p, out_dir, should_execute)
             if should_execute:
-                extract_zip_files(zip_path, out_dir, should_execute)
+                extract_zip_files(
+                    zip_path, out_dir, should_execute, zip_backup_state, zip_backup_dir
+                )
 
-                if zip_backup_state == ZipBackupState.KEEP:
+                if zip_backup_state == ExecBackupState.KEEP:
                     # do nothing
                     pass
-                elif zip_backup_state == ZipBackupState.MOVE:
+                elif zip_backup_state == ExecBackupState.MOVE:
                     # move the zip to the new directory, and remove the current one
                     if not zip_backup_dir:
                         raise FileMoveException(
                             f"Cannot move zipfiles with no specified output directory"
                         )
-                    try_move_file(p, Path(zip_backup_dir, p, should_execute))
-                elif zip_backup_state == ZipBackupState.DELETE:
+                    try_move_file(p, zip_backup_dir / p.name, should_execute)
+                elif zip_backup_state == ExecBackupState.DELETE:
                     # remove the current one
                     p.unlink()
                 else:
@@ -243,16 +248,30 @@ def extract_zip_files(
 
 @click.command()
 @click.argument("path")
-@click.option("--zip", is_flag=True, default=False)
-@click.option("--exec", is_flag=True, default=False)
-def list_path(path, zip, exec):
+@click.option("--exec", "-e", is_flag=True, default=False)
+@click.option("--output", default="")
+@click.option("--backup_dir", default="")
+@click.option("--delete_files", "-D", is_flag=True, default=False)
+def list_path(path, exec, output, backup_dir, delete_files):
     # Pass 1 - unzip files
     # pass 2 - cleanup path names
     # pass 3 - re-organize folders, move final categorization to the bottom layer
     path_obj = Path(path)
 
-    if zip:
-        extract_zip_files(path_obj, should_execute=exec)
+    exec_format = ExecBackupState.KEEP
+    if delete_files:
+        if backup_dir:
+            exec_format = ExecBackupState.MOVE
+        else:
+            exec_format = ExecBackupState.DELETE
+
+    extract_zip_files(
+        path_obj,
+        should_execute=exec,
+        out_dir=output,
+        zip_backup_dir=backup_dir,
+        zip_backup_state=exec_format,
+    )
 
 
 if __name__ == "__main__":
