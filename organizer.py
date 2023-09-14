@@ -259,89 +259,6 @@ def update_virtual_folder(data: VirtualFolder, name):
     return root_folder
 
 
-def dict_to_virtualfs_nodes(input_dict: dict):
-    """
-    given a dictionary that represents a new virtual FS structure,
-    create a list of virtual FS nodes mapping to the keys of the input dict,
-
-    if a supplied folder has only a single file in it, the file is moved up
-    a level and the folder is dropped
-
-    input_dict is expected to be a dict mapping
-        str -> VirtualFolder
-        str -> dict(str -> list)
-
-    returns a list of VirtualFolder nodes
-    """
-
-    output_list = []
-    for name, data in input_dict.items():
-        if isinstance(data, (VirtualFile, VirtualFolder)):
-            if isinstance(data, VirtualFolder):
-                root_folder = VirtualFolder(data.source_path, name)
-
-                for _, folder in data.contents.items():
-                    root_folder.add_virtual_subfolder(folder)
-
-            else:
-                root_folder = VirtualFile(data.source_path)
-
-            # print(f"new base folder: {root_folder}")
-            output_list.append(root_folder)
-        else:
-            root_folder = VirtualFolder(None, name)
-            subfolders = dict_to_virtualfs_nodes(data)
-            for folder in subfolders:
-                root_folder.add_virtual_subfolder(folder)
-
-            output_list.append(root_folder)
-
-    return output_list
-
-
-def reorganize_virtualfs_old(virtual_fs: VirtualFolder):
-    """
-    creates a new virtual fs based on the existing one, where
-    folder names that include a path seperator get exploded into
-    subfiles
-    """
-
-    if isinstance(virtual_fs, VirtualFile):
-        return virtual_fs
-
-    # create the new hierarchy
-    new_structure = defaultdict(dict)
-    for subfile in virtual_fs.contents.values():
-        # if the name has a directory structure in it, explode the structure
-        if os.sep in subfile.name:
-            parts = subfile.name.split(os.sep)
-            head, *tail = parts
-            list_to_dict(new_structure[head], tail, subfile)
-        # if the subfile name is an empty string,
-        # we should promote the grandchild to this level
-        elif not subfile.name:
-            if isinstance(subfile, VirtualFolder):
-                for grandfile in subfile.contents.values():
-                    new_grandfile = reorganize_virtualfs_old(grandfile)
-                    new_structure[new_grandfile.name] = new_grandfile
-            else:
-                # or something's gone very wrong
-                raise FSException(grandfile)
-        else:
-            new_structure[subfile.name] = subfile
-
-    # create the new folder structure
-    new_fs_list = dict_to_virtualfs_nodes(new_structure)
-
-    new_root = VirtualFolder(virtual_fs.source_path, virtual_fs.name)
-    for new_subfolder in new_fs_list:
-        if isinstance(new_subfolder, VirtualFolder):
-            new_subfolder = reorganize_virtualfs_old(new_subfolder)
-        new_root.add_virtual_subfolder(new_subfolder)
-
-    return new_root
-
-
 def reorganize_virtualfs(virtual_fs: VirtualFolder, new_root: VirtualFolder = None):
     if not new_root:
         new_root = VirtualFolder(virtual_fs.source_path, virtual_fs.name)
@@ -549,6 +466,10 @@ def move_file(
     file: VirtualFile, dest_path: Path, should_execute=True, should_copy=False
 ):
     source_path = file.source_path
+    if source_path.parent == dest_path:
+        # if the file isn't actually moving, don't try to move it
+        return
+    
     # destination = Path(dest_path, file.name)
     try_move_file(source_path, dest_path, should_execute, should_copy)
 
@@ -569,13 +490,16 @@ def move_folder(
     if os.path.exists(filename):
         filename = os.path.basename(filename)
 
-    output_path = Path(output_dir, filename)
+    output_path = Path(output_dir)
 
     for _, subfile in virtual_fs.contents.items():
+        subpath = output_path
         if subfile.is_file():
-            move_file(subfile, output_path, should_execute, should_copy)
+            # subpath = output_path/filename
+            move_file(subfile, subpath, should_execute, should_copy)
         else:
-            move_folder(subfile, output_path, should_execute, should_copy)
+            subpath = output_path/subfile.name
+            move_folder(subfile, subpath, should_execute, should_copy)
 
 
 def move_fs(
@@ -675,25 +599,27 @@ def organize_fs(
 @click.option("--copy_data", "-c", is_flag=True, default=False)
 @click.option("--zip", "-z", is_flag=True, default=False)
 @click.option("--exec", "-e", is_flag=True, default=False)
-@click.option("--delete_zip" , "-d", is_flag=True, default=False)
-@click.option("--zip_backup_dir", default="")
+@click.option("--delete_zip" , "-D", is_flag=True, default=False)
+@click.option("--zip_backup_dir", default=None)
 def organize(path, output,copy_data, zip, exec, delete_zip, zip_backup_dir):
     path_obj = Path(path)
 
     # validate the inputs
-    if not output and not copy_data:
+    if not output and copy_data:
         print("Invalid flag, copy_data. Output must also be specified")
         return -1
 
     if zip:
         zip_exec_format = ZipBackupState.KEEP
-        if delete_zip:
+        if zip_backup_dir:
+            zip_exec_format = ZipBackupState.MOVE
+        elif delete_zip:
             if zip_backup_dir:
                 zip_exec_format = ZipBackupState.MOVE
             else:
                 zip_exec_format = ZipBackupState.DELETE
         if output and zip_backup_dir:
-            ZipBackupState.MOVE
+            zip_exec_format = ZipBackupState.MOVE
 
         extract_zip_files(
             path_obj,
@@ -704,15 +630,15 @@ def organize(path, output,copy_data, zip, exec, delete_zip, zip_backup_dir):
 
     
     
-    # exec_format = FileBackupState.IN_PLACE    
-    # if output:
-    #     if copy_data:
-    #         exec_format = FileBackupState.COPY
-    #     else:
-    #         exec_format = FileBackupState.MOVE
+    exec_format = FileBackupState.IN_PLACE    
+    if output:
+        if copy_data:
+            exec_format = FileBackupState.COPY
+        else:
+            exec_format = FileBackupState.MOVE
 
-    # organize_fs(path_obj, output_dir=output, should_execute=exec,
-    #             backup_state=exec_format)
+    organize_fs(path_obj, output_dir=output, should_execute=exec,
+                backup_state=exec_format)
 
 
 if __name__ == "__main__":

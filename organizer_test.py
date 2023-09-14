@@ -192,167 +192,6 @@ class TestOrganizeGroups:
         self.run_group_similar_folders(expected_results)
 
 
-class TestDictToVirtualFs:
-    def test_basic(self):
-        test_structure = {
-            "one": build_placeholder_file("one"),
-            "two": build_placeholder_file("two"),
-        }
-
-        expected_results = list(test_structure.values())
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-        assert results == expected_results
-
-    def test_empty_folder(self):
-        test_structure = {
-            "one": VirtualFolder(None, "one"),
-        }
-
-        expected_results = list(test_structure.values())
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-        assert results == expected_results
-
-    # def test_only_one_subfolder(self):
-    #     virtual_fs = VirtualFolder(None, "one")
-    #     virtuals_child = build_placeholder_file("two")
-    #     virtual_fs.add_virtual_subfolder(virtuals_child)
-    #     grandchild = list(virtuals_child.contents.values())[0]
-    #     output = VirtualFolder(None, "out")
-    #     output.add_virtual_subfolder(grandchild)
-
-    #     test_structure = {
-    #         "out": virtual_fs,
-    #     }
-
-    #     results = organizer.dict_to_virtualfs_nodes(test_structure)
-
-    #     expected_results = [output]
-
-    #     assert results == expected_results
-
-    def test_multiple_subfolders(self):
-        virtual_fs = VirtualFolder(None, "one")
-        child1 = build_placeholder_file("two")
-        child2 = build_placeholder_file("three")
-        virtual_fs.add_virtual_subfolder(child1)
-        virtual_fs.add_virtual_subfolder(child2)
-
-        output = VirtualFolder(None, "out")
-        output.add_virtual_subfolder(child1)
-        output.add_virtual_subfolder(child2)
-
-        test_structure = {
-            "out": virtual_fs,
-        }
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-
-        expected_results = [output]
-
-        assert results == expected_results
-
-    def test_new_heirarchy(self):
-        virtual_fs = VirtualFolder(None, "one")
-        child1 = build_placeholder_file("two")
-        child2 = build_placeholder_file("three")
-        virtual_fs.add_virtual_subfolder(child1)
-        virtual_fs.add_virtual_subfolder(child2)
-
-        test_structure = {
-            "test": {"out": virtual_fs},
-        }
-
-        output = VirtualFolder(None, "test")
-        output_child = VirtualFolder(None, "out")
-
-        output.add_virtual_subfolder(output_child)
-        output_child.add_virtual_subfolder(child1)
-        output_child.add_virtual_subfolder(child2)
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-
-        result_tree = results[0].get_folders_dict()
-        expected_tree = output.get_folders_dict()
-
-        assert result_tree == expected_tree
-
-    def test_three_deep(self):
-        virtual_fs = VirtualFolder(None, "one")
-        child1 = build_placeholder_file("two")
-        child2 = build_placeholder_file("three")
-        virtual_fs.add_virtual_subfolder(child1)
-        virtual_fs.add_virtual_subfolder(child2)
-
-        test_structure = {
-            "test": {
-                "first": {"out": virtual_fs},
-            }
-        }
-
-        output = VirtualFolder(None, "test")
-        output_g1 = VirtualFolder(None, "first")
-        output_g2 = VirtualFolder(None, "out")
-
-        output.add_virtual_subfolder(output_g1)
-        output_g1.add_virtual_subfolder(output_g2)
-        output_g2.add_virtual_subfolder(child1)
-        output_g2.add_virtual_subfolder(child2)
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-        result_tree = results[0].get_folders_dict()
-        expected_tree = output.get_folders_dict()
-
-        assert result_tree == expected_tree
-
-    def test_two_subfolders(self):
-        child1 = build_placeholder_file("two")
-        child2 = build_placeholder_file("three")
-
-        test_structure = {
-            "test": {
-                "first": child1,
-                "second": child2,
-            }
-        }
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-        result_tree = results[0].get_folders_dict()
-
-        expected_structure = {"test": {"first": TESTFILE_DICT, "second": TESTFILE_DICT}}
-
-        assert result_tree == expected_structure
-
-    def test_two_subfolders_three_deep(self):
-        child1 = build_placeholder_file("two")
-        child2 = build_placeholder_file("three")
-
-        test_structure = {
-            "test": {
-                "data": {
-                    "first": child1,
-                    "second": child2,
-                },
-                "data2": {
-                    "first": child1,
-                    "second": child2,
-                },
-            }
-        }
-
-        results = organizer.dict_to_virtualfs_nodes(test_structure)
-        result_tree = results[0].get_folders_dict()
-
-        expected_structure = {
-            "test": {
-                "data": {"first": TESTFILE_DICT, "second": TESTFILE_DICT},
-                "data2": {"first": TESTFILE_DICT, "second": TESTFILE_DICT},
-            }
-        }
-
-        assert result_tree == expected_structure
-
-
 class TestReorganizeFs:
     def test_basic(self):
         test_structure = {
@@ -829,7 +668,7 @@ class TestMoveFs:
     def test_move_file(self):
         # move to td/test2/test/test.txt
         outdir = Path(self.testdir, "test2")
-        final_path = Path(self.testdir, "test2", self.file_path)
+        final_path = Path(self.testdir, "test2", "test.txt")
 
         organizer.move_fs(
             virtual_fs=self.virtual_fs,
@@ -843,7 +682,7 @@ class TestMoveFs:
 
     def test_copy_file(self):
         outdir = Path(self.testdir, "test2")
-        final_path = Path(self.testdir, "test2", self.file_path)
+        final_path = Path(self.testdir, "test2", "test.txt")
 
         organizer.move_fs(
             virtual_fs=self.virtual_fs,
@@ -860,7 +699,7 @@ class TestMoveFs:
         virtual_fs = self.virtual_fs
         virtual_fs.insert_intermediate_folder("intermediate")
         virtual_fs.name = "test2"
-        final_path = Path(self.testdir, "test2", "intermediate", "test.txt")
+        final_path = Path(self.testdir, "intermediate", "test.txt")
 
         organizer.move_fs(
             virtual_fs=self.virtual_fs,

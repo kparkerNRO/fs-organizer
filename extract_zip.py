@@ -167,7 +167,6 @@ def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
         zipPath = zipfile.Path(zipref)
         zip_children = [p.name for p in zipPath.iterdir()]
         if filename in zip_children:
-            # print(f"Zipfile {zip_file} has a redundant directory")
             if should_execute:
                 # extract to current dir then rename to the target path
                 extract_zip_without_hidden_files(zipref, current_path)
@@ -193,12 +192,16 @@ def extract_zip_files(
 ):
     if not out_dir:
         out_dir = path
-    elif isinstance(out_dir,str) and len(out_dir) == 0:
+    elif isinstance(out_dir, str) and len(out_dir) == 0:
         out_dir = path
     elif isinstance(out_dir, str):
         out_dir = Path(out_dir)
 
-    if zip_backup_dir and isinstance(zip_backup_dir, str):
+    if not zip_backup_dir:
+        zip_backup_dir = ""
+    elif (
+        zip_backup_dir and isinstance(zip_backup_dir, str) and len(zip_backup_dir) != 0 
+    ):
         zip_backup_dir = Path(zip_backup_dir)
 
     for p in path.iterdir():
@@ -226,7 +229,7 @@ def extract_zip_files(
                         raise FileMoveException(
                             f"Cannot move zipfiles with no specified output directory"
                         )
-                    zip_backup_dir.mkdir(exist_ok=True)
+                    zip_backup_dir.mkdir(exist_ok=True, parents=True)
                     try_move_file(p, zip_backup_dir, should_execute)
                 elif zip_backup_state == ZipBackupState.DELETE:
                     # remove the current one
