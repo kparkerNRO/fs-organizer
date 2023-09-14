@@ -1,6 +1,8 @@
 from enum import Enum
 from pathlib import Path
 import shutil
+import filecmp
+import os
 
 ZipBackupState = Enum("ExecBackupState", ["KEEP", "MOVE", "DELETE"])
 FileBackupState = Enum("FileBackupState", ["COPY", "MOVE", "IN_PLACE"])
@@ -32,7 +34,7 @@ def print_path_operation(operator, from_path, to_path=None, should_execute=False
         if to_path:
             print(f"\t\tto \n\t'{to_path}'")
     else:
-        print(f"{operator[:-1]}ing:\n\t{from_path}")
+        print(f"{operator}ing:\n\t{from_path}")
         if to_path:
             print(f"\t\tto \n\t'{to_path}'")
 
@@ -44,13 +46,24 @@ def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file
             target_dir.mkdir(parents=True, exist_ok=True)
         file_path = target_dir / source_file.name
         if file_path.exists():
-            print(f"Found a duplicate file: \n{source_file}\n\tto\n{target_dir}")
-            return (source_file, file_path)
-        else:
-            if copy_file:
-                shutil.copy2(source_file, file_path)
+            print(f"Found a duplicate file moving \n{source_file}\n\tto\n{target_dir}")
+            if not filecmp.cmp(file_path, source_file):
+                # TODO support 2+
+                basename, ext = os.path.split(file_path)
+                new_file_path = basename + "-1." + ext
+                print(f"\tFiles are different. Renaming {file_path} to {new_file_path}")
+                file_path = target_dir/new_file_path
             else:
-                source_file.rename(file_path)
+                print("\tfiles are identical")
+                if not copy_file: 
+                    print("\tRemoving original file")
+                    source_file.unlink()
+                    return
+        
+        if copy_file:
+            shutil.copy2(source_file, file_path)
+        else:
+            source_file.rename(file_path)
 
 
 def merge_directories(source_path: Path, dest_path: Path):
