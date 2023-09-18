@@ -1,6 +1,6 @@
 from pathlib import Path
 import filecmp
-
+import os
 
 class InsertException(Exception):
     def __init__(self, source_path: Path, target_path: Path):
@@ -60,6 +60,51 @@ class VirtualFolder:
     def add_subfolder(self, path: Path):
         return self.add_virtual_subfolder(VirtualFolder(path))
 
+    def add_virtual_file(self, file: VirtualFile):
+        name = file.name
+        if name in self.contents:
+            count = 1
+            basename, ext = os.path.splitext(name)
+            while name in self.contents:
+                name = f"{basename}-{count}{ext}"
+                count+=1
+            file.name = name
+        self.contents[name] = file
+
+    def merge_subfolders(self, virtual_path):
+        if virtual_path.name not in self.contents:
+            self.contents[virtual_path.name] = virtual_path
+            return True
+        else:
+            duplicate_path = self.contents[virtual_path.name]
+            if isinstance(virtual_path, VirtualFolder):
+                # merge subfolders if the name is a duplicate
+                key_list = list(virtual_path.contents.keys())
+                full_transfer = True
+                for subfolder_key in key_list:
+                    subfolder = virtual_path.contents[subfolder_key]
+                    added_file = duplicate_path.merge_subfolders(subfolder)
+                    if added_file:
+                        virtual_path.contents.pop(subfolder_key)
+                    else:
+                        full_transfer = False
+                
+                return full_transfer
+            elif isinstance(virtual_path, VirtualFile):
+                compare = filecmp.cmp(
+                    virtual_path.source_path, duplicate_path.source_path
+                )
+                if compare: 
+                    # if they are identical, do nothing
+                    pass
+                else:
+                    self.add_virtual_file(virtual_path)
+
+                return not compare
+            
+        return False
+                    
+
     def add_virtual_subfolder(self, virtual_path):
         if virtual_path.name not in self.contents:
             self.contents[virtual_path.name] = virtual_path
@@ -80,6 +125,8 @@ class VirtualFolder:
                     raise InsertException(
                         virtual_path.source_path, duplicate_path.source_path
                     )
+                else:
+                    print(f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}")
         return self.contents[virtual_path.name]
 
     def get_subfolders_dict(self, show_files=True, show_file_count=False):
