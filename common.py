@@ -65,6 +65,8 @@ def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file
         else:
             source_file.rename(file_path)
 
+        return file_path
+
 
 def merge_directories(source_path: Path, dest_path: Path):
     if source_path == dest_path:

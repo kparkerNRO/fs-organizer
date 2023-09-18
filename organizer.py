@@ -9,12 +9,9 @@ from pathlib import Path
 import click
 import os
 from extract_zip import extract_zip_files
+from pprint import pprint
 
-from common import (
-    FileBackupState, 
-    ZipBackupState, 
-    FileMoveException, 
-    try_move_file)
+from common import FileBackupState, ZipBackupState, FileMoveException, try_move_file
 
 from filename_utils import (
     split_view_type,
@@ -36,6 +33,7 @@ creator_removes = {
     "MAD Cartographer": "",
     "MikWewa": "$5 Map Rewards",
     "Tom Cartos": "Tier 2+",
+    "Borough Bound": "Chief Courier Reward"
 }
 
 file_name_exceptions = {"The Clean": "Clean", "The": ""}
@@ -343,13 +341,9 @@ def promote_grandchildren(
     }
     grandnames_to_remove = []
     for grandname, grandchild in granchildren.items():
-        try:
-            root_folder.add_virtual_subfolder(grandchild)
+        file_moved = root_folder.merge_subfolders(grandchild)
+        if file_moved:
             grandnames_to_remove.append(grandname)
-        except InsertException as e:
-            print("Unable to merge duplicate files. Conflict occured between")
-            print(f"\t{e.source_path}")
-            print(f"\t{e.target_path}")
 
     for grandname in grandnames_to_remove:
         subfolder.contents.pop(grandname)
@@ -370,14 +364,17 @@ def remove_extra_folders(virtual_fs):
     """
 
     folders_moved = True
+    iteration_count = 0
 
-    while folders_moved:
+    while folders_moved and iteration_count <= 10:
         folders_moved = False
         folders_to_promote = defaultdict(list)
         empty_subfolders = []
 
         for sub_name, subfile in virtual_fs.contents.items():
             if subfile.is_dir():
+                remove_extra_folders(subfile)
+                
                 if subfile.name == "Base" and isinstance(subfile, VirtualFolder):
                     for key, grandfile in subfile.contents.items():
                         if grandfile.is_dir():
@@ -390,9 +387,8 @@ def remove_extra_folders(virtual_fs):
                 elif len(subfile.contents) == 0:
                     empty_subfolders.append(sub_name)
 
-                remove_extra_folders(subfile)
 
-        unpromoted_folders = []
+        unpromoted_folders = set()
         for subfile, grandchildren in folders_to_promote.items():
             promoted_grandchildren = promote_grandchildren(
                 virtual_fs, subfile, grandchildren
@@ -402,7 +398,7 @@ def remove_extra_folders(virtual_fs):
                 current_unpromoted = [
                     x for x in grandchildren if x not in promoted_grandchildren
                 ]
-                unpromoted_folders.extend(current_unpromoted)
+                unpromoted_folders |= set(current_unpromoted)
 
         for unpromoted in unpromoted_folders:
             folders_to_promote.pop(unpromoted)
@@ -412,6 +408,12 @@ def remove_extra_folders(virtual_fs):
             virtual_fs.contents.pop(subname)
 
         folders_moved = len(folders_to_promote) > 0 or len(empty_subfolders) > 0
+        iteration_count += 1
+
+    if iteration_count == 10:
+        raise FileMoveException(
+            f"Too many iterations when processing directory {virtual_fs.name}"
+        )
 
     return virtual_fs
 
@@ -466,10 +468,7 @@ def move_file(
     file: VirtualFile, dest_path: Path, should_execute=True, should_copy=False
 ):
     source_path = file.source_path
-    if source_path.parent == dest_path:
-        # if the file isn't actually moving, don't try to move it
-        return
-    
+
     # destination = Path(dest_path, file.name)
     try_move_file(source_path, dest_path, should_execute, should_copy)
 
@@ -498,7 +497,7 @@ def move_folder(
             # subpath = output_path/filename
             move_file(subfile, subpath, should_execute, should_copy)
         else:
-            subpath = output_path/subfile.name
+            subpath = output_path / subfile.name
             move_folder(subfile, subpath, should_execute, should_copy)
 
 
@@ -599,15 +598,22 @@ def organize_fs(
 @click.option("--copy_data", "-c", is_flag=True, default=False)
 @click.option("--zip", "-z", is_flag=True, default=False)
 @click.option("--exec", "-e", is_flag=True, default=False)
-@click.option("--delete_zip" , "-D", is_flag=True, default=False)
+@click.option("--delete_zip", "-D", is_flag=True, default=False)
 @click.option("--zip_backup_dir", default=None)
-def organize(path, output,copy_data, zip, exec, delete_zip, zip_backup_dir):
+def organize(path, output, copy_data, zip, exec, delete_zip, zip_backup_dir):
     path_obj = Path(path)
 
     # validate the inputs
     if not output and copy_data:
         print("Invalid flag, copy_data. Output must also be specified")
         return -1
+
+    exec_format = FileBackupState.IN_PLACE
+    if output:
+        if copy_data:
+            exec_format = FileBackupState.COPY
+        else:
+            exec_format = FileBackupState.MOVE
 
     if zip:
         zip_exec_format = ZipBackupState.KEEP
@@ -628,17 +634,9 @@ def organize(path, output,copy_data, zip, exec, delete_zip, zip_backup_dir):
             zip_backup_dir=zip_backup_dir,
         )
 
-    
-    
-    exec_format = FileBackupState.IN_PLACE    
-    if output:
-        if copy_data:
-            exec_format = FileBackupState.COPY
-        else:
-            exec_format = FileBackupState.MOVE
-
-    organize_fs(path_obj, output_dir=output, should_execute=exec,
-                backup_state=exec_format)
+    organize_fs(
+        path_obj, output_dir=output, should_execute=exec, backup_state=exec_format
+    )
 
 
 if __name__ == "__main__":

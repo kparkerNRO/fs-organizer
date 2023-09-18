@@ -244,8 +244,13 @@ class TestReorganizeFs:
 
 
 class TestReorganizeTree:
+    def setup_method(self):
+        self.testfile = tempfile.NamedTemporaryFile(delete=True)
+
+    def teardown_method(self):
+        self.testfile.close()
     def test_inversion(self):
-        base_tree = {"a": {"b": {"c": {"d": {}}}}}
+        base_tree = {"a": {"b": {"c": {"d": {"testfile.txt": self.testfile.name}}}}}
 
         frequencies = {"root": 0, "a": 5, "b": 4, "c": 3, "d": 2}
         expected_result = {"root": {"d": {"c": {"b": {"a": TESTFILE_DICT}}}}}
@@ -257,7 +262,7 @@ class TestReorganizeTree:
         assert result_tree == expected_result
 
     def test_multiple_folders(self):
-        base_tree = {"a": {"b": {"e": {}}, "c": {"e": {}}}}
+        base_tree = {"a": {"b": {"e": {}}, "c": {"e": {"testfile.txt": self.testfile.name}}}}
 
         frequencies = {"root": 0, "a": 5, "b": 4, "c": 3, "d": 2, "e": 10}
         expected_result = {
@@ -276,24 +281,24 @@ class TestReorganizeTree:
                 "PDF": {
                     "sample_folder": {
                         "day": {
-                            "base": {"sample_file": {}},
-                            "tile": {"sample_file": {}},
+                            "base": {"sample_file": self.testfile.name},
+                            "tile": {"sample_file": self.testfile.name},
                         },
-                        "night": {"sample_file": {}},
+                        "night": {"sample_file": self.testfile.name},
                     },
-                    "sample_file": {},
+                    "sample_file": self.testfile.name,
                 },
                 "VTT": {
                     "sample_folder": {
                         "day": {
-                            "base": {"sample_file": {}},
-                            "tile": {"sample_file": {}},
+                            "base": {"sample_file": self.testfile.name},
+                            "tile": {"sample_file": self.testfile.name},
                         },
-                        "night": {"sample_file": {}},
+                        "night": {"sample_file": self.testfile.name},
                     },
-                    "sample_file": {},
+                    "sample_file": self.testfile.name,
                 },
-                "sample_file": {},
+                "sample_file": self.testfile.name,
             }
         }
 
@@ -313,19 +318,19 @@ class TestReorganizeTree:
         expected_result = {
             "root": {
                 "tom": {
-                    "PDF": {"sample_file": TESTFILE_DICT},
-                    "VTT": {"sample_file": TESTFILE_DICT},
-                    "sample_file": TESTFILE_DICT,
+                    "PDF": {"sample_file": ""},
+                    "VTT": {"sample_file": ""},
+                    "sample_file": "",
                     "sample_folder": {
                         "PDF": {
-                            "base": {"day": {"sample_file": TESTFILE_DICT}},
-                            "day": {"tile": {"sample_file": TESTFILE_DICT}},
-                            "night": {"sample_file": TESTFILE_DICT},
+                            "base": {"day": {"sample_file": ""}},
+                            "day": {"tile": {"sample_file": ""}},
+                            "night": {"sample_file": ""},
                         },
                         "VTT": {
-                            "base": {"day": {"sample_file": TESTFILE_DICT}},
-                            "day": {"tile": {"sample_file": TESTFILE_DICT}},
-                            "night": {"sample_file": TESTFILE_DICT},
+                            "base": {"day": {"sample_file": ""}},
+                            "day": {"tile": {"sample_file": ""}},
+                            "night": {"sample_file": ""},
                         },
                     },
                 }
@@ -346,7 +351,7 @@ class TestRemoveExtraFolders:
     def test_promote_base_subfolder(self):
         test_structure = {
             "test": {
-                "base": {
+                "Base": {
                     "first": {"sample_file": {}, "second_sample": {}},
                 },
             }
@@ -355,10 +360,8 @@ class TestRemoveExtraFolders:
         expected_output = {
             "root": {
                 "test": {
-                    "first": {
                         "sample_file": TESTFILE_DICT,
                         "second_sample": TESTFILE_DICT,
-                    }
                 }
             }
         }
@@ -421,14 +424,14 @@ class TestRemoveExtraFolders:
     def test_promote_base_subfolder_plus_file(self):
         test_structure = {
             "test": {
-                "base": {"sample_file": {}},
+                "base": {"sample_file": "testfile"},
             },
         }
 
         expected_output = {
             "root": {
                 "test": {
-                    "sample_file": TESTFILE_DICT,
+                    "sample_file": "",
                 }
             }
         }
@@ -442,11 +445,11 @@ class TestRemoveExtraFolders:
     def test_promote_single_subfolder(self):
         test_structure = {
             "test": {
-                "first": {"sample_file": {}},
+                "first": {"sample_file": "testfile"},
             },
         }
 
-        expected_output = {"root": {"test": {"sample_file": TESTFILE_DICT}}}
+        expected_output = {"root": {"test": {"sample_file": ""}}}
 
         virtual_fs = build_virtual_fs(test_structure)
         result = organizer.remove_extra_folders(virtual_fs)
@@ -456,16 +459,20 @@ class TestRemoveExtraFolders:
 
     def test_remove_empty_folder(self):
         test_structure = {
-            "test": {"first": {"sample_file": {}, "second_file": {}}, "second": None},
+            "test": {
+                "first": {
+                    "sample_file": "testfile", 
+                    "second_file": "testfile"
+                }, 
+                "second": None
+            },
         }
 
         expected_output = {
             "root": {
                 "test": {
-                    "first": {
-                        "sample_file": TESTFILE_DICT,
-                        "second_file": TESTFILE_DICT,
-                    },
+                        "sample_file": "",
+                        "second_file": "",
                 }
             }
         }
@@ -479,8 +486,8 @@ class TestRemoveExtraFolders:
     def test_nested_conditions(self):
         test_structure = {
             "test": {
-                "base": {
-                    "first": {"sample_file": {}},
+                "Base": {
+                    "first": {"sample_file": "testfile"},
                 }
             },
         }
@@ -488,7 +495,7 @@ class TestRemoveExtraFolders:
         expected_output = {
             "root": {
                 "test": {
-                    "first": TESTFILE_DICT,
+                    "sample_file": "",
                 },
             }
         }
@@ -502,19 +509,19 @@ class TestRemoveExtraFolders:
     def test_nested_bases(self):
         test_structure = {
             "base": {
-                "base": {"base": {"sample_file": {}}},
-                "test2": {},
+                "base": {"base": {"sample_file": "testfile"}},
+                "test2": "testfile",
             },
-            "test1": {},
+            "test1": "testfile",
         }
 
         expected_output = {
             "test": {
                 "base": {
-                    "base": {"sample_file": TESTFILE_DICT},
-                    "test2": TESTFILE_DICT,
+                    "base": {"sample_file": ""},
+                    "test2": "",
                 },
-                "test1": TESTFILE_DICT,
+                "test1": "",
             }
         }
 
@@ -546,17 +553,18 @@ class TestPromoteGrandchildren:
             basenname = filePath.name
             test_data = {
                 "child": {filePath},
+                basenname: filePath
             }
 
-            expected = {"root": {basenname: ""}}
+            expected = {"root": {basenname: "", "child": {basenname: ""}}}
 
             virtual_fs = build_virtual_fs(test_data)
-            virtual_fs.add_file(filePath)
 
-            organizer.promote_grandchildren(virtual_fs, "child", [basenname])
+            to_remove = organizer.promote_grandchildren(virtual_fs, "child", [basenname])
             result_tree = virtual_fs.get_folders_dict()
 
             assert result_tree == expected
+            assert to_remove == []
 
     def test_duplicate_filename(self):
         with tempfile.NamedTemporaryFile() as file1, tempfile.NamedTemporaryFile() as file2:
@@ -572,7 +580,7 @@ class TestPromoteGrandchildren:
             dupe_file.name = basenname
             test_data = {"child": {basenname: filePath}, basenname: dupe_file}
 
-            expected = {"root": {"child": {basenname: ""}, basenname: ""}}
+            expected = {"root":  {basenname: "", f"{basenname}-1": ""}}
 
             virtual_fs = build_virtual_fs(test_data)
 
