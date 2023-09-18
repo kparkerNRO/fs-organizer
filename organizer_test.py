@@ -1,68 +1,16 @@
 import tempfile
 from common import FileBackupState
-from virtual_folder import VirtualFile, VirtualFolder
+from virtual_folder import VirtualFile
 import organizer as organizer
 import logging
 from pathlib import Path
 import json
+from test_utils import build_virtual_fs
 
 log = logging.getLogger("organizer_v2_test")
 log.setLevel("INFO")
 
 TESTFILE_DICT = {"testfile.txt": ""}
-
-
-def create_virtual_file(input, key=""):
-    if isinstance(input, str):
-        vf = VirtualFile(Path(input))
-    if isinstance(input, Path):
-        vf = VirtualFile(input)
-    if isinstance(input, VirtualFile):
-        vf = input
-
-    if key:
-        vf.name = key
-
-    return vf
-
-
-def build_virtual_fs_recursive(root_node: VirtualFolder, structure: dict):
-    if isinstance(structure, VirtualFile):
-        return structure
-
-    for key, data in structure.items():
-        folder = VirtualFolder(path=None, name=key)
-        root_node.add_virtual_subfolder(folder)
-        if isinstance(data, (str, Path, VirtualFile)):
-            root_node.contents.pop(key, None)
-            virtual_node = create_virtual_file(data, key)
-            root_node.add_virtual_subfolder(virtual_node)
-        elif isinstance(data, set):
-            for entry in data:
-                if isinstance(data, (Path, VirtualFile)):
-                    root_node.contents.pop(key, None)
-                    virtual_node = create_virtual_file(entry)
-                    root_node.add_virtual_subfolder(virtual_node)
-                else:
-                    folder.add_file(Path(entry))
-        elif data is None:
-            continue
-        elif data:
-            build_virtual_fs_recursive(folder, data)
-        else:
-            folder.add_file(Path("./testfile.txt"))
-
-
-def build_virtual_fs(structure: dict, root_name="root"):
-    folder = VirtualFolder(path=None, name=root_name)
-    build_virtual_fs_recursive(folder, structure)
-    return folder
-
-
-def build_placeholder_file(name):
-    folder = VirtualFolder(path=None, name=name)
-    folder.add_file(Path("./testfile.txt"))
-    return folder
 
 
 class TestOrganizeGroups:
