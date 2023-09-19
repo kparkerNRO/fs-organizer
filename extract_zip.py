@@ -13,7 +13,7 @@ from common import (
     print_path_operation,
     try_move_file,
 )
-from filename_utils import clean_filename, clean_path, strip_part_from_base
+from filename_utils import clean_filename, clean_path
 
 PATH_EXTRAS = " -,()/"
 
@@ -37,98 +37,6 @@ replace_exceptions = {
 }
 
 
-def _get_creator_index(parts):
-    for name in creator_removes.keys():
-        try:
-            name_index = parts.index(name)
-            return name_index
-        except ValueError:
-            continue
-
-    return 0
-
-
-def _clean_base_name(base_name, source_dir, parent_len=0):
-    # print(f"starting with '{source_dir}' - '{base_name}'")
-
-    if not base_name:
-        return ""
-
-    out_dir_name = base_name
-
-    # remove myairbrigde tags
-    if "myairbridge" in base_name:
-        out_dir_name = base_name.replace("myairbridge-", "")
-
-    # convert underscores into spaces or 's'
-    if "_" in base_name and base_name != "_Unsorted":
-        if "_s" in base_name:
-            out_dir_name = base_name.replace("_s", "s")
-
-        else:
-            out_dir_name = base_name.replace("_", " ")
-
-    # process duplicate entries in the path
-    parts = source_dir.parts
-    if not parent_len:
-        index = _get_creator_index(parts)
-    else:
-        index = parent_len
-    creator_parts = list(parts)[index:]
-    for part in creator_parts:
-        if part in out_dir_name:
-            # print(f"Stripping {part} from {out_dir_name}")
-            out_dir_name = strip_part_from_base(out_dir_name, part)
-            # print(f"got {out_dir_name}")
-
-    # remove any creator-specific removals
-    for creator, removes in creator_removes.items():
-        if creator in str(source_dir) and removes != "":
-            out_dir_name = strip_part_from_base(out_dir_name, removes)
-
-    # remove "part" naming
-    out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
-    out_dir_name = re.sub("\s*Part\s*\d*", "", out_dir_name)
-    out_dir_name = re.sub("\/\s*\d+\s*", "", out_dir_name)
-    out_dir_name = out_dir_name.strip(" ()")
-
-    # remove file dimensions
-    out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
-
-    # remove special case exceptions
-    for exception, replace in exceptions.items():
-        if out_dir_name == exception:
-            out_dir_name = replace
-            break
-
-    for exception, replace in replace_exceptions.items():
-        if exception in out_dir_name:
-            out_dir_name = out_dir_name.replace(exception, replace)
-
-    # remove numbers at the start and end of the name
-    out_dir_name = re.sub("^#?\d{0,2}\s*", "", out_dir_name)
-    out_dir_name = re.sub("#?\d{0,2}\s*$", "", out_dir_name)
-
-    # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)
-
-    # cleanup whitespace
-    out_dir_name = out_dir_name.replace("(", " ")
-    out_dir_name = re.sub("\s+", " ", out_dir_name)
-    out_dir_name = re.sub("--", " ", out_dir_name)
-    out_dir_name = re.sub("-\s+-", " ", out_dir_name)
-    out_dir_name = out_dir_name.strip(PATH_EXTRAS)
-
-    # cleanup number only entries
-    out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
-
-    if len(out_dir_name) == 1:
-        out_dir_name = ""
-
-    # print(f"ending with '{source_dir}' - '{out_dir_name}'\n")
-
-    return out_dir_name
-
-
 def extract_zip_without_hidden_files(zipref, final_path):
     if not final_path.exists():
         final_path.mkdir(parents=True)
@@ -143,7 +51,14 @@ def extract_zip_without_hidden_files(zipref, final_path):
             continue
 
 
-def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
+def extract_zip(
+    zip_file: Path,
+    out_dir: str = "",
+    should_execute=True,
+    module_dir="",
+    preserve_modules=True,
+    copy_modules=True,
+):
     """
     Extracts a zip file to a similarly named directory and deletes the zip file
     """
@@ -160,13 +75,23 @@ def extract_zip(zip_file: Path, out_dir: str = "", should_execute=True):
     out_dir_name = clean_path(out_dir_name, str(dir))
     print(f"target dir: {out_dir_name}")
 
+
     # do the work
     final_path = Path(out_dir, out_dir_name)
 
     with zipfile.ZipFile(zip_file, "r") as zipref:
         zipPath = zipfile.Path(zipref)
         zip_children = [p.name for p in zipPath.iterdir()]
-        if filename in zip_children:
+        if preserve_modules and "module.json" in zip_children:
+            print(f"File {filename} is a foundry module, moving to {module_dir}")
+            try_move_file(
+                zip_file,
+                Path(module_dir),
+                should_execute=should_execute,
+                copy_file=copy_modules,
+            )
+            return
+        elif filename in zip_children:
             if should_execute:
                 # extract to current dir then rename to the target path
                 extract_zip_without_hidden_files(zipref, current_path)
@@ -189,6 +114,9 @@ def extract_zip_files(
     should_execute: bool = False,
     zip_backup_state: ZipBackupState = ZipBackupState.KEEP,
     zip_backup_dir: str = "",
+    module_dir=None,
+    preserve_modules=True,
+    copy_modules=True,
 ):
     if not out_dir:
         out_dir = path
@@ -200,24 +128,51 @@ def extract_zip_files(
     if not zip_backup_dir:
         zip_backup_dir = ""
     elif (
-        zip_backup_dir and isinstance(zip_backup_dir, str) and len(zip_backup_dir) != 0 
+        zip_backup_dir and isinstance(zip_backup_dir, str) and len(zip_backup_dir) != 0
     ):
         zip_backup_dir = Path(zip_backup_dir)
+
+    if not module_dir:
+        module_dir = Path(out_dir, "modules")
+    elif isinstance(module_dir, str):
+        module_dir = Path(module_dir)
 
     for p in path.iterdir():
         if p.is_dir():
             sub_out_dir = out_dir / p.name
             next_zip_backup_dir = zip_backup_dir / p.name
+            next_module_dir = module_dir / p.name
             extract_zip_files(
-                p, sub_out_dir, should_execute, zip_backup_state, next_zip_backup_dir
+                p,
+                sub_out_dir,
+                should_execute,
+                zip_backup_state,
+                next_zip_backup_dir,
+                module_dir=next_module_dir,
+                preserve_modules=preserve_modules,
+                copy_modules=copy_modules,
             )
         elif p.suffix == ".zip":
             # if the file contains zipfiles, unzip those too
-            zip_path = extract_zip(p, out_dir, should_execute)
-            if should_execute:
+            zip_path = extract_zip(
+                p,
+                out_dir,
+                should_execute,
+                module_dir=module_dir,
+                preserve_modules=preserve_modules,
+                copy_modules=copy_modules,
+            )
+            if should_execute and zip_path:
                 out_dir.mkdir(exist_ok=True)
                 extract_zip_files(
-                    zip_path, out_dir, should_execute, zip_backup_state, zip_backup_dir
+                    zip_path,
+                    out_dir,
+                    should_execute,
+                    zip_backup_state,
+                    zip_backup_dir,
+                    module_dir=module_dir,
+                    preserve_modules=preserve_modules,
+                    copy_modules=copy_modules,
                 )
 
                 if zip_backup_state == ZipBackupState.KEEP:
