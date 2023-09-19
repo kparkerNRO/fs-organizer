@@ -33,7 +33,7 @@ creator_removes = {
     "MAD Cartographer": "",
     "MikWewa": "$5 Map Rewards",
     "Tom Cartos": "Tier 2+",
-    "Borough Bound": "Chief Courier Reward"
+    "Borough Bound": "Chief Courier Rewards",
 }
 
 file_name_exceptions = {"The Clean": "Clean", "The": ""}
@@ -49,6 +49,7 @@ grouping_exceptions = (
     "Bone",
     "Wizard",
     "War",
+    "In",
 )
 
 
@@ -263,24 +264,31 @@ def reorganize_virtualfs(virtual_fs: VirtualFolder, new_root: VirtualFolder = No
 
     for subname, subfile in virtual_fs.contents.items():
         if isinstance(subfile, VirtualFile):
-            new_root.add_virtual_subfolder(subfile)
+            # if it's a file, just add it
+            # new_root.add_virtual_file(subfile)
+            new_root.merge_subfolders(subfile)
         elif not subfile.name:
+            # if the whole folder name has been cleaned, skip it
             reorganize_virtualfs(subfile, new_root)
         else:
             working_folder = new_root
 
+            # if the folder name has path seperators in it,
+            # split those into sub-folders
             if os.sep in subfile.name:
                 parts = subfile.name.split(os.sep)
                 for part in parts:
                     if part not in working_folder.contents:
                         new_folder = VirtualFolder(None, part)
-                        working_folder.add_virtual_subfolder(new_folder)
+                        working_folder.merge_subfolders(new_folder)
                     working_folder = working_folder.contents[part]
 
             else:
                 if subfile.name not in working_folder.contents:
+                    # if the next file isn't already in this folder add it
                     new_folder = VirtualFolder(None, subfile.name)
-                    working_folder.add_virtual_subfolder(new_folder)
+                    working_folder.merge_subfolders(new_folder)
+                # make the next level in the hierearchy the working file
                 working_folder = working_folder.contents[subfile.name]
 
             reorganize_virtualfs(subfile, working_folder)
@@ -374,7 +382,7 @@ def remove_extra_folders(virtual_fs):
         for sub_name, subfile in virtual_fs.contents.items():
             if subfile.is_dir():
                 remove_extra_folders(subfile)
-                
+
                 if subfile.name == "Base" and isinstance(subfile, VirtualFolder):
                     for key, grandfile in subfile.contents.items():
                         if grandfile.is_dir():
@@ -387,14 +395,13 @@ def remove_extra_folders(virtual_fs):
                 elif len(subfile.contents) == 0:
                     empty_subfolders.append(sub_name)
 
-
         unpromoted_folders = set()
         for subfile, grandchildren in folders_to_promote.items():
             promoted_grandchildren = promote_grandchildren(
                 virtual_fs, subfile, grandchildren
             )
             if len(promoted_grandchildren) != len(grandchildren):
-                # promotion failed, and we need to not count this directory
+                # promotion failed, and we need to not count this directory in the loop
                 current_unpromoted = [
                     x for x in grandchildren if x not in promoted_grandchildren
                 ]
