@@ -2,6 +2,7 @@ from pathlib import Path
 import filecmp
 import os
 
+
 class InsertException(Exception):
     def __init__(self, source_path: Path, target_path: Path):
         self.source_path = source_path
@@ -67,7 +68,7 @@ class VirtualFolder:
             basename, ext = os.path.splitext(name)
             while name in self.contents:
                 name = f"{basename}-{count}{ext}"
-                count+=1
+                count += 1
             file.name = name
         self.contents[name] = file
 
@@ -88,22 +89,23 @@ class VirtualFolder:
                         virtual_path.contents.pop(subfolder_key)
                     else:
                         full_transfer = False
-                
+
                 return full_transfer
             elif isinstance(virtual_path, VirtualFile):
                 compare = filecmp.cmp(
                     virtual_path.source_path, duplicate_path.source_path
                 )
-                if compare: 
+                if compare:
                     # if they are identical, do nothing
-                    pass
+                    print(
+                        f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}"
+                    )
                 else:
                     self.add_virtual_file(virtual_path)
 
                 return not compare
-            
+
         return False
-                    
 
     def add_virtual_subfolder(self, virtual_path):
         if virtual_path.name not in self.contents:
@@ -126,7 +128,9 @@ class VirtualFolder:
                         virtual_path.source_path, duplicate_path.source_path
                     )
                 else:
-                    print(f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}")
+                    print(
+                        f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}"
+                    )
         return self.contents[virtual_path.name]
 
     def get_subfolders_dict(self, show_files=True, show_file_count=False):

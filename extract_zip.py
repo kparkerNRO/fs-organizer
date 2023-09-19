@@ -75,7 +75,6 @@ def extract_zip(
     out_dir_name = clean_path(out_dir_name, str(dir))
     print(f"target dir: {out_dir_name}")
 
-
     # do the work
     final_path = Path(out_dir, out_dir_name)
 
