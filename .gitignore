@@ -167,6 +167,5 @@ cython_debug/
 
 .vscode
 
-*.txt
 
 outputs/
