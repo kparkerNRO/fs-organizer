@@ -3,6 +3,10 @@ from pathlib import Path
 import shutil
 import filecmp
 import os
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 ZipBackupState = Enum("ExecBackupState", ["KEEP", "MOVE", "DELETE"])
 FileBackupState = Enum("FileBackupState", ["COPY", "MOVE", "IN_PLACE"])
@@ -23,20 +27,20 @@ def _get_files_in_dir(dir):
 def delete_empty_dir(dir: Path, should_execute):
     next_sub_dir = _get_files_in_dir(dir)
     if len(next_sub_dir) == 0 and (not "_" in str(dir)):
-        print(f"would delete {dir}")
+        logger.info(f"would delete {dir}")
         if should_execute:
             dir.rmdir()
 
 
 def print_path_operation(operator, from_path, to_path=None, should_execute=False):
     if not should_execute:
-        print(f"would {operator}:\n\t'{from_path}'")
+        logger.info(f"would {operator}:\n\t'{from_path}'")
         if to_path:
-            print(f"\t\tto \n\t'{to_path}'")
+            logger.info(f"\t\tto \n\t'{to_path}'")
     else:
-        print(f"{operator}ing:\n\t{from_path}")
+        logger.info(f"{operator}ing:\n\t{from_path}")
         if to_path:
-            print(f"\t\tto \n\t'{to_path}'")
+            logger.info(f"\t\tto \n\t'{to_path}'")
 
 
 def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file=False):
@@ -46,17 +50,17 @@ def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file
             target_dir.mkdir(parents=True, exist_ok=True)
         file_path = target_dir / source_file.name
         if file_path.exists():
-            print(f"Found a duplicate file moving \n{source_file}\n\tto\n{target_dir}")
+            logger.info(f"Found a duplicate file moving \n{source_file}\n\tto\n{target_dir}")
             if not filecmp.cmp(file_path, source_file):
                 # TODO support 2+
                 basename, ext = os.path.split(file_path)
                 new_file_path = basename + "-1." + ext
-                print(f"\tFiles are different. Renaming {file_path} to {new_file_path}")
+                logger.info(f"\tFiles are different. Renaming {file_path} to {new_file_path}")
                 file_path = target_dir/new_file_path
             else:
-                print("\tfiles are identical")
+                logger.info("\tfiles are identical")
                 if not copy_file: 
-                    print("\tRemoving original file")
+                    logger.info("\tRemoving original file")
                     source_file.unlink()
                     return
         
@@ -72,7 +76,7 @@ def merge_directories(source_path: Path, dest_path: Path):
     if source_path == dest_path:
         return
 
-    print(f"moving files from \n\t{source_path} \nto \n\t{dest_path}")
+    logger.info(f"moving files from \n\t{source_path} \nto \n\t{dest_path}")
     for subfile in source_path.iterdir():
         subfile_name = subfile.name
         if subfile_name == source_path.name:

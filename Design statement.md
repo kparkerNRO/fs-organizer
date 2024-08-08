@@ -1,0 +1,3 @@
+Design statement
+
+I have a software problem that I would like you to help me design a solution for. I have a whole bunch of tabletop gaming files that I have downloaded from patreon designers, all organized in different ways depending on the designer. I have loosely organized them into top level folders as in the first picture, then by creator as in the second. However, the challenge comes at the creator level, where each creator has their own format. For example, one creator may be organized like image 3, and another will be organized like image 4

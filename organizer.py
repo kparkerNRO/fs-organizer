@@ -1,6 +1,5 @@
 from collections import defaultdict
 from virtual_folder import (
-    InsertException,
     VirtualFile,
     build_folder_structure,
     VirtualFolder,
@@ -9,7 +8,8 @@ from pathlib import Path
 import click
 import os
 from extract_zip import extract_zip_files
-from pprint import pprint
+import logging
+import json
 
 from common import FileBackupState, ZipBackupState, FileMoveException, try_move_file
 
@@ -21,10 +21,12 @@ from filename_utils import (
     clean_path,
 )
 
+logging.basicConfig(filename="outputs/logs.txt", level="INFO")
+logger = logging.getLogger(__name__)
 
-creator_removes = {
+CREATOR_REMOVES = {
     "CzePeku": "$5 Rewards",
-    "Limithron": "Admiral",
+    "Limithron": ["Admiral", "Captain"],
     "The Reclusive Cartographer": "_MC",
     "Baileywiki": "",
     "Unknown": "",
@@ -36,11 +38,11 @@ creator_removes = {
     "Borough Bound": "Chief Courier Rewards",
 }
 
-file_name_exceptions = {"The Clean": "Clean", "The": ""}
-replace_exceptions = {
+FILE_NAME_EXCEPTIONS = {"The Clean": "Clean", "The": ""}
+REPLACE_EXCEPTIONS = {
     "ItW": "",
 }
-grouping_exceptions = (
+GROUPING_EXCEPTIONS = (
     "City of",
     "Lair of the",
     "Tower of",
@@ -50,6 +52,7 @@ grouping_exceptions = (
     "Wizard",
     "War",
     "In",
+    "Dr"
 )
 
 
@@ -105,7 +108,7 @@ def group_similar_names(names_to_group: list):
                 computed_token = get_max_common_string(tokens, next_name)
 
                 # if the token is in the exceptions list, don't group
-                if computed_token not in grouping_exceptions:
+                if computed_token not in GROUPING_EXCEPTIONS:
                     # if we've found a token with overlap, save it
                     working_token = computed_token
 
@@ -305,7 +308,7 @@ def clean_folder_names(virtual_fs: VirtualFolder):
         if subfile.is_dir():
             sub_name = subfile.name
             cleaned_name = clean_filename(
-                sub_name, creator_removes, file_name_exceptions, replace_exceptions
+                sub_name, CREATOR_REMOVES, FILE_NAME_EXCEPTIONS, REPLACE_EXCEPTIONS
             )
             subfile.name = cleaned_name
             clean_folder_names(subfile)
@@ -324,15 +327,32 @@ def remove_duplicate_folder_terms(virtual_fs, working_path):
     return virtual_fs
 
 
-def count_terms(virtual_fs, terms_counter):
+def count_terms_recursive(virtual_fs, terms_counter):
     """
     recursively count the number of times each term appears in the
     folder structure
     """
     for subfile in virtual_fs.contents.values():
-        if subfile.is_dir():
+        if subfile.is_dir() and subfile.name != "modules":
             terms_counter[subfile.name] += 1
-            count_terms(subfile, terms_counter)
+            count_terms_recursive(subfile, terms_counter)
+
+
+def count_terms(virtual_fs):
+    """
+    recursively count the number of times each term appears in the
+    folder structure
+    """
+    terms_counter = defaultdict(int)
+    count_terms_recursive(virtual_fs, terms_counter)
+
+    # overwrite creator ids to make them root
+    # TODO, someday, maybe account for differnt root folders
+    for creator in CREATOR_REMOVES.keys():
+        if creator in terms_counter:
+            terms_counter[creator] = 0
+
+    return terms_counter
 
 
 def promote_grandchildren(
@@ -408,11 +428,11 @@ def remove_extra_folders(virtual_fs):
                 unpromoted_folders |= set(current_unpromoted)
 
         for unpromoted in unpromoted_folders:
-            folders_to_promote.pop(unpromoted)
+            folders_to_promote.pop(unpromoted, None)
 
         # remove any empty directories
         for subname in empty_subfolders:
-            virtual_fs.contents.pop(subname)
+            virtual_fs.contents.pop(subname, None)
 
         folders_moved = len(folders_to_promote) > 0 or len(empty_subfolders) > 0
         iteration_count += 1
@@ -467,6 +487,22 @@ def reorganize_tree(virtual_fs: VirtualFolder, terms_counter):
         # remove any empty directories
         for subname in empty_subfolders:
             root.contents.pop(subname)
+
+    return virtual_fs
+
+
+def reorganize_at_depth(virtual_fs, target_depth, current_depth=0):
+    if target_depth != current_depth:
+        # reorgaized_folders = []
+        for subfolder in virtual_fs.contents.values():
+            if subfolder.is_dir():
+                reorganize_at_depth(subfolder, target_depth, current_depth + 1)
+    else:
+        term_counter = count_terms(virtual_fs)
+        print(virtual_fs.name)
+        print(json.dumps(term_counter, indent=4))
+
+        virtual_fs = reorganize_tree(virtual_fs, term_counter)
 
     return virtual_fs
 
@@ -528,7 +564,7 @@ def move_fs(
         move_folder(virtual_fs, output_dir, should_execute, should_copy=False)
     elif backup_state == FileBackupState.IN_PLACE:  # in place
         if output_dir:
-            print(
+            logger.info(
                 f"Folder re-org handed an output directory, but requested in-place"
                 + "modification. Will ignore output_dir."
             )
@@ -543,8 +579,6 @@ def organize_fs(
     should_execute=False,
     backup_state=FileBackupState.IN_PLACE,
 ):
-    import json
-
     print("Step 0: build the virtual FS", flush=True)
     virtual_fs = build_folder_structure(source)
     print(f"Total files: {virtual_fs.count_files()}")
@@ -555,15 +589,21 @@ def organize_fs(
     virtual_fs = clean_folder_names(virtual_fs)
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
+    # term_counter = count_terms(virtual_fs)
+    # print(json.dumps(term_counter, indent=4))
     # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # step 2: group folders + files by similar terms (eg day, night, clean, etc)
     print("Step 2: group files", flush=True)
     virtual_fs = organize_groups(virtual_fs)
+    # term_counter = count_terms(virtual_fs)
+    # print(json.dumps(term_counter, indent=4))
     # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     virtual_fs = reorganize_virtualfs(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
+    # term_counter = count_terms(virtual_fs)
+    # print(json.dumps(term_counter, indent=4))
     # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # print(json.dumps(virtual_fs.get_folders_dict(), indent=4))
@@ -581,16 +621,13 @@ def organize_fs(
     print("Step 3.5: remove excess base folders", flush=True)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
-    # print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
+    print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
 
     # step 3: organize the folders by term likelyhood
     print("\n\n------------")
     print("Step 4: reorganize", flush=True)
-    term_counter = defaultdict(int)
-    count_terms(virtual_fs, term_counter)
-    # print(json.dumps(term_counter, indent=4))
+    virtual_fs = reorganize_at_depth(virtual_fs, 1)
 
-    virtual_fs = reorganize_tree(virtual_fs, term_counter)
     virtual_fs = remove_extra_folders(virtual_fs)
     print(f"Total files: {virtual_fs.count_files()}")
     print(json.dumps(virtual_fs.get_folders_dict(False, True), indent=4))
@@ -607,7 +644,10 @@ def organize_fs(
 @click.option("--exec", "-e", is_flag=True, default=False)
 @click.option("--delete_zip", "-D", is_flag=True, default=False)
 @click.option("--zip_backup_dir", default=None)
-def organize(path, output, copy_data, zip, exec, delete_zip, zip_backup_dir):
+@click.option("--skip_organize", "-S", is_flag=True, default=False)
+def organize(
+    path, output, copy_data, zip, exec, delete_zip, zip_backup_dir, skip_organize
+):
     path_obj = Path(path)
 
     # validate the inputs
@@ -639,11 +679,15 @@ def organize(path, output, copy_data, zip, exec, delete_zip, zip_backup_dir):
             should_execute=exec,
             zip_backup_state=zip_exec_format,
             zip_backup_dir=zip_backup_dir,
+            copy_modules=False,
         )
 
-    organize_fs(
-        path_obj, output_dir=output, should_execute=exec, backup_state=exec_format
-    )
+    if not skip_organize:
+        organize_fs(
+            path_obj, output_dir=output, should_execute=exec, backup_state=exec_format
+        )
+
+    print("Finished!")
 
 
 if __name__ == "__main__":

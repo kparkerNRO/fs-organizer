@@ -1,9 +1,12 @@
 import re
+import logging
 
 from common import VIEW_TYPES
 
 PATH_EXTRAS = " -,()/"
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def strip_part_from_base(base_name: str, part):
@@ -85,8 +88,12 @@ def clean_filename(
     # remove any creator-specific removals
     for _, removes in creator_removes.items():
         # if creator in str(source_dir) and removes != "":
-        if removes != "":
-            out_dir_name = strip_part_from_base(out_dir_name, removes)
+        if isinstance(removes, list):
+            for remove in removes:
+                out_dir_name = strip_part_from_base(out_dir_name, remove)
+        else:
+            if removes != "":
+                out_dir_name = strip_part_from_base(out_dir_name, removes)
 
     # remove "part" naming
     out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
@@ -113,6 +120,10 @@ def clean_filename(
 
     # clean up directory sizes
     # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)
+
+    # clean up special characters at the start and end
+    out_dir_name = re.sub("^\.\s*", "", out_dir_name)
+    out_dir_name = re.sub("\s*\.$", "", out_dir_name)
 
     # cleanup whitespace
     out_dir_name = out_dir_name.replace("(", " ")

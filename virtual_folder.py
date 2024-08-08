@@ -1,7 +1,9 @@
 from pathlib import Path
 import filecmp
 import os
+import logging
 
+logger = logging.getLogger(__name__)
 
 class InsertException(Exception):
     def __init__(self, source_path: Path, target_path: Path):
@@ -72,7 +74,7 @@ class VirtualFolder:
             file.name = name
         self.contents[name] = file
 
-    def merge_subfolders(self, virtual_path):
+    def merge_subfolders(self, virtual_path, drop_duplicates=True):
         if virtual_path.name not in self.contents:
             self.contents[virtual_path.name] = virtual_path
             return True
@@ -88,7 +90,10 @@ class VirtualFolder:
                     if added_file:
                         virtual_path.contents.pop(subfolder_key)
                     else:
-                        full_transfer = False
+                        if isinstance(virtual_path, VirtualFile) and drop_duplicates:
+                            virtual_path.contents.pop(subfolder_key)
+                        else:
+                            full_transfer = False
 
                 return full_transfer
             elif isinstance(virtual_path, VirtualFile):
@@ -97,7 +102,7 @@ class VirtualFolder:
                 )
                 if compare:
                     # if they are identical, do nothing
-                    print(
+                    logger.info(
                         f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}"
                     )
                 else:
@@ -128,7 +133,7 @@ class VirtualFolder:
                         virtual_path.source_path, duplicate_path.source_path
                     )
                 else:
-                    print(
+                    logger.info(
                         f"Files \n\t{virtual_path.source_path} and \n\t{duplicate_path.source_path} \nare identical. Dropping {duplicate_path.source_path}"
                     )
         return self.contents[virtual_path.name]
@@ -196,9 +201,12 @@ class VirtualFolder:
         return False
 
 
-def build_folder_structure(root_path: Path):
+def build_folder_structure(root_path: Path, ignore_hidden_dirs = True):
     root_folder = VirtualFolder(root_path)
     for item in root_path.iterdir():
+        if ignore_hidden_dirs and item.name.startswith('.'):
+            continue
+        
         if item.is_dir():
             current_folder = root_folder.add_subfolder(item)
             build_folder_structure_recursive(current_folder, item)
