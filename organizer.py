@@ -1,4 +1,5 @@
 from collections import defaultdict
+from database.tables import Runs, Tags
 from virtual_folder import (
     VirtualFile,
     build_folder_structure,
@@ -10,8 +11,13 @@ import os
 from extract_zip import extract_zip_files
 import logging
 import json
-
+from database.sqlite import RUN_DB
+from sqlalchemy.orm import Session
 from common import FileBackupState, ZipBackupState, FileMoveException, try_move_file
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from filename_utils import (
     split_view_type,
@@ -52,7 +58,7 @@ GROUPING_EXCEPTIONS = (
     "Wizard",
     "War",
     "In",
-    "Dr"
+    "Dr",
 )
 
 
@@ -77,7 +83,7 @@ def group_similar_names(names_to_group: list):
     names_to_process = list(names_to_group)
     for base_name in names_to_group:
         # handle the data structure mismatch where one's already been removed
-        if not base_name in names_to_process:
+        if base_name not in names_to_process:
             continue
 
         names_to_process.remove(base_name)
@@ -571,6 +577,89 @@ def move_fs(
         move_folder(
             virtual_fs, str(virtual_fs.source_path), should_execute, should_copy=False
         )
+
+
+def normalize_tags(tags: set):
+    """
+    Normalizes the tags in the set by using nltk to strip out stop words and
+    convert the words to their root form
+    """
+    # pre-process tags
+    clean_tags = [
+        clean_filename(tag, CREATOR_REMOVES, FILE_NAME_EXCEPTIONS, REPLACE_EXCEPTIONS)
+        for tag in tags
+    ]
+
+    # normalize the resulting tags
+    stop_words = set(stopwords.words("english"))
+    lemmatizer = WordNetLemmatizer()
+    normalized_tags = []
+    for tag in clean_tags:
+        words = tag.lower().split()
+        normalized_words = [
+            lemmatizer.lemmatize(word) for word in words if word not in stop_words
+        ]
+        normalized_phrases = " ".join(normalized_words)
+        normalized_tags.append(normalized_phrases)
+
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(normalized_tags)
+
+    cluster = AgglomerativeClustering(
+        n_clusters=None, distance_threshold=1, linkage="ward"
+    )
+    cluster.fit(X.toarray())
+
+    # Get the cluster labels
+    cluster_labels = cluster.labels_
+
+    # Create a dictionary to store the tags in each cluster
+    tag_clusters = {}
+    for i, tag in enumerate(normalized_tags):
+        cluster_label = cluster_labels[i]
+        if cluster_label not in tag_clusters:
+            tag_clusters[cluster_label] = []
+        tag_clusters[cluster_label].append(tag)
+
+    # remove the common words
+
+    for cluster_label, tags in tag_clusters.items():
+        files_to_subgroup = {tag: tag for tag in tags}
+
+        data = group_nested_folder(files_to_subgroup)
+        print(f"Cluster {cluster_label}: {data}")
+        
+    # remove the common words
+
+    return tag_clusters
+
+
+def organize_fs_2(
+    source: Path,
+    output_dir="",
+    should_execute=False,
+    backup_state=FileBackupState.IN_PLACE,
+):
+    with Session(bind=RUN_DB.engine) as session:
+        run = Runs(root_folder=source.name)
+        session.add(run)
+        session.commit()
+
+        print("Step 0: build the virtual FS", flush=True)
+        virtual_fs = build_folder_structure(source)
+
+        print("step 1: write fs to database", flush=True)
+        virtual_fs.create_database_export(session)
+
+        # normalize the heck out of our tags
+        tags = session.query(Tags)
+        orig_tags = set(tag.original_name for tag in tags)
+
+        # update the virtual fs with the new tags
+
+        # reorganize the virtual fs
+
+    # profit???
 
 
 def organize_fs(

@@ -2,8 +2,14 @@ from pathlib import Path
 import filecmp
 import os
 import logging
+from typing import Optional
+import zipfile
+import json
+
+from database.tables import Exports, Files, Tags
 
 logger = logging.getLogger(__name__)
+
 
 class InsertException(Exception):
     def __init__(self, source_path: Path, target_path: Path):
@@ -12,9 +18,10 @@ class InsertException(Exception):
 
 
 class VirtualFile:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, zip_path: Optional[Path] = None):
         self.source_path = path
         self.name = path.name
+        self.zip_path = zip_path
 
     def is_dir(self):
         return False
@@ -23,7 +30,7 @@ class VirtualFile:
         return True
 
     def get_subfolders_dict(self, show_files=True, show_file_count=True):
-        return ""
+        return self
 
     def get_folders_dict(self, show_files=True, show_file_count=True):
         return self.name
@@ -35,15 +42,23 @@ class VirtualFile:
         return self.__str__()
 
     def __eq__(self, __value: object) -> bool:
-        return self.name == __value.name
+        if isinstance(__value, str):
+            return self.name == __value or __value == ""
+        elif isinstance(__value, VirtualFolder):
+            return self.name == __value.name
+        elif isinstance(__value, VirtualFile):
+            return self.name == __value.name
+        else:
+            return False
 
     def count_files(self):
         return 1
 
 
 class VirtualFolder:
-    def __init__(self, path: Path, name: str = None):
+    def __init__(self, path: Path, name: str = None, zip_path: Optional[Path] = None):
         self.source_path = path
+        self.zip_path = zip_path
 
         if name is not None:
             self.name = name
@@ -57,11 +72,11 @@ class VirtualFolder:
     def is_file(self):
         return False
 
-    def add_file(self, path: Path):
-        return self.add_virtual_subfolder(VirtualFile(path))
+    def add_file(self, path: Path, zip_path: Optional[str] = None):
+        return self.add_virtual_subfolder(VirtualFile(path, zip_path=zip_path))
 
-    def add_subfolder(self, path: Path):
-        return self.add_virtual_subfolder(VirtualFolder(path))
+    def add_subfolder(self, path: Path, zip_path: str = None):
+        return self.add_virtual_subfolder(VirtualFolder(path, zip_path=zip_path))
 
     def add_virtual_file(self, file: VirtualFile):
         name = file.name
@@ -114,6 +129,9 @@ class VirtualFolder:
 
     def add_virtual_subfolder(self, virtual_path):
         if virtual_path.name not in self.contents:
+            self.contents[virtual_path.name] = virtual_path
+        elif virtual_path.zip_path is not None:
+            # this isn't a real file, so there is no comparison
             self.contents[virtual_path.name] = virtual_path
         else:
             duplicate_path = self.contents[virtual_path.name]
@@ -170,6 +188,42 @@ class VirtualFolder:
 
         return output_dict
 
+    def export_files_to_db(self, session, export_id, tags):
+        for name, item in self.contents.items():
+            if isinstance(item, VirtualFolder):
+                tags.add(name)
+                item.export_files_to_db(session, export_id=export_id, tags=tags)
+            else:
+                session.add(
+                    Files(
+                        file_name=item.name,
+                        export_id=export_id,
+                        zip_parent=str(self.zip_path),
+                        original_path=str(item.source_path),
+                        # tags=tags,
+                    )
+                )
+
+    def create_database_export(self, session, run_id, export_name = None, export_tags = True):
+        
+        export = Exports(
+            export_stage=export_name or self.name,
+            run_id=run_id,
+            folder_structure=json.dumps(self.get_folders_dict(show_files=False)),
+        )
+        session.add(export)
+        session.flush()
+        tags = set()
+        self.export_files_to_db(session, export.id, tags)
+        if export_tags:
+            for tag in tags:
+                session.add(
+                    Tags(
+                        original_name=tag,
+                    )
+                )
+        session.commit()
+
     def insert_intermediate_folder(self, name):
         intermediate_folder = VirtualFolder(path=None, name=name)
         intermediate_folder.contents = self.contents
@@ -201,24 +255,49 @@ class VirtualFolder:
         return False
 
 
-def build_folder_structure(root_path: Path, ignore_hidden_dirs = True):
-    root_folder = VirtualFolder(root_path)
-    for item in root_path.iterdir():
-        if ignore_hidden_dirs and item.name.startswith('.'):
-            continue
-        
-        if item.is_dir():
-            current_folder = root_folder.add_subfolder(item)
-            build_folder_structure_recursive(current_folder, item)
-        elif item.is_file():
-            root_folder.add_file(item)
-    return root_folder
+def build_folder_structure(
+    path: Path,
+    folder: Optional[VirtualFolder] = None,
+    ignore_hidden_dirs=True,
+    preserve_modules=True,
+    zip_path: Path = None,
+):
+    if folder is None:
+        folder = VirtualFolder(path)
 
-
-def build_folder_structure_recursive(folder, path: Path):
     for item in path.iterdir():
+        if ignore_hidden_dirs and item.name.startswith("."):
+            continue
+        if item.name.startswith("__MACOSX") or ".DS_Store" in item.name:
+            continue
+
         if item.is_dir():
-            subfolder = folder.add_subfolder(item)
-            build_folder_structure_recursive(subfolder, item)
+            current_folder = folder.add_subfolder(item, zip_path)
+            build_folder_structure(
+                folder=current_folder,
+                path=item,
+                preserve_modules=preserve_modules,
+                ignore_hidden_dirs=ignore_hidden_dirs,
+                zip_path=zip_path,
+            )
+        elif hasattr(item, "suffix") and item.suffix == ".zip":
+            with zipfile.ZipFile(item, "r") as zipref:
+                zip_path = zipfile.Path(zipref)
+                zip_children = [p.name for p in zip_path.iterdir()]
+                # if it's a foundry module, it's a file
+                if preserve_modules and "module.json" in zip_children:
+                    folder.add_file(VirtualFile(item, zip_path))
+
+                else:
+                    current_folder = folder.add_subfolder(item, zip_path)
+                    build_folder_structure(
+                        folder=current_folder,
+                        path=zip_path,
+                        zip_path=item,
+                        preserve_modules=preserve_modules,
+                        ignore_hidden_dirs=ignore_hidden_dirs,
+                    )
         elif item.is_file():
-            folder.add_file(item)
+            folder.add_file(item, zip_path)
+
+    return folder

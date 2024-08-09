@@ -249,6 +249,7 @@ class TestReorganizeTree:
 
     def teardown_method(self):
         self.testfile.close()
+
     def test_inversion(self):
         base_tree = {"a": {"b": {"c": {"d": {"testfile.txt": self.testfile.name}}}}}
 
@@ -262,7 +263,9 @@ class TestReorganizeTree:
         assert result_tree == expected_result
 
     def test_multiple_folders(self):
-        base_tree = {"a": {"b": {"e": {}}, "c": {"e": {"testfile.txt": self.testfile.name}}}}
+        base_tree = {
+            "a": {"b": {"e": {}}, "c": {"e": {"testfile.txt": self.testfile.name}}}
+        }
 
         frequencies = {"root": 0, "a": 5, "b": 4, "c": 3, "d": 2, "e": 10}
         expected_result = {
@@ -360,8 +363,8 @@ class TestRemoveExtraFolders:
         expected_output = {
             "root": {
                 "test": {
-                        "sample_file": TESTFILE_DICT,
-                        "second_sample": TESTFILE_DICT,
+                    "sample_file": TESTFILE_DICT,
+                    "second_sample": TESTFILE_DICT,
                 }
             }
         }
@@ -460,19 +463,16 @@ class TestRemoveExtraFolders:
     def test_remove_empty_folder(self):
         test_structure = {
             "test": {
-                "first": {
-                    "sample_file": "testfile", 
-                    "second_file": "testfile"
-                }, 
-                "second": None
+                "first": {"sample_file": "testfile", "second_file": "testfile"},
+                "second": None,
             },
         }
 
         expected_output = {
             "root": {
                 "test": {
-                        "sample_file": "",
-                        "second_file": "",
+                    "sample_file": "",
+                    "second_file": "",
                 }
             }
         }
@@ -551,16 +551,15 @@ class TestPromoteGrandchildren:
             filename = file.name
             filePath = Path(filename)
             basenname = filePath.name
-            test_data = {
-                "child": {filePath},
-                basenname: filePath
-            }
+            test_data = {"child": {filePath}, basenname: filePath}
 
             expected = {"root": {basenname: "", "child": {basenname: ""}}}
 
             virtual_fs = build_virtual_fs(test_data)
 
-            to_remove = organizer.promote_grandchildren(virtual_fs, "child", [basenname])
+            to_remove = organizer.promote_grandchildren(
+                virtual_fs, "child", [basenname]
+            )
             result_tree = virtual_fs.get_folders_dict()
 
             assert result_tree == expected
@@ -580,7 +579,7 @@ class TestPromoteGrandchildren:
             dupe_file.name = basenname
             test_data = {"child": {basenname: filePath}, basenname: dupe_file}
 
-            expected = {"root":  {basenname: "", f"{basenname}-1": ""}}
+            expected = {"root": {basenname: "", f"{basenname}-1": ""}}
 
             virtual_fs = build_virtual_fs(test_data)
 
@@ -666,3 +665,19 @@ class TestMoveFs:
         assert final_path.exists()
         assert not self.testfile.exists()
         assert not self.testfile.parent.exists()
+
+
+class TestTagFunctions:
+    def test_normalize_tags(self):
+        tags = {
+            "The Wizard Tower",
+            "Wizard Tower walls",
+            "Wizard Tower Interior",
+            "The Wizard Tower Interior grounds",
+            "Port Ryan",
+            "port ryan docks",
+            "Port ryan barracks",
+        }
+        normalized_tags = organizer.normalize_tags(tags)
+        expected_tags = {"appl", "banana", "orang"}
+        assert normalized_tags == expected_tags
