@@ -1,8 +1,14 @@
-import sqlite3
-import json
 import zipfile
 from pathlib import Path
-from database import setup_collections
+from typing import Set, List
+from sqlalchemy.orm import Session
+from database import (
+    setup_collections,
+    get_session,
+    Folder,
+    File,
+    Category,
+)
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
 import os
@@ -25,120 +31,66 @@ def should_ignore(name: str) -> bool:
     }
     return name in ignore_patterns or name.startswith("._")
 
-
-def clean_file_name_post(db_path, update_table: bool = False):
+def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
+    """Clean and update folder names in the database using SQLAlchemy."""
     setup_collections(db_path)
+    session = get_session(db_path)
 
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
+    try:
+        # Fetch all folders
+        folders = session.query(Folder).all()
 
-    rows = [
-        (row[0], row[1])
-        for row in cur.execute(
-            """
-        SELECT id, folder_name FROM folders
-        """
-        ).fetchall()
-    ]
+        for folder in folders:
+            if folder.folder_name.endswith('.zip'):
+                cleaned_name = clean_filename(folder.folder_name[:-4])
+            else:
+                cleaned_name = clean_filename(folder.folder_name)
 
-    def parse_name(name):
-        # do an initial clean up
-        categories = []
-        variants = []
+            # Update the cleaned name
+            folder.cleaned_name = cleaned_name
 
-        clean_row = clean_filename(name)
-
-        # handle any sub-categories in the name
-        components = clean_row.split("-")
-        cleaned_components = [clean_filename(component) for component in components]
-
-        for component in cleaned_components:
-            category_current = component
-            while category_current:
-                category, variant = split_view_type(
-                    category_current, KNOWN_VARIANT_TOKENS
-                )
-                if category and category not in categories:
-                    categories.append(category)
-                if variant:
-                    variants.append(variant)
-
-                if category_current == category:
-                    break
-
-                category_current = category
-
-        return categories, variants
-
-    for id, row in rows:
-        if row[-4:] == ".zip":
-            cleaned_name = clean_filename(row[:-4])
-        else:
-            cleaned_name = clean_filename(row)
-
-        cur.execute(
-            """
-            UPDATE folders
-            SET cleaned_name = ?
-            WHERE id = ?
-        """,
-            (cleaned_name, id),
-        )
-
-        # if categories:
-        #     for category in categories:
-        #         cur.execute(
-        #             """
-        #             INSERT INTO categories (category, folder_id)
-        #             VALUES (?, ?)
-        #             """,
-        #             (category, id),
-        #         )
-
-    conn.commit()
-    conn.close()
-
+        session.commit()
+    finally:
+        session.close()
 
 def process_zip(
     zip_source,
     parent_path: Path,
     zip_name: str,
     base_depth: int,
-    cur: sqlite3.Cursor,
+    session: Session,
     preserve_modules: bool = True,
     num_siblings: int = 0,
 ) -> None:
+    """Process a zip file and store its contents in the database using SQLAlchemy."""
     try:
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
-            processed_dirs = set()
+            processed_dirs: Set[Path] = set()
 
             # shortcut for foundry modules
             if preserve_modules and "module.json" in entries:
-                cur.execute(
-                    """
-                    INSERT INTO files (file_name, file_path, depth)
-                    VALUES (?, ?, ?)
-                """,
-                    (zip_name, str(parent_path), base_depth),
+                new_file = File(
+                    file_name=zip_name,
+                    file_path=str(parent_path),
+                    depth=base_depth
                 )
+                session.add(new_file)
+                session.commit()
                 return
 
             basename = Path(zip_name).stem
-            # store the zipfile as a folder if it isn't redundant
-            cur.execute(
-                """
-                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source, num_siblings)
-                VALUES (?, ?, ?, ?, 'zip_file', num_siblings)
-            """,
-                (
-                    zip_name,
-                    str(parent_path / zip_name),
-                    str(parent_path),
-                    base_depth,
-                    num_siblings
-                ),
+            # store the zipfile as a folder
+            new_folder = Folder(
+                folder_name=zip_name,
+                folder_path=str(parent_path / zip_name),
+                parent_path=str(parent_path),
+                depth=base_depth,
+                file_source='zip_file',
+                num_siblings=num_siblings
             )
+            session.add(new_folder)
+            session.commit()
 
             for entry in entries:
                 entry_path = Path(entry)
@@ -156,7 +108,7 @@ def process_zip(
                         processed_dirs.add(new_path)
                         depth = len(new_path.parts) - base_depth
 
-                        # Get siblings (folders in same directory)
+                        # Get siblings
                         dir_path = entry_path.parent
                         zip_depth = len(entry_path.parts)
                         siblings = [
@@ -168,19 +120,15 @@ def process_zip(
                             and len(Path(e).parts) < zip_depth
                         ]
 
-                        cur.execute(
-                            """
-                            INSERT INTO folders (
-                                folder_name, 
-                                folder_path, 
-                                parent_path, 
-                                depth, 
-                                file_source, 
-                                num_siblings)
-                            VALUES (?, ?, ?, ?, 'zip_content', ?)
-                        """,
-                            (part, str(new_path), str(current_path), depth, len(siblings)),
+                        new_folder = Folder(
+                            folder_name=part,
+                            folder_path=str(new_path),
+                            parent_path=str(current_path),
+                            depth=depth,
+                            file_source='zip_content',
+                            num_siblings=len(siblings)
                         )
+                        session.add(new_folder)
 
                     current_path = new_path
 
@@ -199,65 +147,74 @@ def process_zip(
                                         current_path,
                                         file_name,
                                         depth,
-                                        cur,
+                                        session,
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
                                 print(f"Error processing nested zip {entry}: {e}")
 
-                        cur.execute(
-                            """
-                            INSERT INTO files (file_name, file_path, depth)
-                            VALUES (?, ?, ?)
-                        """,
-                            (file_name, str(file_path), depth),
+                        new_file = File(
+                            file_name=file_name,
+                            file_path=str(file_path),
+                            depth=depth
                         )
+                        session.add(new_file)
+
+            session.commit()
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
         print(f"Error processing zip {zip_name}: {e}")
-
+        session.rollback()
 
 def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
+    """Gather folder structure and store in database using SQLAlchemy."""
+    session = get_session(db_path)
 
-    for root, dirs, files in os.walk(base_path):
-        dirs[:] = [d for d in dirs if not should_ignore(d)]
-        files = [f for f in files if not should_ignore(f)]
+    try:
+        for root, dirs, files in os.walk(base_path):
+            dirs[:] = [d for d in dirs if not should_ignore(d)]
+            files = [f for f in files if not should_ignore(f)]
 
-        for d in dirs:
-            folder_path = Path(root) / d
-            depth = len(folder_path.parts) - len(base_path.parts)
-            parent_path = Path(root) if Path(root) != base_path else Path("")
-            sibling_list = [s for s in dirs if s != d]
+            for d in dirs:
+                folder_path = Path(root) / d
+                depth = len(folder_path.parts) - len(base_path.parts)
+                parent_path = Path(root) if Path(root) != base_path else Path("")
+                sibling_list = [s for s in dirs if s != d]
 
-            cur.execute(
-                """
-                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source,num_siblings)
-                VALUES (?, ?, ?, ?, 'filesystem',?)
-            """,
-                (d, str(folder_path), str(parent_path), depth, len(sibling_list)),
-            )
+                new_folder = Folder(
+                    folder_name=d,
+                    folder_path=str(folder_path),
+                    parent_path=str(parent_path),
+                    depth=depth,
+                    file_source='filesystem',
+                    num_siblings=len(sibling_list)
+                )
+                session.add(new_folder)
 
-        for f in files:
-            file_path = Path(root) / f
-            depth = len(file_path.parts) - len(base_path.parts)
-            
-            if f.lower().endswith(".zip"):
-                try:
-                    process_zip(file_path, Path(root), f, depth, cur)
-                except zipfile.BadZipFile as e:
-                    print(f"Error processing zip file {file_path}: {e}")
-                continue
+            for f in files:
+                file_path = Path(root) / f
+                depth = len(file_path.parts) - len(base_path.parts)
+                
+                if f.lower().endswith(".zip"):
+                    try:
+                        process_zip(file_path, Path(root), f, depth, session)
+                    except zipfile.BadZipFile as e:
+                        print(f"Error processing zip file {file_path}: {e}")
+                    continue
 
-            cur.execute(
-                """
-                INSERT INTO files (file_name, file_path, depth)
-                VALUES (?, ?, ?)
-            """,
-                (f, str(file_path), depth),
-            )
+                new_file = File(
+                    file_name=f,
+                    file_path=str(file_path),
+                    depth=depth
+                )
+                session.add(new_file)
 
-    conn.commit()
-    conn.close()
+            session.commit()
+
+    except Exception as e:
+        print(f"Error gathering folder structure: {e}")
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
     clean_file_name_post(db_path=db_path, update_table=True)
