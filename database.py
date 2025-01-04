@@ -2,6 +2,38 @@ from pathlib import Path
 import sqlite3
 
 
+class Folder:
+    def __init__(
+        self,
+        id,
+        folder_name,
+        folder_path,
+        parent_path,
+        depth,
+        cleaned_name,
+        categories,
+        subject,
+        variants,
+        classification,
+        file_source,
+        num_siblings,
+    ):
+        self.id = id
+        self.folder_name = folder_name
+        self.folder_path = folder_path
+        self.parent_path = parent_path
+        self.depth = depth
+        self.cleaned_name = cleaned_name
+        self.categories = categories
+        self.subject = subject
+        self.variants = variants
+        self.classification = classification
+        self.file_source = file_source
+        self.num_siblings = num_siblings
+
+    def __repr__(self):
+        return f"Folder(id={self.id}, folder_name={self.folder_name}, folder_path={self.folder_path}, parent_path={self.parent_path}, depth={self.depth}, cleaned_name={self.cleaned_name}, categories={self.categories}, subject={self.subject}, variants={self.variants}, classification={self.classification}, file_source={self.file_source}, num_siblings={self.num_siblings})"
+
 
 def setup_gather(db_path: Path):
     """Create or open the SQLite database, ensuring tables exist."""
@@ -22,7 +54,7 @@ def setup_gather(db_path: Path):
         variants TEXT,
         classification TEXT,
         file_source TEXT,
-        siblings TEXT
+        num_siblings INTEGER
     )
     """)
 
@@ -38,6 +70,7 @@ def setup_gather(db_path: Path):
 
     conn.commit()
     conn.close()
+
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database, ensuring tables exist."""
@@ -78,6 +111,7 @@ def setup_group(db_path: Path):
 
     conn.commit()
     conn.close()
+
 
 def setup_collections(db_path: Path):
     """Create or open the SQLite database, ensuring tables exist."""

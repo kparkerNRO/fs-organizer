@@ -1,4 +1,3 @@
-import os
 import sqlite3
 import json
 import zipfile
@@ -6,7 +5,7 @@ from pathlib import Path
 from database import setup_collections
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
-
+import os
 
 def should_ignore(name: str) -> bool:
     """Check if a file or directory should be ignored."""
@@ -73,30 +72,28 @@ def clean_file_name_post(db_path, update_table: bool = False):
 
     for id, row in rows:
         if row[-4:] == ".zip":
-            categories, variants = parse_name(row[:-4])
+            cleaned_name = clean_filename(row[:-4])
         else:
-            categories, variants = parse_name(row)
+            cleaned_name = clean_filename(row)
 
-        variants = list(set(variants))
-        cleaned_name = categories[0] if categories else variants[0] if variants else ""
         cur.execute(
             """
             UPDATE folders
-            SET cleaned_name = ?, categories = ?, variants = ? 
+            SET cleaned_name = ?
             WHERE id = ?
         """,
-            (cleaned_name, ",".join(categories), ",".join(variants), id),
+            (cleaned_name, id),
         )
 
-        if categories:
-            for category in categories:
-                cur.execute(
-                    """
-                    INSERT INTO categories (category, folder_id)
-                    VALUES (?, ?)
-                    """,
-                    (category, id),
-                )
+        # if categories:
+        #     for category in categories:
+        #         cur.execute(
+        #             """
+        #             INSERT INTO categories (category, folder_id)
+        #             VALUES (?, ?)
+        #             """,
+        #             (category, id),
+        #         )
 
     conn.commit()
     conn.close()
@@ -104,11 +101,12 @@ def clean_file_name_post(db_path, update_table: bool = False):
 
 def process_zip(
     zip_source,
-    parent_path: str,
+    parent_path: Path,
     zip_name: str,
     base_depth: int,
     cur: sqlite3.Cursor,
     preserve_modules: bool = True,
+    num_siblings: int = 0,
 ) -> None:
     try:
         with zipfile.ZipFile(zip_source, "r") as zf:
@@ -122,51 +120,52 @@ def process_zip(
                     INSERT INTO files (file_name, file_path, depth)
                     VALUES (?, ?, ?)
                 """,
-                    (zip_name, parent_path, base_depth),
+                    (zip_name, str(parent_path), base_depth),
                 )
                 return
 
-            basename = os.path.splitext(zip_name)[0]
+            basename = Path(zip_name).stem
             # store the zipfile as a folder if it isn't redundant
             cur.execute(
                 """
-                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source)
-                VALUES (?, ?, ?, ?, 'zip_file')
+                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source, num_siblings)
+                VALUES (?, ?, ?, ?, 'zip_file', num_siblings)
             """,
                 (
                     zip_name,
-                    os.path.join(parent_path, zip_name),
-                    parent_path,
+                    str(parent_path / zip_name),
+                    str(parent_path),
                     base_depth,
+                    num_siblings
                 ),
             )
 
             for entry in entries:
-                parts = entry.split("/")
-                if any(should_ignore(part) for part in parts):
+                entry_path = Path(entry)
+                if any(should_ignore(part) for part in entry_path.parts):
                     continue
 
                 # Process directory structure
-                current_path = os.path.join(parent_path, zip_name)
-                for part in parts[:-1]:
+                current_path = parent_path / zip_name
+                for part in entry_path.parts[:-1]:
                     if not part:
                         continue
 
-                    new_path = os.path.join(current_path, part)
+                    new_path = current_path / part
                     if new_path not in processed_dirs and part != basename:
                         processed_dirs.add(new_path)
-                        depth = new_path.count(os.sep) - base_depth
+                        depth = len(new_path.parts) - base_depth
 
                         # Get siblings (folders in same directory)
-                        dir_path = "/".join(parts[:-2]) + "/"
-                        zip_depth = len(parts)
+                        dir_path = entry_path.parent
+                        zip_depth = len(entry_path.parts)
                         siblings = [
-                            os.path.basename(e.rstrip("/"))
+                            Path(e).name
                             for e in entries
-                            if e.startswith(dir_path) 
-                            and e != entry 
+                            if Path(e).parent == dir_path
+                            and e != entry
                             and e.endswith("/")
-                            and len(e.strip('/').split('/')) < zip_depth
+                            and len(Path(e).parts) < zip_depth
                         ]
 
                         cur.execute(
@@ -177,20 +176,20 @@ def process_zip(
                                 parent_path, 
                                 depth, 
                                 file_source, 
-                                siblings)
+                                num_siblings)
                             VALUES (?, ?, ?, ?, 'zip_content', ?)
                         """,
-                            (part, new_path, current_path, depth, json.dumps(siblings)),
+                            (part, str(new_path), str(current_path), depth, len(siblings)),
                         )
 
                     current_path = new_path
 
                 # Process file
-                if not entry.endswith("/"):
-                    file_name = parts[-1]
+                if not entry_path.is_dir():
+                    file_name = entry_path.name
                     if file_name:
-                        file_path = os.path.join(current_path, file_name)
-                        depth = file_path.count(os.sep) - base_depth
+                        file_path = current_path / file_name
+                        depth = len(file_path.parts) - base_depth
 
                         if file_name.lower().endswith(".zip"):
                             try:
@@ -210,14 +209,14 @@ def process_zip(
                             INSERT INTO files (file_name, file_path, depth)
                             VALUES (?, ?, ?)
                         """,
-                            (file_name, file_path, depth),
+                            (file_name, str(file_path), depth),
                         )
 
-    except (NotImplementedError, zipfile.BadZipfile) as e:
+    except (NotImplementedError, zipfile.BadZipFile) as e:
         print(f"Error processing zip {zip_name}: {e}")
 
 
-def gather_folder_structure_and_store(base_path: str, db_path: Path) -> None:
+def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
@@ -226,27 +225,26 @@ def gather_folder_structure_and_store(base_path: str, db_path: Path) -> None:
         files = [f for f in files if not should_ignore(f)]
 
         for d in dirs:
-            folder_path = os.path.join(root, d)
-            depth = folder_path.count(os.sep) - base_path.count(os.sep)
-            parent_path = root if root != base_path else ""
+            folder_path = Path(root) / d
+            depth = len(folder_path.parts) - len(base_path.parts)
+            parent_path = Path(root) if Path(root) != base_path else Path("")
             sibling_list = [s for s in dirs if s != d]
 
             cur.execute(
                 """
-                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source,siblings)
+                INSERT INTO folders (folder_name, folder_path, parent_path, depth, file_source,num_siblings)
                 VALUES (?, ?, ?, ?, 'filesystem',?)
             """,
-                (d, folder_path, parent_path, depth, json.dumps(sibling_list)),
+                (d, str(folder_path), str(parent_path), depth, len(sibling_list)),
             )
 
         for f in files:
-            file_path = os.path.join(root, f)
-            depth = file_path.count(os.sep) - base_path.count(os.sep)
+            file_path = Path(root) / f
+            depth = len(file_path.parts) - len(base_path.parts)
             
-
             if f.lower().endswith(".zip"):
                 try:
-                    process_zip(file_path, root, f, depth, cur)
+                    process_zip(file_path, Path(root), f, depth, cur)
                 except zipfile.BadZipFile as e:
                     print(f"Error processing zip file {file_path}: {e}")
                 continue
@@ -256,7 +254,7 @@ def gather_folder_structure_and_store(base_path: str, db_path: Path) -> None:
                 INSERT INTO files (file_name, file_path, depth)
                 VALUES (?, ?, ?)
             """,
-                (f, file_path, depth),
+                (f, str(file_path), depth),
             )
 
     conn.commit()
