@@ -18,8 +18,8 @@ app = typer.Typer()
 
 @app.command()
 def gather(
-    base_path: str = typer.Argument(...),
-    output_dir: str = typer.Argument(...)
+    base_path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, readable=True, resolve_path=True),
+    output_dir: Path = typer.Argument(..., file_okay=False, dir_okay=True, writable=True, resolve_path=True)
 ):
     """
     1) Create a timestamped subfolder in output_dir,
@@ -27,7 +27,7 @@ def gather(
     3) Gather folder/file data,
     4) Insert freq counts.
     """
-    base_output = Path(output_dir)
+    base_output = output_dir
     base_output.mkdir(parents=True, exist_ok=True)
 
     timestamp_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Optional, List
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, event
+from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, event, inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
@@ -72,11 +72,15 @@ def setup_gather(db_path: Path):
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
     engine = get_engine(db_path)
+    inspector = inspect(engine)
     
     # Drop existing tables if they exist
-    for table in [ProcessedName.__table__, Group.__table__]:
-        if table.exists(engine):
-            table.drop(engine)
+    tables_to_drop = [ProcessedName.__tablename__, Group.__tablename__]
+    existing_tables = inspector.get_table_names()
+    
+    for table_name in tables_to_drop:
+        if table_name in existing_tables:
+            Base.metadata.tables[table_name].drop(engine)
     
     # Create new tables
     Base.metadata.create_all(engine, tables=[ProcessedName.__table__, Group.__table__])
@@ -84,10 +88,11 @@ def setup_group(db_path: Path):
 def setup_collections(db_path: Path):
     """Create or open the SQLite database for categories."""
     engine = get_engine(db_path)
+    inspector = inspect(engine)
     
     # Drop existing categories table if it exists
-    if Category.__table__.exists(engine):
-        Category.__table__.drop(engine)
+    if Category.__tablename__ in inspector.get_table_names():
+        Base.metadata.tables[Category.__tablename__].drop(engine)
     
     # Create new categories table
     Base.metadata.create_all(engine, tables=[Category.__table__])
@@ -98,3 +103,26 @@ def get_session(db_path: Path):
     engine = get_engine(db_path)
     Session = sessionmaker(bind=engine)
     return Session()
+
+# Example usage:
+if __name__ == "__main__":
+    db_path = Path("example.db")
+    
+    # Setup all tables
+    setup_gather(db_path)
+    setup_group(db_path)
+    setup_collections(db_path)
+    
+    # Example of using the session
+    session = get_session(db_path)
+    try:
+        # Create a new folder
+        new_folder = Folder(
+            folder_name="Test Folder",
+            folder_path="/test/path",
+            depth=1
+        )
+        session.add(new_folder)
+        session.commit()
+    finally:
+        session.close()
