@@ -6,6 +6,7 @@ import re
 import difflib
 import sqlite3
 
+from database import setup_group
 from utils.filename_utils import (
     get_max_common_string,
     get_max_common_words,
@@ -366,39 +367,11 @@ def calculate_similarity_difflib(a: str, b: str, threshold=80) -> bool:
 
 
 def group_categories(db_path: str, threshold: int = 80):
+    
+    setup_group(db_path)
+    
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-
-    # create the tables
-    cur.execute("""
-        DROP TABLE IF EXISTS cleaned_groups
-                """)
-    cur.execute("""
-        DROP TABLE IF EXISTS processed_names
-                """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS processed_names (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_id INTEGER,
-            folder_name TEXT,
-            grouped_name TEXT,
-            confidence FLOAT
-        )
-    """)
-
-    cur.execute("""
-        DROP TABLE IF EXISTS related_groups
-                """)
-    cur.execute("""
-        DROP TABLE IF EXISTS groups
-                """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS groups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_name TEXT,
-            cannonical_name TEXT
-        )
-    """)
 
     # get the groups
     distinct_names = [

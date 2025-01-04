@@ -1,6 +1,5 @@
 import os
 import json
-import sqlite3
 import typer
 from dataclasses import dataclass, field
 from typing import Dict, List
@@ -8,54 +7,12 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
+from database import setup_gather
 from gather import gather_folder_structure_and_store, clean_file_name_post
 from classify import classify_folders
 from group import  process_groups, calculate_and_process_groups,process_pre_calculated_groups
 
 app = typer.Typer()
-
-# ---- 1. Setup / Create Tables ----
-
-def setup_database(db_path: Path):
-    """Create or open the SQLite database, ensuring tables exist."""
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-
-    # Create folders table
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS folders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        folder_name TEXT NOT NULL,
-        folder_path TEXT NOT NULL,
-        parent_path TEXT,
-        depth INTEGER,
-        classification TEXT
-    )
-    """)
-
-    # Create files table
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_name TEXT NOT NULL,
-        file_path TEXT NOT NULL,
-        depth INTEGER,
-        siblings TEXT
-    )
-    """)
-
-    # Create counts table (folder name frequency)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS counts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        folder_name TEXT NOT NULL,
-        count INTEGER NOT NULL
-    )
-    """)
-
-    conn.commit()
-    return conn
-
 
 # ---- 4. CLI Commands ----
 
@@ -78,7 +35,7 @@ def gather(
     run_dir.mkdir()
 
     db_path = run_dir / "run_data.db"
-    setup_database(db_path)
+    setup_gather(db_path)
     typer.echo(f"Gathering from: {base_path}")
     typer.echo(f"DB path: {db_path}")
 
