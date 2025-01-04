@@ -161,6 +161,7 @@ cython_debug/
 
 # working docs
 outputs/
+ outputs/
 
 # vscode files
 *.vscode
