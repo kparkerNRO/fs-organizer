@@ -10,7 +10,7 @@ from pathlib import Path
 from database import setup_gather
 from gather import gather_folder_structure_and_store, clean_file_name_post
 from classify import classify_folders
-from group import  process_groups, calculate_and_process_groups,process_pre_calculated_groups
+from grouping.group import  process_groups, calculate_and_process_groups,process_pre_calculated_groups
 
 app = typer.Typer()
 

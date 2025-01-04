@@ -1,101 +1,147 @@
 from pathlib import Path
 from typing import Optional, List
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey, event, inspect
+from sqlalchemy import (
+    TypeDecorator,
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Float,
+    ForeignKey,
+    event,
+    inspect,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+import json
+
+
+class StringList(TypeDecorator):
+    """Custom type for handling lists stored as JSON strings"""
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return json.dumps(value)
+        return None
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return json.loads(value)
+        return []
+
 
 Base = declarative_base()
 
+
 class Folder(Base):
-    __tablename__ = 'folders'
-    
+    __tablename__ = "folders"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     folder_name = Column(String, nullable=False)
     folder_path = Column(String, nullable=False)
     parent_path = Column(String)
     depth = Column(Integer)
     cleaned_name = Column(String)
-    categories = Column(String)
+    categories = Column(String)  # Keeping as string since it wasn't specified as list
     subject = Column(String)
-    variants = Column(String)
-    classification = Column(String)
+    variants = Column(StringList)
+    classification = Column(StringList)
     file_source = Column(String)
-    num_siblings = Column(Integer)
+    num_folder_children = Column(Integer, default=0)
+    num_file_children = Column(Integer, default=0)
+
+    def __init__(self, **kwargs):
+        # Convert lists to default empty lists if not provided
+        kwargs["variants"] = kwargs.get("variants", [])
+        kwargs["classification"] = kwargs.get("classification", [])
+        super(Folder, self).__init__(**kwargs)
 
     def __repr__(self):
         return f"Folder(id={self.id}, folder_name={self.folder_name}, folder_path={self.folder_path}, parent_path={self.parent_path}, depth={self.depth}, cleaned_name={self.cleaned_name}, categories={self.categories}, subject={self.subject}, variants={self.variants}, classification={self.classification}, file_source={self.file_source}, num_siblings={self.num_siblings})"
 
+
 class File(Base):
-    __tablename__ = 'files'
-    
+    __tablename__ = "files"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     file_name = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     depth = Column(Integer)
 
+
 class ProcessedName(Base):
-    __tablename__ = 'processed_names'
-    
+    __tablename__ = "processed_names"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
-    group_id = Column(Integer, ForeignKey('groups.id'))
+    group_id = Column(Integer, ForeignKey("groups.id"))
     folder_name = Column(String)
     grouped_name = Column(String)
     confidence = Column(Float)
 
+
 class Group(Base):
-    __tablename__ = 'groups'
-    
+    __tablename__ = "groups"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_name = Column(String)
     cannonical_name = Column(String)
     processed_names = relationship("ProcessedName", backref="group")
 
+
 class Category(Base):
-    __tablename__ = 'categories'
-    
+    __tablename__ = "categories"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     category = Column(String)
     renamed_category = Column(String)
-    folder_id = Column(Integer, ForeignKey('folders.id'))
+    folder_id = Column(Integer, ForeignKey("folders.id"))
+
 
 def get_engine(db_path: Path):
     """Create and return a SQLAlchemy engine."""
-    return create_engine(f'sqlite:///{db_path}')
+    return create_engine(f"sqlite:///{db_path}")
+
 
 def setup_gather(db_path: Path):
     """Create or open the SQLite database, ensuring tables exist."""
     engine = get_engine(db_path)
-    
+
     # Create tables for Folder and File
     Base.metadata.create_all(engine, tables=[Folder.__table__, File.__table__])
+
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
     engine = get_engine(db_path)
     inspector = inspect(engine)
-    
+
     # Drop existing tables if they exist
     tables_to_drop = [ProcessedName.__tablename__, Group.__tablename__]
     existing_tables = inspector.get_table_names()
-    
+
     for table_name in tables_to_drop:
         if table_name in existing_tables:
             Base.metadata.tables[table_name].drop(engine)
-    
+
     # Create new tables
     Base.metadata.create_all(engine, tables=[ProcessedName.__table__, Group.__table__])
+
 
 def setup_collections(db_path: Path):
     """Create or open the SQLite database for categories."""
     engine = get_engine(db_path)
     inspector = inspect(engine)
-    
+
     # Drop existing categories table if it exists
     if Category.__tablename__ in inspector.get_table_names():
         Base.metadata.tables[Category.__tablename__].drop(engine)
-    
+
     # Create new categories table
     Base.metadata.create_all(engine, tables=[Category.__table__])
+
 
 # Helper function to get a database session
 def get_session(db_path: Path):
@@ -104,23 +150,22 @@ def get_session(db_path: Path):
     Session = sessionmaker(bind=engine)
     return Session()
 
+
 # Example usage:
 if __name__ == "__main__":
     db_path = Path("example.db")
-    
+
     # Setup all tables
     setup_gather(db_path)
     setup_group(db_path)
     setup_collections(db_path)
-    
+
     # Example of using the session
     session = get_session(db_path)
     try:
         # Create a new folder
         new_folder = Folder(
-            folder_name="Test Folder",
-            folder_path="/test/path",
-            depth=1
+            folder_name="Test Folder", folder_path="/test/path", depth=1
         )
         session.add(new_folder)
         session.commit()

@@ -1,6 +1,6 @@
 import unittest
 import pytest
-from group import common_token_grouping
+from grouping.helpers import common_token_grouping
 
 
 @pytest.mark.parametrize(
