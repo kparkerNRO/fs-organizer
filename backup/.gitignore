@@ -1,5 +1,5 @@
-### MAC OS files ###
-.DS_Store
+# Created by https://www.toptal.com/developers/gitignore/api/python
+# Edit at https://www.toptal.com/developers/gitignore?templates=python
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -12,9 +12,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
-__pycache__/
-*.py[oc]
 build/
 develop-eggs/
 dist/
@@ -159,9 +156,16 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# working docs
-outputs/
+# PyCharm
+#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+#  and can be added to the global gitignore or merged into this file.  For a more nuclear
+#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+#.idea/
 
-# vscode files
-*.vscode
-.vscode/launch.json
+# End of https://www.toptal.com/developers/gitignore/api/python
+
+.vscode
+
+
+outputs/

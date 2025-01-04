@@ -1,0 +1,14 @@
+[project]
+name = "organizer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.115.6",
+    "nltk>=3.9.1",
+    "pytest>=8.3.4",
+    "rapidfuzz>=3.11.0",
+    "ruff>=0.8.4",
+    "typer>=0.15.1",
+]
