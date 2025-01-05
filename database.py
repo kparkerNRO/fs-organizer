@@ -37,15 +37,15 @@ Base = declarative_base()
 
 
 class Folder(Base):
-    __tablename__ = "folders"
-
+    __tablename__ = 'folders'
+    
     id = Column(Integer, primary_key=True, autoincrement=True)
     folder_name = Column(String, nullable=False)
     folder_path = Column(String, nullable=False)
     parent_path = Column(String)
     depth = Column(Integer)
     cleaned_name = Column(String)
-    categories = Column(String)  # Keeping as string since it wasn't specified as list
+    categories = Column(StringList)  # Change this to use StringList type
     subject = Column(String)
     variants = Column(StringList)
     classification = Column(StringList)
@@ -55,12 +55,13 @@ class Folder(Base):
 
     def __init__(self, **kwargs):
         # Convert lists to default empty lists if not provided
-        kwargs["variants"] = kwargs.get("variants", [])
-        kwargs["classification"] = kwargs.get("classification", [])
+        kwargs['variants'] = kwargs.get('variants', [])
+        kwargs['classification'] = kwargs.get('classification', [])
+        kwargs['categories'] = kwargs.get('categories', [])  # Add default for categories
         super(Folder, self).__init__(**kwargs)
 
     def __repr__(self):
-        return f"Folder(id={self.id}, folder_name={self.folder_name}, folder_path={self.folder_path}, parent_path={self.parent_path}, depth={self.depth}, cleaned_name={self.cleaned_name}, categories={self.categories}, subject={self.subject}, variants={self.variants}, classification={self.classification}, file_source={self.file_source}, num_siblings={self.num_siblings})"
+        return f"Folder(id={self.id}, folder_name={self.folder_name}"
 
 
 class File(Base):
@@ -70,6 +71,9 @@ class File(Base):
     file_name = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     depth = Column(Integer)
+
+    def __repr__(self):
+        return f"File(id={self.id}, file_name={self.file_name}"
 
 
 class ProcessedName(Base):

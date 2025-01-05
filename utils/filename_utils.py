@@ -62,17 +62,19 @@ def get_max_common_words(tokens, name_to_comp):
 
 def split_view_type(base_name, view_types=VIEW_TYPES):
     """
-    Trims out standard view type suffixes from a filename
+    Trims out standard view type suffixes from a filename, ensuring
+    that the view type is a full word, not part of another word.
     """
     f_suffix = None
     f_name = base_name
     for suffix in view_types:
-        if base_name.endswith(suffix):
+        # Ensure the suffix is a full word using regex
+        if re.search(rf"\b{re.escape(suffix)}\b", base_name):
             f_suffix = suffix.strip()
             f_name = strip_part_from_base(base_name, suffix)
+            break
 
     return f_name, f_suffix
-
 
 def process_file_name(name, final_token, has_suffix, use_suffix=False):
     """
@@ -141,8 +143,11 @@ def clean_filename(
             out_dir_name = out_dir_name.replace(exception, replace)
 
     # remove numbers at the start and end of the name
-    out_dir_name = re.sub("^#?\d{0,2}\s*", "", out_dir_name)
+    out_dir_name = re.sub("^(♯|#?)\d{0,3}\s*", "", out_dir_name)
     out_dir_name = re.sub("#?\d{0,2}\s*$", "", out_dir_name)
+
+    # remove "#<number> at the start of the name"
+    out_dir_name = re.sub("^#\d+\s*", "", out_dir_name)
 
     # clean up directory sizes
     # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)

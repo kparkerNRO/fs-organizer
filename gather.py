@@ -1,6 +1,6 @@
 import zipfile
 from pathlib import Path
-from typing import Set, List, Tuple
+from typing import IO, Set, List, Tuple
 from sqlalchemy.orm import Session
 from database import (
     setup_collections,
@@ -10,6 +10,7 @@ from database import (
 )
 from utils.filename_utils import clean_filename
 import os
+
 
 def should_ignore(name: str) -> bool:
     """Check if a file or directory should be ignored."""
@@ -29,37 +30,39 @@ def should_ignore(name: str) -> bool:
     }
     return name in ignore_patterns or name.startswith("._")
 
-def count_zip_children(entries: List[str], target_dir: str = '') -> Tuple[int, int]:
+
+def count_zip_children(entries: List[str], target_dir: str = "") -> Tuple[int, int]:
     """
     Count direct children in a zip file at a specific directory level
     Returns (folder_children, file_children)
     """
     folders = 0
     files = 0
-    
+
     # Normalize target directory path
-    target_dir = target_dir.rstrip('/')
+    target_dir = target_dir.rstrip("/")
     if target_dir:
-        target_dir = target_dir + '/'
-    
+        target_dir = target_dir + "/"
+
     # Get direct children of the target directory
     for entry in entries:
         # Skip entries not in target directory
         if not entry.startswith(target_dir):
             continue
-            
+
         # Remove target directory prefix
-        rel_path = entry[len(target_dir):]
+        rel_path = entry[len(target_dir) :]
         if not rel_path:
             continue
-            
+
         # Count only direct children
-        if '/' not in rel_path:  # File
+        if "/" not in rel_path:  # File
             files += 1
-        elif rel_path.count('/') == 1 and rel_path.endswith('/'):  # Directory
+        elif rel_path.count("/") == 1 and rel_path.endswith("/"):  # Directory
             folders += 1
-            
+
     return folders, files
+
 
 def process_zip(
     zip_source,
@@ -73,34 +76,40 @@ def process_zip(
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
             processed_dirs: Set[Path] = set()
-            
-            # shortcut if it's a foundry module: i.e. if module.json exists at the root level
-            if preserve_modules and any(entry == "module.json" or entry == "./module.json" for entry in entries):
+
+            # Shortcut if it's a Foundry module: i.e., if module.json exists at the root level
+            matching_foundry_module = [
+                entry for entry in entries 
+                if entry.lower().endswith("module.json") and entry.count("/") <= 2
+            ]
+            if preserve_modules and matching_foundry_module:
                 new_file = File(
-                    file_name=zip_name,
-                    file_path=str(parent_path),
-                    depth=base_depth
+                    file_name=zip_name, file_path=str(parent_path), depth=base_depth
                 )
                 session.add(new_file)
                 session.commit()
                 return
 
-            # Count children at zip root level
+            # Count children at the ZIP root level
             root_folders, root_files = count_zip_children(entries)
 
             basename = Path(zip_name).stem
-            # store the zipfile as a folder with children counts
-            new_folder = Folder(
-                folder_name=zip_name,
-                folder_path=str(parent_path / zip_name),
-                parent_path=str(parent_path),
-                depth=base_depth,
-                file_source='zip_file',
-                num_folder_children=root_folders,
-                num_file_children=root_files
-            )
-            session.add(new_folder)
-            session.commit()
+            matching_root_folder = [
+                entry for entry in entries if entry.startswith(basename + "/")
+            ]
+            # Store the ZIP file as a folder with children counts if not redundant
+            if not matching_root_folder:
+                new_folder = Folder(
+                    folder_name=zip_name,
+                    folder_path=str(parent_path / zip_name),
+                    parent_path=str(parent_path),
+                    depth=base_depth,
+                    file_source="zip_file",
+                    num_folder_children=root_folders,
+                    num_file_children=root_files,
+                )
+                session.add(new_folder)
+                session.commit()
 
             for entry in entries:
                 entry_path = Path(entry)
@@ -109,37 +118,32 @@ def process_zip(
 
                 # Process directory structure
                 current_path = parent_path / zip_name
-                rel_path = ''  # Keep track of relative path in zip
-                
-                for part in entry_path.parts[:-1]:
-                    if not part:
-                        continue
-
+                for part in entry_path.parts[:-1]:  # Exclude the file name itself
                     new_path = current_path / part
-                    if new_path not in processed_dirs and part != basename:
+                    if new_path not in processed_dirs:
                         processed_dirs.add(new_path)
                         depth = len(new_path.parts) - base_depth
 
-                        # Update relative path for children counting
-                        rel_path = str(Path(rel_path) / part)
                         # Count children at this directory level
-                        folder_children, file_children = count_zip_children(entries, rel_path)
+                        folder_children, file_children = count_zip_children(
+                            entries, str(new_path.relative_to(parent_path / zip_name))
+                        )
 
                         new_folder = Folder(
                             folder_name=part,
                             folder_path=str(new_path),
                             parent_path=str(current_path),
                             depth=depth,
-                            file_source='zip_content',
+                            file_source="zip_content",
                             num_folder_children=folder_children,
-                            num_file_children=file_children
+                            num_file_children=file_children,
                         )
                         session.add(new_folder)
 
                     current_path = new_path
-                    
+
                 # Process file
-                if not entry_path.is_dir():
+                if not entry.endswith("/"):
                     file_name = entry_path.name
                     if file_name:
                         file_path = current_path / file_name
@@ -157,19 +161,20 @@ def process_zip(
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
                                 print(f"Error processing nested zip {entry}: {e}")
-
-                        new_file = File(
-                            file_name=file_name,
-                            file_path=str(file_path),
-                            depth=depth
-                        )
-                        session.add(new_file)
+                        else:
+                            new_file = File(
+                                file_name=file_name,
+                                file_path=str(file_path),
+                                depth=depth,
+                            )
+                            session.add(new_file)
 
             session.commit()
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
         print(f"Error processing zip {zip_name}: {e}")
         session.rollback()
+
 
 def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
     """Gather folder structure and store in database using SQLAlchemy."""
@@ -185,28 +190,36 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                 folder_path = Path(root) / d
                 depth = len(folder_path.parts) - len(base_path.parts)
                 parent_path = Path(root) if Path(root) != base_path else Path("")
-                
+
                 # Count children in this directory
-                child_dirs = [child_dir for child_dir in os.listdir(folder_path) 
-                            if (folder_path / child_dir).is_dir() and not should_ignore(child_dir)]
-                child_files = [child_file for child_file in os.listdir(folder_path) 
-                             if (folder_path / child_file).is_file() and not should_ignore(child_file)]
+                child_dirs = [
+                    child_dir
+                    for child_dir in os.listdir(folder_path)
+                    if (folder_path / child_dir).is_dir()
+                    and not should_ignore(child_dir)
+                ]
+                child_files = [
+                    child_file
+                    for child_file in os.listdir(folder_path)
+                    if (folder_path / child_file).is_file()
+                    and not should_ignore(child_file)
+                ]
 
                 new_folder = Folder(
                     folder_name=d,
                     folder_path=str(folder_path),
                     parent_path=str(parent_path),
                     depth=depth,
-                    file_source='filesystem',
+                    file_source="filesystem",
                     num_folder_children=len(child_dirs),
-                    num_file_children=len(child_files)
+                    num_file_children=len(child_files),
                 )
                 session.add(new_folder)
 
             for f in files:
                 file_path = Path(root) / f
                 depth = len(file_path.parts) - len(base_path.parts)
-                
+
                 if f.lower().endswith(".zip"):
                     try:
                         process_zip(file_path, Path(root), f, depth, session)
@@ -214,11 +227,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                         print(f"Error processing zip file {file_path}: {e}")
                     continue
 
-                new_file = File(
-                    file_name=f,
-                    file_path=str(file_path),
-                    depth=depth
-                )
+                new_file = File(file_name=f, file_path=str(file_path), depth=depth)
                 session.add(new_file)
 
             session.commit()
@@ -232,6 +241,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
 
     clean_file_name_post(db_path=db_path, update_table=True)
 
+
 def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
     """Clean and update folder names in the database using SQLAlchemy."""
     setup_collections(db_path)
@@ -242,7 +252,7 @@ def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
         folders = session.query(Folder).all()
 
         for folder in folders:
-            if folder.folder_name.endswith('.zip'):
+            if folder.folder_name.endswith(".zip"):
                 cleaned_name = clean_filename(folder.folder_name[:-4])
             else:
                 cleaned_name = clean_filename(folder.folder_name)

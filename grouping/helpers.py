@@ -1,15 +1,20 @@
+import difflib
 import re
 from typing import Optional
 
 from nltk.metrics import edit_distance
 from rapidfuzz import fuzz
 
-from utils.filename_utils import get_max_common_words, strip_part_from_base
+from utils.filename_utils import (
+    clean_filename,
+    get_max_common_words,
+    strip_part_from_base,
+)
 
 common_words = {"the", "a", "an", "of", "in", "on", "at"}
 
 
-def split_category(target_name, category):
+def split_category(target_name, category, clean_result: bool = True):
     """
     Seperates out the common "overlap name" from the target name to create a
     heierachicial category, ensuring only words overlap
@@ -20,11 +25,17 @@ def split_category(target_name, category):
     overlap_tokens = category if isinstance(category, list) else (category.split())
     overlap_tokens_lower = [token.lower() for token in overlap_tokens]
 
+    if clean_result:
+        category = new_name = clean_filename(category)
+
     if target_lower_tokens[: len(overlap_tokens)] == overlap_tokens_lower:
         if target_lower_tokens == overlap_tokens_lower:
             return [category]
         else:
-            return [category, " ".join(target_tokens[len(overlap_tokens) :])]
+            new_name = " ".join(target_tokens[len(overlap_tokens) :])
+            if clean_result:
+                new_name = clean_filename(new_name)
+            return [category, new_name]
 
 
 def normalize_for_comparison(s: str) -> str:
@@ -178,6 +189,8 @@ def common_token_grouping(
                 for filename in token_to_filenames[token2]:
                     working_path = names_to_replacement[filename]
                     if working_path[0] == token1:
+                        continue
+                    if len(working_path) == 1:
                         continue
                     working_path[-1] = (delta + " " + working_path[-1]).strip()
                     working_path[-2] = token1

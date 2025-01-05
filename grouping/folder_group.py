@@ -53,14 +53,19 @@ def process_folders(session: Session):
     """
 
     grouped_folders = get_folder_groups(session)
+    session.query(Folder).update({Folder.categories:[]})
 
     for parent_path, folders in grouped_folders.items():
-        folder_names = [folder.folder_name for folder in folders]
-        folder_name_to_folder = {folder.folder_name: folder for folder in folders}  
-        token_grouping = common_token_grouping(folder_names)
-        for name, category in token_grouping.items():
-            for folder in folders:
-                if folder.folder_name == name:
-                    folder.classification = category
+        folder_id_to_folder = {folder.id: folder for folder in folders}  
+        cleaned_name_to_id = {folder.cleaned_name: folder.id for folder in folders}  
+        token_grouping = common_token_grouping(cleaned_name_to_id.keys())
+        if token_grouping:
+            for name, category in token_grouping.items():
+                id = cleaned_name_to_id[name]
+
+                folder_id_to_folder[id].categories = category
+                # session.add(folder_id_to_folder[id])
             
+    session.add_all(folder_id_to_folder.values())
+
     session.commit()
