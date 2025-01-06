@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import IO, Set, List, Tuple
 from sqlalchemy.orm import Session
 from database import (
-    setup_category_lookup,
+    setup_folder_categories,
     get_session,
     Folder,
     File,
@@ -245,7 +245,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
 
 def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
     """Clean and update folder names in the database using SQLAlchemy."""
-    setup_category_lookup(db_path)
+    setup_folder_categories(db_path)
     session = get_session(db_path)
 
     try:

@@ -114,12 +114,14 @@ class Group(Base):
     processed_names = relationship("ProcessedName", backref="group")
 
 
-class CategoryLookup(Base):
-    __tablename__ = "category_lookup"
+class FolderCategory(Base):
+    __tablename__ = "folder_category"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    category = Column(String)
-    renamed_category = Column(String)
+    name = Column(String)
+    original_name = Column(String)
+    classification = Column(String)
+
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("category.id"))
 
@@ -129,7 +131,7 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     category_name = Column(String)
-    classification = Column(String)
+    classification = Column(String) # Description: the unified classifcation across all folders
     classification_counts = Column(DictType)
     total_count = Column(Integer)
 
@@ -158,7 +160,7 @@ def reset_tables(db_path: Path, tables: List[str]):
     Base.metadata.create_all(engine, tables=table_objs)
 
 
-def setup_categorize(db_path: Path):
+def setup_category_summarization(db_path: Path):
     reset_tables(db_path, [Category])
 
 
@@ -172,9 +174,9 @@ def setup_group(db_path: Path):
     reset_tables(db_path, [ProcessedName, Group])
 
 
-def setup_category_lookup(db_path: Path):
+def setup_folder_categories(db_path: Path):
     """Create or open the SQLite database for categories."""
-    reset_tables(db_path, [CategoryLookup])
+    reset_tables(db_path, [FolderCategory])
 
 
 # Helper function to get a database session
@@ -192,7 +194,7 @@ if __name__ == "__main__":
     # Setup all tables
     setup_gather(db_path)
     setup_group(db_path)
-    setup_category_lookup(db_path)
+    setup_folder_categories(db_path)
 
     # Example of using the session
     session = get_session(db_path)

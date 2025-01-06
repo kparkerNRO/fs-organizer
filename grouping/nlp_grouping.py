@@ -4,9 +4,9 @@ from pathlib import Path
 from database import (
     setup_group,
     get_session,
-    setup_categorize,
+    setup_category_summarization,
     Folder,
-    CategoryLookup,
+    FolderCategory,
     Group,
     ProcessedName,
     Category,
