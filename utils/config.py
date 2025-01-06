@@ -3,7 +3,7 @@
 # from common import FileBackupState, ZipBackupState
 
 CREATOR_REMOVES = {
-    "CzePeku": ["$5 Rewards","$10 Rewards","$1 Rewards"],
+    "CzePeku": ["$5 Rewards", "$10 Rewards", "$1 Rewards"],
     "Limithron": ["Admiral", "Captain"],
     "The Reclusive Cartographer": "_MC",
     "Baileywiki": "",
@@ -71,6 +71,8 @@ other = {
     "Variants",
     "Key & Design Notes",
     "Exterior",
+    "Clean",
+    "Asset Pack",
 }
 # Combine them
 KNOWN_VARIANT_TOKENS = season_tokens | time_tokens | style_tokens | other

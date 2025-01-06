@@ -33,12 +33,29 @@ class StringList(TypeDecorator):
         return []
 
 
+class DictType(TypeDecorator):
+    """Custom type for handling dictionaries stored as JSON strings"""
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return json.dumps(value)
+        return None
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return json.loads(value)
+        return {}
+
+
 Base = declarative_base()
 
 
 class Folder(Base):
-    __tablename__ = 'folders'
-    
+    __tablename__ = "folders"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     folder_name = Column(String, nullable=False)
     folder_path = Column(String, nullable=False)
@@ -55,9 +72,11 @@ class Folder(Base):
 
     def __init__(self, **kwargs):
         # Convert lists to default empty lists if not provided
-        kwargs['variants'] = kwargs.get('variants', [])
-        kwargs['classification'] = kwargs.get('classification', [])
-        kwargs['categories'] = kwargs.get('categories', [])  # Add default for categories
+        kwargs["variants"] = kwargs.get("variants", [])
+        kwargs["classification"] = kwargs.get("classification", [])
+        kwargs["categories"] = kwargs.get(
+            "categories", []
+        )  # Add default for categories
         super(Folder, self).__init__(**kwargs)
 
     def __repr__(self):
@@ -95,13 +114,24 @@ class Group(Base):
     processed_names = relationship("ProcessedName", backref="group")
 
 
-class Category(Base):
-    __tablename__ = "categories"
+class CategoryLookup(Base):
+    __tablename__ = "category_lookup"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     category = Column(String)
     renamed_category = Column(String)
-    folder_id = Column(Integer, ForeignKey("folders.id"))
+    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("category.id"))
+
+
+class Category(Base):
+    __tablename__ = "category"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category_name = Column(String)
+    classification = Column(String)
+    classification_counts = Column(DictType)
+    total_count = Column(Integer)
 
 
 def get_engine(db_path: Path):
@@ -109,42 +139,42 @@ def get_engine(db_path: Path):
     return create_engine(f"sqlite:///{db_path}")
 
 
-def setup_gather(db_path: Path):
-    """Create or open the SQLite database, ensuring tables exist."""
-    engine = get_engine(db_path)
-
-    # Create tables for Folder and File
-    Base.metadata.create_all(engine, tables=[Folder.__table__, File.__table__])
-
-
-def setup_group(db_path: Path):
-    """Create or open the SQLite database for grouping functionality."""
+def reset_tables(db_path: Path, tables: List[str]):
+    """Reset tables in the database."""
     engine = get_engine(db_path)
     inspector = inspect(engine)
 
     # Drop existing tables if they exist
-    tables_to_drop = [ProcessedName.__tablename__, Group.__tablename__]
+    table_names = [table.__tablename__ for table in tables]
     existing_tables = inspector.get_table_names()
 
-    for table_name in tables_to_drop:
+    for table_name in table_names:
         if table_name in existing_tables:
             Base.metadata.tables[table_name].drop(engine)
 
+    table_objs = [table.__table__ for table in tables]
+
     # Create new tables
-    Base.metadata.create_all(engine, tables=[ProcessedName.__table__, Group.__table__])
+    Base.metadata.create_all(engine, tables=table_objs)
 
 
-def setup_collections(db_path: Path):
+def setup_categorize(db_path: Path):
+    reset_tables(db_path, [Category])
+
+
+def setup_gather(db_path: Path):
+    """Create or open the SQLite database, ensuring tables exist."""
+    reset_tables(db_path, [Folder, File])
+
+
+def setup_group(db_path: Path):
+    """Create or open the SQLite database for grouping functionality."""
+    reset_tables(db_path, [ProcessedName, Group])
+
+
+def setup_category_lookup(db_path: Path):
     """Create or open the SQLite database for categories."""
-    engine = get_engine(db_path)
-    inspector = inspect(engine)
-
-    # Drop existing categories table if it exists
-    if Category.__tablename__ in inspector.get_table_names():
-        Base.metadata.tables[Category.__tablename__].drop(engine)
-
-    # Create new categories table
-    Base.metadata.create_all(engine, tables=[Category.__table__])
+    reset_tables(db_path, [CategoryLookup])
 
 
 # Helper function to get a database session
@@ -162,7 +192,7 @@ if __name__ == "__main__":
     # Setup all tables
     setup_gather(db_path)
     setup_group(db_path)
-    setup_collections(db_path)
+    setup_category_lookup(db_path)
 
     # Example of using the session
     session = get_session(db_path)

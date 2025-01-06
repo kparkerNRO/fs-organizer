@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import IO, Set, List, Tuple
 from sqlalchemy.orm import Session
 from database import (
-    setup_collections,
+    setup_category_lookup,
     get_session,
     Folder,
     File,
@@ -79,7 +79,8 @@ def process_zip(
 
             # Shortcut if it's a Foundry module: i.e., if module.json exists at the root level
             matching_foundry_module = [
-                entry for entry in entries 
+                entry
+                for entry in entries
                 if entry.lower().endswith("module.json") and entry.count("/") <= 2
             ]
             if preserve_modules and matching_foundry_module:
@@ -244,7 +245,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
 
 def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
     """Clean and update folder names in the database using SQLAlchemy."""
-    setup_collections(db_path)
+    setup_category_lookup(db_path)
     session = get_session(db_path)
 
     try:

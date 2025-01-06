@@ -10,6 +10,7 @@ dependencies = [
     "pytest>=8.3.4",
     "rapidfuzz>=3.11.0",
     "ruff>=0.8.4",
+    "scikit-learn>=1.6.0",
     "sqlalchemy>=2.0.36",
     "typer>=0.15.1",
 ]
