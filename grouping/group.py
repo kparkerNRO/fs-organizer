@@ -11,8 +11,7 @@ from database import (
     setup_category_summarization,
     Folder,
     FolderCategory,
-    Group,
-    ProcessedName,
+    GroupRecord,
     Category,
 )
 from grouping.folder_group import process_folders
@@ -33,7 +32,6 @@ from nltk.metrics import edit_distance
 from pathlib import Path
 
 
-
 def parse_name(name: str) -> tuple[list[str], list[str]]:
     """Parse a name into categories and variants"""
     categories = []
@@ -48,7 +46,10 @@ def parse_name(name: str) -> tuple[list[str], list[str]]:
         while category_current:
             category, variant = split_view_type(category_current, KNOWN_VARIANT_TOKENS)
             if category and category not in categories:
-                categories.append(category)
+                if category in KNOWN_VARIANT_TOKENS:
+                    variants.append(category)
+                else:
+                    categories.append(category)
             if variant:
                 variants.append(variant)
 
@@ -102,16 +103,18 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
             for category in categories:
                 category_lookup = FolderCategory(
                     folder_id=folder.id,
-                    category=category,
-                    renamed_category=folder.cleaned_name,
+                    original_name=folder.folder_name,
+                    name=category,
+                    classification=folder.classification,
                 )
                 session.add(category_lookup)
 
             for variant in variants:
                 category_lookup = FolderCategory(
                     folder_id=folder.id,
-                    category=variant,
-                    renamed_category=folder.cleaned_name,
+                    original_name=folder.folder_name,
+                    name=variant,
+                    classification=ClassificationType.VARIANT,
                 )
                 session.add(category_lookup)
         session.commit()
@@ -137,10 +140,12 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
                     folder.classification = ClassificationType.SUBJECT
                     folder.subject = folder.categories[0]
                     # also update the FolderCategory reference for folder.categories[0]
-                    category_lookup = session.query(FolderCategory).filter_by(
-                        folder_id=folder.id, category=folder.categories[0]
-                    ).one()
-                    category_lookup.category = folder.subject
+                    category_lookup = (
+                        session.query(FolderCategory)
+                        .filter_by(folder_id=folder.id, name=folder.categories[0])
+                        .one()
+                    )
+                    category_lookup.classification = ClassificationType.SUBJECT
         session.commit()
 
     finally:
@@ -157,7 +162,7 @@ def evaluate_categorization(db_path: Path) -> None:
             classification_counts: a map of classification types to counts
         """
         # Get all folders
-        folders = (
+        folder_category = (
             session.query(FolderCategory)
             # .filter(Folder.classification != ClassificationType.VARIANT)
             .all()
@@ -166,11 +171,8 @@ def evaluate_categorization(db_path: Path) -> None:
         # Create a dictionary to store category counts
         category_counts = defaultdict(lambda: defaultdict(int))
 
-        for folder in folders:
-            for category in folder.categories:
-                category_counts[category][folder.classification] += 1
-            for category in folder.variants:
-                category_counts[category][ClassificationType.VARIANT] += 1
+        for category in folder_category:
+            category_counts[category.name][category.classification] += 1
 
         # Insert into WorkingCategory table
         for category, counts in category_counts.items():
@@ -194,9 +196,7 @@ def evaluate_categorization(db_path: Path) -> None:
         session.close()
 
 
-
 def categorize(db_path: Path):
-
     # Reset processed names
     # session.query(ProcessedName).update({
     #     ProcessedName.grouped_name: None,
@@ -204,7 +204,7 @@ def categorize(db_path: Path):
     # })
     heuristic_categorize(db_path)
     evaluate_categorization(db_path)
-    # group_uncertain(db_path)
+    group_uncertain(db_path)
 
     # first, process folders in the same folder group and pull out duplicate terms
     # process_folders(session)

@@ -10,7 +10,7 @@ import shutil
 from database import setup_gather
 from gather import gather_folder_structure_and_store, clean_file_name_post
 from classify import classify_folders
-from grouping.group import process_groups, calculate_and_process_groups, categorize
+from grouping.group import categorize
 
 app = typer.Typer()
 
@@ -54,14 +54,14 @@ def gather(
     # Set up latest directory and file
     latest_dir = base_output / "latest"
     latest_db = latest_dir / "latest.db"
-    
+
     # Remove existing latest directory if it exists
     if latest_dir.exists():
         shutil.rmtree(latest_dir)
-    
+
     # Create new latest directory
     latest_dir.mkdir()
-    
+
     # Copy the current run's database to latest.db
     shutil.copy2(db_path, latest_db)
     typer.echo(f"Copied latest run to: {latest_db}")

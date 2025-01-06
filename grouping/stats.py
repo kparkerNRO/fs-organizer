@@ -11,7 +11,7 @@ from database import (
     setup_category_summarization,
     Folder,
     FolderCategory,
-    Group,
+    GroupRecord,
     ProcessedName,
     Category,
 )
@@ -148,6 +148,7 @@ class Grouper:
             clean_only=True,
         )
 
+
 def group_categories(db_path: Path, threshold: int = 80) -> dict[int, list[str]]:
     """Group categories using SQLAlchemy"""
     setup_group(db_path)
@@ -155,7 +156,9 @@ def group_categories(db_path: Path, threshold: int = 80) -> dict[int, list[str]]
 
     try:
         # Get distinct categories
-        distinct_categories = session.query(FolderCategory.original_name).distinct().all()
+        distinct_categories = (
+            session.query(FolderCategory.original_name).distinct().all()
+        )
         distinct_names = [cat[0] for cat in distinct_categories]
 
         groups = []  # List to store groups of related terms
@@ -179,7 +182,9 @@ def group_categories(db_path: Path, threshold: int = 80) -> dict[int, list[str]]
             group_mapping[index] = group
 
             # Create group record
-            new_group = Group(id=index, group_name=group_name, cannonical_name=group[0])
+            new_group = GroupRecord(
+                id=index, group_name=group_name, cannonical_name=group[0]
+            )
             session.add(new_group)
 
             # Create processed names records
@@ -251,4 +256,3 @@ def process_pre_calculated_groups(db_path: Path) -> None:
         process_groups(db_path, group_mapping)
     finally:
         session.close()
-

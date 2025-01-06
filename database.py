@@ -95,23 +95,15 @@ class File(Base):
         return f"File(id={self.id}, file_name={self.file_name}"
 
 
-class ProcessedName(Base):
-    __tablename__ = "processed_names"
+class GroupRecord(Base):
+    __tablename__ = "group_record"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    group_id = Column(Integer, ForeignKey("groups.id"))
-    folder_name = Column(String)
-    grouped_name = Column(String)
-    confidence = Column(Float)
-
-
-class Group(Base):
-    __tablename__ = "groups"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("folder_category.id"), nullable=False)
     group_name = Column(String)
     cannonical_name = Column(String)
-    processed_names = relationship("ProcessedName", backref="group")
+    processed_names = Column(StringList)
 
 
 class FolderCategory(Base):
@@ -131,7 +123,9 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     category_name = Column(String)
-    classification = Column(String) # Description: the unified classifcation across all folders
+    classification = Column(
+        String
+    )  # Description: the unified classifcation across all folders
     classification_counts = Column(DictType)
     total_count = Column(Integer)
 
@@ -171,7 +165,7 @@ def setup_gather(db_path: Path):
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
-    reset_tables(db_path, [ProcessedName, Group])
+    reset_tables(db_path, [GroupRecord])
 
 
 def setup_folder_categories(db_path: Path):
