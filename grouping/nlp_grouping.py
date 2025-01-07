@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
 from pathlib import Path
 from database import (
     get_session,
