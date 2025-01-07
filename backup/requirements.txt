@@ -1,8 +1,0 @@
-click
-pydantic
-pydantic_yaml
-scikit-learn
-nltk
-sqlalchemy
-alembic
-pytest
