@@ -62,7 +62,7 @@ class Folder(Base):
     parent_path = Column(String)
     depth = Column(Integer)
     cleaned_name = Column(String)
-    categories = Column(StringList)  # Change this to use StringList type
+    categories = Column(StringList)  
     subject = Column(String)
     variants = Column(StringList)
     classification = Column(StringList)
@@ -103,7 +103,9 @@ class GroupRecord(Base):
     category_id = Column(Integer, ForeignKey("folder_category.id"), nullable=False)
     group_name = Column(String)
     cannonical_name = Column(String)
+    path = Column(String, nullable=True)
     processed_names = Column(StringList)
+
 
 
 class FolderCategory(Base):

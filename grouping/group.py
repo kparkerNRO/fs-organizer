@@ -22,7 +22,7 @@ from grouping.helpers import (
     normalized_grouping,
     spelling_grouping,
 )
-from grouping.nlp_grouping import group_uncertain
+from grouping.nlp_grouping import cluster_with_custom_metric, group_uncertain
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
     clean_filename,
@@ -204,7 +204,8 @@ def categorize(db_path: Path):
     # })
     heuristic_categorize(db_path)
     evaluate_categorization(db_path)
-    group_uncertain(db_path)
+    # group_uncertain(db_path)
+    cluster_with_custom_metric(db_path)
 
     # first, process folders in the same folder group and pull out duplicate terms
     # process_folders(session)
