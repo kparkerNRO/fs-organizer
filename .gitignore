@@ -166,3 +166,7 @@ outputs/
 # vscode files
 *.vscode
 .vscode/launch.json
+
+# javascript development
+node_modules/
+dist/
