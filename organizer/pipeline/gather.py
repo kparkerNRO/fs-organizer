@@ -2,7 +2,7 @@ import zipfile
 from pathlib import Path
 from typing import IO, Set, List, Tuple
 from sqlalchemy.orm import Session
-from organizer.pipeline.database import (
+from pipeline.database import (
     setup_folder_categories,
     get_session,
     Folder,

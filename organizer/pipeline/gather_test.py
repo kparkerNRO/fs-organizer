@@ -2,8 +2,8 @@ import pytest
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from organizer.pipeline.gather import process_zip
-from organizer.pipeline.database import Base, Folder, File
+from pipeline.gather import process_zip
+from pipeline.database import Base, Folder, File
 import zipfile
 import io
 
@@ -107,6 +107,7 @@ def test_process_zip_ignores(session):
     file_names = [file.file_name for file in files]
     assert file_names == ["file1.txt"]
 
+
 def test_process_zip_top_level_folder(session):
     zip_entries = ["test/", "test/file1.txt", "test/file2.txt"]
     zip_buffer = create_test_zip(zip_entries)
@@ -124,6 +125,7 @@ def test_process_zip_top_level_folder(session):
 
     file_names = [file.file_name for file in files]
     assert file_names == ["file1.txt", "file2.txt"]
+
 
 def test_process_zip_top_level_folder_non_specified(session):
     zip_entries = ["test/file1.txt", "test/file2.txt"]

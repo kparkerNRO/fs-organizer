@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from organizer.pipeline.database import (
+from pipeline.database import (
     setup_folder_categories,
     setup_group,
     get_session,
@@ -23,7 +23,7 @@ from grouping.helpers import (
     normalized_grouping,
     spelling_grouping,
 )
-from organizer.pipeline.nlp_grouping import cluster_with_custom_metric, group_uncertain
+from pipeline.nlp_grouping import cluster_with_custom_metric, group_uncertain
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
     clean_filename,
@@ -67,7 +67,6 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
     Break the filenames into tokens, and identify known variants and suspected categories.
     Clean up the tokens, and assign the folder name to the first category or variant
     """
-
 
     session = get_session(db_path)
 
@@ -256,8 +255,6 @@ def consolidate_groups(db_path: Path) -> None:
         #         category.hidden = True
         #         category.group_name = group_id
 
-            
-
         # for the rest of the groups, try to group them by common name
         remaining_groups = {
             group_id: group
@@ -279,7 +276,6 @@ def consolidate_groups(db_path: Path) -> None:
                         # record.group_name = group_entry.grouped_name
                         record.processed = True
                         record.confidence = group_entry.confidence
-
 
         session.commit()
 

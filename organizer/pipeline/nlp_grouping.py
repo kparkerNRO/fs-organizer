@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from organizer.pipeline.database import (
+from pipeline.database import (
     get_session,
     Folder,
     FolderCategory,
@@ -16,6 +16,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 TEXT_DISTANCE_RATIO = 0.7
 DISTANCE_THRESHOLD = 0.5
+
 
 @dataclass
 class CustomDistanceFolder:
@@ -109,7 +110,7 @@ def cluster_with_custom_metric(db_path):
     # Step 2: run Agglomerative (or DBSCAN) with precomputed distance
     clusterer = AgglomerativeClustering(
         n_clusters=None,  # or some fixed number
-        distance_threshold=DISTANCE_THRESHOLD, 
+        distance_threshold=DISTANCE_THRESHOLD,
         metric="precomputed",
         linkage="average",
     )
@@ -127,7 +128,6 @@ def cluster_with_custom_metric(db_path):
         session.add(group_record)
     session.commit()
     session.close()
-
 
 
 def group_uncertain(db_path: Path):
