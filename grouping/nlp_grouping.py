@@ -10,8 +10,12 @@ from database import (
 from grouping.helpers import ClassificationType
 
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.feature_extraction.text import TfidfVectorizer
 
+
+TEXT_DISTANCE_RATIO = 0.7
+DISTANCE_THRESHOLD = 0.5
 
 @dataclass
 class CustomDistanceFolder:
@@ -51,7 +55,7 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
     n = len(folders)
     D = np.zeros((n, n), dtype=float)
 
-    alpha = 0.5  # weight for text distance vs structural distance
+    alpha = TEXT_DISTANCE_RATIO
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -76,7 +80,6 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
 
 
 def cluster_with_custom_metric(db_path):
-    setup_group(db_path)
     session = get_session(db_path)
     uncertain_categories = (
         session.query(FolderCategory, Folder)
@@ -106,7 +109,7 @@ def cluster_with_custom_metric(db_path):
     # Step 2: run Agglomerative (or DBSCAN) with precomputed distance
     clusterer = AgglomerativeClustering(
         n_clusters=None,  # or some fixed number
-        distance_threshold=.65,  # experiment with a lower threshold
+        distance_threshold=DISTANCE_THRESHOLD, 
         metric="precomputed",
         linkage="average",
     )
@@ -117,9 +120,9 @@ def cluster_with_custom_metric(db_path):
         group_record = GroupRecord(
             folder_id=f.folder_id,
             category_id=f.category_id,
-            group_name=labels[i],
+            group_id=int(labels[i]),
             cannonical_name=f.name,
-            path = str(f.path),
+            path=str(f.path),
         )
         session.add(group_record)
     session.commit()
@@ -129,7 +132,6 @@ def cluster_with_custom_metric(db_path):
 
 def group_uncertain(db_path: Path):
     """Group uncertain categories using KMeans clustering."""
-    setup_group(db_path)
     session = get_session(db_path)
     uncertain_categories = (
         session.query(FolderCategory, Folder)

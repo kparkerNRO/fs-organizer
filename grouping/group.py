@@ -15,6 +15,7 @@ from database import (
     Category,
 )
 from grouping.folder_group import process_folders
+from grouping.group_cleanup import Grouper
 from grouping.helpers import (
     ClassificationType,
     calculate_similarity_difflib,
@@ -66,8 +67,7 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
     Break the filenames into tokens, and identify known variants and suspected categories.
     Clean up the tokens, and assign the folder name to the first category or variant
     """
-    setup_folder_categories(db_path)
-    setup_category_summarization(db_path)
+
 
     session = get_session(db_path)
 
@@ -196,16 +196,107 @@ def evaluate_categorization(db_path: Path) -> None:
         session.close()
 
 
+def consolidate_groups(db_path: Path) -> None:
+    session = get_session(db_path)
+
+    try:
+        # Get all groups
+        group_categories = (
+            session.query(GroupRecord, FolderCategory)
+            .join(FolderCategory, GroupRecord.category_id == FolderCategory.id)
+            .all()
+        )
+
+        # Create a dictionary to store group counts
+        group_unique_names = defaultdict(set)
+        group_record_map = defaultdict(list)
+        group_category_map = defaultdict(list)
+
+        for group, category in group_categories:
+            group_unique_names[group.group_id].add(group.cannonical_name)
+            group_record_map[group.group_id].append(group)
+            group_category_map[group.group_id].append(category)
+
+        # Find groups with only one unique name
+        singleton_groups = {
+            group_id: list(group)[0]
+            for group_id, group in group_unique_names.items()
+            if len(group) == 1
+        }
+
+        for group_id, group_cannon_name in singleton_groups.items():
+            # update the group records with the new name
+            for group in group_record_map[group_id]:
+                group.group_name = group_cannon_name
+                group.processed = True
+
+        #     if len(group_record_map[group_id]) == 1:
+        #         continue
+        #     group = group_record_map[group_id][0]
+        #     existing_classifications = {
+        #         category.classification for category in group_category_map[group_id]
+        #     }
+        #     classification = (
+        #         list(existing_classifications)[0]
+        #         if len(existing_classifications) == 1
+        #         else ClassificationType.UNKNOWN
+        #     )
+
+        #     # create a new folder category record
+        #     category_lookup = FolderCategory(
+        #         folder_id=group.folder_id,
+        #         name=group.cannonical_name,
+        #         classification=classification,
+        #         group_name=group_id,
+        #     )
+        #     session.add(category_lookup)
+
+        #     # update the existing classifications to be hidden
+        #     for category in group_category_map[group_id]:
+        #         category.hidden = True
+        #         category.group_name = group_id
+
+            
+
+        # for the rest of the groups, try to group them by common name
+        remaining_groups = {
+            group_id: group
+            for group_id, group in group_record_map.items()
+            if group_id not in singleton_groups
+        }
+        for group_id, group in remaining_groups.items():
+            record_names = [record.cannonical_name for record in group]
+            cannon_group_map = defaultdict(list)
+            for record in group:
+                cannon_group_map[record.cannonical_name].append(record)
+            grouper = Grouper(record_names)
+            grouper.process_group()
+            new_grouping = grouper.get_changed_group_entries()
+            for name, group_entry in new_grouping.items():
+                if name in cannon_group_map:
+                    for record in cannon_group_map[name]:
+                        record.processed_names = group_entry.categories
+                        # record.group_name = group_entry.grouped_name
+                        record.processed = True
+                        record.confidence = group_entry.confidence
+
+
+        session.commit()
+
+    finally:
+        session.close()
+
+
 def categorize(db_path: Path):
-    # Reset processed names
-    # session.query(ProcessedName).update({
-    #     ProcessedName.grouped_name: None,
-    #     ProcessedName.confidence: None
-    # })
+    setup_folder_categories(db_path)
+    setup_category_summarization(db_path)
+    setup_group(db_path)
+
     heuristic_categorize(db_path)
     evaluate_categorization(db_path)
-    # group_uncertain(db_path)
+
     cluster_with_custom_metric(db_path)
+    consolidate_groups(db_path)
 
     # first, process folders in the same folder group and pull out duplicate terms
     # process_folders(session)

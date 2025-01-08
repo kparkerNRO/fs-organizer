@@ -9,7 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     event,
-    inspect,
+    inspect, Boolean
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -101,11 +101,13 @@ class GroupRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("folder_category.id"), nullable=False)
-    group_name = Column(String)
+    group_id = Column(Integer)
     cannonical_name = Column(String)
     path = Column(String, nullable=True)
     processed_names = Column(StringList)
 
+    confidence = Column(Float, default=1.0)
+    processed = Column(Boolean, default=False)
 
 
 class FolderCategory(Base):
@@ -118,6 +120,10 @@ class FolderCategory(Base):
 
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
     category_id = Column(Integer, ForeignKey("category.id"))
+
+    hidden = Column(Boolean, default=False)
+    group_name = Column(String)
+    confidence = Column(Float, default=1.0)
 
 
 class Category(Base):

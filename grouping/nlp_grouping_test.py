@@ -9,6 +9,7 @@ from grouping.nlp_grouping import compute_distance_to_shared_parent
     (Path("/a/b/c"), Path("/x/y/z"), 6),
     (Path("/"), Path("/"), 0),
     (Path(""), Path("/a/b/c"), 3),
+    (Path("/a/b/c"), Path(""), 3),
     (Path(""), Path(""), 0),
 ])
 def test_compute_distance_to_shared_parent(path1, path2, expected):
