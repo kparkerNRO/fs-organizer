@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from database import (
+from organizer.pipeline.database import (
     get_session,
     Folder,
     FolderCategory,

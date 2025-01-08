@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from database import (
+from organizer.pipeline.database import (
     setup_folder_categories,
     setup_group,
     get_session,
@@ -23,7 +23,7 @@ from grouping.helpers import (
     normalized_grouping,
     spelling_grouping,
 )
-from grouping.nlp_grouping import cluster_with_custom_metric, group_uncertain
+from organizer.pipeline.nlp_grouping import cluster_with_custom_metric, group_uncertain
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
     clean_filename,

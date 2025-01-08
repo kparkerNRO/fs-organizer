@@ -2,8 +2,8 @@ import pytest
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from gather import process_zip
-from database import Base, Folder, File
+from organizer.pipeline.gather import process_zip
+from organizer.pipeline.database import Base, Folder, File
 import zipfile
 import io
 

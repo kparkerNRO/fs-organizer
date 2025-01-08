@@ -7,9 +7,9 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 import shutil
-from database import setup_gather
-from gather import gather_folder_structure_and_store, clean_file_name_post
-from classify import classify_folders
+from organizer.pipeline.database import setup_gather
+from organizer.pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
+from organizer.pipeline.classify import classify_folders
 from grouping.group import categorize
 
 app = typer.Typer()
