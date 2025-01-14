@@ -6,7 +6,7 @@ export interface Category {
     classification: string;
     count: number;
     confidence: number;
-    possibleClassifications: string[];
+    // possibleClassifications: string[];
   }
   
   export interface Folder {
