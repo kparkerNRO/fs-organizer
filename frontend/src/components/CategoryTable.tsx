@@ -1,23 +1,28 @@
 import React, { useState } from "react";
+import { Category } from "../types";
+
+type SortableColumn = keyof Omit<Category, 'id'>;
 
 interface CategoryTableProps {
   data: any[];
   onRowSelect: (row: any) => void;
 }
-
 export const CategoryTable: React.FC<CategoryTableProps> = ({ data, onRowSelect }) => {
-  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortBy, setSortBy] = useState<SortableColumn>("name");
   const [filter, setFilter] = useState<string>("");
 
-  const handleSort = (column: string) => setSortBy(column);
+  const handleSort = (column: SortableColumn) => setSortBy(column);
 
   const filteredData = data.filter((item) =>
     item.name.toLowerCase().includes(filter.toLowerCase())
   );
 
-  const sortedData = [...filteredData].sort((a, b) =>
-    a[sortBy].localeCompare(b[sortBy])
-  );
+  const sortedData = [...filteredData].sort((a, b) => {
+    if (sortBy === 'count' || sortBy === 'confidence') {
+      return a[sortBy] - b[sortBy];
+    }
+    return a[sortBy].localeCompare(b[sortBy]);
+  });
 
   return (
     <div>
