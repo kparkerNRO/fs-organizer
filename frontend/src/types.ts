@@ -15,6 +15,5 @@ export interface Category {
     folderPath: string;
     depth: number;
     cleanedName: string;
-    categories: Category[];
   }
   

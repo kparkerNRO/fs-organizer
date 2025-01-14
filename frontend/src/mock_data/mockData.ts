@@ -66,50 +66,16 @@ export const mockCategoryData: Category[] = [
     name: 'Sports Equipment',
     classification: 'Recreation',
     count: 567,
-    confidence: 95.4
+    confidence: 80.4
   },
   {
     id: 5,
     name: 'Home Decor',
     classification: 'Furnishings',
     count: 923,
-    confidence: 96.7
+    confidence: 50.7
   },
-  {
-    id: 6,
-    name: 'Garden Tools',
-    classification: 'Outdoor',
-    count: 445,
-    confidence: 94.3
-  },
-  {
-    id: 7,
-    name: 'Pet Supplies',
-    classification: 'Animal Care',
-    count: 778,
-    confidence: 98.1
-  },
-  {
-    id: 8,
-    name: 'Office Supplies',
-    classification: 'Business',
-    count: 1102,
-    confidence: 97.5
-  },
-  {
-    id: 9,
-    name: 'Toys',
-    classification: 'Children',
-    count: 1567,
-    confidence: 99.0
-  },
-  {
-    id: 10,
-    name: 'Kitchen Appliances',
-    classification: 'Home',
-    count: 890,
-    confidence: 98.3
-  }
+
 ];
 
 // Example usage:
