@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Category, Folder } from "../types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface CategoryTableProps {
   categories: Category[];
-  onSelectItem: (item: Category | Folder) => void;
+  onSelectItem: (item: Category | Folder | Folder[] | null) => void;
 }
 
 export const CategoryTable: React.FC<CategoryTableProps> = ({
@@ -14,7 +14,24 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
+
+  const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
+
+  // Handle updates to selection
+  useEffect(() => {
+    if (selectedFolders.length > 1) {
+      onSelectItem(null);
+    } else if (selectedFolders.length === 1) {
+      onSelectItem(selectedFolders[0]);
+    }
+  }, [selectedFolders, onSelectItem]);
+
+  // Handle category selection updates
+  useEffect(() => {
+    if (activeCategory && selectedFolders.length === 0) {
+      onSelectItem(activeCategory);
+    }
+  }, [activeCategory, selectedFolders.length, onSelectItem]);
 
   const toggleExpand = (categoryId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -25,36 +42,50 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     );
   };
 
-  const setSelectedItems = (item: Category | Folder) => {
-    if ("original_filename" in item) {
-        if (activeCategory && !activeCategory.children?.includes(item)) {
-          setActiveCategory(null);
-          const parentCategory = categories.find((category) =>
-            category.children?.includes(item)
-          );
-          setActiveCategory(parentCategory || null);
-        }
-        setActiveFolder(item);
-      
-    }
-    else {
-      if (activeFolder && !item.children?.includes(activeFolder)) {
-        setActiveFolder(null);
-      }
-      setActiveCategory(item);
-    }
+  const handleFolderSelection = (
+    folder: Folder,
+    parentCategory: Category,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
 
-    onSelectItem(item);
+    if (e.ctrlKey || e.metaKey) {
+      // if (activeCategory && !activeCategory.children?.includes(folder)) {
+      if (activeCategory?.id === parentCategory.id) {
+        setSelectedFolders((prev) => {
+          const isAlreadySelected = prev.some((f) => f.id === folder.id);
+          const newSelection = isAlreadySelected
+            ? prev.filter((f) => f.id !== folder.id)
+            : [...prev, folder];
+
+          return newSelection;
+        });
+      }
+    } else {
+      // Handle normal click
+      setSelectedFolders([folder]);
+      setActiveCategory(parentCategory);
+    }
   };
 
-
+  const handleCategorySelection = (category: Category) => {
+    // setSelectedFolders([]);
+    // onSelectItem(category);
+    if (
+      selectedFolders.length > 0 &&
+      !category.children?.some((folder) => folder.id === selectedFolders[0].id)
+    ) {
+      setSelectedFolders([]);
+    }
+    setActiveCategory(category);
+  };
 
   const renderCategory = (category: Category, index: number) => (
     <React.Fragment key={category.id}>
       <TableRow
         $isEven={index % 2 === 0}
         $isSelected={category.id === activeCategory?.id}
-        onClick={() => setSelectedItems(category)}
+        onClick={() => handleCategorySelection(category)}
       >
         <RowCell>
           {category.children ? (
@@ -80,14 +111,9 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           <TableRow
             key={folder.id}
             $isEven={index % 2 === 0}
-            $isSelected={
-              !!(
-                folder.id === activeFolder?.id &&
-                activeCategory?.children?.includes(folder)
-              )
-            }
+            $isSelected={selectedFolders.some((f) => f.id === folder.id)}
             $isChild
-            onClick={() => setSelectedItems(folder)}
+            onClick={(e) => handleFolderSelection(folder, category, e)}
           >
             <RowCell>
               <IndentSpace />
