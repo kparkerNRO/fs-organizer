@@ -2,23 +2,35 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { Category, Folder } from "../types";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { log } from "console";
-
+import { ContextMenu } from "./ContextMenu";
 interface CategoryTableProps {
   categories: Category[];
   onSelectItem: (item: Category | Folder | null) => void;
   onUpdateCategories: (updatedCategories: Category[]) => void;
 }
 
+interface ContextMenuState {
+  show: boolean;
+  x: number;
+  y: number;
+}
+
 export const CategoryTable: React.FC<CategoryTableProps> = ({
   categories,
   onSelectItem,
-  onUpdateCategories
+  onUpdateCategories,
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
-  const [draggedOverCategoryId, setDraggedOverCategoryId] = useState<number | null>(null);
+  const [draggedOverCategoryId, setDraggedOverCategoryId] = useState<
+    number | null
+  >(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    show: false,
+    x: 0,
+    y: 0,
+  });
 
   // Handle updates to selection
   useEffect(() => {
@@ -35,17 +47,79 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     }
   }, [activeCategory, selectedFolders.length, onSelectItem]);
 
-  const handleDragStart = (folder: Folder, category: Category, e: React.DragEvent) => {
+  const handleContextMenu = (
+    e: React.MouseEvent,
+    folder: Folder,
+    parentCategory: Category
+  ) => {
+    e.preventDefault();
 
-    const working_folders = (selectedFolders.some(f => f.id === folder.id)) ? selectedFolders : [folder];
+    // If the folder isn't already selected, select it
+    if (!selectedFolders.some((f) => f.id === folder.id)) {
+      handleFolderSelection(folder, parentCategory, e);
+    }
+
+    setContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ show: false, x: 0, y: 0 });
+  };
+
+  const createNewGroup = () => {
+    if (selectedFolders.length === 0) return;
+
+    // Create new category based on first selected folder
+    const newCategory: Category = {
+      id: Math.max(...categories.map((c) => c.id)) + 1,
+      name: selectedFolders[0].name,
+      classification: selectedFolders[0].classification,
+      confidence: selectedFolders[0].confidence,
+      children: selectedFolders,
+      count: selectedFolders.length,
+    };
+
+    // Find and remove selected folders from their current categories
+    const updatedCategories = categories.map((category) => ({
+      ...category,
+      children:
+        category.children?.filter(
+          (child) => !selectedFolders.some((f) => f.id === child.id)
+        ) || [],
+    }));
+
+    // Add the new category
+    onUpdateCategories([...updatedCategories, newCategory]);
+
+    // Update local state
+    setSelectedFolders([]);
+    setActiveCategory(newCategory);
+    setExpandedCategories((prev) => [...prev, newCategory.id]);
+    closeContextMenu();
+  };
+
+  const handleDragStart = (
+    folder: Folder,
+    category: Category,
+    e: React.DragEvent
+  ) => {
+    const working_folders = selectedFolders.some((f) => f.id === folder.id)
+      ? selectedFolders
+      : [folder];
     setSelectedFolders(working_folders);
 
-    
     // Store the source category ID and selected folders in the drag data
-    e.dataTransfer.setData('application/json', JSON.stringify({
-      sourceCategoryId: category.id,
-      folders: working_folders
-    }));
+    e.dataTransfer.setData(
+      "application/json",
+      JSON.stringify({
+        sourceCategoryId: category.id,
+        folders: working_folders,
+      })
+    );
   };
 
   const handleDragOver = (e: React.DragEvent, categoryId: number) => {
@@ -53,8 +127,13 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     setDraggedOverCategoryId(categoryId);
   };
 
-  const handleDragLeave = () => {
-    setDraggedOverCategoryId(null);
+  const handleDragLeave = (e: React.DragEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (
+      !relatedTarget?.closest(`[data-category-id="${draggedOverCategoryId}"]`)
+    ) {
+      setDraggedOverCategoryId(null);
+    }
   };
 
   const handleDrop = async (targetCategory: Category, e: React.DragEvent) => {
@@ -62,40 +141,20 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     setDraggedOverCategoryId(null);
 
     try {
-      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      const data = JSON.parse(e.dataTransfer.getData("application/json"));
       const { sourceCategoryId, folders } = data;
 
-      // Don't do anything if dropping in the same category
       if (sourceCategoryId === targetCategory.id) return;
 
+      const foldersToMove = folders.map((folder: any) => ({ ...folder }));
 
-      // Create deep copies of the folders to move
-      const foldersToMove = folders.map((folder: any) => ({...folder}));
-
-      const updatedSourceCategory = categories.find(c => c.id === sourceCategoryId) && {
-        ...categories.find(c => c.id === sourceCategoryId),
-        children: (categories.find(c => c.id === sourceCategoryId)?.children || []).filter(
-          child => !foldersToMove.some((f: { id: number; }) => f.id === child.id)
-        ),
-        count: (categories.find(c => c.id === sourceCategoryId)?.children || []).length - foldersToMove.length
-      };
-
-      const updatedTargetCategory = categories.find(c => c.id === targetCategory.id) && {
-        ...categories.find(c => c.id === targetCategory.id)!,
-        children: [
-          ...(categories.find(c => c.id === targetCategory.id)?.children || []),
-          ...foldersToMove
-        ]
-      };
-
-      const updatedCategories = categories.map(category => {
-        
+      const updatedCategories = categories.map((category) => {
         // source case
         if (category.id === sourceCategoryId) {
           const new_children = (category.children || []).filter(
-            child => !foldersToMove.some((f: { id: number; }) => f.id === child.id)
+            (child) =>
+              !foldersToMove.some((f: { id: number }) => f.id === child.id)
           );
-          console.log(new_children)
           return {
             ...category,
             children: new_children,
@@ -104,7 +163,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
         // target case
         if (category.id === targetCategory.id) {
-          const new_children = [ ...(category.children || []), ...foldersToMove ];
+          const new_children = [...(category.children || []), ...foldersToMove];
           return {
             ...category,
             children: new_children,
@@ -112,28 +171,24 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
         }
 
         // default case
-        return {...category};
-
+        return { ...category };
       });
 
+      // Update state
+      onUpdateCategories(updatedCategories);
 
-
-      // Update parent state
-      if (updatedSourceCategory && updatedTargetCategory) {
-        onUpdateCategories(updatedCategories);
+      const updatedTargetCategory = updatedCategories.find(
+        (c) => c.id === targetCategory.id
+      );
       setActiveCategory(updatedTargetCategory || null);
-        
-      }
 
-      // Update local state
       setSelectedFolders([]);
-      
-      // Ensure the target category is expanded
+
       if (!expandedCategories.includes(targetCategory.id)) {
-        setExpandedCategories(prev => [...prev, targetCategory.id]);
+        setExpandedCategories((prev) => [...prev, targetCategory.id]);
       }
     } catch (error) {
-      console.error('Error processing drop:', error);
+      console.error("Error processing drop:", error);
     }
   };
 
@@ -180,18 +235,21 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   };
 
   const renderCategory = (category: Category, index: number) => (
-    <React.Fragment key={category.id}>
+    // <React.Fragment key={category.id}>
+    <CategoryGroup
+      key={category.id}
+      $isDraggedOver={category.id === draggedOverCategoryId}
+      onDragOver={(e) => handleDragOver(e, category.id)}
+      onDragLeave={handleDragLeave}
+      onDrop={(e) => handleDrop(category, e)}
+    >
       <TableRow
         $isEven={index % 2 === 0}
         $isSelected={category.id === activeCategory?.id}
-        $isDraggedOver={category.id === draggedOverCategoryId}
         onClick={() => handleCategorySelection(category)}
-        onDragOver={(e) => handleDragOver(e, category.id)}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(category, e)}
       >
         <RowCell>
-          {(category.children && category.children.length > 0) ? (
+          {category.children && category.children.length > 0 ? (
             <ExpandButton onClick={(e) => toggleExpand(category.id, e)}>
               {expandedCategories.includes(category.id) ? (
                 <ChevronDown size={16} />
@@ -214,10 +272,11 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           <TableRow
             key={folder.id}
             $isEven={index % 2 === 0}
-            $isSelected={selectedFolders.some(f => f.id === folder.id)}
+            $isSelected={selectedFolders.some((f) => f.id === folder.id)}
             $isChild
             draggable
             onClick={(e) => handleFolderSelection(folder, category, e)}
+            onContextMenu={(e) => handleContextMenu(e, folder, category)}
             onDragStart={(e) => handleDragStart(folder, category, e)}
           >
             <RowCell>
@@ -230,7 +289,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             <RowCell>{folder.confidence}%</RowCell>
           </TableRow>
         ))}
-    </React.Fragment>
+    </CategoryGroup>
   );
 
   return (
@@ -262,6 +321,14 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           {categories.map((category, index) => renderCategory(category, index))}
         </RowsContainer>
       </TableGrid>
+      {contextMenu.show && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          onCreateGroup={createNewGroup}
+        />
+      )}
     </TableContainer>
   );
 };
@@ -342,35 +409,28 @@ const TableRow = styled.div<{
   $isEven: boolean;
   $isSelected: boolean;
   $isChild?: boolean;
-  $isDraggedOver?: boolean;
 }>`
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;  // Reduced from 0.75rem 1rem
+  border-radius: 0.375rem;  // Reduced from 0.5rem
   cursor: pointer;
   background-color: ${(props) =>
-    props.$isDraggedOver
-      ? "#93c5fd"
-      : props.$isSelected
+    props.$isSelected
       ? "#e0f2fe"
       : props.$isEven
       ? "#f3f4f6"
       : "#eff6ff"};
   border: ${(props) =>
-    props.$isDraggedOver
-      ? "2px dashed #2563eb"
-      : props.$isSelected
+    props.$isSelected
       ? "2px solid #60a5fa"
       : "none"};
   margin-left: ${(props) => (props.$isChild ? "1.5rem" : "0")};
 
   &:hover {
     background-color: ${(props) =>
-      props.$isDraggedOver
-        ? "#93c5fd"
-        : props.$isSelected
+      props.$isSelected
         ? "#dbeafe"
         : props.$isEven
         ? "#e5e7eb"
@@ -383,3 +443,31 @@ const RowCell = styled.div`
   align-items: center;
   gap: 0.5rem;
 `;
+
+const CategoryGroup = styled.div<{ $isDraggedOver: boolean }>`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;  // Reduced from 0.5rem
+  margin-bottom: 0.1rem;  // Reduced from 0.5rem
+  
+  ${props => props.$isDraggedOver && `
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(147, 197, 253, 0.2);
+      border: 2px dashed #2563eb;
+      border-radius: 0.375rem;
+      pointer-events: none;
+    }
+  `}
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
