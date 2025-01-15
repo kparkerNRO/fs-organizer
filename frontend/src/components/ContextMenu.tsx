@@ -5,24 +5,36 @@ interface ContextMenuProps {
   x: number;
   y: number;
   onClose: () => void;
-  onCreateGroup: () => void;
+  menu_items: MenuItemProps[];
+}
+
+interface MenuItemProps {
+    onClick: () => void;
+    text: string;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
   x,
   y,
   onClose,
-  onCreateGroup,
+  menu_items,
 }) => {
   return (
     <>
       <Overlay onClick={onClose} />
       <MenuContainer style={{ top: y, left: x }}>
-        <MenuItem onClick={onCreateGroup}>Create new group</MenuItem>
+        {menu_items.map((item, index) => (
+          <MenuItem key={index} onClick={item.onClick}>
+            {item.text}
+          </MenuItem>
+        ))}
       </MenuContainer>
     </>
   );
 };
+
+
+
 
 const Overlay = styled.div`
   position: fixed;

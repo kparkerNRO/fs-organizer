@@ -70,13 +70,16 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     setContextMenu({ show: false, x: 0, y: 0 });
   };
 
-  const createNewGroup = () => {
+  const createNewGroup = (name?: string) => {
     if (selectedFolders.length === 0) return;
+
+    const categoryName = name == null ?  selectedFolders[0].name : name;
 
     // Create new category based on first selected folder
     const newCategory: Category = {
       id: Math.max(...categories.map((c) => c.id)) + 1,
-      name: selectedFolders[0].name,
+      name: categoryName,
+      // name: selectedFolders[0].name,
       classification: selectedFolders[0].classification,
       confidence: selectedFolders[0].confidence,
       children: selectedFolders,
@@ -326,7 +329,12 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={closeContextMenu}
-          onCreateGroup={createNewGroup}
+          menu_items={[
+            {
+              text: "Create new group",
+              onClick: () => createNewGroup(),
+            },
+          ]}
         />
       )}
     </TableContainer>
@@ -413,28 +421,17 @@ const TableRow = styled.div<{
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
-  padding: 0.6rem 0.75rem;  // Reduced from 0.75rem 1rem
-  border-radius: 0.375rem;  // Reduced from 0.5rem
+  padding: 0.6rem 0.75rem; // Reduced from 0.75rem 1rem
+  border-radius: 0.375rem; // Reduced from 0.5rem
   cursor: pointer;
   background-color: ${(props) =>
-    props.$isSelected
-      ? "#e0f2fe"
-      : props.$isEven
-      ? "#f3f4f6"
-      : "#eff6ff"};
-  border: ${(props) =>
-    props.$isSelected
-      ? "2px solid #60a5fa"
-      : "none"};
+    props.$isSelected ? "#e0f2fe" : props.$isEven ? "#f3f4f6" : "#eff6ff"};
+  border: ${(props) => (props.$isSelected ? "2px solid #60a5fa" : "none")};
   margin-left: ${(props) => (props.$isChild ? "1.5rem" : "0")};
 
   &:hover {
     background-color: ${(props) =>
-      props.$isSelected
-        ? "#dbeafe"
-        : props.$isEven
-        ? "#e5e7eb"
-        : "#dbeafe"};
+      props.$isSelected ? "#dbeafe" : props.$isEven ? "#e5e7eb" : "#dbeafe"};
   }
 `;
 
@@ -448,10 +445,12 @@ const CategoryGroup = styled.div<{ $isDraggedOver: boolean }>`
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;  // Reduced from 0.5rem
-  margin-bottom: 0.1rem;  // Reduced from 0.5rem
-  
-  ${props => props.$isDraggedOver && `
+  gap: 0.25rem; // Reduced from 0.5rem
+  margin-bottom: 0.1rem; // Reduced from 0.5rem
+
+  ${(props) =>
+    props.$isDraggedOver &&
+    `
     &::after {
       content: '';
       position: absolute;
@@ -470,4 +469,3 @@ const CategoryGroup = styled.div<{ $isDraggedOver: boolean }>`
     margin-bottom: 0;
   }
 `;
-
