@@ -36,16 +36,15 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   }, [activeCategory, selectedFolders.length, onSelectItem]);
 
   const handleDragStart = (folder: Folder, category: Category, e: React.DragEvent) => {
-    // If the dragged folder isn't in the selection, clear selection and select only this folder
-    console.log(selectedFolders)
-    if (!selectedFolders.some(f => f.id === folder.id)) {
-      setSelectedFolders([folder]);
-    }
+
+    const working_folders = (selectedFolders.some(f => f.id === folder.id)) ? selectedFolders : [folder];
+    setSelectedFolders(working_folders);
+
     
     // Store the source category ID and selected folders in the drag data
     e.dataTransfer.setData('application/json', JSON.stringify({
       sourceCategoryId: category.id,
-      folders: selectedFolders
+      folders: working_folders
     }));
   };
 
@@ -69,14 +68,9 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       // Don't do anything if dropping in the same category
       if (sourceCategoryId === targetCategory.id) return;
 
-      console.log('Before update:', 
-        'Source category:', categories.find(c => c.id === sourceCategoryId),
-        'Target category:', categories.find(c => c.id === targetCategory.id)
-      );
 
       // Create deep copies of the folders to move
       const foldersToMove = folders.map((folder: any) => ({...folder}));
-      console.log("folders to move",foldersToMove)
 
       const updatedSourceCategory = categories.find(c => c.id === sourceCategoryId) && {
         ...categories.find(c => c.id === sourceCategoryId),
@@ -85,7 +79,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
         ),
         count: (categories.find(c => c.id === sourceCategoryId)?.children || []).length - foldersToMove.length
       };
-      console.log("Updated source category",updatedSourceCategory)
 
       const updatedTargetCategory = categories.find(c => c.id === targetCategory.id) && {
         ...categories.find(c => c.id === targetCategory.id)!,
@@ -94,7 +87,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           ...foldersToMove
         ]
       };
-      console.log("Updated target category",updatedTargetCategory)
 
       const updatedCategories = categories.map(category => {
         
@@ -125,7 +117,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       });
 
 
-      console.log("Updated categories",updatedCategories)
 
       // Update parent state
       if (updatedSourceCategory && updatedTargetCategory) {
@@ -163,7 +154,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     e.stopPropagation();
 
     if (e.ctrlKey || e.metaKey) {
-      // if (activeCategory && !activeCategory.children?.includes(folder)) {
       if (activeCategory?.id === parentCategory.id) {
         setSelectedFolders((prev) => {
           const isAlreadySelected = prev.some((f) => f.id === folder.id);
@@ -186,13 +176,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
   const handleCategorySelection = (category: Category) => {
     setSelectedFolders([]);
-    // onSelectItem(category);
-    // if (
-    //   selectedFolders.length > 0 &&
-    //   !category.children?.some((folder) => folder.id === selectedFolders[0].id)
-    // ) {
-    //   setSelectedFolders([]);
-    // }
     setActiveCategory(category);
   };
 
@@ -253,7 +236,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   return (
     <TableContainer>
       <HeaderContainer>
-        <Title>Categories</Title>
         <SearchInput placeholder="Search" />
       </HeaderContainer>
 

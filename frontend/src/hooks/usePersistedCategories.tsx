@@ -19,7 +19,6 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
-      console.log('Categories saved to localStorage');
     } catch (error) {
       console.error('Error saving categories to localStorage:', error);
     }
