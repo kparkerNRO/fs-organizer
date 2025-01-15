@@ -42,39 +42,95 @@ export const mockFolders: Folder[] = [
 export const mockCategoryData: Category[] = [
   {
     id: 1,
-    name: 'Electronics',
-    classification: 'Consumer Goods',
-    count: 1243,
-    confidence: 98.5
+    name: "Dragon Lair",
+    classification: "Subject",
+    count: 85,
+    confidence: 85,
+    possibleClassifications: ["Subject: 10", "Category: 5"],
+    isExpanded: false,
+    children: [
+      {
+        id: 1,
+        name: "Wizard Tower Red",
+        classification: "Category",
+        original_filename: "Wizard Tower Green Interior",
+        cleanedName: "Wizard Tower Green",
+        confidence: 90,
+        original_path: "C:\\gaming\\maps\\wizard-tower",
+        processed_names: ["Wizard Tower Green"]
+      },
+      {
+        id: 2,
+        name: "Wizard Tower Orange",
+        classification: "Category",
+        original_filename: "Wizard Tower Blue Interior",
+        cleanedName: "Wizard Tower Blue",
+        confidence: 90,
+        original_path: "C:\\gaming\\maps\\wizard-tower",
+        processed_names: ["Wizard Tower Blue"]
+      },
+    ]
   },
   {
     id: 2,
-    name: 'Books',
-    classification: 'Media',
-    count: 856,
-    confidence: 99.2
+    name: "Wizard Tower",
+    classification: "Category",
+    count: 60,
+    confidence: 20,
+    possibleClassifications: ["Category: 5", "Unknown: 8"],
+    isExpanded: true,
+    children: [
+      {
+        id: 1,
+        name: "Wizard Tower Green",
+        classification: "Category",
+        original_filename: "Wizard Tower Green Interior",
+        cleanedName: "Wizard Tower Green",
+        confidence: 90,
+        original_path: "C:\\gaming\\maps\\wizard-tower",
+        processed_names: ["Wizard Tower Green"]
+      },
+      {
+        id: 2,
+        name: "Wizard Tower Blue",
+        classification: "Category",
+        original_filename: "Wizard Tower Blue Interior",
+        cleanedName: "Wizard Tower Blue",
+        confidence: 90,
+        original_path: "C:\\gaming\\maps\\wizard-tower",
+        processed_names: ["Wizard Tower Blue"]
+      },
+      {
+      id: 3,
+      name: "Wizard Tower Yellow",
+      classification: "Category",
+      original_filename: "Wizard Tower Blue Interior",
+      cleanedName: "Wizard Tower Blue",
+      confidence: 90,
+      original_path: "C:\\gaming\\maps\\wizard-tower",
+      processed_names: ["Wizard Tower Blue"]
+    }
+  
+    ]
   },
   {
     id: 3,
-    name: 'Clothing',
-    classification: 'Fashion',
-    count: 2134,
-    confidence: 97.8
+    name: "Into the wilds",
+    classification: "Subject",
+    count: 85,
+    confidence: 85,
+    possibleClassifications: ["Subject: 10", "Category: 5"],
+    isExpanded: false
   },
   {
     id: 4,
-    name: 'Sports Equipment',
-    classification: 'Recreation',
-    count: 567,
-    confidence: 80.4
-  },
-  {
-    id: 5,
-    name: 'Home Decor',
-    classification: 'Furnishings',
-    count: 923,
-    confidence: 50.7
-  },
+    name: "Music",
+    classification: "Subject",
+    count: 85,
+    confidence: 85,
+    possibleClassifications: ["Subject: 10", "Category: 5"],
+    isExpanded: false
+  }
 
 ];
 

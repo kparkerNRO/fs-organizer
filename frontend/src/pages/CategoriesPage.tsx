@@ -1,15 +1,22 @@
 // CategoriesPage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { Category } from "../types";
+import { Category, Folder } from "../types";
 import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
 
-export const CategoriesPage: React.FC = () => {
-  const [categories, setData] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
+type SelectableItem = {
+  type: 'category' | 'folder';
+  item: Category | Folder;
+}
+
+export const CategoriesPage: React.FC = () => {
+  const [data, setData] = useState<any[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Category | Folder | null>(null);
+
+  
   useEffect(() => {
     const fetchData = async () => {
       // Fetch data from FastAPI
@@ -22,11 +29,11 @@ export const CategoriesPage: React.FC = () => {
     <PageContainer>
       <ContentContainer>
         <CategoryTable
-          categories={categories}
-          onSelectCategory={setSelectedCategory}
-          selectedCategory={selectedCategory}  
+          categories={data}
+          onSelectItem={setSelectedItem}
+          selectedItem={selectedItem}  
         />
-        <CategoryDetails category={selectedCategory} />
+        <CategoryDetails item={selectedItem} />
       </ContentContainer>
     </PageContainer>
   );

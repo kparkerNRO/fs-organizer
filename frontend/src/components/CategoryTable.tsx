@@ -1,19 +1,79 @@
-import React from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
-import { Category } from "../types";
-import { ChevronDown } from "lucide-react"; 
+import { Category, Folder } from "../types";
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface CategoryTableProps {
   categories: Category[];
-  onSelectCategory: (cat: Category) => void;
-  selectedCategory: Category | null;  
+  onSelectItem: (item: Category | Folder) => void;
+  selectedItem: Category | Folder | null;
 }
 
 export const CategoryTable: React.FC<CategoryTableProps> = ({
   categories,
-  onSelectCategory,
-  selectedCategory,
+  onSelectItem,
+  selectedItem,
 }) => {
+  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+
+  const toggleExpand = (categoryId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCategories(prev => 
+      prev.includes(categoryId) 
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
+  
+
+  const renderCategory = (category: Category, index: number) => (
+    <React.Fragment key={category.id}>
+      <TableRow
+        $isEven={index % 2 === 0}
+        $isSelected={selectedItem?.isSelected === true}
+        onClick={() => onSelectItem(category)}
+      >
+        <RowCell>
+          {category.children ? (
+            <ExpandButton onClick={(e) => toggleExpand(category.id, e)}>
+              {expandedCategories.includes(category.id) ? (
+                <ChevronDown size={16} />
+              ) : (
+                <ChevronRight size={16} />
+              )}
+            </ExpandButton>
+          ) : (
+            <ExpandButton></ExpandButton>
+          )}
+          {category.name}
+        </RowCell>
+        <RowCell>{category.classification}</RowCell>
+        <RowCell>{category.count}</RowCell>
+        <RowCell>{category.possibleClassifications?.join(", ") || "-"}</RowCell>
+        <RowCell>{category.confidence}%</RowCell>
+      </TableRow>
+      {expandedCategories.includes(category.id) && category.children?.map((folder) => (
+        <TableRow
+          key={folder.id}
+          $isEven={index % 2 === 0}
+          $isSelected={selectedItem?.isSelected === true}
+          $isChild
+          onClick={() => onSelectItem(folder)}
+        >
+          <RowCell>
+            <IndentSpace />
+            {folder.name}
+          </RowCell>
+          <RowCell>{folder.classification}</RowCell>
+          <RowCell>-</RowCell>
+          <RowCell>{folder.original_filename}</RowCell>
+          <RowCell>{folder.confidence}%</RowCell>
+        </TableRow>
+      ))}
+    </React.Fragment>
+  );
+
   return (
     <TableContainer>
       <HeaderContainer>
@@ -41,28 +101,23 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
         </HeaderGrid>
 
         <RowsContainer>
-          {categories.map((cat, index) => (
-            <TableRow
-              key={cat.id}
-              onClick={() => onSelectCategory(cat)}
-              $isEven={index % 2 === 0}
-              $isSelected={selectedCategory?.id === cat.id}
-            >
-              <RowCell>
-                <span>›</span>
-                {cat.name}
-              </RowCell>
-              <RowCell>{cat.classification}</RowCell>
-              <RowCell>{cat.count}</RowCell>
-              <RowCell>[Subject: 10, Category: 5, ...]</RowCell>
-              <RowCell>{cat.confidence}%</RowCell>
-            </TableRow>
-          ))}
+          {categories.map((category, index) => renderCategory(category, index))}
         </RowsContainer>
       </TableGrid>
     </TableContainer>
   );
 };
+
+const ExpandButton = styled.span`
+  margin-right: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+`;
+
+const IndentSpace = styled.span`
+  display: inline-block;
+  width: 1.5rem;
+`;
 
 const TableContainer = styled.div`
   padding: 1.5rem;
@@ -125,7 +180,11 @@ const RowsContainer = styled.div`
   gap: 0.5rem;
 `;
 
-const TableRow = styled.div<{ $isEven: boolean; $isSelected: boolean }>`
+const TableRow = styled.div<{ 
+  $isEven: boolean; 
+  $isSelected: boolean;
+  $isChild?: boolean;
+}>`
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
@@ -134,24 +193,24 @@ const TableRow = styled.div<{ $isEven: boolean; $isSelected: boolean }>`
   cursor: pointer;
   background-color: ${props => 
     props.$isSelected 
-      ? '#e0f2fe'  // Light blue highlight for selected row
+      ? '#e0f2fe'
       : props.$isEven 
         ? '#f3f4f6' 
         : '#eff6ff'
   };
   border: ${props => props.$isSelected ? '2px solid #60a5fa' : 'none'};
+  margin-left: ${props => props.$isChild ? '1.5rem' : '0'};
 
   &:hover {
     background-color: ${props => 
       props.$isSelected 
-        ? '#dbeafe'  // Slightly darker on hover even when selected
+        ? '#dbeafe'
         : props.$isEven 
           ? '#e5e7eb' 
           : '#dbeafe'
     };
   }
 `;
-
 const RowCell = styled.div`
   display: flex;
   align-items: center;

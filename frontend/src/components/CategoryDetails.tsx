@@ -1,14 +1,13 @@
 import React from "react";
 import styled from "styled-components";
-import { Category } from "../types";
-import { ChevronDown } from "lucide-react";
+import { Category, Folder } from "../types";
 
 interface CategoryDetailsProps {
-  category: Category | null;
+    item: Category | Folder |null;
 }
 
-export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ category }) => {
-  if (!category) {
+export const CategoryDetails: React.FC<CategoryDetailsProps> = ({  item }) => {
+  if (!item) {
     return (
       <DetailsContainer>
         <PlaceholderText>Select a category to view details</PlaceholderText>
@@ -16,46 +15,97 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ category }) =>
     );
   }
 
+  // TODO is this really the best way?
+  const isFolder = (item: Category | Folder): item is Folder => {
+    return 'original_path' in item;
+  };
+
+  if (isFolder(item)) {
+    return (
+      <DetailsContainer>
+        <DetailsGrid>
+          <FieldContainer>
+            <Label>Category Name</Label>
+            <Input type="text" value={item.cleanedName} readOnly />
+          </FieldContainer>
+
+          <FieldContainer>
+            <Label>Name:</Label>
+            <Input type="text" value={item.name} readOnly />
+          </FieldContainer>
+
+          <FieldContainer>
+            <Label>Classification</Label>
+            <SelectInput>
+              <option value={item.classification}>{item.classification}</option>
+            </SelectInput>
+          </FieldContainer>
+        </DetailsGrid>
+
+        <FieldRow>
+          <Label>Original Filename</Label>
+          <Input type="text" value={item.original_filename} readOnly />
+        </FieldRow>
+
+        <FieldRow>
+          <Label>Original Path</Label>
+          <Input type="text" value={item.original_path} readOnly />
+        </FieldRow>
+
+        <FieldRow>
+          <Label>Confidence</Label>
+          <ConfidenceBar>
+            <ConfidenceFill style={{ width: `${item.confidence}%` }}>
+              {item.confidence}%
+            </ConfidenceFill>
+          </ConfidenceBar>
+        </FieldRow>
+
+        <ProcessedNamesContainer>
+          <Label>Processed Names</Label>
+          <ProcessedNamesInput 
+            value={item.processed_names?.join('\n') || ''} 
+            readOnly 
+          />
+        </ProcessedNamesContainer>
+      </DetailsContainer>
+    );
+  }
+
+  // Render Category details
   return (
     <DetailsContainer>
       <DetailsGrid>
         <FieldContainer>
           <Label>Category Name</Label>
-          <Input type="text" value={category.name} readOnly />
+          <Input type="text" value={item.name} readOnly />
+        </FieldContainer>
+
+        <FieldContainer>
+          <Label>Classification</Label>
+          <SelectInput>
+            <option value={item.classification}>{item.classification}</option>
+          </SelectInput>
         </FieldContainer>
 
         <FieldContainer>
           <Label>Confidence</Label>
           <ConfidenceBar>
-            <ConfidenceFill style={{ width: `${category.confidence}%` }} />
+            <ConfidenceFill style={{ width: `${item.confidence}%` }}>
+              {item.confidence}%
+            </ConfidenceFill>
           </ConfidenceBar>
         </FieldContainer>
-
-        <FieldContainer>
-          <Label>Classification</Label>
-          <Input type="text" value={category.classification} readOnly />
-        </FieldContainer>
       </DetailsGrid>
-
-      <GroupMembersSection>
-        <GroupTitle>Group Members</GroupTitle>
-        <MembersGrid>
-          <HeaderRow>
-            <Label>Name</Label>
-            <Label>Original Name</Label>
-            <Label>
-              Subcategories <ChevronDown size={16} />
-            </Label>
-          </HeaderRow>
-          {[1, 2, 3].map((_, index) => (
-            <MemberRow key={index}>
-              <Input type="text" readOnly />
-              <Input type="text" readOnly />
-              <Input type="text" readOnly />
-            </MemberRow>
-          ))}
-        </MembersGrid>
-      </GroupMembersSection>
+      
+      <FieldRow>
+        <Label>Possible Classifications</Label>
+        <Input 
+          type="text" 
+          value={item.possibleClassifications?.join(", ") || ""} 
+          readOnly 
+        />
+      </FieldRow>
     </DetailsContainer>
   );
 };
@@ -80,6 +130,12 @@ const FieldContainer = styled.div`
   flex-direction: column;
   gap: 0.25rem;
 `;
+const FieldRow = styled.div`
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
 
 const Label = styled.label`
   font-size: 0.875rem;
@@ -98,6 +154,30 @@ const Input = styled.input`
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
+`;
+
+
+const SelectInput = styled.select`
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  outline: none;
+  background-color: white;
+  
+  &:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+`;
+
+const ProcessedNamesContainer = styled.div`
+  margin-top: 1rem;
+`;
+
+const ProcessedNamesInput = styled(Input)`
+  min-height: 100px;
+  resize: vertical;
 `;
 
 const ConfidenceBar = styled.div`
