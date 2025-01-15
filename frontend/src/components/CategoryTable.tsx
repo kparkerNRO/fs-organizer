@@ -1,38 +1,60 @@
 import React, { useState } from "react";
 import styled from "styled-components";
 import { Category, Folder } from "../types";
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface CategoryTableProps {
   categories: Category[];
   onSelectItem: (item: Category | Folder) => void;
-  selectedItem: Category | Folder | null;
 }
 
 export const CategoryTable: React.FC<CategoryTableProps> = ({
   categories,
   onSelectItem,
-  selectedItem,
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
+  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [activeFolder, setActiveFolder] = useState<Folder | null>(null);
 
   const toggleExpand = (categoryId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedCategories(prev => 
-      prev.includes(categoryId) 
-        ? prev.filter(id => id !== categoryId)
+    setExpandedCategories((prev) =>
+      prev.includes(categoryId)
+        ? prev.filter((id) => id !== categoryId)
         : [...prev, categoryId]
     );
   };
 
-  
+  const setSelectedItems = (item: Category | Folder) => {
+    if ("original_filename" in item) {
+        if (activeCategory && !activeCategory.children?.includes(item)) {
+          setActiveCategory(null);
+          const parentCategory = categories.find((category) =>
+            category.children?.includes(item)
+          );
+          setActiveCategory(parentCategory || null);
+        }
+        setActiveFolder(item);
+      
+    }
+    else {
+      if (activeFolder && !item.children?.includes(activeFolder)) {
+        setActiveFolder(null);
+      }
+      setActiveCategory(item);
+    }
+
+    onSelectItem(item);
+  };
+
+
 
   const renderCategory = (category: Category, index: number) => (
     <React.Fragment key={category.id}>
       <TableRow
         $isEven={index % 2 === 0}
-        $isSelected={selectedItem?.isSelected === true}
-        onClick={() => onSelectItem(category)}
+        $isSelected={category.id === activeCategory?.id}
+        onClick={() => setSelectedItems(category)}
       >
         <RowCell>
           {category.children ? (
@@ -53,24 +75,30 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
         <RowCell>{category.possibleClassifications?.join(", ") || "-"}</RowCell>
         <RowCell>{category.confidence}%</RowCell>
       </TableRow>
-      {expandedCategories.includes(category.id) && category.children?.map((folder) => (
-        <TableRow
-          key={folder.id}
-          $isEven={index % 2 === 0}
-          $isSelected={selectedItem?.isSelected === true}
-          $isChild
-          onClick={() => onSelectItem(folder)}
-        >
-          <RowCell>
-            <IndentSpace />
-            {folder.name}
-          </RowCell>
-          <RowCell>{folder.classification}</RowCell>
-          <RowCell>-</RowCell>
-          <RowCell>{folder.original_filename}</RowCell>
-          <RowCell>{folder.confidence}%</RowCell>
-        </TableRow>
-      ))}
+      {expandedCategories.includes(category.id) &&
+        category.children?.map((folder) => (
+          <TableRow
+            key={folder.id}
+            $isEven={index % 2 === 0}
+            $isSelected={
+              !!(
+                folder.id === activeFolder?.id &&
+                activeCategory?.children?.includes(folder)
+              )
+            }
+            $isChild
+            onClick={() => setSelectedItems(folder)}
+          >
+            <RowCell>
+              <IndentSpace />
+              {folder.name}
+            </RowCell>
+            <RowCell>{folder.classification}</RowCell>
+            <RowCell>-</RowCell>
+            <RowCell>{folder.original_filename}</RowCell>
+            <RowCell>{folder.confidence}%</RowCell>
+          </TableRow>
+        ))}
     </React.Fragment>
   );
 
@@ -143,7 +171,7 @@ const SearchInput = styled.input`
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   outline: none;
-  
+
   &:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
@@ -168,7 +196,7 @@ const HeaderCell = styled.div`
   font-size: 0.875rem;
   color: #4b5563;
   cursor: pointer;
-  
+
   svg {
     margin-left: 0.25rem;
   }
@@ -180,8 +208,8 @@ const RowsContainer = styled.div`
   gap: 0.5rem;
 `;
 
-const TableRow = styled.div<{ 
-  $isEven: boolean; 
+const TableRow = styled.div<{
+  $isEven: boolean;
   $isSelected: boolean;
   $isChild?: boolean;
 }>`
@@ -191,24 +219,14 @@ const TableRow = styled.div<{
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   cursor: pointer;
-  background-color: ${props => 
-    props.$isSelected 
-      ? '#e0f2fe'
-      : props.$isEven 
-        ? '#f3f4f6' 
-        : '#eff6ff'
-  };
-  border: ${props => props.$isSelected ? '2px solid #60a5fa' : 'none'};
-  margin-left: ${props => props.$isChild ? '1.5rem' : '0'};
+  background-color: ${(props) =>
+    props.$isSelected ? "#e0f2fe" : props.$isEven ? "#f3f4f6" : "#eff6ff"};
+  border: ${(props) => (props.$isSelected ? "2px solid #60a5fa" : "none")};
+  margin-left: ${(props) => (props.$isChild ? "1.5rem" : "0")};
 
   &:hover {
-    background-color: ${props => 
-      props.$isSelected 
-        ? '#dbeafe'
-        : props.$isEven 
-          ? '#e5e7eb' 
-          : '#dbeafe'
-    };
+    background-color: ${(props) =>
+      props.$isSelected ? "#dbeafe" : props.$isEven ? "#e5e7eb" : "#dbeafe"};
   }
 `;
 const RowCell = styled.div`

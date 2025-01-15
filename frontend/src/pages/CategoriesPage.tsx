@@ -6,12 +6,6 @@ import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
 
-
-type SelectableItem = {
-  type: 'category' | 'folder';
-  item: Category | Folder;
-}
-
 export const CategoriesPage: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<Category | Folder | null>(null);
@@ -31,7 +25,6 @@ export const CategoriesPage: React.FC = () => {
         <CategoryTable
           categories={data}
           onSelectItem={setSelectedItem}
-          selectedItem={selectedItem}  
         />
         <CategoryDetails item={selectedItem} />
       </ContentContainer>
