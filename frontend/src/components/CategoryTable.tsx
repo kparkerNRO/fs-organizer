@@ -3,10 +3,17 @@ import styled from "styled-components";
 import { Category, Folder } from "../types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
+import { Pagination } from "./Pagination";
 interface CategoryTableProps {
   categories: Category[];
   onSelectItem: (item: Category | Folder | null) => void;
   onUpdateCategories: (updatedCategories: Category[]) => void;
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 }
 
 interface ContextMenuState {
@@ -19,6 +26,12 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   categories,
   onSelectItem,
   onUpdateCategories,
+  currentPage,
+  totalPages,
+  pageSize,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
 }) => {
   const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -290,7 +303,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   };
 
   const renderCategory = (category: Category, index: number) => (
-    // <React.Fragment key={category.id}>
     <CategoryGroup
       key={category.id}
       $isDraggedOver={category.id === draggedOverCategoryId}
@@ -376,6 +388,14 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           {categories.map((category, index) => renderCategory(category, index))}
         </RowsContainer>
       </TableGrid>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={totalItems}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+      />
       {contextMenu.show && (
         <ContextMenu
           x={contextMenu.x}

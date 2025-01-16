@@ -8,11 +8,23 @@ import { fetchCategories } from "../api";
 import { usePersistedCategories } from '../hooks/usePersistedCategories';
 import { ResetButton } from '../components/ResetButton';
 
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
 
 export const CategoriesPage: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
   const [selectedItem, setSelectedItem] = useState<Category | Folder  | null>(null);
-  // const [categories, setCategories] = useState<Category[]>([]);
+
+  const [pagination, setPagination] = useState<PaginationState>({
+    currentPage: 1,
+    pageSize: 10,
+    totalItems: 0,
+    totalPages: 1
+  });
 
   const {
     categories,
@@ -23,27 +35,71 @@ export const CategoriesPage: React.FC = () => {
   const handleUpdateCategories = (updatedCategories: Category[]) => {
     setCategories(updatedCategories);
   };
+
+  const handleReset = () => {
+    // Reset pagination state
+    setPagination(prev => ({
+      ...prev,
+      currentPage: 1
+    }));
+    
+    // Reset local selection state
+    setSelectedItem(null);
+
+    // Fetch first page of data
+    fetchCategoryData(1, pagination.pageSize);
+  };
   
   useEffect(() => {
-    const fetchData = async () => {
-      // Fetch data from FastAPI
-      setData(await fetchCategories());
-    };
-    fetchData();
+    fetchCategoryData(pagination.currentPage, pagination.pageSize);
   }, []);
+
+  const handlePageChange = async (page: number) => {
+    setPagination(prev => ({ ...prev, currentPage: page }));
+    await fetchCategoryData(page, pagination.pageSize);
+  };
+
+  const handlePageSizeChange = async (size: number) => {
+    setPagination(prev => ({ 
+      ...prev, 
+      pageSize: size,
+      currentPage: 1 // Reset to first page when changing page size
+    }));
+    await fetchCategoryData(1, size);
+  };
+
+  const fetchCategoryData = async (page: number, pageSize: number) => {
+    try {
+      const response = await fetchCategories({ page, pageSize });
+      setCategories(response.data);
+      setPagination(prev => ({
+        ...prev,
+        totalItems: response.totalItems,
+        totalPages: response.totalPages
+      }));
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   return (
     <PageContainer>
       <Header>
         <Title>Categories</Title>
-        <ResetButton onReset={resetToInitial} />
+        <ResetButton onReset={() => resetToInitial(handleReset)} />
       </Header>
 
       <ContentContainer>
-        <CategoryTable
+      <CategoryTable
           categories={categories}
           onSelectItem={setSelectedItem}
           onUpdateCategories={handleUpdateCategories}
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          pageSize={pagination.pageSize}
+          totalItems={pagination.totalItems}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
         />
         <CategoryDetails item={selectedItem} />
       </ContentContainer>

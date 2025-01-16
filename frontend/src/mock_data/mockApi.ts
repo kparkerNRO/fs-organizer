@@ -2,6 +2,7 @@
 
 import { mockFolders, mockCategoryData } from "./mockData";
 import { Category, Folder } from "../types";
+import { FetchCategoriesParams, FetchCategoriesResponse } from "../api";
 
 export const fetchMockFolders = (): Promise<Folder[]> => {
   return new Promise((resolve) => {
@@ -9,8 +10,14 @@ export const fetchMockFolders = (): Promise<Folder[]> => {
   });
 };
 
-export const fetchMockCategoryData = (): Promise<Category[]> => {
+export const fetchMockCategoryData = (params: FetchCategoriesParams): Promise<FetchCategoriesResponse> => {
+  const mockData = {
+    data: mockCategoryData,
+    totalItems: mockCategoryData.length,
+    totalPages: 1,
+  };
+  
   return new Promise((resolve) => {
-    setTimeout(() => resolve(mockCategoryData)); // Simulate API delay
+    setTimeout(() => resolve(mockData), 500); // Simulate API delay
   });
 };

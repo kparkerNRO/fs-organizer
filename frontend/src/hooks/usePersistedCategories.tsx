@@ -25,8 +25,11 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
   }, [categories]);
 
   // Function to reset to initial data
-  const resetToInitial = () => {
+  const resetToInitial = (callback?: () => void) => {
     setCategories(initialCategories);
+    if (callback) {
+      callback();
+    }
   };
 
   return {
