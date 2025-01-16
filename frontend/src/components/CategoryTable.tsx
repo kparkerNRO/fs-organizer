@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, act } from "react";
 import styled from "styled-components";
 import { Category, Folder } from "../types";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -73,13 +73,12 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   const createNewGroup = (name?: string) => {
     if (selectedFolders.length === 0) return;
 
-    const categoryName = name == null ?  selectedFolders[0].name : name;
+    const categoryName = name == null ? selectedFolders[0].name : name;
 
     // Create new category based on first selected folder
     const newCategory: Category = {
       id: Math.max(...categories.map((c) => c.id)) + 1,
       name: categoryName,
-      // name: selectedFolders[0].name,
       classification: selectedFolders[0].classification,
       confidence: selectedFolders[0].confidence,
       children: selectedFolders,
@@ -99,6 +98,59 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     onUpdateCategories([...updatedCategories, newCategory]);
 
     // Update local state
+    setSelectedFolders([]);
+    setActiveCategory(newCategory);
+    setExpandedCategories((prev) => [...prev, newCategory.id]);
+    closeContextMenu();
+  };
+
+  const createGroupWithCommonPrefix = (folders: Folder[]) => {
+    if (selectedFolders.length === 0) return;
+
+    //Find the max common prefix (in whole words) of the folder names
+    const names = folders.map((folder) => folder.name);
+    if (names.length === 0) return "";
+
+    const splitNames = names.map((name) => name.split(" "));
+    const minLength = Math.min(...splitNames.map((parts) => parts.length));
+
+    let commonPrefix = "";
+    for (let i = 0; i < minLength; i++) {
+      const wordSet = new Set(splitNames.map((parts) => parts[i]));
+      if (wordSet.size === 1) {
+        commonPrefix += `${splitNames[0][i]} `;
+      } else {
+        break;
+      }
+    }
+
+    const prefix = commonPrefix.trim();
+
+    // Create new group with the common prefix and move the folders to it
+    const newCategory: Category = {
+      id: Math.max(...categories.map((c) => c.id)) + 1,
+      name: prefix,
+      classification: selectedFolders[0].classification,
+      confidence: selectedFolders[0].confidence,
+      children: selectedFolders.map((child) =>
+        folders.some((f) => f.id === child.id)
+          ? { ...child, name: child.name.replace(prefix, "").trim() }
+          : child
+      ),
+      count: selectedFolders.length,
+    };
+
+    // Find and remove selected folders from their current categories
+    const updatedCategories = categories.map((category) => ({
+      ...category,
+      children:
+        category.children?.filter(
+          (child) => !selectedFolders.some((f) => f.id === child.id)
+        ) || [],
+    }));
+
+    // Update the categories
+    onUpdateCategories([...updatedCategories, newCategory]);
     setSelectedFolders([]);
     setActiveCategory(newCategory);
     setExpandedCategories((prev) => [...prev, newCategory.id]);
@@ -333,6 +385,10 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             {
               text: "Create new group",
               onClick: () => createNewGroup(),
+            },
+            {
+              text: "Extract common prefix",
+              onClick: () => createGroupWithCommonPrefix(selectedFolders),
             },
           ]}
         />
