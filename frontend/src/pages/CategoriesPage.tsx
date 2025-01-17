@@ -1,12 +1,12 @@
 // CategoriesPage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { Category, Folder } from "../types";
+import { Category, Folder } from "../types/types";
 import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
-import { usePersistedCategories } from '../hooks/usePersistedCategories';
-import { ResetButton } from '../components/ResetButton';
+import { usePersistedCategories } from "../hooks/usePersistedCategories";
+import { ResetButton } from "../components/ResetButton";
 
 interface PaginationState {
   currentPage: number;
@@ -17,20 +17,19 @@ interface PaginationState {
 
 export const CategoriesPage: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Category | Folder  | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Category | Folder | null>(
+    null
+  );
 
   const [pagination, setPagination] = useState<PaginationState>({
     currentPage: 1,
     pageSize: 10,
     totalItems: 0,
-    totalPages: 1
+    totalPages: 1,
   });
 
-  const {
-    categories,
-    setCategories,
-    resetToInitial
-  } = usePersistedCategories(data);
+  const { categories, setCategories, resetToInitial } =
+    usePersistedCategories(data);
 
   const handleUpdateCategories = (updatedCategories: Category[]) => {
     setCategories(updatedCategories);
@@ -38,32 +37,32 @@ export const CategoriesPage: React.FC = () => {
 
   const handleReset = () => {
     // Reset pagination state
-    setPagination(prev => ({
+    setPagination((prev) => ({
       ...prev,
-      currentPage: 1
+      currentPage: 1,
     }));
-    
+
     // Reset local selection state
     setSelectedItem(null);
 
     // Fetch first page of data
     fetchCategoryData(1, pagination.pageSize);
   };
-  
+
   useEffect(() => {
     fetchCategoryData(pagination.currentPage, pagination.pageSize);
   }, []);
 
   const handlePageChange = async (page: number) => {
-    setPagination(prev => ({ ...prev, currentPage: page }));
+    setPagination((prev) => ({ ...prev, currentPage: page }));
     await fetchCategoryData(page, pagination.pageSize);
   };
 
   const handlePageSizeChange = async (size: number) => {
-    setPagination(prev => ({ 
-      ...prev, 
+    setPagination((prev) => ({
+      ...prev,
       pageSize: size,
-      currentPage: 1 // Reset to first page when changing page size
+      currentPage: 1, // Reset to first page when changing page size
     }));
     await fetchCategoryData(1, size);
   };
@@ -72,13 +71,13 @@ export const CategoriesPage: React.FC = () => {
     try {
       const response = await fetchCategories({ page, pageSize });
       setCategories(response.data);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         totalItems: response.totalItems,
-        totalPages: response.totalPages
+        totalPages: response.totalPages,
       }));
     } catch (error) {
-      console.error('Error fetching categories:', error);
+      console.error("Error fetching categories:", error);
     }
   };
 
@@ -90,7 +89,7 @@ export const CategoriesPage: React.FC = () => {
       </Header>
 
       <ContentContainer>
-      <CategoryTable
+        <CategoryTable
           categories={categories}
           onSelectItem={setSelectedItem}
           onUpdateCategories={handleUpdateCategories}

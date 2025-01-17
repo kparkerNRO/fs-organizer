@@ -2,7 +2,7 @@
 
 import { fetchMockFolders, fetchMockCategoryData } from "./mock_data/mockApi";
 import { useMockMode } from "./mock_data/MockModeContext";
-import { Category } from "./types";
+import { Category } from "./types/types";
 
 export const fetchFolders = async () => {
   //   const useMockData = useMockMode();
@@ -16,14 +16,17 @@ export const fetchFolders = async () => {
 };
 
 export interface FetchCategoriesParams {
-  page: number;
-  pageSize: number;
+  limit: number;
+  offset: number;
+  sortField?: string;
+  sortOrder?: string;
 }
 
 export interface FetchCategoriesResponse {
   data: Category[];
   totalItems: number;
   totalPages: number;
+  currentPage: number;
 }
 
 export const fetchCategories = async (

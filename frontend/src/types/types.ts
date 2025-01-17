@@ -1,7 +1,15 @@
 // src/types.ts
+import { SORT_FIELD, SORT_ORDER } from "./enums";
 
-type SelectableItem = {
-  item: Category | Folder;
+export interface SortConfig {
+  field: SORT_FIELD;
+  direction: SORT_ORDER;
+}
+
+export interface PageState {
+  sortConfig: SortConfig;
+  expandedCategories: number[];
+  selectedItem: number | null;
 }
 
 

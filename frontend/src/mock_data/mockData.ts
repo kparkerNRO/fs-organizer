@@ -1,6 +1,6 @@
 // src/mockData.ts
 
-import { Folder, Category } from "../types";
+import { Folder, Category } from "../types/types";
 
 export const mockFolders: Folder[] = [];
 

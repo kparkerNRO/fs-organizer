@@ -1,9 +1,12 @@
 import React, { useState, useEffect, act } from "react";
 import styled from "styled-components";
-import { Category, Folder } from "../types";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Category, Folder, SortConfig } from "../types/types";
+import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
 import { Pagination } from "./Pagination";
+import { usePageState } from "../hooks/usePageState";
+import { SORT_FIELD, SORT_ORDER } from "../types/enums";
+
 interface CategoryTableProps {
   categories: Category[];
   onSelectItem: (item: Category | Folder | null) => void;
@@ -14,6 +17,7 @@ interface CategoryTableProps {
   totalItems: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  onSortChange: (sortConfig: SortConfig) => void;
 }
 
 interface ContextMenuState {
@@ -32,8 +36,8 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   totalItems,
   onPageChange,
   onPageSizeChange,
+  onSortChange,
 }) => {
-  const [expandedCategories, setExpandedCategories] = useState<number[]>([]);
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
   const [draggedOverCategoryId, setDraggedOverCategoryId] = useState<
@@ -45,18 +49,91 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     y: 0,
   });
 
+  const {
+    pageState,
+    updateSortConfig,
+    updateExpandedCategories,
+    updateSelectedItem,
+  } = usePageState();
+
+  // Initialize state from pageState
+  const [expandedCategories, setExpandedCategories] = useState<number[]>(
+    pageState.expandedCategories
+  );
+
+  // Handle sort column click
+  const handleHeaderClick = (field: SORT_FIELD) => {
+    const currentSort = pageState.sortConfig;
+    let newSort: SortConfig;
+
+    if (currentSort.field === field) {
+      if (currentSort.direction === SORT_ORDER.ASC) {
+        newSort = { field, direction: SORT_ORDER.DESC };
+      } else if (currentSort.direction === SORT_ORDER.DESC) {
+        newSort = { field: SORT_FIELD.NAME, direction: SORT_ORDER.ASC };
+      } else {
+        newSort = { field, direction: SORT_ORDER.ASC };
+      }
+    } else {
+      newSort = { field, direction: SORT_ORDER.ASC };
+    }
+
+    updateSortConfig(newSort);
+    onSortChange(newSort);
+  };
+
+  // Render sort icon based on current sort state
+  const SortIcon = ({ field }: { field: SORT_FIELD }) => {
+    const { sortConfig } = pageState;
+
+    if (sortConfig.field !== field) {
+      return (
+        <div className="w-4 h-4 opacity-0 group-hover:opacity-50">
+          <ChevronUp size={16} />
+        </div>
+      );
+    }
+
+    if (sortConfig.direction === SORT_ORDER.NONE) {
+      return (
+        <div className="w-4 h-4 text-gray-400 hover:text-gray-600">
+          <X size={16} />
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-4 h-4 text-blue-500">
+        {sortConfig.direction === "asc" ? (
+          <ChevronUp size={16} />
+        ) : (
+          <ChevronDown size={16} />
+        )}
+      </div>
+    );
+  };
+
+  // Update persisted state when expandedCategories changes
+  useEffect(() => {
+    updateExpandedCategories(expandedCategories);
+  }, [expandedCategories]);
+
   // Handle updates to selection
   useEffect(() => {
     if (selectedFolders.length > 1) {
       onSelectItem(null);
+      updateSelectedItem(null)
     } else if (selectedFolders.length === 1) {
       onSelectItem(selectedFolders[0]);
+      updateSelectedItem(selectedFolders[0].id)
     }
+    
   }, [selectedFolders, onSelectItem]);
 
   useEffect(() => {
     if (activeCategory && selectedFolders.length === 0) {
       onSelectItem(activeCategory);
+      updateSelectedItem(activeCategory.id)
     }
   }, [activeCategory, selectedFolders.length, onSelectItem]);
 
@@ -367,20 +444,31 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
       <TableGrid>
         <HeaderGrid>
-          <HeaderCell>
-            Title <ChevronDown size={16} />
+          <HeaderCell
+            $active={pageState.sortConfig.field === SORT_FIELD.NAME}
+            onClick={() => handleHeaderClick(SORT_FIELD.NAME)}
+          >
+            Name <SortIcon field={SORT_FIELD.NAME} />
           </HeaderCell>
-          <HeaderCell>
-            Classification <ChevronDown size={16} />
+          <HeaderCell
+            $active={pageState.sortConfig.field === SORT_FIELD.CLASSIFICATION}
+            onClick={() => handleHeaderClick(SORT_FIELD.CLASSIFICATION)}
+          >
+            Classification <SortIcon field={SORT_FIELD.CLASSIFICATION} />
           </HeaderCell>
-          <HeaderCell>
-            Count <ChevronDown size={16} />
+          <HeaderCell
+            $active={pageState.sortConfig.field === SORT_FIELD.COUNT}
+            onClick={() => handleHeaderClick(SORT_FIELD.COUNT)}
+          >
+            Count <SortIcon field={SORT_FIELD.COUNT} />
           </HeaderCell>
-          <HeaderCell>
-            Possible classifications <ChevronDown size={16} />
-          </HeaderCell>
-          <HeaderCell>
-            Confidence <ChevronDown size={16} />
+          <HeaderCell>Possible classifications</HeaderCell>
+          <HeaderCell
+            $active={pageState.sortConfig.field === SORT_FIELD.CONFIDENCE}
+            onClick={() => handleHeaderClick(SORT_FIELD.CONFIDENCE)}
+          >
+            Confidence
+            <SortIcon field={SORT_FIELD.CONFIDENCE} />
           </HeaderCell>
         </HeaderGrid>
 
@@ -471,15 +559,28 @@ const HeaderGrid = styled.div`
   margin-bottom: 0.5rem;
 `;
 
-const HeaderCell = styled.div`
+const HeaderCell = styled.div<{
+  $active?: boolean;
+}>`
   display: flex;
   align-items: center;
-  font-size: 0.875rem;
-  color: #4b5563;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-weight: 500;
+  color: ${(props) => (props.$active ? "#2563eb" : "#4b5563")};
   cursor: pointer;
+  transition: all 0.2s;
 
-  svg {
-    margin-left: 0.25rem;
+  &:hover {
+    background-color: #f3f4f6;
+    border-radius: 0.375rem;
+  }
+
+  /* Sort icon container */
+  > div {
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
   }
 `;
 

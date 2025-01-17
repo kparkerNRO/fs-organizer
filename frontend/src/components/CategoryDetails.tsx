@@ -1,12 +1,12 @@
 import React from "react";
 import styled from "styled-components";
-import { Category, Folder } from "../types";
+import { Category, Folder } from "../types/types";
 
 interface CategoryDetailsProps {
-    item: Category | Folder |null;
+  item: Category | Folder | null;
 }
 
-export const CategoryDetails: React.FC<CategoryDetailsProps> = ({  item }) => {
+export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ item }) => {
   if (!item) {
     return (
       <DetailsContainer>
@@ -17,7 +17,7 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({  item }) => {
 
   // TODO is this really the best way?
   const isFolder = (item: Category | Folder): item is Folder => {
-    return 'original_path' in item;
+    return "original_path" in item;
   };
 
   if (isFolder(item)) {
@@ -63,9 +63,9 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({  item }) => {
 
         <ProcessedNamesContainer>
           <Label>Processed Names</Label>
-          <ProcessedNamesInput 
-            value={item.processed_names?.join('\n') || ''} 
-            readOnly 
+          <ProcessedNamesInput
+            value={item.processed_names?.join("\n") || ""}
+            readOnly
           />
         </ProcessedNamesContainer>
       </DetailsContainer>
@@ -97,13 +97,13 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({  item }) => {
           </ConfidenceBar>
         </FieldContainer>
       </DetailsGrid>
-      
+
       <FieldRow>
         <Label>Possible Classifications</Label>
-        <Input 
-          type="text" 
-          value={item.possibleClassifications?.join(", ") || ""} 
-          readOnly 
+        <Input
+          type="text"
+          value={item.possibleClassifications?.join(", ") || ""}
+          readOnly
         />
       </FieldRow>
     </DetailsContainer>
@@ -149,13 +149,12 @@ const Input = styled.input`
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   outline: none;
-  
+
   &:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
 `;
-
 
 const SelectInput = styled.select`
   width: 100%;
@@ -164,7 +163,7 @@ const SelectInput = styled.select`
   border-radius: 0.5rem;
   outline: none;
   background-color: white;
-  
+
   &:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Category } from '../types';
+import { useState, useEffect } from "react";
+import { Category } from "../types/types";
 
-const STORAGE_KEY = 'categoriesData';
+const STORAGE_KEY = "categoriesData";
 
 export const usePersistedCategories = (initialCategories: Category[]) => {
   // Initialize state from localStorage or use initial categories
@@ -10,7 +10,7 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
       const savedCategories = localStorage.getItem(STORAGE_KEY);
       return savedCategories ? JSON.parse(savedCategories) : initialCategories;
     } catch (error) {
-      console.error('Error loading categories from localStorage:', error);
+      console.error("Error loading categories from localStorage:", error);
       return initialCategories;
     }
   });
@@ -20,7 +20,7 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
     } catch (error) {
-      console.error('Error saving categories to localStorage:', error);
+      console.error("Error saving categories to localStorage:", error);
     }
   }, [categories]);
 
@@ -35,6 +35,6 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
   return {
     categories,
     setCategories,
-    resetToInitial
+    resetToInitial,
   };
 };
