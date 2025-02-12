@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
-from pipeline.database import (
+from data_models.database import (
     get_session,
     Folder,
-    FolderCategory,
-    GroupRecord,
+    PartialNameCategory,
+    GroupCategoryEntry,
     setup_group,
 )
-from grouping.helpers import ClassificationType
+from data_models.classify import ClassificationType
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering, KMeans
@@ -81,11 +81,14 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
 
 
 def cluster_with_custom_metric(db_path):
+    """
+    Cluster the calculated categories into groups using a custom distance metric.
+    """
     session = get_session(db_path)
     uncertain_categories = (
-        session.query(FolderCategory, Folder)
-        .join(Folder, FolderCategory.folder_id == Folder.id)
-        .filter(FolderCategory.classification != ClassificationType.VARIANT)
+        session.query(PartialNameCategory, Folder)
+        .join(Folder, PartialNameCategory.folder_id == Folder.id)
+        .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
         .all()
     )
 
@@ -118,11 +121,11 @@ def cluster_with_custom_metric(db_path):
 
     # Step 3: assign cluster labels
     for i, f in enumerate(folders):
-        group_record = GroupRecord(
+        group_record = GroupCategoryEntry(
             folder_id=f.folder_id,
             category_id=f.category_id,
             group_id=int(labels[i]),
-            cannonical_name=f.name,
+            original_name=f.name,
             path=str(f.path),
         )
         session.add(group_record)
@@ -134,9 +137,9 @@ def group_uncertain(db_path: Path):
     """Group uncertain categories using KMeans clustering."""
     session = get_session(db_path)
     uncertain_categories = (
-        session.query(FolderCategory, Folder)
-        .join(Folder, FolderCategory.folder_id == Folder.id)
-        .filter(FolderCategory.classification != ClassificationType.VARIANT)
+        session.query(PartialNameCategory, Folder)
+        .join(Folder, PartialNameCategory.folder_id == Folder.id)
+        .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
         .all()
     )
     n_clusters = 20
@@ -154,11 +157,11 @@ def group_uncertain(db_path: Path):
 
     for i, uf in enumerate(uncertain_categories):
         cluster_id = clusters[i]
-        group_record = GroupRecord(
+        group_record = GroupCategoryEntry(
             folder_id=uf[1].id,
             category_id=uf[0].id,
             group_name=f"cluster_{cluster_id}",
-            cannonical_name=uf[0].name,
+            original_name=uf[0].name,
         )
         session.add(group_record)
         # uf.classification = f"cluster_{cluster_id}"

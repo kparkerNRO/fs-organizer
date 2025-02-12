@@ -3,7 +3,7 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from pipeline.gather import process_zip
-from pipeline.database import Base, Folder, File
+from organizer.data_models.database import Base, Folder, File
 import zipfile
 import io
 

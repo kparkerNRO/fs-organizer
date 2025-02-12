@@ -1,40 +1,32 @@
 from collections import defaultdict
-from dataclasses import dataclass
-from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 
-from pipeline.database import (
+from data_models.classify import ClassificationType
+from data_models.database import (
+    GroupCategory,
     setup_folder_categories,
     setup_group,
     get_session,
     setup_category_summarization,
     Folder,
-    FolderCategory,
-    GroupRecord,
+    PartialNameCategory,
+    GroupCategoryEntry,
     Category,
 )
-from grouping.folder_group import process_folders
-from grouping.group_cleanup import Grouper
-from grouping.helpers import (
-    ClassificationType,
-    calculate_similarity_difflib,
-    common_token_grouping,
-    normalized_grouping,
-    spelling_grouping,
-)
-from pipeline.nlp_grouping import cluster_with_custom_metric, group_uncertain
+from grouping.group_cleanup import GroupEntry, Grouper
+
+from pipeline.nlp_grouping import cluster_with_custom_metric
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
     clean_filename,
     split_view_type,
 )
-from nltk.metrics import edit_distance
 from pathlib import Path
 
 
 def parse_name(name: str) -> tuple[list[str], list[str]]:
-    """Parse a name into categories and variants"""
+    """
+    Parse out known names and suspected components
+    """
     categories = []
     variants = []
 
@@ -66,6 +58,8 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
     """
     Break the filenames into tokens, and identify known variants and suspected categories.
     Clean up the tokens, and assign the folder name to the first category or variant
+
+    Fills out the "partial name category"
     """
 
     session = get_session(db_path)
@@ -100,7 +94,7 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
                 folder.classification = ClassificationType.UNKNOWN
 
             for category in categories:
-                category_lookup = FolderCategory(
+                category_lookup = PartialNameCategory(
                     folder_id=folder.id,
                     original_name=folder.folder_name,
                     name=category,
@@ -109,7 +103,7 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
                 session.add(category_lookup)
 
             for variant in variants:
-                category_lookup = FolderCategory(
+                category_lookup = PartialNameCategory(
                     folder_id=folder.id,
                     original_name=folder.folder_name,
                     name=variant,
@@ -140,7 +134,7 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
                     folder.subject = folder.categories[0]
                     # also update the FolderCategory reference for folder.categories[0]
                     category_lookup = (
-                        session.query(FolderCategory)
+                        session.query(PartialNameCategory)
                         .filter_by(folder_id=folder.id, name=folder.categories[0])
                         .one()
                     )
@@ -152,6 +146,9 @@ def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
 
 
 def evaluate_categorization(db_path: Path) -> None:
+    """
+    Evaluate the partial name categories, and agregate the counts for each category
+    """
     session = get_session(db_path)
 
     try:
@@ -162,7 +159,7 @@ def evaluate_categorization(db_path: Path) -> None:
         """
         # Get all folders
         folder_category = (
-            session.query(FolderCategory)
+            session.query(PartialNameCategory)
             # .filter(Folder.classification != ClassificationType.VARIANT)
             .all()
         )
@@ -196,86 +193,73 @@ def evaluate_categorization(db_path: Path) -> None:
 
 
 def consolidate_groups(db_path: Path) -> None:
+    """
+    After groupings have been calculated, evalute the groups to determine which represent
+    "real" groupings (i.e. single unique name, or multiple names with a common prefix), and
+    which are unable to be grouped.
+    
+    """
     session = get_session(db_path)
 
     try:
-        # Get all groups
-        group_categories = (
-            session.query(GroupRecord, FolderCategory)
-            .join(FolderCategory, GroupRecord.category_id == FolderCategory.id)
+        # Get all processed categories
+        group_categories: list[GroupCategoryEntry] = (
+            session.query(GroupCategoryEntry)
             .all()
         )
 
-        # Create a dictionary to store group counts
-        group_unique_names = defaultdict(set)
         group_record_map = defaultdict(list)
-        group_category_map = defaultdict(list)
 
-        for group, category in group_categories:
-            group_unique_names[group.group_id].add(group.cannonical_name)
+        calculated_groups = defaultdict(list)
+
+        for group in group_categories:
+            # group_unique_names[group.group_id].add(group.original_name)
             group_record_map[group.group_id].append(group)
-            group_category_map[group.group_id].append(category)
+            # group_category_map[group.group_id].append(category)
 
-        # Find groups with only one unique name
-        singleton_groups = {
-            group_id: list(group)[0]
-            for group_id, group in group_unique_names.items()
-            if len(group) == 1
-        }
+        for group_id, group_items in group_record_map.items():
+            
+            # singletons - just store them and move on
+            if len(group_items) == 1:
+                calculated_groups[group_items[0].original_name].append(group_items[0])
+                group_items[0].processed = True
+                group_items[0].confidence = 1.0
+                continue
 
-        for group_id, group_cannon_name in singleton_groups.items():
-            # update the group records with the new name
-            for group in group_record_map[group_id]:
-                group.group_name = group_cannon_name
-                group.processed = True
+            record_names = [record.original_name for record in group_items]
 
-        #     if len(group_record_map[group_id]) == 1:
-        #         continue
-        #     group = group_record_map[group_id][0]
-        #     existing_classifications = {
-        #         category.classification for category in group_category_map[group_id]
-        #     }
-        #     classification = (
-        #         list(existing_classifications)[0]
-        #         if len(existing_classifications) == 1
-        #         else ClassificationType.UNKNOWN
-        #     )
-
-        #     # create a new folder category record
-        #     category_lookup = FolderCategory(
-        #         folder_id=group.folder_id,
-        #         name=group.cannonical_name,
-        #         classification=classification,
-        #         group_name=group_id,
-        #     )
-        #     session.add(category_lookup)
-
-        #     # update the existing classifications to be hidden
-        #     for category in group_category_map[group_id]:
-        #         category.hidden = True
-        #         category.group_name = group_id
-
-        # for the rest of the groups, try to group them by common name
-        remaining_groups = {
-            group_id: group
-            for group_id, group in group_record_map.items()
-            if group_id not in singleton_groups
-        }
-        for group_id, group in remaining_groups.items():
-            record_names = [record.cannonical_name for record in group]
-            cannon_group_map = defaultdict(list)
-            for record in group:
-                cannon_group_map[record.cannonical_name].append(record)
+            # evaluate the group - this does a few things
+            # 1. try to normalize the names to a common prefix correcting for spelling
+            # 2. determine sub-categories when the group name is a common prefix
             grouper = Grouper(record_names)
             grouper.process_group()
-            new_grouping = grouper.get_changed_group_entries()
-            for name, group_entry in new_grouping.items():
-                if name in cannon_group_map:
-                    for record in cannon_group_map[name]:
-                        record.processed_names = group_entry.categories
-                        # record.group_name = group_entry.grouped_name
-                        record.processed = True
-                        record.confidence = group_entry.confidence
+
+            name_to_processed_entry: dict[str,list[GroupEntry]] = defaultdict(list)
+            for record in group_items:
+                record.processed = True
+                name_to_processed_entry[record.original_name].append(record)
+
+            new_grouping = grouper.name_mapping
+            grouped_name = grouper.get_group_name()
+            if grouped_name is not None:
+                for name, group_entry in new_grouping.items():
+                    if name in name_to_processed_entry:
+                        for record in name_to_processed_entry[name]:
+                            record.derived_names = group_entry.categories
+                            # record.group_name = group_entry.grouped_name
+                            record.processed = True
+                            record.confidence = group_entry.confidence
+
+                            calculated_groups[grouped_name].append(record)
+      
+        i=0
+        for group_id, group_items in calculated_groups.items():
+            group_confidence = min([record.confidence for record in group_items])
+            db_category = GroupCategory(id=i, name=group_id, count=len(group_items), group_confidence=group_confidence)
+            session.add(db_category)
+            for group_item in group_items:
+                group_item.group_id = i
+            i += 1
 
         session.commit()
 
@@ -284,15 +268,15 @@ def consolidate_groups(db_path: Path) -> None:
 
 
 def categorize(db_path: Path):
+    
+    # setup the database
     setup_folder_categories(db_path)
     setup_category_summarization(db_path)
     setup_group(db_path)
+
 
     heuristic_categorize(db_path)
     evaluate_categorization(db_path)
 
     cluster_with_custom_metric(db_path)
     consolidate_groups(db_path)
-
-    # first, process folders in the same folder group and pull out duplicate terms
-    # process_folders(session)

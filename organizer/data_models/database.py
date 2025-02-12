@@ -95,36 +95,33 @@ class File(Base):
         return f"File(id={self.id}, file_name={self.file_name}"
 
 
-class GroupRecord(Base):
-    __tablename__ = "group_record"
+class PartialNameCategory(Base):
+    """
+    Represents a part of a folder name, once the string has been broken
+    down into best-guess categories.
+    (i.e. "garden indoor" -> "garden" and "indoor")
+    """
+    __tablename__ = "partial_name_category"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("folder_category.id"), nullable=False)
-    group_id = Column(Integer)
-    cannonical_name = Column(String)
-    path = Column(String, nullable=True)
-    processed_names = Column(StringList)
-
-    confidence = Column(Float, default=1.0)
-    processed = Column(Boolean, default=False)
-
-
-class FolderCategory(Base):
-    __tablename__ = "folder_category"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    # the name of the substring & category
     name = Column(String)
+
+    # the original name of the folder
     original_name = Column(String)
+
+    # the classification of the category
     classification = Column(String)
 
+    # the folder this category has been derived from
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
+    
+    # the category this category has been assigned to
     category_id = Column(Integer, ForeignKey("category.id"))
 
     hidden = Column(Boolean, default=False)
     group_name = Column(String)
     confidence = Column(Float, default=1.0)
-
 
 class Category(Base):
     __tablename__ = "category"
@@ -138,23 +135,50 @@ class Category(Base):
     total_count = Column(Integer)
 
 
+class GroupCategory(Base):
+    __tablename__ = "group_category"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String)
+    count = Column(Integer)
+    group_confidence = Column(Float)
+
+class GroupCategoryEntry(Base):
+    __tablename__ = "category_entry"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
+    category_id = Column(Integer, nullable=False)
+    group_id = Column(Integer)
+    original_name = Column(String)
+    path = Column(String, nullable=True)
+    derived_names = Column(StringList)
+
+    confidence = Column(Float, default=0)
+    processed = Column(Boolean, default=False)
+
 def get_engine(db_path: Path):
     """Create and return a SQLAlchemy engine."""
     return create_engine(f"sqlite:///{db_path}")
 
 
-def reset_tables(db_path: Path, tables: List[str]):
+def reset_tables(db_path: Path, tables: List[str], legacy_tables: List[str] = []):
     """Reset tables in the database."""
     engine = get_engine(db_path)
     inspector = inspect(engine)
 
     # Drop existing tables if they exist
-    table_names = [table.__tablename__ for table in tables]
+    table_names = [table.__tablename__ for table in tables] + legacy_tables
     existing_tables = inspector.get_table_names()
 
     for table_name in table_names:
         if table_name in existing_tables:
-            Base.metadata.tables[table_name].drop(engine)
+            if table_name in Base.metadata.tables:
+                Base.metadata.tables[table_name].drop(engine)
+            else:
+                from sqlalchemy import text
+                with engine.connect() as connection:
+                    connection.execute(text(f"DROP TABLE {table_name}"))
 
     table_objs = [table.__table__ for table in tables]
 
@@ -173,12 +197,12 @@ def setup_gather(db_path: Path):
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
-    reset_tables(db_path, [GroupRecord])
+    reset_tables(db_path, [GroupCategoryEntry])
 
 
 def setup_folder_categories(db_path: Path):
     """Create or open the SQLite database for categories."""
-    reset_tables(db_path, [FolderCategory])
+    reset_tables(db_path, [PartialNameCategory, GroupCategory], legacy_tables=["folder_category", "group_record"])
 
 
 # Helper function to get a database session

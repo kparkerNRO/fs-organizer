@@ -1,35 +1,14 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import func
 
-from pipeline.database import (
-    setup_folder_categories,
-    setup_group,
-    get_session,
-    setup_category_summarization,
-    Folder,
-    FolderCategory,
-    GroupRecord,
-    Category,
-)
-from grouping.folder_group import process_folders
 from grouping.helpers import (
-    ClassificationType,
-    calculate_similarity_difflib,
     common_token_grouping,
     normalized_grouping,
     spelling_grouping,
 )
-from pipeline.nlp_grouping import group_uncertain
-from utils.config import KNOWN_VARIANT_TOKENS
-from utils.filename_utils import (
-    clean_filename,
-    split_view_type,
-)
+
 from nltk.metrics import edit_distance
-from pathlib import Path
 
 
 @dataclass
@@ -78,6 +57,18 @@ class Grouper:
 
     def get_changed_group_entries(self) -> dict[str, GroupEntry]:
         return {key: value for key, value in self.name_mapping.items() if value.dirty}
+
+    def get_group_name(self) -> str:
+        """
+        get the most common group name in the mapping
+        """
+        group_name = defaultdict(int)
+        for name in self.name_mapping.values():
+            group_name[name.grouped_name] += 1
+
+        max_name = max(group_name, key=group_name.get)
+        if group_name[max_name] > 1:
+            return max_name
 
     def process_group(self):
         """Process the group using various grouping strategies"""
@@ -146,3 +137,5 @@ class Grouper:
             confidence_mapping={name: 0.2 for name in working_list},
             clean_only=True,
         )
+
+

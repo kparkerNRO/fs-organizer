@@ -1,5 +1,4 @@
 import difflib
-from enum import Enum
 import re
 from typing import Optional
 
@@ -219,9 +218,3 @@ def calculate_similarity_difflib(a: str, b: str, threshold=80) -> bool:
     return (difflib.SequenceMatcher(None, a, b).ratio() * 100) >= threshold
 
 
-class ClassificationType(str, Enum):
-    VARIANT = "variant"
-    CATEGORY = "category"
-    SUBJECT = "subject"
-    UNKNOWN = "unknown"
-    CLUSTERED = "clustered"

@@ -1,20 +1,15 @@
-import os
-import json
+
 import typer
-from dataclasses import dataclass, field
-from typing import Dict, List
-from collections import Counter
 from datetime import datetime
 from pathlib import Path
 import shutil
-from pipeline.database import setup_gather
+from data_models.database import setup_gather
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
 from grouping.group import categorize
 
 app = typer.Typer()
 
-# ---- 4. CLI Commands ----
 
 
 @app.command()
@@ -101,6 +96,8 @@ def group(db_path: str = typer.Argument(...)):
     # process_pre_calculated_groups(Path(db_path))
     typer.echo("Grouping complete.")
 
+
+# FastAPI endpoints
 
 if __name__ == "__main__":
     app()

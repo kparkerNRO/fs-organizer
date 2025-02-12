@@ -1,11 +1,7 @@
 
 from dataclasses import dataclass
 
-@dataclass
-class Category():
-    id: int
-    name: str
-    classification: str
+from data_models.categorize import Category
 
 @dataclass
 class Folder():
