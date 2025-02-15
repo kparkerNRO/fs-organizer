@@ -7,6 +7,7 @@ import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
 import { usePersistedCategories } from "../hooks/usePersistedCategories";
 import { ResetButton } from "../components/ResetButton";
+import { CategoryDetailsProps } from "../types/types";
 
 interface PaginationState {
   currentPage: number;
@@ -17,8 +18,8 @@ interface PaginationState {
 
 export const CategoriesPage: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
-  const [selectedItem, setSelectedItem] = useState<Category | Folder | null>(
-    null
+  const [selectedItem, setSelectedItem] = useState<CategoryDetailsProps>(
+    {category:null, folder:null}
   );
 
   const [pagination, setPagination] = useState<PaginationState>({
@@ -43,7 +44,7 @@ export const CategoriesPage: React.FC = () => {
     }));
 
     // Reset local selection state
-    setSelectedItem(null);
+    setSelectedItem({category:null, folder:null});
 
     // Fetch first page of data
     fetchCategoryData(1, pagination.pageSize);
@@ -67,9 +68,9 @@ export const CategoriesPage: React.FC = () => {
     await fetchCategoryData(1, size);
   };
 
-  const fetchCategoryData = async (page: number, pageSize: number) => {
+  const fetchCategoryData = async (limit: number, offset: number) => {
     try {
-      const response = await fetchCategories({ page, pageSize });
+      const response = await fetchCategories({ limit, offset });
       setCategories(response.data);
       setPagination((prev) => ({
         ...prev,
@@ -100,7 +101,7 @@ export const CategoriesPage: React.FC = () => {
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
         />
-        <CategoryDetails item={selectedItem} />
+        <CategoryDetails category={selectedItem?.category ?? undefined} folder={selectedItem?.folder ?? undefined} />
       </ContentContainer>
     </PageContainer>
   );

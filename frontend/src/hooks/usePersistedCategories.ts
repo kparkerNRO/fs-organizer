@@ -8,12 +8,16 @@ export const usePersistedCategories = (initialCategories: Category[]) => {
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
       const savedCategories = localStorage.getItem(STORAGE_KEY);
-      return savedCategories ? JSON.parse(savedCategories) : initialCategories;
+      const result = savedCategories ? JSON.parse(savedCategories) : initialCategories;
+      console.log("result", result);
+      return result;
     } catch (error) {
       console.error("Error loading categories from localStorage:", error);
       return initialCategories;
     }
   });
+
+  // 
 
   // Save to localStorage whenever categories change
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, act } from "react";
 import styled from "styled-components";
-import { Category, Folder, SortConfig } from "../types/types";
+import { Category, Folder, SortConfig, CategoryDetailsProps } from "../types/types";
 import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
 import { Pagination } from "./Pagination";
@@ -9,7 +9,7 @@ import { SORT_FIELD, SORT_ORDER } from "../types/enums";
 
 interface CategoryTableProps {
   categories: Category[];
-  onSelectItem: (item: Category | Folder | null) => void;
+  onSelectItem: (category_info: CategoryDetailsProps) => void;
   onUpdateCategories: (updatedCategories: Category[]) => void;
   currentPage: number;
   totalPages: number;
@@ -17,7 +17,7 @@ interface CategoryTableProps {
   totalItems: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
-  onSortChange: (sortConfig: SortConfig) => void;
+  // onSortChange: (sortConfig: SortConfig) => void;
 }
 
 interface ContextMenuState {
@@ -36,7 +36,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   totalItems,
   onPageChange,
   onPageSizeChange,
-  onSortChange,
+  // onSortChange,
 }) => {
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
@@ -79,7 +79,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     }
 
     updateSortConfig(newSort);
-    onSortChange(newSort);
+    // onSortChange(newSort);
   };
 
   // Render sort icon based on current sort state
@@ -121,10 +121,10 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   // Handle updates to selection
   useEffect(() => {
     if (selectedFolders.length > 1) {
-      onSelectItem(null);
+      onSelectItem({category:null, folder:null});
       updateSelectedItem(null)
     } else if (selectedFolders.length === 1) {
-      onSelectItem(selectedFolders[0]);
+      onSelectItem({ category: activeCategory, folder: selectedFolders[0] });
       updateSelectedItem(selectedFolders[0].id)
     }
     
@@ -132,7 +132,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
   useEffect(() => {
     if (activeCategory && selectedFolders.length === 0) {
-      onSelectItem(activeCategory);
+      onSelectItem({ category: activeCategory, folder: null });
       updateSelectedItem(activeCategory.id)
     }
   }, [activeCategory, selectedFolders.length, onSelectItem]);
@@ -429,7 +429,8 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
             </RowCell>
             <RowCell>{folder.classification}</RowCell>
             <RowCell>-</RowCell>
-            <RowCell>{folder.original_filename}</RowCell>
+            {/* <RowCell>{folder.original_filename}</RowCell> */}
+            <RowCell>{folder.processed_names?.join(", ")}</RowCell>
             <RowCell>{folder.confidence}%</RowCell>
           </TableRow>
         ))}

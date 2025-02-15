@@ -1,62 +1,50 @@
 import React from "react";
 import styled from "styled-components";
-import { Category, Folder } from "../types/types";
+import { CategoryDetailsProps } from "../types/types";
 
-interface CategoryDetailsProps {
-  item: Category | Folder | null;
-}
-
-export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ item }) => {
-  if (!item) {
-    return (
-      <DetailsContainer>
-        <PlaceholderText>Select a category to view details</PlaceholderText>
-      </DetailsContainer>
-    );
-  }
-
-  // TODO is this really the best way?
-  const isFolder = (item: Category | Folder): item is Folder => {
-    return "original_path" in item;
-  };
-
-  if (isFolder(item)) {
+export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
+  category,
+  folder,
+}) => {
+  if (folder != null) {
     return (
       <DetailsContainer>
         <DetailsGrid>
           <FieldContainer>
             <Label>Category Name</Label>
-            <Input type="text" value={item.cleanedName} readOnly />
+            <Input type="text" value={category?.name || ""} readOnly />
           </FieldContainer>
 
           <FieldContainer>
             <Label>Name:</Label>
-            <Input type="text" value={item.name} readOnly />
+            <Input type="text" value={folder.name || ""} readOnly />
           </FieldContainer>
 
           <FieldContainer>
             <Label>Classification</Label>
             <SelectInput>
-              <option value={item.classification}>{item.classification}</option>
+              <option value={folder.classification}>
+                {folder.classification}
+              </option>
             </SelectInput>
           </FieldContainer>
         </DetailsGrid>
 
         <FieldRow>
           <Label>Original Filename</Label>
-          <Input type="text" value={item.original_filename} readOnly />
+          <Input type="text" value={folder.original_filename || ""} readOnly />
         </FieldRow>
 
         <FieldRow>
           <Label>Original Path</Label>
-          <Input type="text" value={item.original_path} readOnly />
+          <Input type="text" value={folder.original_path || ""} readOnly />
         </FieldRow>
 
         <FieldRow>
           <Label>Confidence</Label>
           <ConfidenceBar>
-            <ConfidenceFill style={{ width: `${item.confidence}%` }}>
-              {item.confidence}%
+            <ConfidenceFill style={{ width: `${folder.confidence}%` }}>
+              {folder.confidence}%
             </ConfidenceFill>
           </ConfidenceBar>
         </FieldRow>
@@ -64,7 +52,7 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ item }) => {
         <ProcessedNamesContainer>
           <Label>Processed Names</Label>
           <ProcessedNamesInput
-            value={item.processed_names?.join("\n") || ""}
+            value={folder.processed_names?.join("\n") || ""}
             readOnly
           />
         </ProcessedNamesContainer>
@@ -72,42 +60,53 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({ item }) => {
     );
   }
 
-  // Render Category details
-  return (
-    <DetailsContainer>
-      <DetailsGrid>
-        <FieldContainer>
-          <Label>Category Name</Label>
-          <Input type="text" value={item.name} readOnly />
-        </FieldContainer>
+  if (category != null) {
+    // Render Category details
+    return (
+      <DetailsContainer>
+        <DetailsGrid>
+          <FieldContainer>
+            <Label>Category Name</Label>
+            <Input type="text" value={category.name || ""} readOnly />
+          </FieldContainer>
 
-        <FieldContainer>
-          <Label>Classification</Label>
-          <SelectInput>
-            <option value={item.classification}>{item.classification}</option>
-          </SelectInput>
-        </FieldContainer>
+          <FieldContainer>
+            <Label>Classification</Label>
+            <SelectInput>
+              <option value={category.classification}>
+                {category.classification}
+              </option>
+            </SelectInput>
+          </FieldContainer>
 
-        <FieldContainer>
-          <Label>Confidence</Label>
-          <ConfidenceBar>
-            <ConfidenceFill style={{ width: `${item.confidence}%` }}>
-              {item.confidence}%
-            </ConfidenceFill>
-          </ConfidenceBar>
-        </FieldContainer>
-      </DetailsGrid>
+          <FieldContainer>
+            <Label>Confidence</Label>
+            <ConfidenceBar>
+              <ConfidenceFill style={{ width: `${category.confidence}%` }}>
+                {category.confidence}%
+              </ConfidenceFill>
+            </ConfidenceBar>
+          </FieldContainer>
+        </DetailsGrid>
 
-      <FieldRow>
-        <Label>Possible Classifications</Label>
-        <Input
-          type="text"
-          value={item.possibleClassifications?.join(", ") || ""}
-          readOnly
-        />
-      </FieldRow>
-    </DetailsContainer>
-  );
+        <FieldRow>
+          <Label>Possible Classifications</Label>
+          <Input
+            type="text"
+            value={category.possibleClassifications?.join(", ") || ""}
+            readOnly
+          />
+        </FieldRow>
+      </DetailsContainer>
+    );
+  }
+  if (!category && !folder) {
+    return (
+      <DetailsContainer>
+        <PlaceholderText>Select a category to view details</PlaceholderText>
+      </DetailsContainer>
+    );
+  }
 };
 
 const DetailsContainer = styled.div`

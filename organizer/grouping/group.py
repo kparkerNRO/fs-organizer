@@ -197,16 +197,15 @@ def consolidate_groups(db_path: Path) -> None:
     After groupings have been calculated, evalute the groups to determine which represent
     "real" groupings (i.e. single unique name, or multiple names with a common prefix), and
     which are unable to be grouped.
-    
+
     """
     session = get_session(db_path)
 
     try:
         # Get all processed categories
-        group_categories: list[GroupCategoryEntry] = (
-            session.query(GroupCategoryEntry)
-            .all()
-        )
+        group_categories: list[GroupCategoryEntry] = session.query(
+            GroupCategoryEntry
+        ).all()
 
         group_record_map = defaultdict(list)
 
@@ -218,7 +217,6 @@ def consolidate_groups(db_path: Path) -> None:
             # group_category_map[group.group_id].append(category)
 
         for group_id, group_items in group_record_map.items():
-            
             # singletons - just store them and move on
             if len(group_items) == 1:
                 calculated_groups[group_items[0].original_name].append(group_items[0])
@@ -234,7 +232,7 @@ def consolidate_groups(db_path: Path) -> None:
             grouper = Grouper(record_names)
             grouper.process_group()
 
-            name_to_processed_entry: dict[str,list[GroupEntry]] = defaultdict(list)
+            name_to_processed_entry: dict[str, list[GroupEntry]] = defaultdict(list)
             for record in group_items:
                 record.processed = True
                 name_to_processed_entry[record.original_name].append(record)
@@ -246,16 +244,25 @@ def consolidate_groups(db_path: Path) -> None:
                     if name in name_to_processed_entry:
                         for record in name_to_processed_entry[name]:
                             record.derived_names = group_entry.categories
-                            # record.group_name = group_entry.grouped_name
+                            record.new_name = (
+                                None
+                                if len(group_entry.categories) == 1
+                                else group_entry.categories[-1]
+                            )
                             record.processed = True
                             record.confidence = group_entry.confidence
 
                             calculated_groups[grouped_name].append(record)
-      
-        i=0
+
+        i = 0
         for group_id, group_items in calculated_groups.items():
             group_confidence = min([record.confidence for record in group_items])
-            db_category = GroupCategory(id=i, name=group_id, count=len(group_items), group_confidence=group_confidence)
+            db_category = GroupCategory(
+                id=i,
+                name=group_id,
+                count=len(group_items),
+                group_confidence=group_confidence,
+            )
             session.add(db_category)
             for group_item in group_items:
                 group_item.group_id = i
@@ -268,12 +275,10 @@ def consolidate_groups(db_path: Path) -> None:
 
 
 def categorize(db_path: Path):
-    
     # setup the database
     setup_folder_categories(db_path)
     setup_category_summarization(db_path)
     setup_group(db_path)
-
 
     heuristic_categorize(db_path)
     evaluate_categorization(db_path)

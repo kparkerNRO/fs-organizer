@@ -1,19 +1,41 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 from pathlib import Path
 from datetime import datetime
 import shutil
 from typing import Optional
-from organizer.data_models.database import setup_gather
+import json
+
+from sqlalchemy import Cast, String, text
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
 from grouping.group import categorize
+from data_models.database import get_session, GroupCategory, GroupCategoryEntry
+
+from data_models.api import Folder as FolderAPI, Category as CategoryAPI, CategoryResponse
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import func
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+db_path = "outputs/latest/latest.db"
+
+def get_db_session():
+    return get_session(Path(db_path))
 
 class GatherRequest(BaseModel):
     base_path: str
     output_dir: str
+
+
 
 @app.post("/gather")
 async def gather_endpoint(request: GatherRequest):
@@ -37,7 +59,7 @@ async def gather_endpoint(request: GatherRequest):
 
         # Set up and populate database
         db_path = run_dir / "run_data.db"
-        setup_gather(db_path)
+        # setup_gather(db_path)
         gather_folder_structure_and_store(base_path, db_path)
 
         # Handle latest symlink
@@ -58,9 +80,45 @@ async def gather_endpoint(request: GatherRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.get("groups")
-async def get_groups():
+@app.get("/groups")
+async def get_groups(db = Depends(get_db_session)) -> CategoryResponse:
     """
     Get the pre-calculated grouping
     """
+    CategoryEntry = aliased(GroupCategoryEntry)
+
+    query = (
+        db.query(
+            GroupCategory.id.label("id"),
+            GroupCategory.name.label("name"),
+            GroupCategory.name.label("original_name"),
+            GroupCategory.count.label("count"),
+            GroupCategory.group_confidence.label("confidence"),
+            func.json_group_array(
+                func.json_object(
+                    'id', CategoryEntry.id,
+                    'name', func.coalesce(CategoryEntry.new_name, '-'),
+                    'original_name', CategoryEntry.original_name,
+                    'original_path', CategoryEntry.path,
+                    'processed_names', func.json(Cast(func.coalesce(CategoryEntry.derived_names, '[]'), String)),
+                    'confidence', CategoryEntry.confidence
+                )
+            ).label("children")
+        )
+        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
+        .filter(GroupCategory.group_confidence < 1.0)
+        .filter(CategoryEntry.confidence > 0.0)
+        .group_by(GroupCategory.id)
+        .order_by(GroupCategory.id)
+    )
+    result = db.execute(query).mappings().fetchall()
+    results = [dict(row) for row in result]
+
+    categories = []
+    for row in results:
+        row['children'] = json.loads(row['children'])
+        categories.append(CategoryAPI(**row))
+
+    return CategoryResponse(categories=categories)
+    
     
