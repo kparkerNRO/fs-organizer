@@ -5,8 +5,8 @@ import { useMockMode } from "./mock_data/MockModeContext";
 import { Category } from "./types/types";
 
 export interface FetchCategoriesParams {
-  limit: number;
-  offset: number;
+  page_size: number;
+  page: number;
   sortField?: string;
   sortOrder?: string;
 }
@@ -26,12 +26,8 @@ export const fetchCategories = async (
   // return fetchMockCategoryData(params);
   // }
 
-  const response = await fetch(`http://0.0.0.0:8000/groups`); // ?page=${params.page}&pageSize=${params.pageSize}
+  const response = await fetch(`http://0.0.0.0:8000/groups?page=${params.page}&pageSize=${params.page_size}`); // 
   const data = await response.json();
-  return {
-    data: data['categories'],
-    totalItems: data.length,
-    totalPages: 1,
-    currentPage: 1
-  };
+  console.log(data)
+  return data
 };

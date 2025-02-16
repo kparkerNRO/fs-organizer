@@ -153,7 +153,7 @@ def evaluate_categorization(db_path: Path) -> None:
 
     try:
         """
-        Populate the WorkingCategory table from the Folder table
+        Populate the WorkingCategory table from the PartialNameCategory table
             category_name: the unique name of the category
             classification_counts: a map of classification types to counts
         """
@@ -275,13 +275,31 @@ def consolidate_groups(db_path: Path) -> None:
 
 
 def categorize(db_path: Path):
+    """
+    Grouping steps:
+        1. Clean up folder names, and make a best guess at classification
+            * This breaks out known variants (from KNOWN_VARIANT_TOKENS), and auto-categorizes them
+            * This populates the  PartialNameCategory with a record for known variants, and a record for "the rest"
+        2. (disabled) Populates the Category table, by counting how many of each classification there are for
+            every record in PartialNameCategory
+        3. Cluster the records in PartialNameCategory to find category names which should be grouped together
+            * This populates the GroupCategoryEntry table with the name (matching to PartialNameCategory)
+                and the id of the group it has been clustered into
+        4. Evaluate the NLP clusters to determine which ones represent a genuine match
+            * this creates sub-clusters where all entries in the cluster start with the same string
+            * Calculated groups are stored in GroupCategory, and the confidence is set to the
+                lowest confidence score of the grouped entries
+        
+    
+    """
+
     # setup the database
     setup_folder_categories(db_path)
-    setup_category_summarization(db_path)
+    # setup_category_summarization(db_path)
     setup_group(db_path)
 
     heuristic_categorize(db_path)
-    evaluate_categorization(db_path)
+    # evaluate_categorization(db_path)
 
     cluster_with_custom_metric(db_path)
     consolidate_groups(db_path)

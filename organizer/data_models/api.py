@@ -24,4 +24,7 @@ class Category(BaseModel):
 
 
 class CategoryResponse(BaseModel):
-    categories: List[Category] = []
+    data: List[Category] = []
+    totalItems: int = 0
+    totalPages: int = 1
+    currentPage: int = 1

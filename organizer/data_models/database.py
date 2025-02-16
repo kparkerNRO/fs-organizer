@@ -69,6 +69,7 @@ class Folder(Base):
     file_source = Column(String)
     num_folder_children = Column(Integer, default=0)
     num_file_children = Column(Integer, default=0)
+    cleaned_path = Column(String)
 
     def __init__(self, **kwargs):
         # Convert lists to default empty lists if not provided
