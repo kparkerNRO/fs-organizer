@@ -26,7 +26,7 @@ def split_category(target_name, category, clean_result: bool = True):
     overlap_tokens_lower = [token.lower() for token in overlap_tokens]
 
     if clean_result:
-        category = new_name = clean_filename(category)
+        category = clean_filename(category)
 
     if target_lower_tokens[: len(overlap_tokens)] == overlap_tokens_lower:
         if target_lower_tokens == overlap_tokens_lower:

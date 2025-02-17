@@ -20,6 +20,7 @@ FILE_NAME_EXCEPTIONS = {"The Clean": "Clean", "The": ""}
 REPLACE_EXCEPTIONS = {
     "ItW": "",
 }
+CLEAN_EXCEPTIONS = {"5e"}
 
 GROUPING_EXCEPTIONS = (
     "City of",

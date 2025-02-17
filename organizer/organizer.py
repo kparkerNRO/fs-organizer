@@ -1,4 +1,3 @@
-
 import typer
 from datetime import datetime
 from pathlib import Path
@@ -6,10 +5,9 @@ import shutil
 from data_models.database import setup_gather
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
-from grouping.group import categorize
+from grouping.group import group_folders
 
 app = typer.Typer()
-
 
 
 @app.command()
@@ -91,7 +89,7 @@ def group(db_path: str = typer.Argument(...)):
     using known variant detection + structural heuristics.
     """
     typer.echo(f"Grouping folders in: {db_path}")
-    categorize(Path(db_path))
+    group_folders(Path(db_path))
     # calculate_and_process_groups(Path(db_path), threshold=90)
     # process_pre_calculated_groups(Path(db_path))
     typer.echo("Grouping complete.")

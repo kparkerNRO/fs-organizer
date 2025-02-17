@@ -3,7 +3,7 @@ import logging
 
 from utils.common import VIEW_TYPES
 from pathlib import Path
-from utils.config import REPLACE_EXCEPTIONS, CREATOR_REMOVES, FILE_NAME_EXCEPTIONS
+from utils.config import CLEAN_EXCEPTIONS, REPLACE_EXCEPTIONS, CREATOR_REMOVES, FILE_NAME_EXCEPTIONS
 
 PATH_EXTRAS = " -,()/"
 
@@ -96,10 +96,14 @@ def clean_filename(
     creator_removes=CREATOR_REMOVES,
     file_name_exceptions=FILE_NAME_EXCEPTIONS,
     replace_exceptions=REPLACE_EXCEPTIONS,
+    clean_exceptions=CLEAN_EXCEPTIONS,
 ):
     """
     Handles a bunch of standardized cleanup for junk that ends up in folder names
     """
+    if base_name in clean_exceptions:
+        return base_name
+
     out_dir_name = base_name
     # remove myairbridge tags
     if "myairbridge" in base_name:

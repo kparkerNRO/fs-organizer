@@ -61,8 +61,8 @@ from grouping.group_cleanup import GroupEntry, Grouper
                 "A wild test three",
             ],
             {
-                "A wild test one": ["A wild test", "one"],
-                "A wild test three": ["A wild test", "three"],
+                "A wild test one": ["A wild", "test one"],
+                "A wild test three": ["A wild", "test three"],
                 "A wild two": ["A wild", "two"],
                 "A wild four": ["A wild", "four"],
             },
@@ -78,10 +78,18 @@ from grouping.group_cleanup import GroupEntry, Grouper
                 "A wild four",
             ],
             {
-                "A wild test one": ["A wild test", "one"],
-                "A wild test three": ["A wild test", "three"],
+                "A wild test one": ["A wild", "test one"],
+                "A wild test three": ["A wild", "test three"],
                 "A wild two": ["A wild", "two"],
                 "A wild four": ["A wild", "four"],
+            },
+        ),
+        (
+            "5e no match",
+            ["Dagons Deliverance 5e", "Dagons Deliverance"],
+            {
+                "Dagons Deliverance 5e": ["Dagons Deliverance", "5e"],
+                "Dagons Deliverance": ["Dagons Deliverance"],
             },
         ),
     ],
@@ -89,9 +97,6 @@ from grouping.group_cleanup import GroupEntry, Grouper
 def test_common_token_grouping(name, input_list, expected):
     result = common_token_grouping(input_list)
     assert result == expected
-
-
-
 
 
 @pytest.mark.parametrize(
@@ -138,7 +143,11 @@ def test_common_token_grouping(name, input_list, expected):
         (
             "partial_overlap",
             ["apple pie", "apple tart", "banana pie"],
-            {"apple pie": ["apple", "pie"], "apple tart": ["apple", "tart"],  "banana pie":[ "banana pie"]},
+            {
+                "apple pie": ["apple", "pie"],
+                "apple tart": ["apple", "tart"],
+                "banana pie": ["banana pie"],
+            },
         ),
         (
             "overlapping_groups",
@@ -180,8 +189,7 @@ def test_grouper_grouping(name, input_list, expected):
     name_to_processed_entry: dict[str, str] = {}
 
     for record in group_items.values():
-        if record.categories:   
-         name_to_processed_entry[record.original_name] =record.categories 
-
+        if record.categories:
+            name_to_processed_entry[record.original_name] = record.categories
 
     assert name_to_processed_entry == expected

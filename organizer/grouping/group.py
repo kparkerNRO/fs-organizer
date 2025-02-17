@@ -11,7 +11,7 @@ from data_models.database import (
     GroupCategoryEntry,
     Category,
 )
-from grouping.group_cleanup import refine_groups
+from grouping.group_cleanup import refine_group
 
 from pipeline.nlp_grouping import cluster_with_custom_metric
 from utils.config import KNOWN_VARIANT_TOKENS
@@ -53,7 +53,7 @@ def parse_name(name: str) -> tuple[list[str], list[str]]:
     return categories, variants
 
 
-def heuristic_categorize(db_path: Path, update_table: bool = False) -> None:
+def heuristic_categorize(db_path: Path) -> None:
     """
     Break the filenames into tokens, and identify known variants and suspected categories.
     Clean up the tokens, and assign the folder name to the first category or variant
@@ -227,9 +227,11 @@ def consolidate_groups(db_path: Path) -> None:
             # evaluate the group - this does a few things
             # 1. try to normalize the names to a common prefix correcting for spelling
             # 2. determine sub-categories when the group name is a common prefix
-            refined_groups = refine_groups(record_names)
+            refined_groups = refine_group(record_names)
 
-            name_to_processed_entry: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
+            name_to_processed_entry: dict[str, list[GroupCategoryEntry]] = defaultdict(
+                list
+            )
             for record in group_items:
                 record.processed = True
                 name_to_processed_entry[record.original_name].append(record)
@@ -270,7 +272,7 @@ def consolidate_groups(db_path: Path) -> None:
         session.close()
 
 
-def categorize(db_path: Path):
+def group_folders(db_path: Path):
     """
     Grouping steps:
         1. Clean up folder names, and make a best guess at classification
@@ -299,3 +301,9 @@ def categorize(db_path: Path):
 
     cluster_with_custom_metric(db_path)
     consolidate_groups(db_path)
+
+    """
+    Possible next steps:
+        * Re-group the categories to find overlaps that can be collapsed further
+        * Within categories, find sub-categories that can be collapsed
+    """
