@@ -176,16 +176,11 @@ def common_token_grouping(
                     names_to_replacement[base_name] = grouping
 
     # at the end of the set, see if we accidentally grabbed two overlapping sets
-    # tokens_to_revisit = {}
     for file, replace in names_to_replacement.items():
         for token in token_to_filenames.keys():
-            if (token in file
-                and replace[0] != token
-                and  token in replace[0]):
-                names_to_replacement[file] = split_category(
-                            file, token
-                        )
-                
+            if token in file and replace[0] != token and token in replace[0]:
+                names_to_replacement[file] = split_category(file, token)
+
     # remove any empty entries
     names = list(names_to_replacement.keys())
     for name in names:
@@ -197,4 +192,3 @@ def common_token_grouping(
         return None
 
     return names_to_replacement
-

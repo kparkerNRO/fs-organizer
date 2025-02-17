@@ -1,7 +1,7 @@
 // CategoriesPage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { Category, Folder } from "../types/types";
+import { Category, Folder, SortConfig } from "../types/types";
 import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
@@ -69,11 +69,21 @@ export const CategoriesPage: React.FC = () => {
     await fetchCategoryData(1, size);
   };
 
-  const fetchCategoryData = async ( page: number, page_size: number,) => {
+  const handleSortChange = async (sort_config: SortConfig) => {
+    await fetchCategoryData(pagination.currentPage, pagination.pageSize, sort_config);
+  };
+
+  const fetchCategoryData = async ( 
+    page: number, 
+    page_size: number,
+    sort_config?: SortConfig
+  ) => {
     try {
       const response = await fetchCategories({
         page_size: page_size,
         page: page,
+        sortField: sort_config?.field,
+        sortOrder: sort_config?.direction,
       });
       setCategories(response.data);
       setPagination((prev) => ({
@@ -104,6 +114,7 @@ export const CategoriesPage: React.FC = () => {
           totalItems={pagination.totalItems}
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
+          onSortChange={handleSortChange}
         />
         <CategoryDetails
           category={selectedItem?.category ?? undefined}

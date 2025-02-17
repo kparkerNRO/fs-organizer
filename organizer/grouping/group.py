@@ -278,10 +278,10 @@ def categorize(db_path: Path):
             * This populates the  PartialNameCategory with a record for known variants, and a record for "the rest"
         2. (disabled) Populates the Category table, by counting how many of each classification there are for
             every record in PartialNameCategory
-        3. Cluster the records in PartialNameCategory to find category names which should be grouped together
+        3. Using NLP heuristics, cluster the records in PartialNameCategory to find category names which should be grouped together
             * This populates the GroupCategoryEntry table with the name (matching to PartialNameCategory)
                 and the id of the group it has been clustered into
-        4. Evaluate the NLP clusters to determine which ones represent a genuine match
+        4. Evaluate the clusters to determine which ones represent a genuine match
             * this creates sub-clusters where all entries in the cluster start with the same string
             * Calculated groups are stored in GroupCategory, and the confidence is set to the
                 lowest confidence score of the grouped entries

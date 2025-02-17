@@ -22,11 +22,14 @@ export const fetchCategories = async (
   params: FetchCategoriesParams
 ): Promise<FetchCategoriesResponse> => {
 
-  // if (useMockData) {
-  // return fetchMockCategoryData(params);
-  // }
 
-  const response = await fetch(`http://0.0.0.0:8000/groups?page=${params.page}&pageSize=${params.page_size}`); // 
+  const response = await fetch(
+    `http://0.0.0.0:8000/groups?` +
+    `page=${params.page}&` +
+    `pageSize=${params.page_size}` +
+    `${params.sortField ? `&sort_column=${params.sortField}` : ''}` +
+    `${params.sortOrder ? `&sort_order=${params.sortOrder}` : ''}`
+  );
   const data = await response.json();
   console.log(data)
   return data

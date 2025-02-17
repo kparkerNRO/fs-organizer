@@ -1,6 +1,5 @@
 // src/types.ts
 import { SORT_FIELD, SORT_ORDER } from "./enums";
-import { Category, Folder } from "./types";
 
 export interface SortConfig {
   field: SORT_FIELD;
@@ -35,7 +34,9 @@ export interface Folder {
   original_path: string;
   processed_names?: string[];
   isSelected?: boolean;
-}export interface CategoryDetailsProps {
+}
+
+export interface CategoryDetailsProps {
   category?: Category | null ;
   folder?: Folder| null ;
 }

@@ -17,7 +17,7 @@ interface CategoryTableProps {
   totalItems: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
-  // onSortChange: (sortConfig: SortConfig) => void;
+  onSortChange: (sortConfig: SortConfig) => void;
 }
 
 interface ContextMenuState {
@@ -36,7 +36,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   totalItems,
   onPageChange,
   onPageSizeChange,
-  // onSortChange,
+  onSortChange,
 }) => {
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
@@ -79,7 +79,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     }
 
     updateSortConfig(newSort);
-    // onSortChange(newSort);
+    onSortChange(newSort);
   };
 
   // Render sort icon based on current sort state
@@ -409,7 +409,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
         <RowCell>{category.classification}</RowCell>
         <RowCell>{category.count}</RowCell>
         <RowCell>{category.possibleClassifications?.join(", ") || "-"}</RowCell>
-        <RowCell>{category.confidence}%</RowCell>
+        <RowCell>{category.confidence * 100}%</RowCell>
       </TableRow>
       {expandedCategories.includes(category.id) &&
         category.children?.map((folder) => (

@@ -36,3 +36,7 @@ class SortColumn(str, Enum):
     count = "count"
     confidence = "confidence",
     id = "id"
+
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"

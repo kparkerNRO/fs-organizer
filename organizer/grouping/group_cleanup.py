@@ -33,7 +33,7 @@ def update_group_mapping(confidence_value, filename_to_group_map, mapping_functi
         return
 
     for name, new_names in group.items():
-        if name in filename_to_group_map and len(new_names) > 1:
+        # if name in filename_to_group_map and len(new_names) > 1:
             filename_to_group_map[name].dirty = True
             filename_to_group_map[name].grouped_name = new_names[0]
             filename_to_group_map[name].categories = new_names
@@ -181,18 +181,6 @@ def refine_groups(filenames: list[str]) -> dict[str, list[GroupEntry]]:
     unify_category_spelling(refined_groups)
     process_outliers(refined_groups)
     process_ungrouped(refined_groups, filenames)
-
-    # TODO - handle the "remainders" - names that don't fit into any group
-    """
-    probably this looks like:
-        checking if the grouping consists of one large group, and 1+ groups with only one member
-        store the single group memeber in the large group with a confidence equal 
-            to the inverse of the edit distance
-
-        after this processing, any remaining singleton lists should be flagged as low confidence
-            maybe regroup them into a single group with low confidence if they are all singles
-            (long term, this should handle suffix matching, but that's out of scope for)
-    """
 
     return refined_groups
 
