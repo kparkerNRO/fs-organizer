@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, List
 from pathlib import Path
 
-from organizer.data_models.database import Folder
+from data_models.database import Folder
 from grouping.helpers import common_token_grouping
 
 

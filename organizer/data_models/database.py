@@ -151,6 +151,7 @@ class GroupCategoryEntry(Base):
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False)
     category_id = Column(Integer, nullable=False)
     group_id = Column(Integer)
+    new_group_id = Column(Integer)
     original_name = Column(String)
     new_name = Column(String)
     path = Column(String, nullable=True)

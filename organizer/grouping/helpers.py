@@ -147,8 +147,6 @@ def common_token_grouping(
         working_token = None
 
         for next_name in names_to_process:
-            # if next_name in names_to_replacement:
-            #     continue
             next_name_lower = next_name.lower()
 
             if working_token and next_name_lower.startswith(working_token):
@@ -172,34 +170,22 @@ def common_token_grouping(
                 grouping = split_category(next_name, working_token)
                 if grouping and is_valid_category(grouping[-1]):
                     names_to_replacement[next_name] = grouping
-                    # names_to_process.remove(next_name)
 
                 grouping = split_category(base_name, working_token)
                 if grouping and is_valid_category(grouping[-1]):
                     names_to_replacement[base_name] = grouping
 
     # at the end of the set, see if we accidentally grabbed two overlapping sets
-    tokens_to_revisit = {}
-    for token1 in token_to_filenames.keys():
-        for token2 in token_to_filenames.keys():
-            # if this isn't itself, and the main token is a subset of the other token
-            if token1 in token2 and not token1 == token2:
-                # replace the longer token with the shorter one in the replacement array
-                delta = token2.replace(token1, "")
-                for filename in token_to_filenames[token2]:
-                    working_path = names_to_replacement[filename]
-                    if working_path[0] == token1:
-                        continue
-                    if len(working_path) == 1:
-                        continue
-                    working_path[-1] = (delta + " " + working_path[-1]).strip()
-                    working_path[-2] = token1
-
-                # empty the longer token and transfer it's contents to the shorter one
-                token_to_filenames[token1] |= token_to_filenames[token2]
-                token_to_filenames[token2] = set()
-                tokens_to_revisit[token1] = token_to_filenames[token1]
-
+    # tokens_to_revisit = {}
+    for file, replace in names_to_replacement.items():
+        for token in token_to_filenames.keys():
+            if (token in file
+                and replace[0] != token
+                and  token in replace[0]):
+                names_to_replacement[file] = split_category(
+                            file, token
+                        )
+                
     # remove any empty entries
     names = list(names_to_replacement.keys())
     for name in names:
@@ -211,10 +197,4 @@ def common_token_grouping(
         return None
 
     return names_to_replacement
-
-
-def calculate_similarity_difflib(a: str, b: str, threshold=80) -> bool:
-    """Calculate similarity using difflib."""
-    return (difflib.SequenceMatcher(None, a, b).ratio() * 100) >= threshold
-
 

@@ -6,13 +6,12 @@ from data_models.database import (
     setup_folder_categories,
     setup_group,
     get_session,
-    setup_category_summarization,
     Folder,
     PartialNameCategory,
     GroupCategoryEntry,
     Category,
 )
-from grouping.group_cleanup import GroupEntry, Grouper
+from grouping.group_cleanup import refine_groups
 
 from pipeline.nlp_grouping import cluster_with_custom_metric
 from utils.config import KNOWN_VARIANT_TOKENS
@@ -212,9 +211,7 @@ def consolidate_groups(db_path: Path) -> None:
         calculated_groups = defaultdict(list)
 
         for group in group_categories:
-            # group_unique_names[group.group_id].add(group.original_name)
             group_record_map[group.group_id].append(group)
-            # group_category_map[group.group_id].append(category)
 
         for group_id, group_items in group_record_map.items():
             # singletons - just store them and move on
@@ -222,6 +219,7 @@ def consolidate_groups(db_path: Path) -> None:
                 calculated_groups[group_items[0].original_name].append(group_items[0])
                 group_items[0].processed = True
                 group_items[0].confidence = 1.0
+                group_items[0].derived_names = [group_items[0].original_name]
                 continue
 
             record_names = [record.original_name for record in group_items]
@@ -229,30 +227,28 @@ def consolidate_groups(db_path: Path) -> None:
             # evaluate the group - this does a few things
             # 1. try to normalize the names to a common prefix correcting for spelling
             # 2. determine sub-categories when the group name is a common prefix
-            grouper = Grouper(record_names)
-            grouper.process_group()
+            refined_groups = refine_groups(record_names)
 
-            name_to_processed_entry: dict[str, list[GroupEntry]] = defaultdict(list)
+            name_to_processed_entry: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
             for record in group_items:
                 record.processed = True
                 name_to_processed_entry[record.original_name].append(record)
 
-            new_grouping = grouper.name_mapping
-            grouped_name = grouper.get_group_name()
-            if grouped_name is not None:
-                for name, group_entry in new_grouping.items():
+            for group_name, group_entry in refined_groups.items():
+                name_mapping = {entry.original_name: entry for entry in group_entry}
+                for name, group_entry in name_mapping.items():
                     if name in name_to_processed_entry:
                         for record in name_to_processed_entry[name]:
                             record.derived_names = group_entry.categories
                             record.new_name = (
                                 None
-                                if len(group_entry.categories) == 1
+                                if len(group_entry.categories) <= 1
                                 else group_entry.categories[-1]
                             )
                             record.processed = True
                             record.confidence = group_entry.confidence
 
-                            calculated_groups[grouped_name].append(record)
+                            calculated_groups[group_name].append(record)
 
         i = 0
         for group_id, group_items in calculated_groups.items():
@@ -265,7 +261,7 @@ def consolidate_groups(db_path: Path) -> None:
             )
             session.add(db_category)
             for group_item in group_items:
-                group_item.group_id = i
+                group_item.new_group_id = i
             i += 1
 
         session.commit()
@@ -289,8 +285,8 @@ def categorize(db_path: Path):
             * this creates sub-clusters where all entries in the cluster start with the same string
             * Calculated groups are stored in GroupCategory, and the confidence is set to the
                 lowest confidence score of the grouped entries
-        
-    
+
+
     """
 
     # setup the database

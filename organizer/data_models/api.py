@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -28,3 +29,10 @@ class CategoryResponse(BaseModel):
     totalItems: int = 0
     totalPages: int = 1
     currentPage: int = 1
+
+
+class SortColumn(str, Enum):
+    name = "name"
+    count = "count"
+    confidence = "confidence",
+    id = "id"
