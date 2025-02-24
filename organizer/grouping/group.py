@@ -3,9 +3,10 @@ from collections import defaultdict
 from data_models.classify import ClassificationType
 from data_models.database import (
     GroupCategory,
+    setup_category_summarization,
     setup_folder_categories,
     setup_group,
-    get_session,
+    get_session, get_sessionmaker,
     Folder,
     PartialNameCategory,
     GroupCategoryEntry,
@@ -53,7 +54,7 @@ def parse_name(name: str) -> tuple[list[str], list[str]]:
     return categories, variants
 
 
-def heuristic_categorize(db_path: Path) -> None:
+def heuristic_categorize(session) -> None:
     """
     Break the filenames into tokens, and identify known variants and suspected categories.
     Clean up the tokens, and assign the folder name to the first category or variant
@@ -61,87 +62,82 @@ def heuristic_categorize(db_path: Path) -> None:
     Fills out the "partial name category"
     """
 
-    session = get_session(db_path)
+    # Get all folders
+    folders = session.query(Folder).all()
 
-    try:
-        # Get all folders
-        folders = session.query(Folder).all()
+    for folder in folders:
+        name = folder.folder_name
 
-        for folder in folders:
-            name = folder.folder_name
+        if name.endswith(".zip"):
+            categories, variants = parse_name(name[:-4])
+        else:
+            categories, variants = parse_name(name)
 
-            if name.endswith(".zip"):
-                categories, variants = parse_name(name[:-4])
-            else:
-                categories, variants = parse_name(name)
-
-            variants = list(set(variants))
-            cleaned_name = (
-                categories[0] if categories else variants[0] if variants else ""
-            )
-
-            # Update the folder
-            folder.cleaned_name = cleaned_name
-            folder.variants = variants
-            folder.categories = categories
-
-            if len(categories) == 0 and len(variants) > 0:
-                folder.classification = ClassificationType.VARIANT
-            elif len(categories) == 1 and len(variants) == 0:
-                folder.classification = ClassificationType.CATEGORY
-            else:
-                folder.classification = ClassificationType.UNKNOWN
-
-            for category in categories:
-                category_lookup = PartialNameCategory(
-                    folder_id=folder.id,
-                    original_name=folder.folder_name,
-                    name=category,
-                    classification=folder.classification,
-                )
-                session.add(category_lookup)
-
-            for variant in variants:
-                category_lookup = PartialNameCategory(
-                    folder_id=folder.id,
-                    original_name=folder.folder_name,
-                    name=variant,
-                    classification=ClassificationType.VARIANT,
-                )
-                session.add(category_lookup)
-        session.commit()
-
-        non_variant_folders = (
-            session.query(Folder)
-            .filter(Folder.classification != ClassificationType.VARIANT)
-            .all()
+        variants = list(set(variants))
+        cleaned_name = (
+            categories[0] if categories else variants[0] if variants else ""
         )
-        # for each of these folders, check if
-        # (a) there is only one category and (b) that all sub-folders are classified as variant
-        for folder in non_variant_folders:
-            if len(folder.categories) == 1:
-                children = (
-                    session.query(Folder)
-                    .filter(Folder.parent_path.startswith(folder.folder_path))
-                    .all()
-                )
-                if len(children) == 0 or all(
-                    child.classification == ClassificationType.VARIANT
-                    for child in children
-                ):
-                    folder.classification = ClassificationType.SUBJECT
-                    folder.subject = folder.categories[0]
-                    # also update the FolderCategory reference for folder.categories[0]
-                    category_lookup = (
-                        session.query(PartialNameCategory)
-                        .filter_by(folder_id=folder.id, name=folder.categories[0])
-                        .one()
-                    )
-                    category_lookup.classification = ClassificationType.SUBJECT
-        session.commit()
 
-    finally:
-        session.close()
+        # Update the folder
+        folder.cleaned_name = cleaned_name
+        folder.variants = variants
+        folder.categories = categories
+
+        if len(categories) == 0 and len(variants) > 0:
+            folder.classification = ClassificationType.VARIANT
+        elif len(categories) == 1 and len(variants) == 0:
+            folder.classification = ClassificationType.CATEGORY
+        else:
+            folder.classification = ClassificationType.UNKNOWN
+
+        for category in categories:
+            category_lookup = PartialNameCategory(
+                folder_id=folder.id,
+                original_name=folder.folder_name,
+                name=category,
+                classification=folder.classification,
+            )
+            session.add(category_lookup)
+
+        for variant in variants:
+            category_lookup = PartialNameCategory(
+                folder_id=folder.id,
+                original_name=folder.folder_name,
+                name=variant,
+                classification=ClassificationType.VARIANT,
+            )
+            session.add(category_lookup)
+    session.commit()
+
+    non_variant_folders = (
+        session.query(Folder)
+        .filter(Folder.classification != ClassificationType.VARIANT)
+        .all()
+    )
+    # for each of these folders, check if
+    # (a) there is only one category and (b) that all sub-folders are classified as variant
+    for folder in non_variant_folders:
+        if len(folder.categories) == 1:
+            children = (
+                session.query(Folder)
+                .filter(Folder.parent_path.startswith(folder.folder_path))
+                .all()
+            )
+            if len(children) == 0 or all(
+                child.classification == ClassificationType.VARIANT
+                for child in children
+            ):
+                folder.classification = ClassificationType.SUBJECT
+                folder.subject = folder.categories[0]
+                # also update the FolderCategory reference for folder.categories[0]
+                category_lookup = (
+                    session.query(PartialNameCategory)
+                    .filter_by(folder_id=folder.id, name=folder.categories[0])
+                    .one()
+                )
+                category_lookup.classification = ClassificationType.SUBJECT
+    session.commit()
+
 
 
 def evaluate_categorization(db_path: Path) -> None:
@@ -191,85 +187,75 @@ def evaluate_categorization(db_path: Path) -> None:
         session.close()
 
 
-def consolidate_groups(db_path: Path) -> None:
+def consolidate_groups(group_categories: list[GroupCategoryEntry] ) -> None:
     """
     After groupings have been calculated, evalute the groups to determine which represent
     "real" groupings (i.e. single unique name, or multiple names with a common prefix), and
     which are unable to be grouped.
 
     """
-    session = get_session(db_path)
+    consolidated_groups = []
+    group_record_map = defaultdict(list)
 
-    try:
-        # Get all processed categories
-        group_categories: list[GroupCategoryEntry] = session.query(
-            GroupCategoryEntry
-        ).all()
+    calculated_groups = defaultdict(list)
 
-        group_record_map = defaultdict(list)
+    for group in group_categories:
+        group_record_map[group.group_id].append(group)
 
-        calculated_groups = defaultdict(list)
+    for group_id, group_items in group_record_map.items():
+        # singletons - just store them and move on
+        if len(group_items) == 1:
+            calculated_groups[group_items[0].original_name].append(group_items[0])
+            group_items[0].processed = True
+            group_items[0].confidence = 1.0
+            group_items[0].derived_names = [group_items[0].original_name]
+            continue
 
-        for group in group_categories:
-            group_record_map[group.group_id].append(group)
+        record_names = [record.original_name for record in group_items]
 
-        for group_id, group_items in group_record_map.items():
-            # singletons - just store them and move on
-            if len(group_items) == 1:
-                calculated_groups[group_items[0].original_name].append(group_items[0])
-                group_items[0].processed = True
-                group_items[0].confidence = 1.0
-                group_items[0].derived_names = [group_items[0].original_name]
-                continue
+        # evaluate the group - this does a few things
+        # 1. try to normalize the names to a common prefix correcting for spelling
+        # 2. determine sub-categories when the group name is a common prefix
+        refined_groups = refine_group(record_names)
 
-            record_names = [record.original_name for record in group_items]
+        name_to_processed_entry: dict[str, list[GroupCategoryEntry]] = defaultdict(
+            list
+        )
+        for record in group_items:
+            record.processed = True
+            name_to_processed_entry[record.original_name].append(record)
 
-            # evaluate the group - this does a few things
-            # 1. try to normalize the names to a common prefix correcting for spelling
-            # 2. determine sub-categories when the group name is a common prefix
-            refined_groups = refine_group(record_names)
+        for group_name, group_entry in refined_groups.items():
+            name_mapping = {entry.original_name: entry for entry in group_entry}
+            for name, group_entry in name_mapping.items():
+                if name in name_to_processed_entry:
+                    for record in name_to_processed_entry[name]:
+                        record.derived_names = group_entry.categories
+                        record.new_name = (
+                            None
+                            if len(group_entry.categories) <= 1
+                            else group_entry.categories[-1]
+                        )
+                        record.processed = True
+                        record.confidence = group_entry.confidence
 
-            name_to_processed_entry: dict[str, list[GroupCategoryEntry]] = defaultdict(
-                list
-            )
-            for record in group_items:
-                record.processed = True
-                name_to_processed_entry[record.original_name].append(record)
+                        calculated_groups[group_name].append(record)
 
-            for group_name, group_entry in refined_groups.items():
-                name_mapping = {entry.original_name: entry for entry in group_entry}
-                for name, group_entry in name_mapping.items():
-                    if name in name_to_processed_entry:
-                        for record in name_to_processed_entry[name]:
-                            record.derived_names = group_entry.categories
-                            record.new_name = (
-                                None
-                                if len(group_entry.categories) <= 1
-                                else group_entry.categories[-1]
-                            )
-                            record.processed = True
-                            record.confidence = group_entry.confidence
+    i = 0
+    for group_id, group_items in calculated_groups.items():
+        group_confidence = min([record.confidence for record in group_items])
+        db_category = GroupCategory(
+            id=i,
+            name=group_id,
+            count=len(group_items),
+            group_confidence=group_confidence,
+        )
+        consolidated_groups.append(db_category)
+        for group_item in group_items:
+            group_item.new_group_id = i
+        i += 1
 
-                            calculated_groups[group_name].append(record)
-
-        i = 0
-        for group_id, group_items in calculated_groups.items():
-            group_confidence = min([record.confidence for record in group_items])
-            db_category = GroupCategory(
-                id=i,
-                name=group_id,
-                count=len(group_items),
-                group_confidence=group_confidence,
-            )
-            session.add(db_category)
-            for group_item in group_items:
-                group_item.new_group_id = i
-            i += 1
-
-        session.commit()
-
-    finally:
-        session.close()
+    return consolidated_groups
 
 
 def group_folders(db_path: Path):
@@ -293,14 +279,32 @@ def group_folders(db_path: Path):
 
     # setup the database
     setup_folder_categories(db_path)
-    # setup_category_summarization(db_path)
+    setup_category_summarization(db_path)
     setup_group(db_path)
 
-    heuristic_categorize(db_path)
-    # evaluate_categorization(db_path)
+    sessionmaker = get_sessionmaker(db_path)
+    with sessionmaker() as session:
+        heuristic_categorize(session)
+        # evaluate_categorization(db_path)
 
-    cluster_with_custom_metric(db_path)
-    consolidate_groups(db_path)
+        uncertain_categories = (
+            session.query(PartialNameCategory, Folder)
+            .join(Folder, PartialNameCategory.folder_id == Folder.id)
+            .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
+            .all()
+        )
+
+        clusters = cluster_with_custom_metric( uncertain_categories)
+        session.add_all(clusters)
+        session.commit()
+        
+
+        group_categories: list[GroupCategoryEntry] = session.query(
+            GroupCategoryEntry
+        ).all()
+        groups = consolidate_groups(session, group_categories)
+        session.add_all(groups)
+        session.commit()
 
     """
     Possible next steps:

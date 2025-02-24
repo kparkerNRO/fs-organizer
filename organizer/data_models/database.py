@@ -216,6 +216,11 @@ def get_session(db_path: Path):
     return Session()
 
 
+def get_sessionmaker(db_path: Path):
+    """Create and return a new database session."""
+    engine = get_engine(db_path)
+    return sessionmaker(bind=engine)
+
 # Example usage:
 if __name__ == "__main__":
     db_path = Path("example.db")
@@ -236,3 +241,24 @@ if __name__ == "__main__":
         session.commit()
     finally:
         session.close()
+
+
+
+"""
+Have a categories table (no mapping)
+    similar to GroupCategory, but count and confidence are optional
+        maybe also track renames or related here?
+        could have classification, which is optional
+
+Have a Category Entry table (maps category id to folder id)
+    iteration number (can always just be the max + 1)
+    id
+    folder_id
+    category_id - could have multiple entries for a given pass        
+    confidence
+    <for tracking purposes>
+    original_name
+    source_folder_path
+    derived_names (related categories)
+
+"""

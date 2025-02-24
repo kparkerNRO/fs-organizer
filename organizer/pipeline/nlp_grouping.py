@@ -80,17 +80,10 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
     return D
 
 
-def cluster_with_custom_metric(db_path):
+def cluster_with_custom_metric( uncertain_categories):
     """
     Cluster the calculated categories into groups using a custom distance metric.
     """
-    session = get_session(db_path)
-    uncertain_categories = (
-        session.query(PartialNameCategory, Folder)
-        .join(Folder, PartialNameCategory.folder_id == Folder.id)
-        .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
-        .all()
-    )
 
     corpus = [category[0].name for category in uncertain_categories]
     vectorizer = TfidfVectorizer(stop_words="english")
@@ -119,6 +112,8 @@ def cluster_with_custom_metric(db_path):
     )
     labels = clusterer.fit_predict(dist_matrix)
 
+    clusters = []
+
     # Step 3: assign cluster labels
     for i, f in enumerate(folders):
         group_record = GroupCategoryEntry(
@@ -128,9 +123,8 @@ def cluster_with_custom_metric(db_path):
             original_name=f.name,
             path=str(f.path),
         )
-        session.add(group_record)
-    session.commit()
-    session.close()
+        clusters.append(group_record)
+    return clusters
 
 
 def group_uncertain(db_path: Path):
