@@ -14,7 +14,7 @@ from data_models.database import (
 )
 from grouping.group_cleanup import refine_group
 
-from pipeline.nlp_grouping import cluster_with_custom_metric
+from grouping.nlp_grouping import cluster_with_custom_metric
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
     clean_filename,

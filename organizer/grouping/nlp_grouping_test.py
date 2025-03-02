@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from pipeline.nlp_grouping import compute_distance_to_shared_parent
+from grouping.nlp_grouping import compute_distance_to_shared_parent
 
 
 @pytest.mark.parametrize(
