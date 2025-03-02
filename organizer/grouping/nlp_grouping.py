@@ -1,28 +1,26 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from data_models.database import (
-    get_session,
     Folder,
-    PartialNameCategory,
     GroupCategoryEntry,
-    setup_group,
 )
-from data_models.classify import ClassificationType
 
 import numpy as np
-from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 TEXT_DISTANCE_RATIO = 0.7
-DISTANCE_THRESHOLD = 0.5
+DISTANCE_THRESHOLD = 0.6
 
 
 @dataclass
-class CustomDistanceFolder:
+class ClusterItem:
     folder_id: int
-    category_id: int
+    partial_category_id: int
     name: str
+    original_name: str
     text_vec: np.ndarray
     depth: int
     path: Path
@@ -45,7 +43,7 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     return (len(A_path.parts) - i) + (len(B_path.parts) - i)
 
 
-def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.ndarray:
+def compute_custom_distance_matrix(folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO) -> np.ndarray:
     """
     folders: list of dicts with keys:
       - 'id'
@@ -56,7 +54,7 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
     n = len(folders)
     D = np.zeros((n, n), dtype=float)
 
-    alpha = TEXT_DISTANCE_RATIO
+    alpha = text_distance_ratio
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -80,85 +78,120 @@ def compute_custom_distance_matrix(folders: list[CustomDistanceFolder]) -> np.nd
     return D
 
 
-def cluster_with_custom_metric( uncertain_categories):
+def prepare_records(
+    previous_round_groups: list[tuple[GroupCategoryEntry, Folder]],
+):
+    corpus = [category[0].processed_name for category in previous_round_groups]
+
+    vectorizer = TfidfVectorizer(stop_words="english")
+    vectorizer.fit_transform(corpus)
+
+    items = [
+        ClusterItem(
+            folder_id=pair[1].id,
+            partial_category_id=pair[0].id,
+            name=pair[0].processed_name,
+            original_name=pair[0].pre_processed_name,
+            text_vec=vectorizer.transform([pair[0].processed_name]).toarray()[0],
+            depth=pair[1].depth or 1,
+            path=Path(pair[1].folder_path) if pair[1] else Path(),
+        )
+        for pair in previous_round_groups
+    ]
+
+    return items
+
+
+def cluster_with_custom_metric(cluster_items, iteration_id, text_distance_ratio=0) -> list[GroupCategoryEntry]:
     """
     Cluster the calculated categories into groups using a custom distance metric.
     """
 
-    corpus = [category[0].name for category in uncertain_categories]
-    vectorizer = TfidfVectorizer(stop_words="english")
-    vectorizer.fit_transform(corpus)
-
-    folders = [
-        CustomDistanceFolder(
-            folder_id=uc[1].id,
-            category_id=uc[0].id,
-            name=uc[0].name,
-            text_vec=vectorizer.transform([uc[0].name]).toarray()[0],
-            depth=uc[1].depth,
-            path=Path(uc[1].folder_path),
-        )
-        for uc in uncertain_categories
-    ]
     # Step 1: build distance matrix
-    dist_matrix = compute_custom_distance_matrix(folders)
+    dist_matrix = compute_custom_distance_matrix(cluster_items, text_distance_ratio)
 
     # Step 2: run Agglomerative (or DBSCAN) with precomputed distance
     clusterer = AgglomerativeClustering(
-        n_clusters=None,  # or some fixed number
+        n_clusters=None,
         distance_threshold=DISTANCE_THRESHOLD,
         metric="precomputed",
         linkage="average",
     )
     labels = clusterer.fit_predict(dist_matrix)
 
-    clusters = []
+    # Calculate confidence scores
+    cluster_confidence = defaultdict(list)
+    for i, label in enumerate(labels):
+        cluster_indices = [id for id, label in enumerate(labels) if label == label]
 
-    # Step 3: assign cluster labels
-    for i, f in enumerate(folders):
-        group_record = GroupCategoryEntry(
-            folder_id=f.folder_id,
-            category_id=f.category_id,
-            group_id=int(labels[i]),
-            original_name=f.name,
-            path=str(f.path),
+        if len(cluster_indices) > 1:
+            # Calculate average distance to other items in cluster
+            distances = [dist_matrix[i, j] for j in cluster_indices if j != i]
+            avg_distance = sum(distances) / len(distances)
+            confidence = max(0.0, 1.0 - avg_distance)
+        else:
+            # Single item clusters get lower confidence
+            confidence = 0.5
+
+        cluster_confidence[label].append((i, confidence))
+
+    # Create GroupCategoryEntry objects
+    entries = []
+    for i, item in enumerate(cluster_items):
+        label = int(labels[i])
+        confidence = next(conf for idx, conf in cluster_confidence[label] if idx == i)
+
+        entry = GroupCategoryEntry(
+            folder_id=item.folder_id,
+            partial_category_id=item.partial_category_id,
+            group_id=None,  # Will be set during refinement
+            pre_processed_name=item.name,
+            # name=item.name,
+            path=str(item.path),
+            confidence=0.8,
+            # confidence=confidence,
+            processed=False,
+            derived_names=[item.name],
+            iteration_id=iteration_id,
         )
-        clusters.append(group_record)
-    return clusters
+        entry.cluster_id = label  # Temporary attribute for refinement
+        entries.append(entry)
+
+    return entries
 
 
-def group_uncertain(db_path: Path):
-    """Group uncertain categories using KMeans clustering."""
-    session = get_session(db_path)
-    uncertain_categories = (
-        session.query(PartialNameCategory, Folder)
-        .join(Folder, PartialNameCategory.folder_id == Folder.id)
-        .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
-        .all()
-    )
-    n_clusters = 20
+# def group_uncertain(db_path: Path):
+#     """Group uncertain categories using KMeans clustering."""
+#     session = get_session(db_path)
+#     uncertain_categories = (
+#         session.query(PartialNameCategory, Folder)
+#         .join(Folder, PartialNameCategory.folder_id == Folder.id)
+#         .filter(PartialNameCategory.classification != ClassificationType.VARIANT)
+#         .all()
+#     )
+#     n_clusters = 20
 
-    corpus = [category[0].name for category in uncertain_categories]
+#     corpus = [category[0].name for category in uncertain_categories]
 
-    # Vectorize the category names
-    vectorizer = TfidfVectorizer(stop_words="english")
-    X = vectorizer.fit_transform(corpus)
-    # vectorizer.transform([folder_name]).toarray()[0]
+#     # Vectorize the category names
+#     vectorizer = TfidfVectorizer(stop_words="english")
+#     X = vectorizer.fit_transform(corpus)
+#     # vectorizer.transform([folder_name]).toarray()[0]
 
-    # Cluster the categories
-    km = KMeans(n_clusters=n_clusters, random_state=42)
-    clusters = km.fit_predict(X)
+#     # Cluster the categories
+#     km = KMeans(n_clusters=n_clusters, random_state=42)
+#     clusters = km.fit_predict(X)
 
-    for i, uf in enumerate(uncertain_categories):
-        cluster_id = clusters[i]
-        group_record = GroupCategoryEntry(
-            folder_id=uf[1].id,
-            category_id=uf[0].id,
-            group_name=f"cluster_{cluster_id}",
-            original_name=uf[0].name,
-        )
-        session.add(group_record)
-        # uf.classification = f"cluster_{cluster_id}"
+#     for i, uf in enumerate(uncertain_categories):
+#         cluster_id = clusters[i]
+#         group_record = GroupCategoryEntry(
+#             folder_id=uf[1].id,
+#             category_id=uf[0].id,
+#             group_name=f"cluster_{cluster_id}",
+#             original_name=uf[0].name,
+#         )
+#         session.add(group_record)
+#         # uf.classification = f"cluster_{cluster_id}"
 
-    session.commit()
-    session.close()
+#     session.commit()
+#     session.close()

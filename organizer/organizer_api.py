@@ -66,14 +66,20 @@ async def get_groups(
             GroupCategory.group_confidence.label("confidence"),
             func.json_group_array(
                 func.json_object(
-                    "id",CategoryEntry.id,
-                    "name",func.coalesce(CategoryEntry.new_name, "-"),
-                    "original_filename",CategoryEntry.original_name,
-                    "original_path",CategoryEntry.path,
-                    "processed_names",func.json(
+                    "id",
+                    CategoryEntry.id,
+                    "name",
+                    func.coalesce(CategoryEntry.processed_name, "-"),
+                    "original_filename",
+                    CategoryEntry.pre_processed_name,
+                    "original_path",
+                    CategoryEntry.path,
+                    "processed_names",
+                    func.json(
                         Cast(func.coalesce(CategoryEntry.derived_names, "[]"), String)
                     ),
-                    "confidence",CategoryEntry.confidence,
+                    "confidence",
+                    CategoryEntry.confidence,
                 )
             ).label("children"),
         )

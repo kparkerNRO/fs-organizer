@@ -1,10 +1,7 @@
-import difflib
-import os
-import json
+
 import re
 import sqlite3
 from pathlib import Path
-from rapidfuzz import fuzz as rapidfuzz_fuzz
 from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
 import nltk
@@ -21,7 +18,6 @@ nltk.download("stopwords")
 STOPWORDS = set(stopwords.words("english"))
 
 
-########### Initial pass ############
 def classify_folders(db_path: Path):
     """
     Classify each folder in the 'folders' table using:
@@ -33,22 +29,16 @@ def classify_folders(db_path: Path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
-    # We might want to do a multi-pass approach, or we can sort folders by descending depth
-    # if we want "lowest-level first".
-    # For example:
     rows = cur.execute(
         "SELECT id, folder_name, folder_path, parent_path, depth FROM folders ORDER BY depth DESC"
     ).fetchall()
 
     # Precompute the global frequency of each folder_name at or above the same depth.
-    # But we can also rely on the 'counts' table if that suits your logic. We'll keep it simple here:
-    # We'll store them in a dictionary: {folder_name: freq_count}
     freq_map = {}
     freq_rows = cur.execute("SELECT folder_name, count FROM counts").fetchall()
     for fname, cval in freq_rows:
         freq_map[fname] = cval
 
-    # We'll define a helper to see if children are variant:
     def children_are_all_variant(folder_path: str) -> bool:
         """
         Return True if all direct children of folder_path are classified as variant
@@ -77,9 +67,7 @@ def classify_folders(db_path: Path):
 
         # 1) Known Variant Detection
         folder_name_stripped = re.sub(r"[^\w\s]", "", folder_name)
-        tokens = (
-            folder_name_stripped.lower().split()
-        )  # simplistic tokenizing on whitespace
+        tokens = folder_name_stripped.lower().split()
         # If *all* tokens are in known_variant_tokens => classify as variant
         if all(t in KNOWN_VARIANT_TOKENS for t in tokens):
             classification = "variant"
@@ -111,5 +99,3 @@ def classify_folders(db_path: Path):
 
     conn.commit()
     conn.close()
-
-
