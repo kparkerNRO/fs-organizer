@@ -260,5 +260,6 @@ Have a Category Entry table (maps category id to folder id)
     original_name
     source_folder_path
     derived_names (related categories)
+    category name
 
 """

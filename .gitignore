@@ -170,3 +170,4 @@ outputs/
 # javascript development
 node_modules/
 dist/
+.aider*
