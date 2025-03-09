@@ -119,7 +119,7 @@ def spelling_grouping(group: list) -> Optional[dict[str, list[str]]]:
 
 
 def common_token_grouping(
-    names_to_group: list, overlap_func=get_max_common_words
+    names_to_group: list, overlap_func=get_max_common_words, prefer_longer_names=False
 ) -> Optional[dict[str, list[str]]]:
     if len(names_to_group) == 0:
         return None
@@ -178,8 +178,11 @@ def common_token_grouping(
     # at the end of the set, see if we accidentally grabbed two overlapping sets
     for file, replace in names_to_replacement.items():
         for token in token_to_filenames.keys():
-            if token in file and replace[0] != token and token in replace[0]:
-                names_to_replacement[file] = split_category(file, token)
+            if token in file and replace[0] != token:
+                if prefer_longer_names and replace[0] in token:
+                    names_to_replacement[file] = split_category(file, token)
+                elif (not prefer_longer_names) and token in replace[0]:
+                    names_to_replacement[file] = split_category(file, token)
 
     # remove any empty entries
     names = list(names_to_replacement.keys())

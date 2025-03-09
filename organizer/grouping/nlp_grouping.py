@@ -12,7 +12,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 TEXT_DISTANCE_RATIO = 0.7
-DISTANCE_THRESHOLD = 0.6
+DISTANCE_THRESHOLD = 0.55
 
 
 @dataclass

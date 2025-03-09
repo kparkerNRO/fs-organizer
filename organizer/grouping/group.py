@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
@@ -15,11 +16,12 @@ from data_models.database import (
     GroupCategoryEntry,
 )
 from grouping.group_cleanup import refine_group
-
+from logging import getLogger
 from grouping.nlp_grouping import (
     ClusterItem,
     cluster_with_custom_metric,
-    prepare_records,TEXT_DISTANCE_RATIO
+    prepare_records,
+    TEXT_DISTANCE_RATIO,
 )
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import (
@@ -29,7 +31,7 @@ from utils.filename_utils import (
 from pathlib import Path
 
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
-
+log = getLogger(__name__)
 
 def parse_name(name: str) -> tuple[list[str], list[str]]:
     """
@@ -191,28 +193,49 @@ def process_initial_groups(
         session.commit()
 
 
-def refine_groups(
+def process_folders_to_groups(session, group_id: int, iteration_id: int) -> GroupCategoryEntry:
+    """
+    Process the folders to groups
+    """
+    folders = session.query(Folder).all()
+    for folder in folders:
+        group_entry = GroupCategoryEntry(
+            folder_id=folder.id,
+            group_id=group_id,
+            iteration_id=iteration_id,
+            pre_processed_name=folder.folder_name,
+            processed_name=folder.cleaned_name,
+            path=str(folder.folder_path),
+            confidence=1.0,
+            processed=False,
+        )
+        session.add(group_entry)
+    session.commit()
+
+def refine_groups(session,
     current_group_categories: list[GroupCategoryEntry], iteration_id, next_group_id=1
-) -> None:
+) -> list[GroupCategory]:
     """
     After groupings have been calculated, evalute the groups to determine which represent
     "real" groupings (i.e. single unique name, or multiple names with a common prefix), and
     which are unable to be grouped.
 
     """
+    print(f"Refining groups, starting at {next_group_id=}")
     clusters: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
     for entry in current_group_categories:
         clusters[entry.cluster_id].append(entry)
 
-    group_categories: list[GroupCategory] = []
+    # group_categories: list[GroupCategory] = []
+    current_group_id = next_group_id
 
     for cluster_id, cluster_entries in clusters.items():
         # singletons - just store them and move on
         if len(cluster_entries) == 1:
             entry = cluster_entries[0]
 
-            group = GroupCategory(
-                id=next_group_id,
+            group_category = GroupCategory(
+                id=current_group_id,
                 name=entry.pre_processed_name,
                 count=1,
                 group_confidence=1,
@@ -220,12 +243,15 @@ def refine_groups(
                 needs_review=False,
             )
 
-            entry.group_id = next_group_id
+            entry.group_id = current_group_id
             entry.processed_name = entry.pre_processed_name
             entry.processed = True
 
-            group_categories.append(group)
-            next_group_id += 1
+            # group_categories.append(group_category)
+            session.add(group_category)
+            session.flush()
+            current_group_id += 1
+            
             continue
 
         record_names = [record.pre_processed_name for record in cluster_entries]
@@ -233,11 +259,32 @@ def refine_groups(
         # evaluate the group - this does a few things
         # 1. try to normalize the names to a common prefix correcting for spelling
         # 2. determine sub-categories when the group name is a common prefix
-        group_name_to_groups = refine_group(record_names)
+        group_name_to_groups = refine_group(record_names) 
 
         # Create groups based on refined results
         for group_name, entries_by_name in group_name_to_groups.items():
+            subcategories = list(set([
+                entry.categories[1]
+                for entry in entries_by_name
+                if len(entry.categories) > 1
+            ]))
             member_confidences = []
+
+            group_category = GroupCategory(
+                id=current_group_id,
+                name=group_name,
+                iteration_id=iteration_id,
+            )
+            subgroups = {
+                subcategory: GroupCategory(id=sub_id, name=subcategory, iteration_id=iteration_id)
+                for sub_id, subcategory in enumerate(
+                    subcategories, start=current_group_id+1
+                )
+            }
+            subcategory_to_entry = {
+                subcategory: []
+                for subcategory in subcategories
+            }
 
             # Find entries that match this refined group
             group_members = []
@@ -249,37 +296,69 @@ def refine_groups(
                 ]
 
                 for entry in matching_entries:
-                    entry.group_id = next_group_id
+                    entry.group_id = group_category.id
                     entry.processed = True
                     entry.confidence = min(entry.confidence, group_entry.confidence)
                     entry.derived_names = group_entry.categories
                     entry.iteration_id = iteration_id
 
-                    # note: there is a bug with this approch - it doesn't
-                    # guarantee that the group name gets its own entry
-                    # nor does it correctly generate multiple group entries for multiple categories
-                    if len(group_entry.categories) >= 1:
-                        entry.processed_name = group_entry.categories[-1]
+                    entry.processed_name = group_entry.categories[0]
 
                     member_confidences.append(entry.confidence)
                     group_members.append(entry)
 
+                    if len(group_entry.categories) > 1:
+                        subgroup = group_entry.categories[1]
+                        subgroup_entry = GroupCategoryEntry(
+                            folder_id=entry.folder_id,
+                            partial_category_id=entry.partial_category_id,
+                            group_id=subgroups[subgroup].id,
+                            pre_processed_name=entry.pre_processed_name,
+                            processed_name=subgroup,
+                            path=entry.path,
+                            confidence=entry.confidence,
+                            processed=True,
+                            iteration_id=iteration_id,
+                            derived_names=entry.derived_names,
+                        )
+                        session.add(subgroup_entry)
+                        subcategory_to_entry[subgroup].append(subgroup_entry)
+            session.flush()
+
+            current_group_id += len(subgroups) + 1
+
+
             # Calculate overall group confidence
-            overall_confidence = min(member_confidences) if member_confidences else 0.5
+            group_category.overall_confidence = min(member_confidences) if member_confidences else 0.5
+            group_category.count = len(group_members)
+            group_category.needs_review = group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
 
-            # Create group
-            group = GroupCategory(
-                id=next_group_id,
-                name=group_name,
-                count=len(group_members),
-                group_confidence=overall_confidence,
-                needs_review=overall_confidence < REVIEW_CONFIDENCE_THRESHOLD,
-            )
+            # group_categories.append(group_category)
+            session.add(group_category)
 
-            group_categories.append(group)
-            next_group_id += 1
+            for _, subgroup in subgroups.items():
+                sub_member_confidences = [
+                    e.confidence
+                    for e in subcategory_to_entry[subgroup.name]
+                ]
+                subgroup.overall_confidence = min(sub_member_confidences) if sub_member_confidences else 0.5
+                subgroup.count = len([e for e in group_members if e.processed_name == subgroup.name])
+                subgroup.needs_review = subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
 
-    return group_categories
+                # group_categories.append(subgroup)
+                session.add(subgroup)
+            session.flush()
+
+        session.flush()
+
+
+    # id_to_group = defaultdict(list)
+    # for group in group_categories:
+    #     id_to_group[group.id].append(group)
+    # duplicate_ids = [id for id, groups in id_to_group.items() if len(groups) > 1]
+    # print(f"Duplicate group ids: {duplicate_ids}")
+    session.commit()
+    # return group_categories
 
 
 def group_iteration(session: Session, iteration_id: int) -> None:
@@ -308,23 +387,18 @@ def group_iteration(session: Session, iteration_id: int) -> None:
 
     next_group_id = session.query(GroupCategory).count() + 1
 
-    groups = refine_groups(group_category_entries, iteration_id, next_group_id)
-    session.add_all(groups)
-    session.commit()
+    refine_groups(session, group_category_entries, iteration_id, next_group_id)
+    # session.add_all(groups)
+    # session.commit()
 
 
 def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
     """
     Grouping steps:
-        1. Clean up folder names, and make a best guess at classification
-            * This breaks out known variants (from KNOWN_VARIANT_TOKENS), and auto-categorizes them
-            * This populates the  PartialNameCategory with a record for known variants, and a record for "the rest"
-        2. (disabled) Populates the Category table, by counting how many of each classification there are for
-            every record in PartialNameCategory
-        3. Using NLP heuristics, cluster the records in PartialNameCategory to find category names which should be grouped together
+        1. Using NLP heuristics, cluster the records in PartialNameCategory to find category names which should be grouped together
             * This populates the GroupCategoryEntry table with the name (matching to PartialNameCategory)
                 and the id of the group it has been clustered into
-        4. Evaluate the clusters to determine which ones represent a genuine match
+        2. Evaluate the clusters to determine which ones represent a genuine match
             * this creates sub-clusters where all entries in the cluster start with the same string
             * Calculated groups are stored in GroupCategory, and the confidence is set to the
                 lowest confidence score of the grouped entries
@@ -339,9 +413,7 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
-        heuristic_categorize(session)
-        process_initial_groups(db_path)
-        session.commit()
+        process_folders_to_groups(session, 0, 0)  
 
         for i in range(0, max_iterations):
             # Get groups needing review

@@ -137,7 +137,7 @@ def process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
             edit_distance(comp_file, group_entry.original_name, transpositions=True)
             for comp_file in filenames_in_main
         ]
-        min_edit_dist = min(edit_dists)
+        min_edit_dist = min(edit_dists) or 1
         confidence = 1 / min_edit_dist
         group_entry.grouped_name = main_group
         group_entry.confidence = confidence
