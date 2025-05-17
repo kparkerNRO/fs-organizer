@@ -136,14 +136,8 @@ const ContentContainer = styled.div`
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   overflow: hidden;
-  
-  @media (min-width: 1024px) {
-    flex-direction: row;
-    gap: 2rem;
-    align-items: flex-start;
-  }
 `;
 
 const Header = styled.div`

@@ -6,6 +6,14 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
   category,
   folder,
 }) => {
+  // If neither category nor folder is provided, return the placeholder
+  if (!category && !folder) {
+    return (
+      <DetailsContainer>
+        <PlaceholderText>Select a folder to view details</PlaceholderText>
+      </DetailsContainer>
+    );
+  }
   if (folder != null) {
     return (
       <DetailsContainer>
@@ -116,31 +124,45 @@ const DetailsContainer = styled.div`
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   width: 100%;
   box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
   
-  @media (min-width: 1024px) {
-    margin-top: 0;
-    width: 35%;
-    flex-shrink: 0;
-    overflow-x: auto;
+  .folder-structure-page & {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Critical for proper flexbox behavior with scrolling */
+    overflow-y: auto;
+  }
+  
+  /* Modern scrollbar styling */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
   }
 `;
 
 const DetailsGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
   margin-bottom: 1.5rem;
   
-  @media (min-width: 768px) {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  @media (min-width: 1024px) {
+  .folder-structure-page & {
     grid-template-columns: 1fr;
-  }
-  
-  @media (min-width: 1400px) {
-    grid-template-columns: repeat(2, 1fr);
   }
 `;
 

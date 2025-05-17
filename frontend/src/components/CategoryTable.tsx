@@ -525,10 +525,6 @@ const TableContainer = styled.div`
   width: 100%;
   box-sizing: border-box;
   overflow-x: auto;
-  
-  @media (min-width: 1024px) {
-    flex: 1;
-  }
 `;
 
 const HeaderContainer = styled.div`
