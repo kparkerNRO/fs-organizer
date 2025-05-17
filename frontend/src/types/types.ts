@@ -36,8 +36,19 @@ export interface Folder {
   isSelected?: boolean;
 }
 
+export interface FileItem {
+  id: number;
+  name: string;
+  fileType: string;
+  size?: string;
+  original_path: string;
+  confidence: number;
+  categories?: string[];
+}
+
 export interface CategoryDetailsProps {
-  category?: Category | null ;
-  folder?: Folder| null ;
+  category?: Category | null;
+  folder?: Folder | null;
+  file?: FileItem | null;
 }
 

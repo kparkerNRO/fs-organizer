@@ -1,22 +1,94 @@
 import React from "react";
 import styled from "styled-components";
 import { CategoryDetailsProps } from "../types/types";
+import { FileIcon, FolderIcon } from "lucide-react";
 
 export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
   category,
   folder,
+  file
 }) => {
-  // If neither category nor folder is provided, return the placeholder
-  if (!category && !folder) {
+  // If no item is selected, return the placeholder
+  if (!category && !folder && !file) {
     return (
       <DetailsContainer>
-        <PlaceholderText>Select a folder to view details</PlaceholderText>
+        <DetailHeader>
+          <DetailTitle>Details</DetailTitle>
+        </DetailHeader>
+        <PlaceholderContainer>
+          <PlaceholderText>Select a folder or file to view details</PlaceholderText>
+        </PlaceholderContainer>
       </DetailsContainer>
     );
   }
-  if (folder != null) {
+  
+  // Render file details if a file is selected
+  if (file) {
     return (
       <DetailsContainer>
+        <DetailHeader>
+          <FileIcon size={18} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
+          <DetailTitle>File Details</DetailTitle>
+        </DetailHeader>
+        
+        <DetailsGrid>
+          <FieldContainer>
+            <Label>File Name</Label>
+            <Input type="text" value={file.name || ""} readOnly />
+          </FieldContainer>
+
+          <FieldContainer>
+            <Label>File Type</Label>
+            <Input type="text" value={file.fileType || ""} readOnly />
+          </FieldContainer>
+          
+          {file.size && (
+            <FieldContainer>
+              <Label>Size</Label>
+              <Input type="text" value={file.size} readOnly />
+            </FieldContainer>
+          )}
+        </DetailsGrid>
+
+        <FieldRow>
+          <Label>Original Path</Label>
+          <Input type="text" value={file.original_path || ""} readOnly />
+        </FieldRow>
+        
+        {file.categories && file.categories.length > 0 && (
+          <FieldRow>
+            <Label>Categories</Label>
+            <Input 
+              type="text" 
+              value={file.categories.join(", ")} 
+              readOnly 
+            />
+          </FieldRow>
+        )}
+
+        <FieldRow>
+          <Label>Confidence</Label>
+          <ConfidenceBar>
+            <ConfidenceFill style={{ width: `${file.confidence}%` }}>
+              {file.confidence}%
+            </ConfidenceFill>
+          </ConfidenceBar>
+        </FieldRow>
+      </DetailsContainer>
+    );
+  }
+  // Render folder details if a folder is selected
+  if (folder != null) {
+    // Calculate content based on what's available
+    const hasProcessedNames = folder.processed_names && folder.processed_names.length > 0;
+    
+    return (
+      <DetailsContainer>
+        <DetailHeader>
+          <FolderIcon size={18} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
+          <DetailTitle>Folder Details</DetailTitle>
+        </DetailHeader>
+        
         <DetailsGrid>
           <FieldContainer>
             <Label>Category Name</Label>
@@ -47,6 +119,18 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
           <Label>Original Path</Label>
           <Input type="text" value={folder.original_path || ""} readOnly />
         </FieldRow>
+        
+        {hasProcessedNames && (
+          <FieldRow>
+            <Label>Categories</Label>
+            <Input 
+              type="text" 
+              value={folder.processed_names!.join(", ")} 
+              readOnly 
+            />
+          </FieldRow>
+        )}
+        {!hasProcessedNames && <EmptySpace />}
 
         <FieldRow>
           <Label>Confidence</Label>
@@ -57,13 +141,16 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
           </ConfidenceBar>
         </FieldRow>
 
-        <ProcessedNamesContainer>
-          <Label>Processed Names</Label>
-          <ProcessedNamesInput
-            value={folder.processed_names?.join("\n") || ""}
-            readOnly
-          />
-        </ProcessedNamesContainer>
+        {hasProcessedNames && (
+          <ProcessedNamesContainer>
+            <Label>Processed Names</Label>
+            <ProcessedNamesInput
+              value={folder.processed_names!.join("\n")}
+              readOnly
+            />
+          </ProcessedNamesContainer>
+        )}
+        {!hasProcessedNames && <EmptySpace />}
       </DetailsContainer>
     );
   }
@@ -72,6 +159,10 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
     // Render Category details
     return (
       <DetailsContainer>
+        <DetailHeader>
+          <DetailTitle>Category Details</DetailTitle>
+        </DetailHeader>
+        
         <DetailsGrid>
           <FieldContainer>
             <Label>Category Name</Label>
@@ -133,6 +224,7 @@ const DetailsContainer = styled.div`
     flex-direction: column;
     min-height: 0; /* Critical for proper flexbox behavior with scrolling */
     overflow-y: auto;
+    width: 450px;
   }
   
   /* Modern scrollbar styling */
@@ -268,6 +360,36 @@ const MemberRow = styled.div`
   gap: 1.5rem;
 `;
 
+const DetailHeader = styled.div`
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+`;
+
+const DetailTitle = styled.h3`
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #111827;
+  margin: 0;
+`;
+
+const PlaceholderContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 200px;
+`;
+
+const EmptySpace = styled.div`
+  height: 80px;
+  width: 100%;
+`;
+
 const PlaceholderText = styled.p`
   color: #6b7280;
+  font-size: 0.95rem;
 `;

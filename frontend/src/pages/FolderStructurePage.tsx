@@ -1,16 +1,16 @@
 // src/pages/FolderStructurePage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { fetchFolderStructure, FolderNode } from "../api";
-import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon } from "lucide-react";
+import { fetchFolderStructure, FolderNode, FileNode } from "../api";
+import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon, File as FileIcon } from "lucide-react";
 import { CategoryDetails } from "../components/CategoryDetails";
-import { CategoryDetailsProps, Folder } from "../types/types";
+import { CategoryDetailsProps, Folder, FileItem } from "../types/types";
 
 export const FolderStructurePage: React.FC = () => {
   const [folderStructure, setFolderStructure] = useState<FolderNode | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(["root"]));
-  const [selectedFolder, setSelectedFolder] = useState<CategoryDetailsProps>({category: null, folder: null});
+  const [selectedItem, setSelectedItem] = useState<CategoryDetailsProps>({category: null, folder: null, file: null});
 
   useEffect(() => {
     const loadFolderStructure = async () => {
@@ -40,51 +40,80 @@ export const FolderStructurePage: React.FC = () => {
     });
   };
 
-  const selectFolder = (node: FolderNode) => {
-    // Convert FolderNode to Folder type for CategoryDetails
-    const folderData: Folder = {
-      id: parseInt(node.id, 10) || Math.floor(Math.random() * 1000),
-      name: node.name,
-      classification: node.name.split('/').pop() || '',
-      original_filename: node.name,
-      cleaned_name: node.name,
-      confidence: 90, // Default confidence
-      original_path: node.path || '',
-      processed_names: node.name.split('/')
-    };
-    
-    setSelectedFolder({category: null, folder: folderData});
+  const isFileNode = (node: FolderNode | FileNode): node is FileNode => {
+    return 'fileType' in node || node.path?.includes('.') || false;
   };
 
-  const renderFolderNode = (node: FolderNode, level: number = 0) => {
-    const isExpanded = expandedFolders.has(node.id);
-    const hasChildren = node.children && node.children.length > 0;
+  const selectItem = (node: FolderNode | FileNode) => {
+    const nodeId = parseInt(node.id, 10) || Math.floor(Math.random() * 1000);
+    
+    if (isFileNode(node)) {
+      // Create file item
+      const fileData: FileItem = {
+        id: nodeId,
+        name: node.name,
+        fileType: node.fileType || node.name.split('.').pop() || 'unknown',
+        size: node.size,
+        original_path: node.originalPath || node.path || '',
+        confidence: node.confidence || 90,
+        categories: node.categories
+      };
+      
+      setSelectedItem({category: null, folder: null, file: fileData});
+    } else {
+      // Create folder item
+      const folderData: Folder = {
+        id: nodeId,
+        name: node.name,
+        classification: node.name.split('/').pop() || '',
+        original_filename: node.name,
+        cleaned_name: node.name,
+        confidence: 90,
+        original_path: node.path || '',
+        processed_names: node.name.split('/')
+      };
+      
+      setSelectedItem({category: null, folder: folderData, file: null});
+    }
+  };
+
+  const renderNode = (node: FolderNode | FileNode, level: number = 0) => {
+    const isFile = isFileNode(node);
+    const isExpanded = !isFile && expandedFolders.has(node.id);
+    const hasChildren = !isFile && (node as FolderNode).children && (node as FolderNode).children!.length > 0;
 
     return (
       <div key={node.id}>
         <FolderItem 
-          $level={level} 
+          $level={level}
+          $isFile={isFile}
           onClick={() => {
-            selectFolder(node);
-            if (hasChildren) toggleFolder(node.id);
+            selectItem(node);
+            if (!isFile && hasChildren) toggleFolder(node.id);
           }}
         >
-          {hasChildren ? (
+          {!isFile && hasChildren ? (
             <ExpandIcon>
               {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </ExpandIcon>
           ) : (
             <ExpandIcon style={{ opacity: 0.7 }}>
-              <FolderIcon size={14} />
+              {isFile ? <FileIcon size={14} /> : <FolderIcon size={14} />}
             </ExpandIcon>
           )}
           <FolderName>{node.name}</FolderName>
-          {node.path && node.id !== 'root' && <FolderPath>{node.path}</FolderPath>}
+          {isFile && (node as FileNode).fileType && (
+            <FileType>{(node as FileNode).fileType}</FileType>
+          )}
+          {isFile && (node as FileNode).size && (
+            <FileSize>{(node as FileNode).size}</FileSize>
+          )}
+          {!isFile && node.path && node.id !== 'root' && <FolderPath>{node.path}</FolderPath>}
         </FolderItem>
         
-        {isExpanded && hasChildren && (
+        {!isFile && isExpanded && hasChildren && (
           <div>
-            {node.children?.map(child => renderFolderNode(child, level + 1))}
+            {(node as FolderNode).children?.map(child => renderNode(child, level + 1))}
           </div>
         )}
       </div>
@@ -107,17 +136,18 @@ export const FolderStructurePage: React.FC = () => {
             <LoadingMessage>Loading folder structure...</LoadingMessage>
           ) : folderStructure ? (
             <FolderTree>
-              {renderFolderNode(folderStructure)}
+              {renderNode(folderStructure)}
             </FolderTree>
           ) : (
             <ErrorMessage>Failed to load folder structure</ErrorMessage>
           )}
         </ContentContainer>
         
-        <div className="folder-structure-page" style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="folder-structure-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '450px' }}>
           <CategoryDetails 
-            category={selectedFolder.category} 
-            folder={selectedFolder.folder} 
+            category={selectedItem.category} 
+            folder={selectedItem.folder}
+            file={selectedItem.file} 
           />
         </div>
       </MainContainer>
@@ -144,6 +174,7 @@ const MainContainer = styled.div`
   flex: 1;
   min-height: 0; /* Critical for proper flexbox behavior with scrolling */
   overflow: hidden;
+  justify-content: space-between;
 `;
 
 const ContentContainer = styled.div`
@@ -199,7 +230,7 @@ const FolderTree = styled.div`
   }
 `;
 
-const FolderItem = styled.div<{ $level: number }>`
+const FolderItem = styled.div<{ $level: number, $isFile?: boolean }>`
   display: flex;
   align-items: center;
   padding: 0.35rem 0.5rem;
@@ -209,6 +240,7 @@ const FolderItem = styled.div<{ $level: number }>`
   transition: all 0.15s ease;
   margin: 1px 0;
   font-size: 0.9rem;
+  color: ${(props) => props.$isFile ? '#4b5563' : '#000'};
 
   &:hover {
     background-color: #e7eefa;
@@ -244,6 +276,21 @@ const FolderPath = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 180px;
+`;
+
+const FileType = styled.span`
+  margin-left: 0.5rem;
+  color: #6b7280;
+  font-size: 0.75rem;
+  background-color: #f3f4f6;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.25rem;
+`;
+
+const FileSize = styled.span`
+  margin-left: 0.5rem;
+  color: #6b7280;
+  font-size: 0.75rem;
 `;
 
 const LoadingMessage = styled.div`

@@ -40,10 +40,21 @@ export const fetchCategories = async (
   return data;
 };
 
+export interface FileNode {
+  id: string;
+  name: string;
+  path?: string;
+  fileType?: string;
+  size?: string;
+  categories?: string[];
+  confidence?: number;
+  originalPath?: string;
+}
+
 export interface FolderNode {
   id: string;
   name: string;
-  children?: FolderNode[];
+  children?: (FolderNode | FileNode)[];
   path?: string;
 }
 
