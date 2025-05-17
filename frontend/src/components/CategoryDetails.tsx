@@ -110,18 +110,38 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
 };
 
 const DetailsContainer = styled.div`
-  margin-top: 1.5rem;
   padding: 1.5rem;
   background: white;
   border-radius: 0.5rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
+  
+  @media (min-width: 1024px) {
+    margin-top: 0;
+    width: 35%;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
 `;
 
 const DetailsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   margin-bottom: 1.5rem;
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  @media (min-width: 1024px) {
+    grid-template-columns: 1fr;
+  }
+  
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `;
 
 const FieldContainer = styled.div`
@@ -134,6 +154,7 @@ const FieldRow = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  width: 100%;
 `;
 
 const Label = styled.label`
@@ -148,6 +169,7 @@ const Input = styled.input`
   border: 1px solid #e2e8f0;
   border-radius: 0.5rem;
   outline: none;
+  box-sizing: border-box;
 
   &:focus {
     border-color: #3b82f6;
@@ -176,6 +198,8 @@ const ProcessedNamesContainer = styled.div`
 const ProcessedNamesInput = styled(Input)`
   min-height: 100px;
   resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const ConfidenceBar = styled.div`

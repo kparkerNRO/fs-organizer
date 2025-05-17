@@ -1,6 +1,7 @@
 // src/mockData.ts
 
 import { Folder, Category } from "../types/types";
+import { FolderNode } from "../api";
 
 export const mockFolders: Folder[] = [];
 
@@ -97,10 +98,79 @@ export const mockCategoryData: Category[] = [
   },
 ];
 
-// Example usage:
-// import { mockCategoryData } from './mockData';
-//
-// <CategoryTable
-//   data={mockCategoryData}
-//   onRowSelect={(row) => console.log('Selected:', row)}
-// />
+export const mockFolderStructure: FolderNode = {
+  id: "root",
+  name: "Root",
+  children: [
+    {
+      id: "gaming",
+      name: "Gaming",
+      path: "/gaming",
+      children: [
+        {
+          id: "gaming/maps",
+          name: "Maps",
+          path: "/gaming/maps",
+          children: [
+            {
+              id: "gaming/maps/wizard-tower",
+              name: "Wizard Tower",
+              path: "/gaming/maps/wizard-tower",
+              children: [
+                {
+                  id: "gaming/maps/wizard-tower/green",
+                  name: "Green",
+                  path: "/gaming/maps/wizard-tower/green"
+                },
+                {
+                  id: "gaming/maps/wizard-tower/blue",
+                  name: "Blue",
+                  path: "/gaming/maps/wizard-tower/blue"
+                }
+              ]
+            },
+            {
+              id: "gaming/maps/dragon-lair",
+              name: "Dragon Lair",
+              path: "/gaming/maps/dragon-lair"
+            }
+          ]
+        },
+        {
+          id: "gaming/assets",
+          name: "Assets",
+          path: "/gaming/assets",
+          children: [
+            {
+              id: "gaming/assets/characters",
+              name: "Characters",
+              path: "/gaming/assets/characters"
+            },
+            {
+              id: "gaming/assets/props",
+              name: "Props",
+              path: "/gaming/assets/props"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: "music",
+      name: "Music",
+      path: "/music",
+      children: [
+        {
+          id: "music/classical",
+          name: "Classical",
+          path: "/music/classical"
+        },
+        {
+          id: "music/jazz",
+          name: "Jazz",
+          path: "/music/jazz"
+        }
+      ]
+    }
+  ]
+};

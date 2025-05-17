@@ -126,14 +126,24 @@ export const CategoriesPage: React.FC = () => {
 };
 
 const PageContainer = styled.div`
-  min-height: 100vh;
   background-color: #f3f4f6;
   padding: 2rem;
+  min-height: calc(100vh - 57px); /* Account for navbar height */
 `;
 
 const ContentContainer = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow: hidden;
+  
+  @media (min-width: 1024px) {
+    flex-direction: row;
+    gap: 2rem;
+    align-items: flex-start;
+  }
 `;
 
 const Header = styled.div`

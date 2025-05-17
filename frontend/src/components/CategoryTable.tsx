@@ -522,6 +522,13 @@ const TableContainer = styled.div`
   background: white;
   border-radius: 0.5rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
+  
+  @media (min-width: 1024px) {
+    flex: 1;
+  }
 `;
 
 const HeaderContainer = styled.div`
