@@ -11,6 +11,7 @@ export const FolderStructurePage: React.FC = () => {
   const [expandedFoldersNew, setExpandedFoldersNew] = useState<Set<string>>(new Set(["root"]));
   // const [selectedItem, setSelectedItem] = useState<{category: any, folder: Folder | null, file: FileItem | null}>({category: null, folder: null, file: null});
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [highlightedPaths, setHighlightedPaths] = useState<{original: string[], new: string[]}>({original: [], new: []});
   
   const [draggedNodes, setDraggedNodes] = useState<(FolderNode | FileNode)[]>([]);
   const [draggedOverId, setDraggedOverId] = useState<string | null>(null);
@@ -34,9 +35,10 @@ export const FolderStructurePage: React.FC = () => {
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape key: clear file selection
+      // Escape key: clear file selection and path highlighting
       if (e.key === 'Escape') {
         setSelectedFileId(null);
+        setHighlightedPaths({original: [], new: []});
       }
     };
     
@@ -309,10 +311,25 @@ export const FolderStructurePage: React.FC = () => {
       setSelectedFileId(fileNode.id);
       selectItem(fileNode);
       
-      // Find the corresponding file by ID in the other view and expand path to it
+      // Find paths to the file in both views for highlighting
       if (folderComparison) {
+        const currentRoot = isFromOriginal ? folderComparison.original : folderComparison.new;
         const otherRoot = isFromOriginal ? folderComparison.new : folderComparison.original;
+        
+        // Find file in current view
+        const currentFile = findFileById(fileNode.id, currentRoot);
+        const currentPath = currentFile ? ['root', ...currentFile.path] : [];
+        
+        // Find corresponding file in other view  
         const matchingFile = findFileById(fileNode.id, otherRoot);
+        const matchingPath = matchingFile ? ['root', ...matchingFile.path] : [];
+        
+        // Set highlighted paths for both views
+        if (isFromOriginal) {
+          setHighlightedPaths({original: currentPath, new: matchingPath});
+        } else {
+          setHighlightedPaths({original: matchingPath, new: currentPath});
+        }
         
         if (matchingFile) {
           // Expand all folders in the path to the matching file in the other view
@@ -328,14 +345,19 @@ export const FolderStructurePage: React.FC = () => {
     const hasChildren = !isFile && (node as FolderNode).children && (node as FolderNode).children!.length > 0;
     const isDraggedOver = draggedOverId === node.id;
     const isHighlighted = isFile && selectedFileId === node.id;
+    
+    // Check if this folder is in the highlighted path
+    const relevantPath = isOriginal ? highlightedPaths.original : highlightedPaths.new;
+    const isInHighlightedPath = !isFile && relevantPath.includes(node.id);
 
     return (
       <div key={node.id}>
         <FolderItem 
           $level={level}
           $isFile={isFile}
-$isSelected={isHighlighted}
+          $isSelected={isHighlighted}
           $isDraggedOver={isDraggedOver && !isFile}
+          $isInHighlightedPath={isInHighlightedPath}
           onClick={() => {
             if (isFile) {
               handleFileClick(node as FileNode, isOriginal);
@@ -358,7 +380,12 @@ $isSelected={isHighlighted}
               {isFile ? <FileIcon size={14} /> : <FolderIcon size={14} />}
             </ExpandIcon>
           )}
-          <FolderName>{node.name}</FolderName>
+          <FolderName 
+            $isFile={isFile}
+            $confidence={!isFile ? (node as FolderNode).confidence : undefined}
+          >
+            {node.name}
+          </FolderName>
           {isFile && (node as FileNode).fileType && (
             <FileType>{(node as FileNode).fileType}</FileType>
           )}
@@ -463,7 +490,6 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
   padding: 0 0.5rem;
 `;
 
@@ -504,7 +530,8 @@ const FolderItem = styled.div<{
   $level: number, 
   $isFile?: boolean, 
   $isSelected?: boolean,
-  $isDraggedOver?: boolean
+  $isDraggedOver?: boolean,
+  $isInHighlightedPath?: boolean
 }>`
   display: flex;
   align-items: center;
@@ -521,9 +548,17 @@ const FolderItem = styled.div<{
   background-color: ${(props) => {
     if (props.$isDraggedOver) return '#e2f0fd';
     if (props.$isSelected) return '#dbeafe';
+    if (props.$isInHighlightedPath) return '#f0f9ff'; // Very subtle blue highlight for path
     return 'transparent';
   }};
-  border: ${(props) => props.$isDraggedOver ? '1px dashed #3b82f6' : props.$isSelected ? '1px solid #60a5fa' : 'none'};
+  border: 1px solid transparent; /* Always maintain border space */
+  border-color: ${(props) => {
+    if (props.$isDraggedOver) return '#3b82f6';
+    if (props.$isSelected) return '#60a5fa';
+    if (props.$isInHighlightedPath) return '#e0f2fe'; // Subtle border for path highlight
+    return 'transparent';
+  }};
+  border-style: ${(props) => props.$isDraggedOver ? 'dashed' : 'solid'};
   position: relative;
 
   &:hover {
@@ -544,12 +579,31 @@ const ExpandIcon = styled.span`
   height: 16px;
 `;
 
-const FolderName = styled.span`
+const FolderName = styled.span<{
+  $isFile: boolean;
+  $confidence?: number;
+}>`
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  background-color: ${(props) => {
+    if (props.$isFile) return 'transparent';
+    if (props.$confidence !== undefined) {
+      // Calculate confidence background color
+      const confidence = Math.max(0, Math.min(100, props.$confidence));
+      const normalizedConfidence = confidence / 100;
+      const red = Math.round(220 + (255 - 220) * normalizedConfidence);
+      const green = Math.round(38 + (255 - 38) * normalizedConfidence);
+      const blue = Math.round(38 + (255 - 38) * normalizedConfidence);
+      return `rgb(${red}, ${green}, ${blue})`;
+    }
+    return 'transparent';
+  }};
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-right: 4px;
 `;
 
 const FolderPath = styled.span`

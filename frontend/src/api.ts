@@ -57,6 +57,7 @@ export interface FolderNode {
   name: string;
   children?: (FolderNode | FileNode)[];
   path?: string;
+  confidence?: number; // Confidence level 0-100 for folder categorization
 }
 
 export interface FolderStructureComparison {
