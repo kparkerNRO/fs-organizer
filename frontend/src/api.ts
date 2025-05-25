@@ -1,6 +1,6 @@
 // src/api.ts
 
-import { fetchMockCategoryData, fetchMockFolderStructure } from "./mock_data/mockApi";
+import { fetchMockCategoryData, fetchMockFolderStructure, fetchMockFolderStructureComparison } from "./mock_data/mockApi";
 import { useMockMode } from "./mock_data/MockModeContext";
 import { Category } from "./types/types";
 
@@ -49,6 +49,7 @@ export interface FileNode {
   categories?: string[];
   confidence?: number;
   originalPath?: string;
+  children: (FolderNode | FileNode)[];
 }
 
 export interface FolderNode {
@@ -56,6 +57,11 @@ export interface FolderNode {
   name: string;
   children?: (FolderNode | FileNode)[];
   path?: string;
+}
+
+export interface FolderStructureComparison {
+  original: FolderNode;
+  new: FolderNode;
 }
 
 export const fetchFolderStructure = async (): Promise<FolderNode> => {
@@ -76,6 +82,34 @@ export const fetchFolderStructure = async (): Promise<FolderNode> => {
     return {
       id: "error",
       name: "Error loading folders"
+    };
+  }
+};
+
+export const fetchFolderStructureComparison = async (): Promise<FolderStructureComparison> => {
+  try {
+    // Use mock data if in mock mode
+    const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
+    
+    if (isMockMode) {
+      return await fetchMockFolderStructureComparison();
+    }
+    
+    const response = await fetch('http://0.0.0.0:8000/folders/comparison');
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching folder structure comparison:", error);
+    // Return a simple error structure in case of failure
+    return {
+      original: {
+        id: "error",
+        name: "Error loading original folders"
+      },
+      new: {
+        id: "error", 
+        name: "Error loading new folders"
+      }
     };
   }
 };

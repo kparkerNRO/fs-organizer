@@ -98,32 +98,32 @@ export const mockCategoryData: Category[] = [
   },
 ];
 
-export const mockFolderStructure: FolderNode = {
+export const mockOriginalFolderStructure: FolderNode = {
   id: "root",
-  name: "Root",
+  name: "Root_old",
   children: [
     {
       id: "gaming",
-      name: "Gaming",
+      name: "Gaming_old",
       path: "/gaming",
       children: [
         {
           id: "gaming/maps",
-          name: "Maps",
+          name: "Maps_old",
           path: "/gaming/maps",
           children: [
             {
               id: "gaming/maps/wizard-tower",
-              name: "Wizard Tower",
+              name: "Wizard Tower_old",
               path: "/gaming/maps/wizard-tower",
               children: [
                 {
                   id: "gaming/maps/wizard-tower/green",
-                  name: "Green",
+                  name: "Green_old",
                   path: "/gaming/maps/wizard-tower/green",
                   children: [
                     {
-                      id: "gaming/maps/wizard-tower/green/map1.png",
+                      id: "1",
                       name: "map1.png",
                       path: "/gaming/maps/wizard-tower/green/map1.png",
                       fileType: "image/png",
@@ -133,7 +133,7 @@ export const mockFolderStructure: FolderNode = {
                       originalPath: "/original/path/to/wizard_tower_green_map1.png"
                     },
                     {
-                      id: "gaming/maps/wizard-tower/green/map2.jpg",
+                      id: "2",
                       name: "map2.jpg",
                       path: "/gaming/maps/wizard-tower/green/map2.jpg",
                       fileType: "image/jpeg",
@@ -146,11 +146,11 @@ export const mockFolderStructure: FolderNode = {
                 },
                 {
                   id: "gaming/maps/wizard-tower/blue",
-                  name: "Blue",
+                  name: "Blue_old",
                   path: "/gaming/maps/wizard-tower/blue",
                   children: [
                     {
-                      id: "gaming/maps/wizard-tower/blue/blueprint.pdf",
+                      id: "3",
                       name: "blueprint.pdf",
                       path: "/gaming/maps/wizard-tower/blue/blueprint.pdf",
                       fileType: "application/pdf",
@@ -165,11 +165,11 @@ export const mockFolderStructure: FolderNode = {
             },
             {
               id: "gaming/maps/dragon-lair",
-              name: "Dragon Lair",
+              name: "Dragon Lair_old",
               path: "/gaming/maps/dragon-lair",
               children: [
                 {
-                  id: "gaming/maps/dragon-lair/entrance.png",
+                  id: "4",
                   name: "entrance.png",
                   path: "/gaming/maps/dragon-lair/entrance.png",
                   fileType: "image/png",
@@ -179,7 +179,7 @@ export const mockFolderStructure: FolderNode = {
                   originalPath: "/original/path/to/dragon_lair_entrance.png"
                 },
                 {
-                  id: "gaming/maps/dragon-lair/treasure-room.png",
+                  id: "5",
                   name: "treasure-room.png",
                   path: "/gaming/maps/dragon-lair/treasure-room.png",
                   fileType: "image/png",
@@ -194,16 +194,16 @@ export const mockFolderStructure: FolderNode = {
         },
         {
           id: "gaming/assets",
-          name: "Assets",
+          name: "Assets_old",
           path: "/gaming/assets",
           children: [
             {
               id: "gaming/assets/characters",
-              name: "Characters",
+              name: "Characters_old",
               path: "/gaming/assets/characters",
               children: [
                 {
-                  id: "gaming/assets/characters/wizard.fbx",
+                  id: "6",
                   name: "wizard.fbx",
                   path: "/gaming/assets/characters/wizard.fbx",
                   fileType: "model/fbx",
@@ -213,7 +213,7 @@ export const mockFolderStructure: FolderNode = {
                   originalPath: "/original/path/to/wizard_character.fbx"
                 },
                 {
-                  id: "gaming/assets/characters/dragon.fbx",
+                  id: "7",
                   name: "dragon.fbx",
                   path: "/gaming/assets/characters/dragon.fbx",
                   fileType: "model/fbx",
@@ -226,11 +226,11 @@ export const mockFolderStructure: FolderNode = {
             },
             {
               id: "gaming/assets/props",
-              name: "Props",
+              name: "Props_old",
               path: "/gaming/assets/props",
               children: [
                 {
-                  id: "gaming/assets/props/treasure-chest.obj",
+                  id: "8",
                   name: "treasure-chest.obj",
                   path: "/gaming/assets/props/treasure-chest.obj",
                   fileType: "model/obj",
@@ -247,16 +247,16 @@ export const mockFolderStructure: FolderNode = {
     },
     {
       id: "music",
-      name: "Music",
+      name: "Music_old",
       path: "/music",
       children: [
         {
           id: "music/classical",
-          name: "Classical",
+          name: "Classical_old",
           path: "/music/classical",
           children: [
             {
-              id: "music/classical/beethoven.mp3",
+              id: "9",
               name: "beethoven.mp3",
               path: "/music/classical/beethoven.mp3",
               fileType: "audio/mp3",
@@ -269,11 +269,11 @@ export const mockFolderStructure: FolderNode = {
         },
         {
           id: "music/jazz",
-          name: "Jazz",
+          name: "Jazz_old",
           path: "/music/jazz",
           children: [
             {
-              id: "music/jazz/miles-davis.mp3",
+              id: "10",
               name: "miles-davis.mp3",
               path: "/music/jazz/miles-davis.mp3",
               fileType: "audio/mp3",
@@ -283,7 +283,208 @@ export const mockFolderStructure: FolderNode = {
               originalPath: "/original/path/to/miles_davis_kind_of_blue.mp3"
             },
             {
-              id: "music/jazz/coltrane.mp3",
+              id: "11",
+              name: "coltrane.mp3",
+              path: "/music/jazz/coltrane.mp3",
+              fileType: "audio/mp3",
+              size: "6.9 MB",
+              categories: ["Jazz", "John Coltrane"],
+              confidence: 88,
+              originalPath: "/original/path/to/coltrane_a_love_supreme.mp3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+};
+
+export const mockFolderStructure: FolderNode = {
+  id: "root",
+  name: "Root_new",
+  children: [
+    {
+      id: "gaming",
+      name: "Gaming_new",
+      path: "/gaming",
+      children: [
+        {
+          id: "gaming/maps",
+          name: "Maps_new",
+          path: "/gaming/maps",
+          children: [
+            {
+              id: "gaming/maps/wizard-tower",
+              name: "Wizard Tower_new",
+              path: "/gaming/maps/wizard-tower",
+              children: [
+                {
+                  id: "gaming/maps/wizard-tower/green",
+                  name: "Green_new",
+                  path: "/gaming/maps/wizard-tower/green",
+                  children: [
+                    {
+                      id: "1",
+                      name: "map1.png",
+                      path: "/gaming/maps/wizard-tower/green/map1.png",
+                      fileType: "image/png",
+                      size: "2.4 MB",
+                      categories: ["Wizard Tower", "Green"],
+                      confidence: 92,
+                      originalPath: "/original/path/to/wizard_tower_green_map1.png"
+                    },
+                    {
+                      id: "2",
+                      name: "map2.jpg",
+                      path: "/gaming/maps/wizard-tower/green/map2.jpg",
+                      fileType: "image/jpeg",
+                      size: "1.8 MB",
+                      categories: ["Wizard Tower", "Green"],
+                      confidence: 85,
+                      originalPath: "/original/path/to/green_wizard_tower_map2.jpg"
+                    }
+                  ]
+                },
+                {
+                  id: "gaming/maps/wizard-tower/blue",
+                  name: "Blue_new",
+                  path: "/gaming/maps/wizard-tower/blue",
+                  children: [
+                    {
+                      id: "3",
+                      name: "blueprint.pdf",
+                      path: "/gaming/maps/wizard-tower/blue/blueprint.pdf",
+                      fileType: "application/pdf",
+                      size: "3.2 MB",
+                      categories: ["Wizard Tower", "Blueprint"],
+                      confidence: 78,
+                      originalPath: "/original/path/to/blue_tower_blueprint.pdf"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              id: "gaming/maps/dragon-lair",
+              name: "Dragon Lair_new",
+              path: "/gaming/maps/dragon-lair",
+              children: [
+                {
+                  id: "4",
+                  name: "entrance.png",
+                  path: "/gaming/maps/dragon-lair/entrance.png",
+                  fileType: "image/png",
+                  size: "4.1 MB",
+                  categories: ["Dragon Lair", "Entrance"],
+                  confidence: 95,
+                  originalPath: "/original/path/to/dragon_lair_entrance.png"
+                },
+                {
+                  id: "5",
+                  name: "treasure-room.png",
+                  path: "/gaming/maps/dragon-lair/treasure-room.png",
+                  fileType: "image/png",
+                  size: "3.8 MB",
+                  categories: ["Dragon Lair", "Treasure"],
+                  confidence: 89,
+                  originalPath: "/original/path/to/dragon_treasure_room.png"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          id: "gaming/assets",
+          name: "Assets_new",
+          path: "/gaming/assets",
+          children: [
+            {
+              id: "gaming/assets/characters",
+              name: "Characters_new",
+              path: "/gaming/assets/characters",
+              children: [
+                {
+                  id: "6",
+                  name: "wizard.fbx",
+                  path: "/gaming/assets/characters/wizard.fbx",
+                  fileType: "model/fbx",
+                  size: "12.6 MB",
+                  categories: ["Character", "Wizard"],
+                  confidence: 91,
+                  originalPath: "/original/path/to/wizard_character.fbx"
+                },
+                {
+                  id: "7",
+                  name: "dragon.fbx",
+                  path: "/gaming/assets/characters/dragon.fbx",
+                  fileType: "model/fbx",
+                  size: "28.3 MB",
+                  categories: ["Character", "Dragon"],
+                  confidence: 94,
+                  originalPath: "/original/path/to/red_dragon_model.fbx"
+                }
+              ]
+            },
+            {
+              id: "gaming/assets/props",
+              name: "Props_new",
+              path: "/gaming/assets/props",
+              children: [
+                {
+                  id: "8",
+                  name: "treasure-chest.obj",
+                  path: "/gaming/assets/props/treasure-chest.obj",
+                  fileType: "model/obj",
+                  size: "5.2 MB",
+                  categories: ["Prop", "Treasure"],
+                  confidence: 87,
+                  originalPath: "/original/path/to/gold_treasure_chest.obj"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: "music",
+      name: "Music_new",
+      path: "/music",
+      children: [
+        {
+          id: "music/classical",
+          name: "Classical_new",
+          path: "/music/classical",
+          children: [
+            {
+              id: "9",
+              name: "beethoven.mp3",
+              path: "/music/classical/beethoven.mp3",
+              fileType: "audio/mp3",
+              size: "8.7 MB",
+              categories: ["Classical", "Beethoven"],
+              confidence: 96,
+              originalPath: "/original/path/to/beethoven_symphony_no9.mp3"
+            }
+          ]
+        },
+        {
+          id: "music/jazz",
+          name: "Jazz_new",
+          path: "/music/jazz",
+          children: [
+            {
+              id: "10",
+              name: "miles-davis.mp3",
+              path: "/music/jazz/miles-davis.mp3",
+              fileType: "audio/mp3",
+              size: "7.2 MB",
+              categories: ["Jazz", "Miles Davis"],
+              confidence: 93,
+              originalPath: "/original/path/to/miles_davis_kind_of_blue.mp3"
+            },
+            {
+              id: "11",
               name: "coltrane.mp3",
               path: "/music/jazz/coltrane.mp3",
               fileType: "audio/mp3",
