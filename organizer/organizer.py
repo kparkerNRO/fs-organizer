@@ -3,10 +3,11 @@ from datetime import datetime
 from pathlib import Path
 import shutil
 from data_models.database import setup_gather
-from pipeline.folder_reconstruction import generate_folder_heirarchy
+# from pipeline.folder_reconstruction import generate_folder_heirarchy
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
 from grouping.group import group_folders
+from pipeline.categorize import calculate_categories, generate_folder_heirarchy
 
 app = typer.Typer()
 
@@ -102,6 +103,7 @@ def folders(db_path: str = typer.Argument(...)):
     Generate a folder hierarchy from the cleaned paths in the database.
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
+    calculate_categories(db_path)
     generate_folder_heirarchy(db_path)
     typer.echo("Folder hierarchy generation complete.")
 

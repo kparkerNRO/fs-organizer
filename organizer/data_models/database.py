@@ -109,6 +109,21 @@ class File(Base):
         return f"File(id={self.id}, name={self.file_name})"
 
 
+class FileProcess(Base):
+    """
+    Represents the intermediate processing logic on a file
+    """
+    __tablename__ = "file_process"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    file_id = Column(Integer, ForeignKey("files.id"), nullable=False, index=True)
+    name = Column(String, nullable=False) # For debugging purposes
+    parent_folder_id =  Column(Integer, ForeignKey("folders.id"), nullable=True)
+    groups = Column(JsonList)
+    original_path = Column(String, nullable=True)
+    new_path = Column(String, nullable=True) 
+    
+
 class PartialNameCategory(Base):
     """
     Represents a part of a folder name, once the string has been broken
@@ -286,6 +301,9 @@ def setup_folder_categories(db_path: Path):
         legacy_tables=["folder_category", "group_record"],
     )
 
+def setup_file_processing(db_path:Path):
+    reset_tables(db_path, [FileProcess])
+    
 
 # Helper function to get a database session
 # def get_session(db_path: Path):

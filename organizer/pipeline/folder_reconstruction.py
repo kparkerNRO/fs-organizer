@@ -45,7 +45,6 @@ def build_cleaned_path(session: Session, folder: Folder, target_iteration=0) -> 
     and using cleaned_name at each level.
     """
     cleaned_name = get_category_name(session, folder.id, target_iteration)
-    # cleaned_name = folder.cleaned_name
     if not folder.parent_path:
         return cleaned_name
 

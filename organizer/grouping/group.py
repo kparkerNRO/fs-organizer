@@ -18,7 +18,6 @@ from grouping.nlp_grouping import (
     prepare_records,
     compute_custom_distance_matrix,
     compute_same_folder_distance_matrix,
-    TEXT_DISTANCE_RATIO,
 )
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
@@ -205,7 +204,7 @@ def refine_groups(
     return current_group_id
 
 
-def group_iteration(session: Session, iteration_id: int) -> None:
+def group_by_name(session: Session, iteration_id: int) -> None:
     """
     Run a single iteration of the grouping process
     """
@@ -227,7 +226,7 @@ def group_iteration(session: Session, iteration_id: int) -> None:
         items,
         iteration_id=iteration_id,
         distance_matrix_func=lambda items: compute_custom_distance_matrix(
-            items, text_distance_ratio=.8
+            items, text_distance_ratio=0.7
         ),
     )
     session.add_all(group_category_entries)
@@ -239,12 +238,12 @@ def group_iteration(session: Session, iteration_id: int) -> None:
 
 
 def group_within_folder(session: Session, iteration_id: int) -> None:
-    uncertain_categories: tuple[GroupCategoryEntry, Folder] = (
-        session.query(GroupCategoryEntry, Folder)
+    stmt = (
+        select(GroupCategoryEntry, Folder)
         .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
-        .filter(GroupCategoryEntry.iteration_id == iteration_id - 1)
-        .all()
+        .where(GroupCategoryEntry.iteration_id == iteration_id - 1)
     )
+    uncertain_categories = session.execute(stmt).all()
 
     items = prepare_records(uncertain_categories)
 
@@ -252,7 +251,7 @@ def group_within_folder(session: Session, iteration_id: int) -> None:
         items,
         iteration_id=iteration_id,
         distance_matrix_func=lambda items: compute_same_folder_distance_matrix(
-            items, text_distance_ratio=0.6
+            items, text_distance_ratio=0.5
         ),
     )
     session.add_all(group_category_entries)
@@ -308,6 +307,7 @@ def pre_process_groups(session: Session, iteration_id: int) -> None:
 
         for entry in categories:
             session.add(GroupCategoryEntry(**category | {"processed_name": entry}))
+    session.commit()
 
 
 def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
@@ -334,23 +334,4 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
         process_folders_to_groups(session, 0, 0)
         pre_process_groups(session, 1)
         group_within_folder(session, 2)
-        group_iteration(session, 3)
-        # for i in range(2, max_iterations + 2):
-        #     # Get groups needing review
-        #     group_iteration(session, i)
-        #     # if review_callback:
-        #     #     review_callback(i)
-        #     print(f"Completed iteration {i}")
-
-    """
-    Possible next steps:
-        * Re-group the categories to find overlaps that can be collapsed further
-        * Within categories, find sub-categories that can be collapsed
-    """
-
-def compact_groups(session):
-    """
-    Go through all the generated categories, and collapse groups that were over-zealous in splitting
-    Eg: tower/of isolation -> tower of isolation
-    """
-    
+        group_by_name(session, 3)
