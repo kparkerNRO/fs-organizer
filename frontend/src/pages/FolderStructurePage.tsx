@@ -3,15 +3,24 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { fetchFolderStructureComparison, FolderNode, FileNode, FolderStructureComparison } from "../api";
 import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon, File as FileIcon, Move } from "lucide-react";
+import { usePersistedFolderPageState } from "../hooks/usePersistedFolderPageState";
 
 export const FolderStructurePage: React.FC = () => {
   const [folderComparison, setFolderComparison] = useState<FolderStructureComparison | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedFoldersOriginal, setExpandedFoldersOriginal] = useState<Set<string>>(new Set(["root"]));
-  const [expandedFoldersNew, setExpandedFoldersNew] = useState<Set<string>>(new Set(["root"]));
-  // const [selectedItem, setSelectedItem] = useState<{category: any, folder: Folder | null, file: FileItem | null}>({category: null, folder: null, file: null});
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
-  const [highlightedPaths, setHighlightedPaths] = useState<{original: string[], new: string[]}>({original: [], new: []});
+  
+  // Use persisted folder page state (expansion, selected file, highlighted paths)
+  const {
+    expandedFoldersOriginal,
+    setExpandedFoldersOriginal,
+    expandedFoldersNew,
+    setExpandedFoldersNew,
+    selectedFileId,
+    setSelectedFileId,
+    highlightedPaths,
+    setHighlightedPaths,
+    resetPageState,
+  } = usePersistedFolderPageState();
   
   const [draggedNodes, setDraggedNodes] = useState<(FolderNode | FileNode)[]>([]);
   const [draggedOverId, setDraggedOverId] = useState<string | null>(null);
@@ -347,7 +356,7 @@ export const FolderStructurePage: React.FC = () => {
     const isHighlighted = isFile && selectedFileId === node.id;
     
     // Check if this folder is in the highlighted path
-    const relevantPath = isOriginal ? highlightedPaths.original : highlightedPaths.new;
+    const relevantPath = isOriginal ? highlightedPaths?.original || [] : highlightedPaths?.new || [];
     const isInHighlightedPath = !isFile && relevantPath.includes(node.id);
 
     return (
