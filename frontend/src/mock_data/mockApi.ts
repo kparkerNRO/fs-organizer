@@ -1,14 +1,8 @@
 // src/mockApi.ts
 
-import { mockFolders, mockCategoryData, mockFolderStructure, mockOriginalFolderStructure } from "./mockData";
-import { Category, Folder } from "../types/types";
+import {  mockCategoryData, mockFolderStructure, mockOriginalFolderStructure } from "./mockData";
 import { FetchCategoriesParams, FetchCategoriesResponse, FolderNode, FolderStructureComparison } from "../api";
 
-export const fetchMockFolders = (): Promise<Folder[]> => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(mockFolders), 500); // Simulate API delay
-  });
-};
 
 export const fetchMockCategoryData = (
   params: FetchCategoriesParams

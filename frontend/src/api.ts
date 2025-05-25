@@ -2,7 +2,7 @@
 
 import { fetchMockCategoryData, fetchMockFolderStructure, fetchMockFolderStructureComparison } from "./mock_data/mockApi";
 import { useMockMode } from "./mock_data/MockModeContext";
-import { Category } from "./types/types";
+import { Folder } from "./types/types";
 
 export interface FetchCategoriesParams {
   page_size: number;
@@ -12,7 +12,7 @@ export interface FetchCategoriesParams {
 }
 
 export interface FetchCategoriesResponse {
-  data: Category[];
+  data: Folder[];
   totalItems: number;
   totalPages: number;
   currentPage: number;

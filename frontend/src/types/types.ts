@@ -19,12 +19,12 @@ export interface Category {
   count: number;
   confidence: number;
   possibleClassifications?: string[];
-  children?: Folder[];
+  children?: LegacyFolder[];
   isExpanded?: boolean;
   isSelected?: boolean;
 }
 
-export interface Folder {
+export interface LegacyFolder {
   id: number;
   name: string;
   classification: string;
@@ -36,7 +36,7 @@ export interface Folder {
   isSelected?: boolean;
 }
 
-export interface FileItem {
+export interface LegacyFileItem {
   id: number;
   name: string;
   fileType: string;
@@ -48,7 +48,30 @@ export interface FileItem {
 
 export interface CategoryDetailsProps {
   category?: Category | null;
-  folder?: Folder | null;
-  file?: FileItem | null;
+  folder?: LegacyFolder | null;
+  file?: LegacyFileItem | null;
 }
 
+// New data structures for folder view
+export interface Selectable {
+  isSelected?: boolean;
+}
+
+export interface Expandable {
+  isExpanded?: boolean;
+
+}
+
+export interface Folder extends Selectable, Expandable {
+  name: string;
+  count: number;
+  confidence: number;
+  children?: (Folder | File)[];
+}
+
+export interface File extends Selectable {
+  id: number;
+  name: string;
+  confidence: number;
+  possibleClassifications?: string[];
+}

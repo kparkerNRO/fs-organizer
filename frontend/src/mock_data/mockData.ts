@@ -1,11 +1,10 @@
 // src/mockData.ts
 
-import { Folder, Category } from "../types/types";
+import {  Folder } from "../types/types";
 import { FolderNode, FileNode } from "../api";
 
-export const mockFolders: Folder[] = [];
 
-export const mockCategoryData: Category[] = [
+export const mockCategoryData: Folder[] = [
   {
     id: 1,
     name: "Dragon Lair",

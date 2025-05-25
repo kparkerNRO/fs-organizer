@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { Category } from "../types/types";
+import { Folder } from "../types/types";
 
 const STORAGE_KEY = "categoriesData";
 
-export const usePersistedCategories = (initialCategories: Category[]) => {
+export const usePersistedCategories = (initialCategories: Folder[]) => {
   // Initialize state from localStorage or use initial categories
-  const [categories, setCategories] = useState<Category[]>(() => {
+  const [categories, setCategories] = useState<Folder[]>(() => {
     try {
       const savedCategories = localStorage.getItem(STORAGE_KEY);
       const result = savedCategories ? JSON.parse(savedCategories) : initialCategories;

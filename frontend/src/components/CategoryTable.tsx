@@ -1,6 +1,11 @@
 import React, { useState, useEffect, act } from "react";
 import styled from "styled-components";
-import { Category, Folder, SortConfig, CategoryDetailsProps } from "../types/types";
+import {
+  Folder,
+  LegacyFolder,
+  SortConfig,
+  CategoryDetailsProps,
+} from "../types/types";
 import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
 import { Pagination } from "./Pagination";
@@ -8,9 +13,9 @@ import { usePageState } from "../hooks/usePageState";
 import { SORT_FIELD, SORT_ORDER } from "../types/enums";
 
 interface CategoryTableProps {
-  categories: Category[];
+  categories: Folder[];
   onSelectItem: (category_info: CategoryDetailsProps) => void;
-  onUpdateCategories: (updatedCategories: Category[]) => void;
+  onUpdateCategories: (updatedCategories: Folder[]) => void;
   currentPage: number;
   totalPages: number;
   pageSize: number;
@@ -38,8 +43,8 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   onPageSizeChange,
   onSortChange,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  const [selectedFolders, setSelectedFolders] = useState<Folder[]>([]);
+  const [activeCategory, setActiveCategory] = useState<Folder | null>(null);
+  const [selectedFolders, setSelectedFolders] = useState<LegacyFolder[]>([]);
   const [draggedOverCategoryId, setDraggedOverCategoryId] = useState<
     number | null
   >(null);
@@ -121,26 +126,25 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   // Handle updates to selection
   useEffect(() => {
     if (selectedFolders.length > 1) {
-      onSelectItem({category:null, folder:null});
-      updateSelectedItem(null)
+      onSelectItem({ category: null, folder: null });
+      updateSelectedItem(null);
     } else if (selectedFolders.length === 1) {
       onSelectItem({ category: activeCategory, folder: selectedFolders[0] });
-      updateSelectedItem(selectedFolders[0].id)
+      updateSelectedItem(selectedFolders[0].id);
     }
-    
   }, [selectedFolders, onSelectItem]);
 
   useEffect(() => {
     if (activeCategory && selectedFolders.length === 0) {
       onSelectItem({ category: activeCategory, folder: null });
-      updateSelectedItem(activeCategory.id)
+      updateSelectedItem(activeCategory.id);
     }
   }, [activeCategory, selectedFolders.length, onSelectItem]);
 
   const handleContextMenu = (
     e: React.MouseEvent,
-    folder: Folder,
-    parentCategory: Category
+    folder: LegacyFolder,
+    parentCategory: Folder
   ) => {
     e.preventDefault();
 
@@ -166,7 +170,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     const categoryName = name == null ? selectedFolders[0].name : name;
 
     // Create new category based on first selected folder
-    const newCategory: Category = {
+    const newCategory: Folder = {
       id: Math.max(...categories.map((c) => c.id)) + 1,
       name: categoryName,
       classification: selectedFolders[0].classification,
@@ -194,7 +198,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     closeContextMenu();
   };
 
-  const createGroupWithCommonPrefix = (folders: Folder[]) => {
+  const createGroupWithCommonPrefix = (folders: LegacyFolder[]) => {
     if (selectedFolders.length === 0) return;
 
     //Find the max common prefix (in whole words) of the folder names
@@ -217,7 +221,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     const prefix = commonPrefix.trim();
 
     // Create new group with the common prefix and move the folders to it
-    const newCategory: Category = {
+    const newCategory: Folder = {
       id: Math.max(...categories.map((c) => c.id)) + 1,
       name: prefix,
       classification: selectedFolders[0].classification,
@@ -248,8 +252,8 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   };
 
   const handleDragStart = (
-    folder: Folder,
-    category: Category,
+    folder: LegacyFolder,
+    category: Folder,
     e: React.DragEvent
   ) => {
     const working_folders = selectedFolders.some((f) => f.id === folder.id)
@@ -281,7 +285,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     }
   };
 
-  const handleDrop = async (targetCategory: Category, e: React.DragEvent) => {
+  const handleDrop = async (targetCategory: Folder, e: React.DragEvent) => {
     e.preventDefault();
     setDraggedOverCategoryId(null);
 
@@ -347,8 +351,8 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   };
 
   const handleFolderSelection = (
-    folder: Folder,
-    parentCategory: Category,
+    folder: LegacyFolder,
+    parentCategory: Folder,
     e: React.MouseEvent
   ) => {
     e.stopPropagation();
@@ -374,12 +378,12 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     }
   };
 
-  const handleCategorySelection = (category: Category) => {
+  const handleCategorySelection = (category: Folder) => {
     setSelectedFolders([]);
     setActiveCategory(category);
   };
 
-  const renderCategory = (category: Category, index: number) => (
+  const renderCategory = (category: Folder, index: number) => (
     <CategoryGroup
       key={category.id}
       $isDraggedOver={category.id === draggedOverCategoryId}

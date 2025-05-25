@@ -1,7 +1,7 @@
 // CategoriesPage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { Category, Folder, SortConfig } from "../types/types";
+import { Folder, SortConfig } from "../types/types";
 import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
 import { fetchCategories } from "../api";
@@ -33,7 +33,7 @@ export const CategoriesPage: React.FC = () => {
   const { categories, setCategories, resetToInitial } =
     usePersistedCategories(data);
 
-  const handleUpdateCategories = (updatedCategories: Category[]) => {
+  const handleUpdateCategories = (updatedCategories: Folder[]) => {
     setCategories(updatedCategories);
   };
 
@@ -70,11 +70,15 @@ export const CategoriesPage: React.FC = () => {
   };
 
   const handleSortChange = async (sort_config: SortConfig) => {
-    await fetchCategoryData(pagination.currentPage, pagination.pageSize, sort_config);
+    await fetchCategoryData(
+      pagination.currentPage,
+      pagination.pageSize,
+      sort_config
+    );
   };
 
-  const fetchCategoryData = async ( 
-    page: number, 
+  const fetchCategoryData = async (
+    page: number,
     page_size: number,
     sort_config?: SortConfig
   ) => {
