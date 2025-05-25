@@ -39,7 +39,6 @@ def get_parent_folder(
 
     if not parent and zip_content:
         parent_path = parent_path.parent
-        # If the parent folder is not found, try to find it in the zip content
         parent = session.query(Folder).filter(Folder.folder_path == str(parent_path)).first()
 
     return parent
@@ -49,7 +48,6 @@ def get_categories_for_path(
     session: Session,
     path: str | Path,
     iteration_id: int,
-    # categories: list = [],
 ):
     """
     recursively get categories for the provided path
@@ -82,9 +80,6 @@ def get_categories_for_path(
 
     return merged_groups
 
-
-
-
 def calculate_categories(db_path: Path):
     setup_file_processing(db_path)
 
@@ -94,7 +89,14 @@ def calculate_categories(db_path: Path):
         iteration_id = session.execute(
             select(func.max(GroupCategoryEntry.iteration_id))
         ).scalar_one()
-        for file in files:
+        total_files = len(files)
+        print(f"Processing {total_files} files...")
+
+        # Process each file
+        for i, file in enumerate(files, 1):
+            if i % 100 == 0:
+                print(f"Processed {i}/{total_files} folders")
+
             # get parent folder
             if file.file_name[-4:] == ".zip":
                 continue
@@ -104,51 +106,15 @@ def calculate_categories(db_path: Path):
                 file.file_path,
                 iteration_id,
             )
+            new_path = "/".join(categories)
             session.add(
                 FileProcess(
                     file_id=file.id,
                     name = file.file_name,
                     groups=categories,
                     original_path=file.file_path,
+                    new_path=new_path
                 )
             )
         session.commit()
 
-
-def generate_file_heirarchy_from_file_groups(
-    file: FileProcess, working_representation={}
-):
-    categories = file.groups
-    if not categories:
-        return working_representation
-
-    current_representation = working_representation
-    for category in categories:
-        if category not in current_representation:
-            current_representation[category] = {}
-        current_representation = current_representation[category]
-    if "__count__" not in current_representation:
-        current_representation["__count__"] = 0
-    current_representation["__count__"] += 1
- 
-    return working_representation
-
-
-def generate_folder_heirarchy(db_path: str):
-    print(os.getcwd())
-    if not os.path.exists(db_path):
-        raise typer.BadParameter(f"Database file not found: {db_path}")
-
-    print(f"Processing database at: {db_path}")
-    sessionmaker = get_sessionmaker(db_path)
-    with sessionmaker() as session:
-        files = session.execute(select(FileProcess)).scalars().all()
-        folder_hierarchy = {}
-
-        for file in files:
-            folder_hierarchy = generate_file_heirarchy_from_file_groups(
-                file, working_representation=folder_hierarchy
-            )
-
-        json_output = json.dumps(folder_hierarchy, indent=4, sort_keys=True)
-        print(json_output)

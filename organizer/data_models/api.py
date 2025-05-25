@@ -3,6 +3,23 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class File(BaseModel):
+    id: int
+    name: str
+    confidence: int = 100
+    possibleClassifications: list[str] = []
+    originalPath: str
+    newPath: str
+
+class FolderV2(BaseModel):
+    name: str
+    count: int = 0
+    confidence: int = 100
+    children: list[File] = []
+
+class FolderViewResponse(BaseModel):
+    original: FolderV2
+    new: FolderV2
 
 class Folder(BaseModel):
     id: int

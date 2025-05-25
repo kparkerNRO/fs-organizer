@@ -74,4 +74,6 @@ export interface File extends Selectable {
   name: string;
   confidence: number;
   possibleClassifications?: string[];
+  originalPath: string;
+  newPath: string;
 }
