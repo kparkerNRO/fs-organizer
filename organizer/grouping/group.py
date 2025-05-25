@@ -16,15 +16,21 @@ from logging import getLogger
 from grouping.nlp_grouping import (
     cluster_with_custom_metric,
     prepare_records,
+    compute_custom_distance_matrix,
+    compute_same_folder_distance_matrix,
     TEXT_DISTANCE_RATIO,
 )
+from utils.config import KNOWN_VARIANT_TOKENS
+from utils.filename_utils import clean_filename, split_view_type
 
 from pathlib import Path
+from sqlalchemy import select
 
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
 log = getLogger(__name__)
 
-def process_folders_to_groups(session, group_id: int, iteration_id: int) -> GroupCategoryEntry:
+
+def process_folders_to_groups(session, group_id: int, iteration_id: int):
     """
     Process the folders to groups
     """
@@ -43,8 +49,12 @@ def process_folders_to_groups(session, group_id: int, iteration_id: int) -> Grou
         session.add(group_entry)
     session.commit()
 
-def refine_groups(session,
-    current_group_categories: list[GroupCategoryEntry], iteration_id, next_group_id=1
+
+def refine_groups(
+    session,
+    current_group_categories: list[GroupCategoryEntry],
+    iteration_id,
+    next_group_id=1,
 ) -> list[GroupCategory]:
     """
     After groupings have been calculated, evalute the groups to determine which represent
@@ -81,7 +91,7 @@ def refine_groups(session,
             session.add(group_category)
             session.flush()
             current_group_id += 1
-            
+
             continue
 
         record_names = [record.pre_processed_name for record in cluster_entries]
@@ -89,17 +99,20 @@ def refine_groups(session,
         # evaluate the group - this does a few things
         # 1. try to normalize the names to a common prefix correcting for spelling
         # 2. determine sub-categories when the group name is a common prefix
-        group_name_to_groups = refine_group(record_names) 
+        group_name_to_groups = refine_group(record_names)
 
         # Create groups based on refined results
         for group_name, entries_by_name in group_name_to_groups.items():
-            subcategories = list(set([
-                entry.categories[1]
-                for entry in entries_by_name
-                if len(entry.categories) > 1
-            ]))
+            subcategories = list(
+                set(
+                    [
+                        entry.categories[1]
+                        for entry in entries_by_name
+                        if len(entry.categories) > 1
+                    ]
+                )
+            )
             member_confidences = []
-            
 
             group_category = GroupCategory(
                 id=current_group_id,
@@ -107,15 +120,14 @@ def refine_groups(session,
                 iteration_id=iteration_id,
             )
             subgroups = {
-                subcategory: GroupCategory(id=sub_id, name=subcategory, iteration_id=iteration_id)
+                subcategory: GroupCategory(
+                    id=sub_id, name=subcategory, iteration_id=iteration_id
+                )
                 for sub_id, subcategory in enumerate(
-                    subcategories, start=current_group_id+1
+                    subcategories, start=current_group_id + 1
                 )
             }
-            subcategory_to_entry = {
-                subcategory: []
-                for subcategory in subcategories
-            }
+            subcategory_to_entry = {subcategory: [] for subcategory in subcategories}
 
             # Find entries that match this refined group
             group_members = []
@@ -158,23 +170,31 @@ def refine_groups(session,
 
             current_group_id += len(subgroups) + 1
 
-
             # Calculate overall group confidence
-            group_category.overall_confidence = min(member_confidences) if member_confidences else 0.5
+            group_category.overall_confidence = (
+                min(member_confidences) if member_confidences else 0.5
+            )
             group_category.count = len(group_members)
-            group_category.needs_review = group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+            group_category.needs_review = (
+                group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+            )
 
             # group_categories.append(group_category)
             session.add(group_category)
 
             for _, subgroup in subgroups.items():
                 sub_member_confidences = [
-                    e.confidence
-                    for e in subcategory_to_entry[subgroup.name]
+                    e.confidence for e in subcategory_to_entry[subgroup.name]
                 ]
-                subgroup.overall_confidence = min(sub_member_confidences) if sub_member_confidences else 0.5
-                subgroup.count = len([e for e in group_members if e.processed_name == subgroup.name])
-                subgroup.needs_review = subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+                subgroup.overall_confidence = (
+                    min(sub_member_confidences) if sub_member_confidences else 0.5
+                )
+                subgroup.count = len(
+                    [e for e in group_members if e.processed_name == subgroup.name]
+                )
+                subgroup.needs_review = (
+                    subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+                )
 
                 session.add(subgroup)
             session.flush()
@@ -183,7 +203,6 @@ def refine_groups(session,
 
     session.commit()
     return current_group_id
-    
 
 
 def group_iteration(session: Session, iteration_id: int) -> None:
@@ -199,13 +218,17 @@ def group_iteration(session: Session, iteration_id: int) -> None:
     )
 
     items = prepare_records(uncertain_categories)
-    if iteration_id <= 1:
-        text_distance_ratio = TEXT_DISTANCE_RATIO
-    else:
-        text_distance_ratio = 0.9
+    # if iteration_id <= 1:
+    #     text_distance_ratio = TEXT_DISTANCE_RATIO
+    # else:
+    #     text_distance_ratio = 0.8
 
     group_category_entries = cluster_with_custom_metric(
-        items, iteration_id=iteration_id, text_distance_ratio=text_distance_ratio
+        items,
+        iteration_id=iteration_id,
+        distance_matrix_func=lambda items: compute_custom_distance_matrix(
+            items, text_distance_ratio=.8
+        ),
     )
     session.add_all(group_category_entries)
     session.commit()
@@ -213,6 +236,78 @@ def group_iteration(session: Session, iteration_id: int) -> None:
     next_group_id = session.query(GroupCategory).count() + 1
 
     refine_groups(session, group_category_entries, iteration_id, next_group_id)
+
+
+def group_within_folder(session: Session, iteration_id: int) -> None:
+    uncertain_categories: tuple[GroupCategoryEntry, Folder] = (
+        session.query(GroupCategoryEntry, Folder)
+        .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
+        .filter(GroupCategoryEntry.iteration_id == iteration_id - 1)
+        .all()
+    )
+
+    items = prepare_records(uncertain_categories)
+
+    group_category_entries = cluster_with_custom_metric(
+        items,
+        iteration_id=iteration_id,
+        distance_matrix_func=lambda items: compute_same_folder_distance_matrix(
+            items, text_distance_ratio=0.6
+        ),
+    )
+    session.add_all(group_category_entries)
+    session.commit()
+
+    next_group_id = session.query(GroupCategory).count() + 1
+
+    refine_groups(session, group_category_entries, iteration_id, next_group_id)
+
+
+def pre_process_groups(session: Session, iteration_id: int) -> None:
+    """
+    Run a single iteration of the grouping process
+    """
+    # Get last round's entries
+    stmt = select(GroupCategoryEntry).where(
+        GroupCategoryEntry.iteration_id == iteration_id - 1
+    )
+    uncertain_entries = session.scalars(stmt).all()
+    uncertain_categories = [
+        {
+            "folder_id": entry.folder_id,
+            "group_id": entry.group_id,
+            "iteration_id": iteration_id,  # Artificially set the id to this iteration
+            "pre_processed_name": entry.pre_processed_name,
+            "processed_name": entry.processed_name,
+            "path": entry.path,
+            "confidence": entry.confidence,
+            "processed": entry.processed,
+            "derived_names": getattr(entry, "derived_names", None),
+            "partial_category_id": getattr(entry, "partial_category_id", None),
+        }
+        for entry in uncertain_entries
+    ]
+
+    for category in uncertain_categories:
+        split_name = category["processed_name"].split("-")
+        categories = []
+        for name in split_name:
+            cleaned_name = clean_filename(name)
+            category_current = cleaned_name
+            while category_current:
+                entry, variant = split_view_type(category_current, KNOWN_VARIANT_TOKENS)
+                if entry and entry not in categories:
+                    categories.append(entry)
+                if variant:
+                    categories.append(variant)
+
+                if category_current == entry:
+                    break
+
+                category_current = entry
+
+        for entry in categories:
+            session.add(GroupCategoryEntry(**category | {"processed_name": entry}))
 
 
 def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
@@ -236,17 +331,26 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
-        process_folders_to_groups(session, 0, 0)  
-
-        for i in range(0, max_iterations):
-            # Get groups needing review
-            group_iteration(session, i + 1)
-            # if review_callback:
-            #     review_callback(i)
-            print(f"Completed iteration {i+1}")
+        process_folders_to_groups(session, 0, 0)
+        pre_process_groups(session, 1)
+        group_within_folder(session, 2)
+        group_iteration(session, 3)
+        # for i in range(2, max_iterations + 2):
+        #     # Get groups needing review
+        #     group_iteration(session, i)
+        #     # if review_callback:
+        #     #     review_callback(i)
+        #     print(f"Completed iteration {i}")
 
     """
     Possible next steps:
         * Re-group the categories to find overlaps that can be collapsed further
         * Within categories, find sub-categories that can be collapsed
     """
+
+def compact_groups(session):
+    """
+    Go through all the generated categories, and collapse groups that were over-zealous in splitting
+    Eg: tower/of isolation -> tower of isolation
+    """
+    

@@ -43,6 +43,39 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     return (len(A_path.parts) - i) + (len(B_path.parts) - i)
 
 
+def compute_same_folder_distance_matrix(folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO) -> np.ndarray:
+    """
+    Computes a distance matrix where only items within the same folder (i.e., same parent path) are compared.
+    Items in different folders are assigned a large distance (effectively preventing clustering together).
+    """
+    n = len(folders)
+    D = np.zeros((n, n), dtype=float)
+    alpha = text_distance_ratio
+    LARGE_DISTANCE = 1e6  # Effectively infinite for clustering
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            # Only compare if parent folders are the same
+            parent_i = folders[i].path.parent
+            parent_j = folders[j].path.parent
+            if parent_i == parent_j:
+                text_vec_i = folders[i].text_vec
+                text_vec_j = folders[j].text_vec
+                text_dist = 1.0 - np.dot(text_vec_i, text_vec_j) / (
+                    np.linalg.norm(text_vec_i) * np.linalg.norm(text_vec_j) + 1e-8
+                )
+                # Optionally, you can keep struct_dist as 0 since they are in the same folder
+                struct_dist = 0
+                dist = alpha * text_dist + (1 - alpha) * struct_dist
+            else:
+                dist = LARGE_DISTANCE
+
+            D[i, j] = dist
+            D[j, i] = dist
+
+    return D
+
+
 def compute_custom_distance_matrix(folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO) -> np.ndarray:
     """
     folders: list of dicts with keys:
@@ -77,7 +110,6 @@ def compute_custom_distance_matrix(folders: list[ClusterItem], text_distance_rat
 
     return D
 
-
 def prepare_records(
     previous_round_groups: list[tuple[GroupCategoryEntry, Folder]],
 ):
@@ -102,13 +134,13 @@ def prepare_records(
     return items
 
 
-def cluster_with_custom_metric(cluster_items, iteration_id, text_distance_ratio=0) -> list[GroupCategoryEntry]:
+def cluster_with_custom_metric(cluster_items, iteration_id, distance_matrix_func) -> list[GroupCategoryEntry]:
     """
     Cluster the calculated categories into groups using a custom distance metric.
     """
 
     # Step 1: build distance matrix
-    dist_matrix = compute_custom_distance_matrix(cluster_items, text_distance_ratio)
+    dist_matrix = distance_matrix_func(cluster_items)
 
     # Step 2: run Agglomerative (or DBSCAN) with precomputed distance
     clusterer = AgglomerativeClustering(
