@@ -18,11 +18,11 @@ export interface FetchCategoriesResponse {
   currentPage: number;
 }
 
+const isMockMode = true;
+
 export const fetchCategories = async (
   params: FetchCategoriesParams
 ): Promise<FetchCategoriesResponse> => {
-  // Use mock data if in mock mode
-  const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
   
   if (isMockMode) {
     return await fetchMockCategoryData(params);
@@ -44,8 +44,6 @@ export const fetchCategories = async (
 
 export const fetchFolderStructure = async (): Promise<FolderV2> => {
   try {
-    // Use mock data if in mock mode
-    const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
     
     if (isMockMode) {
       return await fetchMockFolderStructure();
@@ -68,9 +66,6 @@ export const fetchFolderStructure = async (): Promise<FolderV2> => {
 
 export const fetchFolderStructureComparison = async (): Promise<FolderViewResponse> => {
   try {
-    // Use mock data if in mock mode
-    const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
-    
     if (isMockMode) {
       return await fetchMockFolderStructureComparison();
     }
