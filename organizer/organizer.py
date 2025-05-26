@@ -2,7 +2,8 @@ import typer
 from datetime import datetime
 from pathlib import Path
 import shutil
-from data_models.database import FileProcess, setup_gather
+from data_models.api import StructureType
+from data_models.database import setup_gather
 from pipeline.folder_reconstruction import generate_folder_heirarchy
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
@@ -45,6 +46,7 @@ def gather(
     typer.echo(f"DB path: {db_path}")
 
     gather_folder_structure_and_store(base_path, db_path)
+    clean_file_name_post(Path(db_path))
 
     # Set up latest directory and file
     latest_dir = base_output / "latest"
@@ -61,16 +63,6 @@ def gather(
     shutil.copy2(db_path, latest_db)
     typer.echo(f"Copied latest run to: {latest_db}")
     typer.echo("Gather complete.")
-
-
-@app.command()
-def postprocess(db_path: str = typer.Argument(...)):
-    """
-    Postprocess the gather data to clean and add additional metadata
-    """
-    typer.echo(f"Post-processing folders in: {db_path}")
-    clean_file_name_post(Path(db_path))
-    typer.echo("Processing complete.")
 
 
 @app.command()
@@ -102,8 +94,36 @@ def folders(db_path: str = typer.Argument(...)):
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
     calculate_categories(db_path)
-    generate_folder_heirarchy(db_path, FileProcess.new_path)
+    generate_folder_heirarchy(db_path, type=StructureType.new)
     typer.echo("Folder hierarchy generation complete.")
+
+
+@app.command()
+def pipeline(
+    base_path: Path = typer.Argument(
+        ...,
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+        readable=True,
+        resolve_path=True,
+    ),
+    output_dir: Path = typer.Argument(
+        ..., file_okay=False, dir_okay=True, writable=True, resolve_path=True
+    ),
+):
+    # Run gather
+    gather(base_path, output_dir)
+
+    # Get the path to the latest db
+    latest_db = output_dir / "latest" / "latest.db"
+
+    # Run group
+    group(str(latest_db))
+
+    # Run folders
+    folders(str(latest_db))
+
 
 # FastAPI endpoints
 

@@ -1,15 +1,19 @@
 import zipfile
 from pathlib import Path
-from typing import IO, Set, List, Tuple
+from typing import Set, List, Tuple
+from sqlalchemy import select
 from sqlalchemy.orm import Session
+from data_models.api import FolderV2, StructureType
 from data_models.database import (
+    FolderStructure,
     setup_folder_categories,
     get_session,
-    Folder,
-    File,
+    Folder as dbFolder,
+    File as dbFile,
 )
 from utils.filename_utils import clean_filename
 import os
+from utils.folder_structure import insert_file_in_structure
 
 
 def should_ignore(name: str) -> bool:
@@ -84,7 +88,7 @@ def process_zip(
                 if entry.lower().endswith("module.json") and entry.count("/") <= 2
             ]
             if preserve_modules and matching_foundry_module:
-                new_file = File(
+                new_file = dbFile(
                     file_name=zip_name, file_path=str(parent_path), depth=base_depth
                 )
                 session.add(new_file)
@@ -100,7 +104,7 @@ def process_zip(
             ]
             # Store the ZIP file as a folder with children counts if not redundant
             if not matching_root_folder:
-                new_folder = Folder(
+                new_folder = dbFolder(
                     folder_name=zip_name,
                     folder_path=str(parent_path / zip_name),
                     parent_path=str(parent_path),
@@ -130,7 +134,7 @@ def process_zip(
                             entries, str(new_path.relative_to(parent_path / zip_name))
                         )
 
-                        new_folder = Folder(
+                        new_folder = dbFolder(
                             folder_name=part,
                             folder_path=str(new_path),
                             parent_path=str(current_path),
@@ -163,7 +167,7 @@ def process_zip(
                             except (zipfile.BadZipFile, Exception) as e:
                                 print(f"Error processing nested zip {entry}: {e}")
                         else:
-                            new_file = File(
+                            new_file = dbFile(
                                 file_name=file_name,
                                 file_path=str(file_path),
                                 depth=depth,
@@ -175,6 +179,29 @@ def process_zip(
     except (NotImplementedError, zipfile.BadZipFile) as e:
         print(f"Error processing zip {zip_name}: {e}")
         session.rollback()
+
+
+def calculate_structure(session: Session, root_dir: Path):
+    files = session.execute(select(dbFile)).scalars().all()
+
+    total_files = len(files)
+    print(f"Processing {total_files} files...")
+
+    folder_structure = FolderV2(name=str(root_dir))
+    for i, file in enumerate(files, 1):
+        if i % 100 == 0:
+            print(f"Processed {i}/{total_files} folders")
+
+        file_path = Path(file.file_path)
+        file_path = file_path.relative_to(root_dir)
+        insert_file_in_structure(folder_structure, file, file_path.parts)
+
+    session.add(
+        FolderStructure(
+            structure_type=StructureType.old,
+            structure=folder_structure.model_dump_json(),
+        )
+    )
 
 
 def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
@@ -206,7 +233,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                     and not should_ignore(child_file)
                 ]
 
-                new_folder = Folder(
+                new_folder = dbFolder(
                     folder_name=d,
                     folder_path=str(folder_path),
                     parent_path=str(parent_path),
@@ -228,10 +255,13 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                         print(f"Error processing zip file {file_path}: {e}")
                     continue
 
-                new_file = File(file_name=f, file_path=str(file_path), depth=depth)
+                new_file = dbFile(file_name=f, file_path=str(file_path), depth=depth)
                 session.add(new_file)
 
             session.commit()
+
+        calculate_structure(session, base_path)
+        session.commit()
 
     except Exception as e:
         print(f"Error gathering folder structure: {e}")
@@ -250,7 +280,7 @@ def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
 
     try:
         # Fetch all folders
-        folders = session.query(Folder).all()
+        folders = session.query(dbFolder).all()
 
         for folder in folders:
             if folder.folder_name.endswith(".zip"):

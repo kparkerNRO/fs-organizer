@@ -3,19 +3,27 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class StructureType(str,Enum):
+    old = "old"
+    new= "new"
+
 class File(BaseModel):
     id: int
     name: str
-    confidence: int = 100
+    confidence: float = 100
     possibleClassifications: list[str] = []
     originalPath: str
-    newPath: str
+    newPath: str | None
 
 class FolderV2(BaseModel):
     name: str
     count: int = 0
-    confidence: int = 100
-    children: list[File] = []
+    confidence: float = 1
+    children: list["File | FolderV2"] = []
+
+    @property
+    def children_map(self):
+        return {child.name : child for child in self.children}
 
 class FolderViewResponse(BaseModel):
     original: FolderV2

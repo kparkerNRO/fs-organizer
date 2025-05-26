@@ -1,14 +1,13 @@
 import json
 from pathlib import Path
-from typing import Optional
 import os
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import  select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 import typer
-from data_models.api import FolderV2, File
+from data_models.api import  StructureType
+from data_models.database import FolderStructure
 from data_models.database import (
-    FileProcess as dbFile,
     Folder as dbFolder,
     GroupCategoryEntry,
     get_sessionmaker,
@@ -42,7 +41,7 @@ def generate_api_folder_structure_file(
             .join(dbFolder, GroupCategoryEntry.folder_id == dbFolder.id)
             .where(dbFolder.folder_path == str(parent))
         ).scalars().all()
-        
+
 
 
 def generate_api_heirarchy(session: Session, column):
@@ -88,18 +87,27 @@ def generate_folder_heirarchy_session(session: Session, column):
     return folder_hierarchy
 
 
-def generate_folder_heirarchy(db_path: str, column):
+def generate_folder_heirarchy(db_path: str,type:StructureType ):
     print(os.getcwd())
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
-    print(f"Processing database at: {db_path}")
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
-        folders = generate_folder_heirarchy_session(session, column)
-        json_output = json.dumps(folders, indent=4, sort_keys=True)
-        print(json_output)
-        return folders
+        
+        newest_entry = session.execute(
+            select(FolderStructure)
+            .where(FolderStructure.structure_type == type)
+            .order_by(FolderStructure.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        entry = newest_entry.structure
+        entry = json.dumps(json.loads(entry), indent=4)
+        # return newest_entry.structure
+        # folders = generate_folder_heirarchy_session(session, column)
+        # json_output = json.dumps(newest_entry.structure, indent=4, sort_keys=True)
+        print(entry)
+        return newest_entry.structure
 
 
 def main(

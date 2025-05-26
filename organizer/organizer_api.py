@@ -2,14 +2,21 @@ from fastapi import Depends, FastAPI
 from pathlib import Path
 import json
 
-from sqlalchemy import Cast, String
-from data_models.database import get_session, GroupCategory, GroupCategoryEntry
+from sqlalchemy import Cast, String, select
+from data_models.database import (
+    FolderStructure,
+    get_session,
+    GroupCategory,
+    GroupCategoryEntry,
+)
 
 from data_models.api import (
     Category as CategoryAPI,
     CategoryResponse,
     SortColumn,
     SortOrder,
+    StructureType,
+    FolderViewResponse,
 )
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import func
@@ -112,3 +119,27 @@ async def get_groups(
         totalPages=total_pages,
         currentPage=page,
     )
+
+
+@app.get("/folders")
+async def get_folders(
+    session=Depends(get_db_session),
+):
+    newest_entry = session.execute(
+        select(FolderStructure)
+        .where(FolderStructure.structure_type == StructureType.new)
+        .order_by(FolderStructure.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    entry = newest_entry.structure
+    parsed_new_entry = json.loads(entry)
+
+    old_entry = session.execute(
+        select(FolderStructure)
+        .where(FolderStructure.structure_type == StructureType.old)
+        .order_by(FolderStructure.id.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    parsed_old_entry = json.loads(old_entry.structure)
+
+    return FolderViewResponse(original=parsed_old_entry, new=parsed_new_entry)

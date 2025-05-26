@@ -18,6 +18,7 @@ class FileMoveException(Exception):
     pass
 
 
+
 def _get_files_in_dir(dir):
     if isinstance(dir, str):
         dir = Path(dir)

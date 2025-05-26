@@ -102,27 +102,30 @@ class File(Base):
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
     depth = Column(Integer)
 
+    parent_folder_id =  Column(Integer, ForeignKey("folders.id"), nullable=True)
+    groups = Column(JsonList)
+    original_path = Column(String, nullable=True)
+    new_path = Column(String, nullable=True) 
+
     # Relationship
     # folder = relationship("Folder")
 
     def __repr__(self):
         return f"File(id={self.id}, name={self.file_name})"
 
-
-class FileProcess(Base):
-    """
-    Represents the intermediate processing logic on a file
-    """
-    __tablename__ = "file_process"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    file_id = Column(Integer, ForeignKey("files.id"), nullable=False, index=True)
-    name = Column(String, nullable=False) # For debugging purposes
-    parent_folder_id =  Column(Integer, ForeignKey("folders.id"), nullable=True)
-    groups = Column(JsonList)
-    original_path = Column(String, nullable=True)
-    new_path = Column(String, nullable=True) 
     
+class FolderStructure(Base):
+    """
+    Represents the most-recently calculated folder structure
+    for the old and new structures. This should be serializable into
+    data_models.api.FolderV2 and data_models.api.File objects via
+    pydantic
+    """
+    __tablename__ = "folder_structure"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    structure_type = Column(String, nullable=False) 
+    structure = Column(JsonDict, nullable=False)
+
 
 class PartialNameCategory(Base):
     """
@@ -216,20 +219,6 @@ class GroupCategoryEntry(Base):
         return f"GroupCategoryEntry(id={self.id}, original={self.pre_processed_name})"
 
 
-# class Category(Base):
-#     """Represents a unified category across the system"""
-#     __tablename__ = "categories"
-
-#     id = Column(Integer, primary_key=True, autoincrement=True)
-#     name = Column(String, unique=True, index=True)
-#     classification = Column(String)
-#     classification_counts = Column(JsonDict)
-#     total_count = Column(Integer)
-
-#     def __repr__(self):
-#         return f"Category(id={self.id}, name={self.name})"
-
-
 # Database management functions
 def get_engine(db_path: Path):
     """Create and return a SQLAlchemy engine."""
@@ -279,13 +268,9 @@ def reset_tables(
     Base.metadata.create_all(engine, tables=table_objs)
 
 
-# def setup_category_summarization(db_path: Path):
-#     reset_tables(db_path, [Category])
-
-
 def setup_gather(db_path: Path):
     """Create or open the SQLite database, ensuring tables exist."""
-    reset_tables(db_path, [Folder, File])
+    reset_tables(db_path, [Folder, File, FolderStructure])
 
 
 def setup_group(db_path: Path):
@@ -300,25 +285,3 @@ def setup_folder_categories(db_path: Path):
         [PartialNameCategory, GroupCategory],
         legacy_tables=["folder_category", "group_record"],
     )
-
-def setup_file_processing(db_path:Path):
-    reset_tables(db_path, [FileProcess])
-    
-
-# Helper function to get a database session
-# def get_session(db_path: Path):
-#     """Create and return a new database session."""
-#     engine = get_engine(db_path)
-#     Session = sessionmaker(bind=engine)
-#     return Session()
-
-# def get_sessionmaker(db_path: Path):
-#     """Create and return a new database session."""
-#     engine = get_engine(db_path)
-#     return sessionmaker(bind=engine)
-
-
-# def get_latest_iteration(db_path: Path) -> Optional[GroupingIteration]:
-#     """Get the most recent grouping iteration."""
-#     with get_session(db_path) as session:
-#         return session.query(GroupingIteration).order_by(GroupingIteration.id.desc()).first()
