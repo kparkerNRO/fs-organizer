@@ -7,15 +7,17 @@ import { NavBar, NavItem } from "./components/NavBar";
 
 // Navigation items
 const navItems: NavItem[] = [
-  { id: "categorize", label: "Categorize" },
-  { id: "folder-structure", label: "Folder Structure" }
+  { id: "categories", label: "Categorize" },
+  { id: "folders", label: "Folder Structure" }
 ];
 
 function App() {
-  // Get initial view from URL hash or default to "categorize"
+  // Get initial view from URL path
   const getInitialView = () => {
-    const hash = window.location.hash.replace('#', '');
-    return hash && ['categorize', 'folder-structure'].includes(hash) ? hash : 'categorize';
+    const path = window.location.pathname;
+    if (path === '/categories') return 'categories';
+    if (path === '/folders') return 'folders';
+    return 'categories'; // default
   };
 
   const [activeView, setActiveView] = useState<string>(getInitialView);
@@ -23,20 +25,28 @@ function App() {
   // Update URL when view changes
   const handleNavItemClick = (itemId: string) => {
     setActiveView(itemId);
-    window.history.replaceState(null, '', `#${itemId}`);
+    const newPath = `/${itemId}`;
+    window.history.pushState(null, '', newPath);
   };
 
   // Listen for browser back/forward navigation
   useEffect(() => {
-    const handleHashChange = () => {
+    const handlePopState = () => {
       const newView = getInitialView();
       setActiveView(newView);
     };
 
-    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handlePopState);
+    
+    // Set initial URL if needed
+    const currentPath = window.location.pathname;
+    if (currentPath === '/' || (!currentPath.startsWith('/categories') && !currentPath.startsWith('/folders'))) {
+      window.history.replaceState(null, '', '/categories');
+      setActiveView('categories');
+    }
     
     return () => {
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
 
@@ -48,7 +58,7 @@ function App() {
         onNavItemClick={handleNavItemClick}
       />
       <MainContent>
-        {activeView === "categorize" ? (
+        {activeView === "categories" ? (
           <CategoriesPage />
         ) : (
           <FolderStructurePage />

@@ -1,36 +1,131 @@
 // src/pages/FolderStructurePage.tsx
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
-import { fetchFolderStructureComparison, FolderNode, FileNode, FolderStructureComparison } from "../api";
-import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon, File as FileIcon, Move } from "lucide-react";
-import { usePersistedFolderPageState } from "../hooks/usePersistedFolderPageState";
+import { fetchFolderStructureComparison } from "../api";
+import { FolderV2, File, FolderViewResponse } from "../types/types";
+import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon, File as FileIcon } from "lucide-react";
+
+// Helper function to determine if a node is a file (has id property) or folder
+const isFileNode = (node: FolderV2 | File): node is File => {
+  return 'id' in node;
+};
+
+// Helper function to find a file in a tree structure
+const findFileInTree = (tree: FolderV2 | File, fileId: number): File | null => {
+  if (isFileNode(tree) && tree.id === fileId) {
+    return tree;
+  }
+  if (!isFileNode(tree) && tree.children) {
+    for (const child of tree.children) {
+      const found = findFileInTree(child, fileId);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+// Helper function to get the path to a file
+const getFilePathInTree = (tree: FolderV2 | File, fileId: number, path: string[] = []): string[] | null => {
+  if (isFileNode(tree) && tree.id === fileId) {
+    return path;
+  }
+  if (!isFileNode(tree) && tree.children) {
+    for (const child of tree.children) {
+      const childPath = getFilePathInTree(child, fileId, [...path, tree.name]);
+      if (childPath) return childPath;
+    }
+  }
+  return null;
+};
+
+// Cache keys for localStorage
+const CACHE_KEYS = {
+  FOLDER_DATA: 'fs_organizer_folderData',
+  FOLDER_STATE: 'fs_organizer_folderState',
+};
+
+interface FolderState {
+  selectedFileId: number | null;
+  expandedOriginal: string[];
+  expandedNew: string[];
+}
 
 export const FolderStructurePage: React.FC = () => {
-  const [folderComparison, setFolderComparison] = useState<FolderStructureComparison | null>(null);
+  const [folderComparison, setFolderComparison] = useState<FolderViewResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  // Use persisted folder page state (expansion, selected file, highlighted paths)
-  const {
-    expandedFoldersOriginal,
-    setExpandedFoldersOriginal,
-    expandedFoldersNew,
-    setExpandedFoldersNew,
-    selectedFileId,
-    setSelectedFileId,
-    highlightedPaths,
-    setHighlightedPaths,
-    resetPageState,
-  } = usePersistedFolderPageState();
-  
-  const [draggedNodes, setDraggedNodes] = useState<(FolderNode | FileNode)[]>([]);
-  const [draggedOverId, setDraggedOverId] = useState<string | null>(null);
+  const [expandedFoldersOriginal, setExpandedFoldersOriginal] = useState<Set<string>>(new Set());
+  const [expandedFoldersNew, setExpandedFoldersNew] = useState<Set<string>>(new Set());
+  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+  const [isStateLoaded, setIsStateLoaded] = useState(false);
 
+  // Load state from cache on component mount
   useEffect(() => {
+    const loadInitialState = () => {
+      // Load folder state only from localStorage cache
+      const cachedState = localStorage.getItem(CACHE_KEYS.FOLDER_STATE);
+      let folderState: FolderState | null = null;
+      
+      if (cachedState) {
+        try {
+          folderState = JSON.parse(cachedState);
+          console.log('Restoring folder state:', folderState);
+          
+          if (folderState) {
+            // Restore state from cache
+            if (folderState.selectedFileId) {
+              setSelectedFileId(folderState.selectedFileId);
+            }
+            
+            if (folderState.expandedOriginal && folderState.expandedOriginal.length > 0) {
+              console.log('Restoring expanded original:', folderState.expandedOriginal);
+              setExpandedFoldersOriginal(new Set(folderState.expandedOriginal));
+            } else {
+              setExpandedFoldersOriginal(new Set(['root']));
+            }
+            
+            if (folderState.expandedNew && folderState.expandedNew.length > 0) {
+              console.log('Restoring expanded new:', folderState.expandedNew);
+              setExpandedFoldersNew(new Set(folderState.expandedNew));
+            } else {
+              setExpandedFoldersNew(new Set(['root']));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached folder state:', e);
+          setExpandedFoldersOriginal(new Set(['root']));
+          setExpandedFoldersNew(new Set(['root']));
+        }
+      } else {
+        // No cached state, use defaults
+        setExpandedFoldersOriginal(new Set(['root']));
+        setExpandedFoldersNew(new Set(['root']));
+      }
+      
+      setIsStateLoaded(true);
+    };
+
     const loadFolderStructure = async () => {
       try {
         setLoading(true);
+        
+        // Load initial state first
+        loadInitialState();
+        
+        // Try to load from cache first
+        const cachedData = localStorage.getItem(CACHE_KEYS.FOLDER_DATA);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          setFolderComparison(parsed);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch fresh data if no cache
         const data = await fetchFolderStructureComparison();
         setFolderComparison(data);
+        
+        // Save to cache
+        localStorage.setItem(CACHE_KEYS.FOLDER_DATA, JSON.stringify(data));
       } catch (error) {
         console.error("Error loading folder structure:", error);
       } finally {
@@ -44,10 +139,9 @@ export const FolderStructurePage: React.FC = () => {
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape key: clear file selection and path highlighting
+      // Escape key: clear file selection
       if (e.key === 'Escape') {
         setSelectedFileId(null);
-        setHighlightedPaths({original: [], new: []});
       }
     };
     
@@ -58,327 +152,98 @@ export const FolderStructurePage: React.FC = () => {
     };
   }, []);
 
-  const toggleFolder = (folderId: string, isOriginal: boolean) => {
+  // Save folder state to localStorage whenever it changes (but only after initial load)
+  useEffect(() => {
+    if (!isStateLoaded) return; // Don't save during initial state loading
+    
+    const folderState: FolderState = {
+      selectedFileId,
+      expandedOriginal: Array.from(expandedFoldersOriginal),
+      expandedNew: Array.from(expandedFoldersNew),
+    };
+    
+    console.log('Saving folder state:', folderState);
+    localStorage.setItem(CACHE_KEYS.FOLDER_STATE, JSON.stringify(folderState));
+  }, [selectedFileId, expandedFoldersOriginal, expandedFoldersNew, isStateLoaded]);
+
+
+  const toggleFolder = (folderPath: string, isOriginal: boolean) => {
     const setExpandedFolders = isOriginal ? setExpandedFoldersOriginal : setExpandedFoldersNew;
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(folderId)) {
-        newSet.delete(folderId);
+      if (newSet.has(folderPath)) {
+        newSet.delete(folderPath);
       } else {
-        newSet.add(folderId);
+        newSet.add(folderPath);
       }
       return newSet;
     });
   };
 
-  // Helper functions
-  const isFileNode = (node: FolderNode | FileNode): node is FileNode => {
-    return 'fileType' in node || node.path?.includes('.') || false;
-  };
-  
-  const findNodeById = (id: string, rootNode: FolderNode): (FolderNode | FileNode | null) => {
-    if (rootNode.id === id) return rootNode;
-    
-    if (!rootNode.children) return null;
-    
-    for (const child of rootNode.children) {
-      if (child.id === id) return child;
-      
-      if (!isFileNode(child) && child.children) {
-        const found = findNodeById(id, child);
-        if (found) return found;
-      }
-    }
-    
-    return null;
-  };
-  
-  const findParentNode = (childId: string, rootNode: FolderNode): FolderNode | null => {
-    if (!rootNode.children) return null;
-    
-    for (const child of rootNode.children) {
-      if (child.id === childId) return rootNode;
-      
-      if (!isFileNode(child) && child.children) {
-        const parent = findParentNode(childId, child);
-        if (parent) return parent;
-      }
-    }
-    
-    return null;
-  };
-
-  
-  // Drag and drop handlers
-  const handleDragStart = (e: React.DragEvent, node: FolderNode | FileNode) => {
-    e.stopPropagation();
-    
-    setDraggedNodes([node]);
-    
-    // Add visual feedback
-    if (e.dataTransfer) {
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        nodeIds: [node.id]
-      }));
-      e.dataTransfer.effectAllowed = 'move';
-    }
-  };
-  
-  const handleDragOver = (e: React.DragEvent, node: FolderNode | FileNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Only allow dropping onto folders, not files
-    if (!isFileNode(node)) {
-      e.dataTransfer.dropEffect = 'move';
-      setDraggedOverId(node.id);
-    } else {
-      e.dataTransfer.dropEffect = 'none';
-    }
-  };
-  
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDraggedOverId(null);
-  };
-  
-  const handleDrop = (e: React.DragEvent, targetNode: FolderNode | FileNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDraggedOverId(null);
-    
-    // Only allow dropping onto folders
-    if (isFileNode(targetNode) || !folderComparison) return;
-    
-    try {
-      // Make a deep copy of the folder structure to work with
-      const updatedComparison = JSON.parse(JSON.stringify(folderComparison));
-      
-      // Find the target folder in our copy
-      const targetFolderOriginal = findNodeById(targetNode.id, updatedComparison.original) as FolderNode;
-      const targetFolderNew = findNodeById(targetNode.id, updatedComparison.new) as FolderNode;
-      const targetFolder = (targetFolderOriginal || targetFolderNew) as FolderNode;
-      if (!targetFolder || isFileNode(targetFolder)) return;
-      
-      // Ensure the target folder has a children array
-      if (!targetFolder.children) {
-        targetFolder.children = [];
-      }
-      
-      // For each dragged node
-      draggedNodes.forEach(draggedNode => {
-        // Find the parent of the dragged node
-        const parentNodeOriginal = findParentNode(draggedNode.id, updatedComparison.original);
-        const parentNodeNew = findParentNode(draggedNode.id, updatedComparison.new);
-        const parentNode = parentNodeOriginal || parentNodeNew;
-        if (!parentNode) return;
-        
-        // Skip if trying to drop onto itself or its parent
-        if (draggedNode.id === targetFolder.id || parentNode.id === targetFolder.id) return;
-        
-        // Find the dragged node in our structure copy
-        const nodeToDragOriginal = findNodeById(draggedNode.id, updatedComparison.original);
-        const nodeToDragNew = findNodeById(draggedNode.id, updatedComparison.new);
-        const nodeToDrag = nodeToDragOriginal || nodeToDragNew;
-        if (!nodeToDrag) return;
-        
-        // Check for name conflicts with existing items in the target folder
-        const isFolder = !isFileNode(nodeToDrag);
-        const existingItem = targetFolder.children!.find((child: FolderNode | FileNode) => child.name === nodeToDrag.name);
-        
-        if (existingItem) {
-          // Case 1: Folder with same name exists - merge contents
-          if (isFolder && !isFileNode(existingItem)) {
-            // Merge folder contents
-            const nodeToMerge = nodeToDrag as FolderNode;
-            if (nodeToMerge.children && nodeToMerge.children.length > 0) {
-              if (!existingItem.children) {
-                existingItem.children = [];
-              }
-              
-              // Recursively add children, handling any further conflicts
-              nodeToMerge.children.forEach((child: FolderNode | FileNode) => {
-                const childConflict = existingItem.children!.find((existing: FolderNode | FileNode) => existing.name === child.name);
-                
-                if (childConflict) {
-                  // Handle recursive conflicts
-                  if (!isFileNode(child) && !isFileNode(childConflict)) {
-                    // Merge sub-folders
-                    if (child.children) {
-                      if (!childConflict.children) childConflict.children = [];
-                      child.children.forEach(subChild => {
-                        childConflict.children!.push(subChild);
-                      });
-                    }
-                  } else if (isFileNode(child)) {
-                    // Rename conflicting file
-                    const baseName = child.name.split('.')[0] || 'file';
-                    const extension = child.name.includes('.') ? `.${child.name.split('.').pop()}` : '';
-                    let newName = '';
-                    let counter = 1;
-                    
-                    // Find a non-conflicting name
-                    do {
-                      newName = `${baseName}_${counter}${extension}`;
-                      counter++;
-                    } while (existingItem.children!.some((c: FolderNode | FileNode) => c.name === newName));
-                    
-                    // Create a copy with the new name
-                    const renamedChild = { ...child, name: newName, id: `${child.id}_copy${counter}` };
-                    existingItem.children!.push(renamedChild);
-                  }
-                } else {
-                  // No conflict, add directly
-                  existingItem.children!.push(child);
-                }
-              });
-            }
-          } 
-          // Case 2: File with same name exists - rename the file being moved
-          else if (isFileNode(nodeToDrag)) {
-            const baseName = nodeToDrag.name.split('.')[0] || 'file';
-            const extension = nodeToDrag.name.includes('.') ? `.${nodeToDrag.name.split('.').pop()}` : '';
-            let newName = '';
-            let counter = 1;
-            
-            // Find a non-conflicting name
-            do {
-              newName = `${baseName}_${counter}${extension}`;
-              counter++;
-            } while (targetFolder.children!.some((child: FolderNode | FileNode) => child.name === newName));
-            
-            // Create a copy with the new name
-            const renamedNode = { ...nodeToDrag, name: newName, id: `${nodeToDrag.id}_copy${counter}` };
-            if (!targetFolder.children) {
-              targetFolder.children = [];
-            }
-            targetFolder.children.push(renamedNode);
-          }
-        } else {
-          // No conflict, add directly
-          if (!targetFolder.children) {
-              targetFolder.children = [];
-            }
-          targetFolder.children.push(nodeToDrag);
-        }
-        
-        // Remove the dragged node from its original parent
-        if (parentNode.children) {
-          parentNode.children = parentNode.children.filter(child => child.id !== draggedNode.id);
-        }
-      });
-      
-      // Update the folder structure
-      setFolderComparison(updatedComparison);
-      
-      // Clear drag state after drop
-      setDraggedNodes([]);
-    } catch (error) {
-      console.error('Error during drag and drop operation:', error);
-    }
-  };
-  
-  const selectItem = (node: FolderNode | FileNode) => {
-    // No longer needed since CategoryDetails component was removed
-    console.log('Selected item:', node.name);
-  };
-
-  // Find a file by ID and return the path of folder IDs leading to it
-  const findFileById = (fileId: string, rootNode: FolderNode, currentPath: string[] = []): { node: FileNode, path: string[] } | null => {
-    if (!rootNode.children) return null;
-    
-    for (const child of rootNode.children) {
-      if (isFileNode(child) && child.id === fileId) {
-        return { node: child, path: currentPath };
-      }
-      
-      if (!isFileNode(child) && child.children) {
-        const result = findFileById(fileId, child, [...currentPath, child.id]);
-        if (result) return result;
-      }
-    }
-    
-    return null;
-  };
-
-  // Expand all folders in a given path, including root
-  const expandPathInView = (path: string[], isOriginal: boolean) => {
-    const setExpandedFolders = isOriginal ? setExpandedFoldersOriginal : setExpandedFoldersNew;
-    setExpandedFolders(prev => {
-      const newSet = new Set(prev);
-      // Always ensure root is expanded
-      newSet.add('root');
-      // Add all folders in the path
-      path.forEach(folderId => newSet.add(folderId));
-      return newSet;
-    });
-  };
-
-  const handleFileClick = (fileNode: FileNode, isFromOriginal: boolean) => {
+  const handleFileClick = (fileNode: File) => {
     if (isFileNode(fileNode)) {
       setSelectedFileId(fileNode.id);
-      selectItem(fileNode);
       
-      // Find paths to the file in both views for highlighting
-      if (folderComparison) {
-        const currentRoot = isFromOriginal ? folderComparison.original : folderComparison.new;
-        const otherRoot = isFromOriginal ? folderComparison.new : folderComparison.original;
-        
-        // Find file in current view
-        const currentFile = findFileById(fileNode.id, currentRoot);
-        const currentPath = currentFile ? ['root', ...currentFile.path] : [];
-        
-        // Find corresponding file in other view  
-        const matchingFile = findFileById(fileNode.id, otherRoot);
-        const matchingPath = matchingFile ? ['root', ...matchingFile.path] : [];
-        
-        // Set highlighted paths for both views
-        if (isFromOriginal) {
-          setHighlightedPaths({original: currentPath, new: matchingPath});
-        } else {
-          setHighlightedPaths({original: matchingPath, new: currentPath});
-        }
-        
-        if (matchingFile) {
-          // Expand all folders in the path to the matching file in the other view
-          expandPathInView(matchingFile.path, !isFromOriginal);
-        }
+      // Auto-expand paths in both trees to show the selected file
+      if (!folderComparison) return;
+      
+      const originalPath = getFilePathInTree(folderComparison.original, fileNode.id);
+      const newPath = getFilePathInTree(folderComparison.new, fileNode.id);
+      
+      if (originalPath) {
+        setExpandedFoldersOriginal(prev => {
+          const newSet = new Set(prev);
+          let currentPath = '';
+          for (const segment of originalPath) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            newSet.add(currentPath);
+          }
+          return newSet;
+        });
+      }
+      
+      if (newPath) {
+        setExpandedFoldersNew(prev => {
+          const newSet = new Set(prev);
+          let currentPath = '';
+          for (const segment of newPath) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            newSet.add(currentPath);
+          }
+          return newSet;
+        });
       }
     }
   };
 
-  const renderNode = (node: FolderNode | FileNode, level: number = 0, isOriginal: boolean = true, expandedFolders: Set<string>) => {
+
+  const renderNode = (node: FolderV2 | File, level: number = 0, isOriginal: boolean = true, expandedFolders: Set<string>, parentPath: string = ""): React.ReactNode => {
+    const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
     const isFile = isFileNode(node);
-    const isExpanded = !isFile && expandedFolders.has(node.id);
-    const hasChildren = !isFile && (node as FolderNode).children && (node as FolderNode).children!.length > 0;
-    const isDraggedOver = draggedOverId === node.id;
+    const isExpanded = !isFile && expandedFolders.has(nodePath);
+    const hasChildren = !isFile && (node as FolderV2).children && (node as FolderV2).children!.length > 0;
     const isHighlighted = isFile && selectedFileId === node.id;
     
-    // Check if this folder is in the highlighted path
-    const relevantPath = isOriginal ? highlightedPaths?.original || [] : highlightedPaths?.new || [];
-    const isInHighlightedPath = !isFile && relevantPath.includes(node.id);
+    // Check if this folder is in the path to the selected file
+    const isInSelectedPath = selectedFileId && folderComparison ? 
+      getFilePathInTree(isOriginal ? folderComparison.original : folderComparison.new, selectedFileId)?.some(pathSegment => 
+        nodePath.endsWith(pathSegment) || nodePath === pathSegment
+      ) : false;
 
     return (
-      <div key={node.id}>
+      <div key={nodePath}>
         <FolderItem 
           $level={level}
           $isFile={isFile}
           $isSelected={isHighlighted}
-          $isDraggedOver={isDraggedOver && !isFile}
-          $isInHighlightedPath={isInHighlightedPath}
+          $isInHighlightedPath={isInSelectedPath}
           onClick={() => {
             if (isFile) {
-              handleFileClick(node as FileNode, isOriginal);
+              handleFileClick(node as File);
             } else {
-              if (hasChildren) toggleFolder(node.id, isOriginal);
+              if (hasChildren) toggleFolder(nodePath, isOriginal);
             }
           }}
-          draggable
-          onDragStart={(e) => handleDragStart(e, node)}
-          onDragOver={(e) => !isFile && handleDragOver(e, node)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => !isFile && handleDrop(e, node)}
         >
           {!isFile && hasChildren ? (
             <ExpandIcon>
@@ -391,27 +256,37 @@ export const FolderStructurePage: React.FC = () => {
           )}
           <FolderName 
             $isFile={isFile}
-            $confidence={!isFile ? (node as FolderNode).confidence : undefined}
+            $confidence={!isFile ? (node as FolderV2).confidence : undefined}
           >
             {node.name}
           </FolderName>
-          {isFile && (node as FileNode).fileType && (
-            <FileType>{(node as FileNode).fileType}</FileType>
+          {isFile && 'fileType' in node && node.fileType && (
+            <FileType>{node.fileType}</FileType>
           )}
-          {isFile && (node as FileNode).size && (
-            <FileSize>{(node as FileNode).size}</FileSize>
+          {isFile && 'size' in node && node.size && (
+            <FileSize>{node.size}</FileSize>
           )}
-          {!isFile && node.path && node.id !== 'root' && <FolderPath>{node.path}</FolderPath>}
+          {!isFile && 'path' in node && node.path && nodePath !== 'root' && (
+            <FolderPath>{node.path}</FolderPath>
+          )}
         </FolderItem>
         
         {!isFile && isExpanded && hasChildren && (
           <div>
-            {(node as FolderNode).children?.map(child => renderNode(child, level + 1, isOriginal, expandedFolders))}
+            {(node as FolderV2).children?.map(child => renderNode(child, level + 1, isOriginal, expandedFolders, nodePath))}
           </div>
         )}
       </div>
     );
   };
+
+  if (loading) {
+    return <LoadingMessage>Loading folder structure...</LoadingMessage>;
+  }
+
+  if (!folderComparison) {
+    return <ErrorMessage>Failed to load folder structure</ErrorMessage>;
+  }
 
   return (
     <PageContainer>
@@ -428,9 +303,10 @@ export const FolderStructurePage: React.FC = () => {
             </div>
             <InstructionsButton onClick={(e) => {
               e.stopPropagation();
-              alert('Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Drag and drop to move items\n• Esc to clear file selection');
+              alert('Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Escape to clear file selection');
             }}>
-              ?</InstructionsButton>
+              ?
+            </InstructionsButton>
           </div>
           {loading ? (
             <LoadingMessage>Loading folder structure...</LoadingMessage>
@@ -448,18 +324,17 @@ export const FolderStructurePage: React.FC = () => {
                   </div>
                 </div>
               </FolderTree>
-              
             </>
           ) : (
             <ErrorMessage>Failed to load folder structure</ErrorMessage>
           )}
         </ContentContainer>
-        
       </MainContainer>
     </PageContainer>
   );
 };
 
+// Styled components
 const PageContainer = styled.div`
   background-color: #f3f4f6;
   height: calc(100vh - 57px); /* Account for navbar height */
@@ -640,14 +515,6 @@ const FileSize = styled.span`
   font-size: 0.75rem;
 `;
 
-
-const LoadingMessage = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: #6b7280;
-`;
-
-
 const InstructionsButton = styled.button`
   width: 20px;
   height: 20px;
@@ -664,6 +531,12 @@ const InstructionsButton = styled.button`
   &:hover {
     background-color: #d1d5db;
   }
+`;
+
+const LoadingMessage = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
 `;
 
 const ErrorMessage = styled.div`

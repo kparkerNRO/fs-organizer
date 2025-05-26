@@ -59,21 +59,28 @@ export interface Selectable {
 
 export interface Expandable {
   isExpanded?: boolean;
-
-}
-
-export interface Folder extends Selectable, Expandable {
-  name: string;
-  count: number;
-  confidence: number;
-  children?: (Folder | File)[];
 }
 
 export interface File extends Selectable {
   id: number;
   name: string;
   confidence: number;
-  possibleClassifications?: string[];
+  possibleClassifications: string[];
   originalPath: string;
-  newPath: string;
+  newPath: string | null;
 }
+
+export interface FolderV2 extends Selectable, Expandable {
+  name: string;
+  count: number;
+  confidence: number;
+  children: (File | FolderV2)[];
+}
+
+export interface FolderViewResponse {
+  original: FolderV2;
+  new: FolderV2;
+}
+
+// Legacy interface for backward compatibility
+export interface Folder extends FolderV2 {}

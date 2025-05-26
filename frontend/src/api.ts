@@ -1,8 +1,7 @@
 // src/api.ts
 
 import { fetchMockCategoryData, fetchMockFolderStructure, fetchMockFolderStructureComparison } from "./mock_data/mockApi";
-import { useMockMode } from "./mock_data/MockModeContext";
-import { Folder } from "./types/types";
+import { Folder, FolderV2, FolderViewResponse } from "./types/types";
 
 export interface FetchCategoriesParams {
   page_size: number;
@@ -40,32 +39,9 @@ export const fetchCategories = async (
   return data;
 };
 
-export interface FileNode {
-  id: string;
-  name: string;
-  path?: string;
-  fileType?: string;
-  size?: string;
-  categories?: string[];
-  confidence?: number;
-  originalPath?: string;
-  children: (FolderNode | FileNode)[];
-}
+// Types are now imported from types.ts to match backend API exactly
 
-export interface FolderNode {
-  id: string;
-  name: string;
-  children?: (FolderNode | FileNode)[];
-  path?: string;
-  confidence?: number; // Confidence level 0-100 for folder categorization
-}
-
-export interface FolderStructureComparison {
-  original: FolderNode;
-  new: FolderNode;
-}
-
-export const fetchFolderStructure = async (): Promise<FolderNode> => {
+export const fetchFolderStructure = async (): Promise<FolderV2> => {
   try {
     // Use mock data if in mock mode
     const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
@@ -76,18 +52,20 @@ export const fetchFolderStructure = async (): Promise<FolderNode> => {
     
     const response = await fetch('http://0.0.0.0:8000/folders');
     const data = await response.json();
-    return data;
+    return data.new; // Return just the new structure from the comparison
   } catch (error) {
     console.error("Error fetching folder structure:", error);
     // Return a simple error structure in case of failure
     return {
-      id: "error",
-      name: "Error loading folders"
+      name: "Error loading folders",
+      count: 0,
+      confidence: 0,
+      children: []
     };
   }
 };
 
-export const fetchFolderStructureComparison = async (): Promise<FolderStructureComparison> => {
+export const fetchFolderStructureComparison = async (): Promise<FolderViewResponse> => {
   try {
     // Use mock data if in mock mode
     const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
@@ -96,7 +74,7 @@ export const fetchFolderStructureComparison = async (): Promise<FolderStructureC
       return await fetchMockFolderStructureComparison();
     }
     
-    const response = await fetch('http://0.0.0.0:8000/folders/comparison');
+    const response = await fetch('http://0.0.0.0:8000/folders');
     const data = await response.json();
     return data;
   } catch (error) {
@@ -104,12 +82,16 @@ export const fetchFolderStructureComparison = async (): Promise<FolderStructureC
     // Return a simple error structure in case of failure
     return {
       original: {
-        id: "error",
-        name: "Error loading original folders"
+        name: "Error loading original folders",
+        count: 0,
+        confidence: 0,
+        children: []
       },
       new: {
-        id: "error", 
-        name: "Error loading new folders"
+        name: "Error loading new folders",
+        count: 0,
+        confidence: 0,
+        children: []
       }
     };
   }
