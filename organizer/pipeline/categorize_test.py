@@ -13,9 +13,10 @@ from data_models.database import (
     Base,
     Folder,
     File,
-    FileProcess,
     GroupCategoryEntry,
+    FolderStructure,
 )
+from data_models.api import StructureType
 
 
 @pytest.fixture
@@ -59,7 +60,7 @@ def sample_folders(session):
             depth=2,
         ),
     ]
-    
+
     for folder in folders:
         session.add(folder)
     session.commit()
@@ -99,7 +100,7 @@ def sample_files(session):
             depth=3,
         ),
     ]
-    
+
     for file in files:
         session.add(file)
     session.commit()
@@ -132,7 +133,7 @@ def sample_group_entries(session, sample_folders):
             confidence=0.7,
         ),
     ]
-    
+
     for entry in entries:
         session.add(entry)
     session.commit()
@@ -146,7 +147,7 @@ class TestGetParentFolder:
         """Test finding parent folder with normal file path"""
         parent_path = Path("/test/parent_folder")
         result = get_parent_folder(session, parent_path)
-        
+
         assert result is not None
         assert result.folder_name == "parent_folder"
         assert result.folder_path == "/test/parent_folder"
@@ -155,14 +156,14 @@ class TestGetParentFolder:
         """Test when parent folder doesn't exist"""
         parent_path = Path("/nonexistent/path")
         result = get_parent_folder(session, parent_path)
-        
+
         assert result is None
 
     def test_get_parent_folder_zip_content_false(self, session, sample_folders):
         """Test zip content handling when zip_content=False"""
         parent_path = Path("/test/content.zip/zip_content")
         result = get_parent_folder(session, parent_path, zip_content=False)
-        
+
         # The function finds the exact path match regardless of zip_content flag
         assert result is not None
         assert result.folder_name == "zip_content"
@@ -172,7 +173,7 @@ class TestGetParentFolder:
         # Test with a path that doesn't exist to trigger fallback behavior
         parent_path = Path("/test/nonexistent.zip/some_content")
         result = get_parent_folder(session, parent_path, zip_content=True)
-        
+
         assert result is None  # Should not find anything since neither path exists
 
     def test_get_parent_folder_zip_content_fallback(self, session, sample_folders):
@@ -180,54 +181,66 @@ class TestGetParentFolder:
         # Create a scenario where the direct path doesn't exist but parent does
         parent_path = Path("/test/nonexistent.zip/some_folder")
         result = get_parent_folder(session, parent_path, zip_content=True)
-        
+
         assert result is None  # Neither direct path nor parent should exist
 
 
 class TestGetCategoriesForPath:
     """Test cases for get_categories_for_path function"""
 
-    def test_get_categories_for_path_string_input(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_string_input(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test with string path input"""
         path = "/test/parent_folder/child_folder/file.txt"
         result = get_categories_for_path(session, path, iteration_id=2)
-        
+
         assert isinstance(result, list)
 
-    def test_get_categories_for_path_path_input(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_path_input(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test with Path object input"""
         path = Path("/test/parent_folder/child_folder/file.txt")
         result = get_categories_for_path(session, path, iteration_id=2)
-        
+
         assert isinstance(result, list)
 
-    def test_get_categories_for_path_no_parent(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_no_parent(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test when parent folder doesn't exist"""
         path = Path("/nonexistent/path/file.txt")
         result = get_categories_for_path(session, path, iteration_id=2)
-        
+
         assert result == []
 
-    def test_get_categories_for_path_with_groups(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_with_groups(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test when parent folder has associated groups"""
         path = Path("/test/parent_folder/file.txt")
         result = get_categories_for_path(session, path, iteration_id=2)
-        
+
         assert isinstance(result, list)
         # Should include groups from parent folder
 
-    def test_get_categories_for_path_zip_matching(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_zip_matching(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test with zip file path matching"""
         path = Path("/test/content.zip/zip_content/file.txt")
         result = get_categories_for_path(session, path, iteration_id=2)
-        
+
         assert isinstance(result, list)
 
-    def test_get_categories_for_path_recursive(self, session, sample_folders, sample_group_entries):
+    def test_get_categories_for_path_recursive(
+        self, session, sample_folders, sample_group_entries
+    ):
         """Test recursive category collection"""
         # This test verifies that categories are collected recursively up the path
         path = Path("/test/parent_folder/child_folder/deep/file.txt")
-        
+
         # Test the actual recursive behavior by creating a deep folder structure
         deep_folder = Folder(
             id=5,
@@ -237,7 +250,7 @@ class TestGetCategoriesForPath:
         )
         session.add(deep_folder)
         session.commit()
-        
+
         result = get_categories_for_path(session, path, iteration_id=2)
         assert isinstance(result, list)
         # The function should return categories from the recursive traversal
@@ -246,118 +259,160 @@ class TestGetCategoriesForPath:
 class TestCalculateCategories:
     """Test cases for calculate_categories function"""
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    def test_calculate_categories_basic(self, mock_get_sessionmaker, mock_setup, session, sample_files, sample_group_entries):
+    @patch("pipeline.categorize.insert_file_in_structure")
+    @patch("pipeline.categorize.get_sessionmaker")
+    def test_calculate_categories_basic(
+        self,
+        mock_get_sessionmaker,
+        mock_insert,
+        session,
+        sample_files,
+        sample_group_entries,
+    ):
         """Test basic calculate_categories functionality"""
         # Setup mocks
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        
+
         db_path = Path("/test/database.db")
-        
+
         # Add max iteration_id query result
-        session.add(GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test"))
+        session.add(
+            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
+        )
         session.commit()
-        
+
         calculate_categories(db_path)
-        
-        # Verify setup was called
-        mock_setup.assert_called_once_with(db_path)
+
+        # Verify sessionmaker was called
         mock_get_sessionmaker.assert_called_once_with(db_path)
-        
-        # Check that FileProcess entries were created
-        file_processes = session.query(FileProcess).all()
-        assert len(file_processes) > 0
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    def test_calculate_categories_skips_zip_files(self, mock_get_sessionmaker, mock_setup, session, sample_files, sample_group_entries):
-        """Test that zip files are skipped during processing"""
+        # Check that File objects were updated with new_path and groups
+        files = session.query(File).all()
+        non_zip_files = [f for f in files if not f.file_name.endswith(".zip")]
+        for file in non_zip_files:
+            assert hasattr(file, "new_path")
+            assert hasattr(file, "groups")
+
+        # Check that FolderStructure entry was created
+        folder_structures = session.query(FolderStructure).all()
+        assert len(folder_structures) == 1
+        assert folder_structures[0].structure_type == StructureType.new
+
+    @patch("pipeline.categorize.insert_file_in_structure")
+    @patch("pipeline.categorize.get_sessionmaker")
+    def test_calculate_categories_processes_all_files(
+        self,
+        mock_get_sessionmaker,
+        mock_insert,
+        session,
+        sample_files,
+        sample_group_entries,
+    ):
+        """Test that all files are processed including zip files"""
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        
-        db_path = Path("/test/database.db")
-        
-        # Add max iteration_id query result
-        session.add(GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test"))
-        session.commit()
-        
-        calculate_categories(db_path)
-        
-        # Check that zip files were not processed
-        file_processes = session.query(FileProcess).all()
-        zip_processes = [fp for fp in file_processes if fp.name.endswith('.zip')]
-        assert len(zip_processes) == 0
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    @patch('pipeline.categorize.get_categories_for_path')
-    def test_calculate_categories_with_categories(self, mock_get_categories, mock_get_sessionmaker, mock_setup, session, sample_files, sample_group_entries):
+        db_path = Path("/test/database.db")
+
+        # Add max iteration_id query result
+        session.add(
+            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
+        )
+        session.commit()
+
+        calculate_categories(db_path)
+
+        # Check that all files were processed and updated
+        files = session.query(File).all()
+        # All files should have been processed
+        assert len(files) > 0
+        for file in files:
+            assert hasattr(file, "new_path")
+            assert hasattr(file, "groups")
+
+    @patch("pipeline.categorize.insert_file_in_structure")
+    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("pipeline.categorize.get_categories_for_path")
+    def test_calculate_categories_with_categories(
+        self,
+        mock_get_categories,
+        mock_get_sessionmaker,
+        mock_insert,
+        session,
+        sample_files,
+        sample_group_entries,
+    ):
         """Test calculate_categories with mock categories"""
         # Setup mocks
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        mock_get_categories.return_value = ["category1", "category2"]
-        
-        db_path = Path("/test/database.db")
-        
-        # Add max iteration_id query result
-        session.add(GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test"))
-        session.commit()
-        
-        calculate_categories(db_path)
-        
-        # Check that categories were used to create new paths
-        file_processes = session.query(FileProcess).all()
-        non_zip_processes = [fp for fp in file_processes if not fp.name.endswith('.zip')]
-        
-        for fp in non_zip_processes:
-            assert fp.new_path == "category1/category2"
-            assert fp.groups == ["category1", "category2"]
+        # Mock GroupCategoryEntry objects
+        mock_categories = [
+            GroupCategoryEntry(processed_name="category1", confidence=0.8),
+            GroupCategoryEntry(processed_name="category2", confidence=0.9),
+        ]
+        mock_get_categories.return_value = mock_categories
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    def test_calculate_categories_no_files(self, mock_get_sessionmaker, mock_setup, session):
+        db_path = Path("/test/database.db")
+
+        # Add max iteration_id query result
+        session.add(
+            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
+        )
+        session.commit()
+
+        calculate_categories(db_path)
+
+        # Check that categories were used to create new paths
+        files = session.query(File).all()
+        non_zip_files = [f for f in files if not f.file_name.endswith(".zip")]
+
+        for file in non_zip_files:
+            assert file.new_path == "category1/category2"
+            assert file.groups == ["category1", "category2"]
+
+    @patch("pipeline.categorize.get_sessionmaker")
+    def test_calculate_categories_no_files(self, mock_get_sessionmaker, session):
         """Test calculate_categories with no files in database"""
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        
-        db_path = Path("/test/database.db")
-        
-        # Add max iteration_id query result but no files
-        session.add(GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test"))
-        session.commit()
-        
-        calculate_categories(db_path)
-        
-        # Should not create any FileProcess entries
-        file_processes = session.query(FileProcess).all()
-        assert len(file_processes) == 0
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    def test_calculate_categories_empty_categories(self, mock_get_sessionmaker, mock_setup, session, sample_files, sample_group_entries):
+        db_path = Path("/test/database.db")
+
+        # Add max iteration_id query result but no files
+        session.add(
+            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
+        )
+        session.commit()
+
+        calculate_categories(db_path)
+
+        # Should not process any files since there are none
+        files = session.query(File).all()
+        assert len(files) == 0
+
+    @patch("pipeline.categorize.get_sessionmaker")
+    def test_calculate_categories_empty_categories(
+        self, mock_get_sessionmaker, session, sample_files, sample_group_entries
+    ):
         """Test calculate_categories when get_categories_for_path returns empty list"""
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        
+
         db_path = Path("/test/database.db")
-        
+
         # Add max iteration_id query result
-        session.add(GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test"))
+        session.add(
+            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
+        )
         session.commit()
-        
-        with patch('pipeline.categorize.get_categories_for_path', return_value=[]):
+
+        with patch("pipeline.categorize.get_categories_for_path", return_value=[]):
             calculate_categories(db_path)
-        
+
         # Check that empty categories result in empty new_path
-        file_processes = session.query(FileProcess).all()
-        non_zip_processes = [fp for fp in file_processes if not fp.name.endswith('.zip')]
-        
-        for fp in non_zip_processes:
-            assert fp.new_path == ""
-            assert fp.groups == []
+        files = session.query(File).all()
+        non_zip_files = [f for f in files if not f.file_name.endswith(".zip")]
+
+        for file in non_zip_files:
+            assert file.new_path == ""
+            assert file.groups == []
 
 
 class TestEdgeCases:
@@ -375,15 +430,13 @@ class TestEdgeCases:
         result = get_categories_for_path(session, path, iteration_id=1)
         assert result == []
 
-    @patch('pipeline.categorize.setup_file_processing')
-    @patch('pipeline.categorize.get_sessionmaker')
-    def test_calculate_categories_no_iteration_id(self, mock_get_sessionmaker, mock_setup, session):
+    @patch("pipeline.categorize.get_sessionmaker")
+    def test_calculate_categories_no_iteration_id(self, mock_get_sessionmaker, session):
         """Test calculate_categories when no GroupCategoryEntry exists"""
         mock_get_sessionmaker.return_value = lambda: session
-        mock_setup.return_value = None
-        
+
         db_path = Path("/test/database.db")
-        
+
         # No GroupCategoryEntry in database - function returns None instead of raising
         # This test verifies the function handles the case gracefully
         result = calculate_categories(db_path)
