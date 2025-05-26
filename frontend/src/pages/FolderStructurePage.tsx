@@ -254,12 +254,20 @@ export const FolderStructurePage: React.FC = () => {
               {isFile ? <FileIcon size={14} /> : <FolderIcon size={14} />}
             </ExpandIcon>
           )}
-          <FolderName 
+            <FolderName 
             $isFile={isFile}
             $confidence={!isFile ? (node as FolderV2).confidence : undefined}
-          >
-            {node.name}
-          </FolderName>
+            style={{ display: 'flex', alignItems: 'center' }}
+            >
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {node.name}
+            </span>
+            {!isOriginal && !isFile && (node as FolderV2).confidence !== undefined && (
+              <ConfidenceInline $confidence={(node as FolderV2).confidence}>
+              (Confidence: {Math.round((node as FolderV2).confidence)}%)
+              </ConfidenceInline>
+            )}
+            </FolderName>
           {isFile && 'fileType' in node && node.fileType && (
             <FileType>{node.fileType}</FileType>
           )}
@@ -294,8 +302,7 @@ export const FolderStructurePage: React.FC = () => {
         <Title>Folder Structure</Title>
       </Header>
 
-      <MainContainer>
-        <ContentContainer>
+      <ContentContainer>
           <div style={{ paddingBottom: '0.5rem', borderBottom: '1px solid #e5e7eb', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <FolderIcon size={16} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
@@ -329,7 +336,6 @@ export const FolderStructurePage: React.FC = () => {
             <ErrorMessage>Failed to load folder structure</ErrorMessage>
           )}
         </ContentContainer>
-      </MainContainer>
     </PageContainer>
   );
 };
@@ -343,17 +349,7 @@ const PageContainer = styled.div`
   flex-direction: column;
   width: 100vw;
   box-sizing: border-box;
-`;
-
-const MainContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  flex: 1;
-  min-height: 0; /* Critical for proper flexbox behavior with scrolling */
-  overflow: hidden;
   padding: 1rem;
-  box-sizing: border-box;
 `;
 
 const ContentContainer = styled.div`
@@ -374,7 +370,8 @@ const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 0.5rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 `;
 
 const Title = styled.h1`
@@ -513,6 +510,14 @@ const FileSize = styled.span`
   margin-left: 0.5rem;
   color: #6b7280;
   font-size: 0.75rem;
+`;
+
+const ConfidenceInline = styled.span<{ $confidence: number }>`
+  font-size: 0.7rem;
+  font-weight: 400;
+  color:rgb(51, 55, 61); /* Grey text */
+  margin-left: auto; /* Push to the right */
+  padding-left: 0.5rem;
 `;
 
 const InstructionsButton = styled.button`
