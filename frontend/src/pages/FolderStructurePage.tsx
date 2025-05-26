@@ -4,6 +4,7 @@ import styled from "styled-components";
 import { fetchFolderStructureComparison } from "../api";
 import { FolderV2, File, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FolderOpen, Folder as FolderIcon, File as FileIcon } from "lucide-react";
+import { ResetButton } from "../components/ResetButton";
 
 // Helper function to determine if a node is a file (has id property) or folder
 const isFileNode = (node: FolderV2 | File): node is File => {
@@ -135,6 +136,32 @@ export const FolderStructurePage: React.FC = () => {
 
     loadFolderStructure();
   }, []);
+
+  // Reset function to clear cache and reload data
+  const handleReset = async () => {
+    // Clear cache
+    localStorage.removeItem(CACHE_KEYS.FOLDER_DATA);
+    localStorage.removeItem(CACHE_KEYS.FOLDER_STATE);
+    
+    // Reset state
+    setSelectedFileId(null);
+    setExpandedFoldersOriginal(new Set(['root']));
+    setExpandedFoldersNew(new Set(['root']));
+    
+    // Reload data
+    try {
+      setLoading(true);
+      const data = await fetchFolderStructureComparison();
+      setFolderComparison(data);
+      
+      // Save fresh data to cache
+      localStorage.setItem(CACHE_KEYS.FOLDER_DATA, JSON.stringify(data));
+    } catch (error) {
+      console.error("Error reloading folder structure:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -300,6 +327,7 @@ export const FolderStructurePage: React.FC = () => {
     <PageContainer>
       <Header>
         <Title>Folder Structure</Title>
+        <ResetButton onReset={handleReset} />
       </Header>
 
       <ContentContainer>

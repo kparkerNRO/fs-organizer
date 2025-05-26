@@ -18,7 +18,7 @@ class File(BaseModel):
 class FolderV2(BaseModel):
     name: str
     count: int = 0
-    confidence: float = 1
+    confidence: float = 100
     children: list["File | FolderV2"] = []
 
     @property

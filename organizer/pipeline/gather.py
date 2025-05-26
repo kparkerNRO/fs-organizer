@@ -88,9 +88,23 @@ def process_zip(
                 if entry.lower().endswith("module.json") and entry.count("/") <= 2
             ]
             if preserve_modules and matching_foundry_module:
-                new_file = dbFile(
-                    file_name=zip_name, file_path=str(parent_path), depth=base_depth
+                # HACK: this creates an artificial folder to tag foundry modules
+                folder_name = "Foundry Module " + zip_name 
+                new_folder = dbFolder(
+                    folder_name=folder_name,
+                    folder_path=str(parent_path / folder_name),
+                    parent_path=str(parent_path),
+                    depth=base_depth,
+                    file_source="zip_file",
+                    num_folder_children=0,
+                    num_file_children=1,
                 )
+                new_file = dbFile(
+                    file_name=zip_name,
+                    file_path=str(parent_path / folder_name / zip_name),
+                    depth=base_depth,
+                )
+                session.add(new_folder)
                 session.add(new_file)
                 session.commit()
                 return
@@ -194,7 +208,7 @@ def calculate_structure(session: Session, root_dir: Path):
 
         file_path = Path(file.file_path)
         file_path = file_path.relative_to(root_dir)
-        insert_file_in_structure(folder_structure, file, file_path.parts)
+        insert_file_in_structure(folder_structure, file, file_path.parent.parts)
 
     session.add(
         FolderStructure(
@@ -255,8 +269,8 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                         print(f"Error processing zip file {file_path}: {e}")
                     continue
 
-                new_file = dbFile(file_name=f, file_path=str(file_path), depth=depth)
-                session.add(new_file)
+                # new_file = dbFile(file_name=f, file_path=str(file_path), depth=depth)
+                # session.add(new_file)
 
             session.commit()
 

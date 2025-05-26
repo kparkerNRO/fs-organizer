@@ -2,6 +2,7 @@
 
 import { fetchMockCategoryData, fetchMockFolderStructure, fetchMockFolderStructureComparison } from "./mock_data/mockApi";
 import { Folder, FolderV2, FolderViewResponse } from "./types/types";
+import { env } from "./config/env";
 
 export interface FetchCategoriesParams {
   page_size: number;
@@ -21,14 +22,14 @@ export const fetchCategories = async (
   params: FetchCategoriesParams
 ): Promise<FetchCategoriesResponse> => {
   // Use mock data if in mock mode
-  const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
+  const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
   
   if (isMockMode) {
     return await fetchMockCategoryData(params);
   }
 
   const response = await fetch(
-    `http://0.0.0.0:8000/groups?` +
+    `${env.apiUrl}/groups?` +
     `page=${params.page}&` +
     `pageSize=${params.page_size}` +
     `${params.sortField ? `&sort_column=${params.sortField}` : ''}` +
@@ -44,13 +45,13 @@ export const fetchCategories = async (
 export const fetchFolderStructure = async (): Promise<FolderV2> => {
   try {
     // Use mock data if in mock mode
-    const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
+    const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
     
     if (isMockMode) {
       return await fetchMockFolderStructure();
     }
     
-    const response = await fetch('http://0.0.0.0:8000/folders');
+    const response = await fetch(`${env.apiUrl}/folders`);
     const data = await response.json();
     return data.new; // Return just the new structure from the comparison
   } catch (error) {
@@ -68,13 +69,13 @@ export const fetchFolderStructure = async (): Promise<FolderV2> => {
 export const fetchFolderStructureComparison = async (): Promise<FolderViewResponse> => {
   try {
     // Use mock data if in mock mode
-    const isMockMode = true; // Hardcoded for now, would use useMockMode() in a component
+    const isMockMode = false; // Hardcoded for now, would use useMockMode() in a component
     
     if (isMockMode) {
       return await fetchMockFolderStructureComparison();
     }
     
-    const response = await fetch('http://0.0.0.0:8000/folders');
+    const response = await fetch(`${env.apiUrl}/folders`);
     const data = await response.json();
     return data;
   } catch (error) {
