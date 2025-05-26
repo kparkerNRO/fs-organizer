@@ -55,18 +55,15 @@ const CACHE_KEYS = {
   FOLDER_STATE: "fs_organizer_folderState",
 };
 
-interface FolderState {
-  selectedFileId: number | null;
-  expanded: string[];
-}
 
 export const FolderStructurePage: React.FC = () => {
   const [folderComparison, setFolderComparison] =
     useState<FolderViewResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [isStateLoaded, setIsStateLoaded] = useState(false);
+  const [shouldSync, setShouldSync] = useState(true);
 
   // Reset function to clear cache and reload data
   const handleReset = async () => {
@@ -202,16 +199,27 @@ export const FolderStructurePage: React.FC = () => {
             />
             <span style={{ fontWeight: 500 }}>Folders</span>
           </div>
-          <InstructionsButton
-            onClick={(e) => {
-              e.stopPropagation();
-              alert(
-                "Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Escape to clear file selection"
-              );
-            }}
-          >
-            ?
-          </InstructionsButton>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <SyncToggleContainer>
+              <SyncToggleLabel>Sync scroll:</SyncToggleLabel>
+              <SyncToggle
+                $isEnabled={shouldSync}
+                onClick={() => setShouldSync(!shouldSync)}
+              >
+                <SyncToggleThumb $isEnabled={shouldSync} />
+              </SyncToggle>
+            </SyncToggleContainer>
+            <InstructionsButton
+              onClick={(e) => {
+                e.stopPropagation();
+                alert(
+                  "Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Escape to clear file selection\n• Toggle 'Sync scroll' to automatically scroll to selected files"
+                );
+              }}
+            >
+              ?
+            </InstructionsButton>
+          </div>
         </div>
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <div
@@ -230,6 +238,7 @@ export const FolderStructurePage: React.FC = () => {
               onSelectItem={setSelectedFileId}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={selectedFileId}
+              shouldSync={shouldSync}
             />
           </div>
           <div
@@ -246,6 +255,7 @@ export const FolderStructurePage: React.FC = () => {
               onSelectItem={setSelectedFileId}
               viewType={FolderBrowserViewType.NEW}
               externalSelectedFile={selectedFileId}
+              shouldSync={shouldSync}
             />
           </div>
         </div>
@@ -294,145 +304,6 @@ const Title = styled.h1`
   color: #1f2937;
 `;
 
-const FolderTree = styled.div`
-  margin-top: 0.5rem;
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0; /* Critical for proper flexbox behavior with scrolling */
-  width: 100%;
-
-  /* Modern scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-  }
-`;
-
-const FolderItem = styled.div<{
-  $level: number;
-  $isFile?: boolean;
-  $isSelected?: boolean;
-  $isDraggedOver?: boolean;
-  $isInHighlightedPath?: boolean;
-}>`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0.35rem 0.5rem;
-  padding-left: ${(props) => props.$level * 0.9 + 0.6}rem;
-  cursor: pointer;
-  border-radius: 0.15rem;
-  transition: all 0.15s ease;
-  margin: 1px 0;
-  font-size: 0.9rem;
-  color: ${(props) => (props.$isFile ? "#4b5563" : "#000")};
-  background-color: ${(props) => {
-    if (props.$isDraggedOver) return "#e2f0fd";
-    if (props.$isSelected) return "#dbeafe";
-    if (props.$isInHighlightedPath) return "#f0f9ff"; // Very subtle blue highlight for path
-    return "transparent";
-  }};
-  border: 1px solid transparent; /* Always maintain border space */
-  border-color: ${(props) => {
-    if (props.$isDraggedOver) return "#3b82f6";
-    if (props.$isSelected) return "#60a5fa";
-    if (props.$isInHighlightedPath) return "#e0f2fe"; // Subtle border for path highlight
-    return "transparent";
-  }};
-  border-style: ${(props) => (props.$isDraggedOver ? "dashed" : "solid")};
-  position: relative;
-
-  &:hover {
-    background-color: ${(props) => (props.$isSelected ? "#c7d2fe" : "#e7eefa")};
-  }
-
-  &:active {
-    background-color: #dce6f8;
-  }
-`;
-
-const ExpandIcon = styled.span`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 0.3rem;
-  width: 16px;
-  height: 16px;
-`;
-
-const FolderName = styled.span<{
-  $isFile: boolean;
-  $confidence?: number;
-}>`
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  background-color: ${(props) => {
-    if (props.$isFile) return "transparent";
-    if (props.$confidence !== undefined) {
-      // Calculate confidence background color
-      const confidence = Math.max(0, Math.min(100, props.$confidence));
-      const normalizedConfidence = confidence / 100;
-      const red = Math.round(220 + (255 - 220) * normalizedConfidence);
-      const green = Math.round(38 + (255 - 38) * normalizedConfidence);
-      const blue = Math.round(38 + (255 - 38) * normalizedConfidence);
-      return `rgb(${red}, ${green}, ${blue})`;
-    }
-    return "transparent";
-  }};
-  padding: 2px 6px;
-  border-radius: 3px;
-  margin-right: 4px;
-`;
-
-const FolderPath = styled.span`
-  margin-left: 0.5rem;
-  color: #6b7280;
-  font-size: 0.75rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-`;
-
-const FileType = styled.span`
-  margin-left: 0.5rem;
-  color: #6b7280;
-  font-size: 0.75rem;
-  background-color: #f3f4f6;
-  padding: 0.1rem 0.4rem;
-  border-radius: 0.25rem;
-`;
-
-const FileSize = styled.span`
-  margin-left: 0.5rem;
-  color: #6b7280;
-  font-size: 0.75rem;
-`;
-
-const ConfidenceInline = styled.span<{ $confidence: number }>`
-  font-size: 0.7rem;
-  font-weight: 400;
-  color: rgb(51, 55, 61); /* Grey text */
-  margin-left: auto; /* Push to the right */
-  padding-left: 0.5rem;
-`;
 
 const InstructionsButton = styled.button`
   width: 20px;
@@ -452,14 +323,41 @@ const InstructionsButton = styled.button`
   }
 `;
 
-const LoadingMessage = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: #6b7280;
+const SyncToggleContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 `;
 
-const ErrorMessage = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: #ef4444;
+const SyncToggleLabel = styled.span`
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
 `;
+
+const SyncToggle = styled.div<{ $isEnabled: boolean }>`
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background-color: ${(props) => (props.$isEnabled ? "#3b82f6" : "#d1d5db")};
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  position: relative;
+  
+  &:hover {
+    background-color: ${(props) => (props.$isEnabled ? "#2563eb" : "#9ca3af")};
+  }
+`;
+
+const SyncToggleThumb = styled.div<{ $isEnabled: boolean }>`
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: white;
+  position: absolute;
+  top: 2px;
+  left: ${(props) => (props.$isEnabled ? "16px" : "2px")};
+  transition: left 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+`;
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { FolderV2, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FileIcon, FolderIcon } from "lucide-react";
@@ -50,6 +50,7 @@ interface FolderBrowserProps {
   onSelectItem: (file_id: number | null) => void;
   viewType: FolderBrowserViewType;
   externalSelectedFile: number | null;
+  shouldSync?: boolean;
 }
 
 export const FolderBrowser: React.FC<FolderBrowserProps> = ({
@@ -57,6 +58,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   onSelectItem,
   viewType,
   externalSelectedFile,
+  shouldSync = true,
 }) => {
   const folderTree =
     folderViewResponse &&
@@ -68,6 +70,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     new Set()
   );
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const synchronizeFolders = (folderTree: FolderV2, selectedId: number) => {
     const path = getFilePathInTree(folderTree, selectedId);
@@ -84,6 +87,40 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
+  const scrollToSelectedFile = (fileId: number) => {
+    if (!shouldSync || !scrollContainerRef.current) return;
+
+    setTimeout(() => {
+      const fileElement = scrollContainerRef.current?.querySelector(
+        `[data-file-id="${fileId}"]`
+      ) as HTMLElement;
+      
+      if (fileElement && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = fileElement.getBoundingClientRect();
+        
+        // Calculate if element is not fully visible
+        const isAboveView = elementRect.top < containerRect.top;
+        const isBelowView = elementRect.bottom > containerRect.bottom;
+        
+        if (isAboveView || isBelowView) {
+          // Scroll to center the element
+          const scrollTop = 
+            fileElement.offsetTop - 
+            container.offsetTop - 
+            (container.clientHeight / 2) + 
+            (fileElement.clientHeight / 2);
+          
+          container.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+        }
+      }
+    }, 100); // Small delay to allow DOM updates
+  };
+
   // Keep selectedFileId in sync with externalSelectedFile and expand parent folders
   useEffect(() => {
     if (externalSelectedFile !== selectedFileId) {
@@ -91,10 +128,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
       // Expand all parent folders to the selected item
       if (externalSelectedFile && folderViewResponse && folderTree) {
-        return synchronizeFolders(folderTree, externalSelectedFile);
+        synchronizeFolders(folderTree, externalSelectedFile);
+        // Scroll to the selected file if shouldSync is enabled
+        scrollToSelectedFile(externalSelectedFile);
       }
     }
-  }, [externalSelectedFile, folderViewResponse, folderTree]);
+  }, [externalSelectedFile, folderViewResponse, folderTree, shouldSync]);
 
   // Keep externalSelectedFile in sync if selectedFileId changes internally
   useEffect(() => {
@@ -103,10 +142,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
       // Expand all parent folders to the selected item
       if (selectedFileId && folderViewResponse && folderTree) {
-        return synchronizeFolders(folderTree, selectedFileId);
+        synchronizeFolders(folderTree, selectedFileId);
+        // Scroll to the selected file if shouldSync is enabled
+        scrollToSelectedFile(selectedFileId);
       }
     }
-  }, [selectedFileId]);
+  }, [selectedFileId, shouldSync]);
 
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
@@ -158,6 +199,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           $isFile={isFile}
           $isSelected={isHighlighted}
           $isInHighlightedPath={isInSelectedPath}
+          data-file-id={isFile ? node.id : undefined}
           onClick={() => {
             if (isFile) {
               handleFileClick(node as File);
@@ -238,7 +280,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     <ContentContainer>
       {folderViewResponse ? (
         <>
-          <FolderTree>
+          <FolderTree ref={scrollContainerRef}>
             <div
               style={{
                 display: "flex",
