@@ -10,7 +10,7 @@ class StructureType(str,Enum):
 class File(BaseModel):
     id: int
     name: str
-    confidence: float = 100
+    confidence: float = 1.0
     possibleClassifications: list[str] = []
     originalPath: str
     newPath: str | None
@@ -18,7 +18,7 @@ class File(BaseModel):
 class FolderV2(BaseModel):
     name: str
     count: int = 0
-    confidence: float = 100
+    confidence: float = 1.0
     children: list["File | FolderV2"] = []
 
     @property
