@@ -256,6 +256,7 @@ export const FolderStructurePage: React.FC = () => {
               viewType={FolderBrowserViewType.NEW}
               externalSelectedFile={selectedFileId}
               shouldSync={shouldSync}
+              showConfidence={true}
             />
           </div>
         </div>

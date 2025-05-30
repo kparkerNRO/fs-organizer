@@ -18,7 +18,7 @@ export interface FetchCategoriesResponse {
   currentPage: number;
 }
 
-const isMockMode = true;
+const isMockMode = false;
 
 export const fetchCategories = async (
   params: FetchCategoriesParams

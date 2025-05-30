@@ -51,6 +51,7 @@ interface FolderBrowserProps {
   viewType: FolderBrowserViewType;
   externalSelectedFile: number | null;
   shouldSync?: boolean;
+  showConfidence?:boolean;
 }
 
 export const FolderBrowser: React.FC<FolderBrowserProps> = ({
@@ -59,6 +60,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   viewType,
   externalSelectedFile,
   shouldSync = true,
+  showConfidence = false,
 }) => {
   const folderTree =
     folderViewResponse &&
@@ -170,7 +172,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
-    showConfidence: boolean = true,
     expandedFolders: Set<string>,
     parentPath: string = ""
   ): React.ReactNode => {
@@ -236,11 +237,11 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             >
               {node.name}
             </span>
-            {!showConfidence &&
+            {showConfidence &&
               !isFile &&
               (node as FolderV2).confidence !== undefined && (
                 <ConfidenceInline $confidence={(node as FolderV2).confidence}>
-                  (Confidence: {Math.round((node as FolderV2).confidence)}%)
+                  (Confidence: {Math.round((node as FolderV2).confidence*100)}%)
                 </ConfidenceInline>
               )}
           </FolderName>
@@ -261,7 +262,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               renderNode(
                 child,
                 level + 1,
-                showConfidence,
                 expandedFolders,
                 nodePath
               )
@@ -290,7 +290,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               }}
             >
               <div style={{ flex: 1 }}>
-                {renderNode(folderTree, 0, true, expandedFolders, "")}
+                {renderNode(folderTree, 0, expandedFolders, "")}
               </div>
             </div>
           </FolderTree>
@@ -409,8 +409,8 @@ const FolderName = styled.span<{
     if (props.$isFile) return "transparent";
     if (props.$confidence !== undefined) {
       // Calculate confidence background color
-      const confidence = Math.max(0, Math.min(100, props.$confidence));
-      const normalizedConfidence = confidence / 100;
+      // const confidence = Math.max(0, Math.min(100, props.$confidence));
+      const normalizedConfidence = props.$confidence;
       const red = Math.round(220 + (255 - 220) * normalizedConfidence);
       const green = Math.round(38 + (255 - 38) * normalizedConfidence);
       const blue = Math.round(38 + (255 - 38) * normalizedConfidence);
