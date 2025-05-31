@@ -29,8 +29,6 @@ from sqlalchemy import select
 import networkx as nx
 
 from data_models.database import GroupCategoryEntry
-from utils.filename_utils import clean_filename
-import re
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
@@ -49,11 +47,158 @@ MIN_COMPONENT_FREQUENCY = (
 )
 MIN_DECOMPOSITION_CONFIDENCE = 0.4  # Minimum confidence to create decomposed tags
 SEMANTIC_SIMILARITY_THRESHOLD = 0.3  # Threshold for semantic similarity
+
+# Title case configuration
+STOP_WORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "but",
+    "by",
+    "for",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "no",
+    "not",
+    "of",
+    "on",
+    "or",
+    "such",
+    "that",
+    "the",
+    "their",
+    "then",
+    "there",
+    "these",
+    "they",
+    "this",
+    "to",
+    "was",
+    "will",
+    "with",
+}
+
+COMMON_ACRONYMS = {
+    "ai",
+    "api",
+    "ar",
+    "vr",
+    "3d",
+    "2d",
+    "hd",
+    "4k",
+    "8k",
+    "ui",
+    "ux",
+    "pc",
+    "npc",
+    "rpg",
+    "mmo",
+    "fps",
+    "rts",
+    "dnd",
+    "d&d",
+    "pdf",
+    "jpg",
+    "png",
+    "gif",
+    "mp3",
+    "mp4",
+    "usb",
+    "cd",
+    "dvd",
+    "tv",
+    "gps",
+    "wifi",
+    "cpu",
+    "gpu",
+    "ram",
+    "ssd",
+    "hdd",
+    "os",
+    "ios",
+    "app",
+    "url",
+    "http",
+    "https",
+    "ftp",
+    "ssh",
+    "sql",
+    "html",
+    "css",
+    "js",
+    "xml",
+    "json",
+    "csv",
+    "exe",
+    "zip",
+    "rar",
+    "tar",
+    "gz",
+}
 HIGH_FREQUENCY_THRESHOLD = (
     3  # Words appearing this many times are considered significant
 )
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Sentence transformer model
 MIN_HIERARCHICAL_GROUP_SIZE = 2  # Minimum tags needed for hierarchical analysis
+
+
+def format_tag_title_case(tag: str) -> str:
+    """
+    Format a tag using proper title case with special handling for:
+    - Acronyms (keep uppercase)
+    - Stop words (keep lowercase unless first/last word)
+    - Numbers with units (e.g., "3d", "4k")
+    - Special characters and punctuation
+    """
+    if not tag or not tag.strip():
+        return tag
+
+    # Handle special cases like "d&d"
+    if tag.lower() in COMMON_ACRONYMS:
+        if "&" in tag:
+            return tag.upper()
+        return tag.upper()
+
+    words = tag.split()
+    if not words:
+        return tag
+
+    formatted_words = []
+
+    for i, word in enumerate(words):
+        # Clean word of punctuation at start/end for checking
+        clean_word = word.strip(".,!?;:()[]{}\"'").lower()
+
+        # Always capitalize first and last word
+        if i == 0 or i == len(words) - 1:
+            if clean_word in COMMON_ACRONYMS:
+                formatted_words.append(word.upper())
+            else:
+                formatted_words.append(word.capitalize())
+
+        # Handle acronyms
+        elif clean_word in COMMON_ACRONYMS:
+            formatted_words.append(word.upper())
+
+        # Handle stop words (keep lowercase)
+        elif clean_word in STOP_WORDS:
+            formatted_words.append(word.lower())
+
+        # Handle numbers with letters (like "3d", "4k")
+        elif clean_word.isalnum() and any(c.isdigit() for c in clean_word):
+            formatted_words.append(word.upper())
+
+        # Regular words - capitalize
+        else:
+            formatted_words.append(word.capitalize())
+
+    return " ".join(formatted_words)
 
 
 @dataclass
@@ -1185,13 +1330,16 @@ class TagDecomposer:
 
             # Create entries for each component
             for component in best_candidate.components:
+                # Format component with proper title case
+                formatted_component = format_tag_title_case(component)
+
                 new_entry = GroupCategoryEntry(
                     folder_id=original_entry.folder_id,
                     partial_category_id=original_entry.partial_category_id,
                     group_id=original_entry.group_id,
                     iteration_id=iteration_id,
                     cluster_id=original_entry.cluster_id,
-                    processed_name=component,
+                    processed_name=formatted_component,
                     pre_processed_name=original_entry.pre_processed_name,
                     derived_names=(original_entry.derived_names or [])
                     + [best_candidate.original_tag],
