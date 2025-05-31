@@ -6,6 +6,7 @@ combine groups that were over-zealously split
 generate folder paths based on that
 
 """
+
 from pathlib import Path
 from typing import Optional
 
@@ -24,6 +25,7 @@ from sqlalchemy import select
 
 from grouping.group import GroupCategoryEntry
 from utils.folder_structure import insert_file_in_structure
+
 
 def get_parent_folder(
     session: Session, parent_path: Path, zip_content=False
@@ -64,7 +66,7 @@ def get_categories_for_path(
         session.execute(
             select(GroupCategoryEntry)
             .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
-            .where(GroupCategoryEntry.iteration_id == iteration_id )
+            .where(GroupCategoryEntry.iteration_id == iteration_id)
             .where(Folder.id == parent.id)
         )
         .scalars()
@@ -86,7 +88,6 @@ def get_categories_for_path(
 
 
 def calculate_categories(db_path: Path):
-
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
         files = session.execute(select(dbFile)).scalars().all()
@@ -99,8 +100,8 @@ def calculate_categories(db_path: Path):
         # Process each file
         folder_structure = FolderV2(name="Root")
         for i, file in enumerate(files, 1):
-            if i % 100 == 0:
-                print(f"Processed {i}/{total_files} folders")
+            if i % 1000 == 0:
+                print(f"Processed {i}/{total_files} files")
 
             categories = get_categories_for_path(
                 session,
@@ -109,14 +110,19 @@ def calculate_categories(db_path: Path):
             )
             names = [cat.processed_name for cat in categories]
             new_path = "/".join(names)
-            file.new_path=new_path
-            file.groups=names
-            
-            category_names = [category.processed_name for category in categories]
+            file.new_path = new_path
+            file.groups = names
+
+            category_names = [
+                (category.processed_name, category.confidence)
+                for category in categories
+            ]
             insert_file_in_structure(folder_structure, file, category_names, new_path)
 
-        session.add(FolderStructure(
-            structure_type=StructureType.new,
-            structure=folder_structure.model_dump_json()
-        ))
+        session.add(
+            FolderStructure(
+                structure_type=StructureType.new,
+                structure=folder_structure.model_dump_json(),
+            )
+        )
         session.commit()

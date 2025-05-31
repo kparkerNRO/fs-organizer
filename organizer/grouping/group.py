@@ -23,16 +23,25 @@ from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
 
 from pathlib import Path
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
 log = getLogger(__name__)
 
+def get_next_iteration_id(session: Session):
+    result = session.execute(
+            select(func.max(GroupCategoryEntry.iteration_id))
+        ).scalar_one()
 
-def process_folders_to_groups(session, group_id: int, iteration_id: int):
+    if result is None:
+        return 0
+    return result+1
+
+def process_folders_to_groups(session, group_id: int):
     """
     Process the folders to groups
     """
+    iteration_id = get_next_iteration_id(session)
     folders = session.query(Folder).all()
     for folder in folders:
         group_entry = GroupCategoryEntry(
@@ -204,11 +213,12 @@ def refine_groups(
     return current_group_id
 
 
-def group_by_name(session: Session, iteration_id: int) -> None:
+def group_by_name(session: Session, text_distance_ratio) -> None:
     """
     Run a single iteration of the grouping process
     """
     # Get last round's entries
+    iteration_id = get_next_iteration_id(session)
     uncertain_categories: tuple[GroupCategoryEntry, Folder] = (
         session.query(GroupCategoryEntry, Folder)
         .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
@@ -226,7 +236,7 @@ def group_by_name(session: Session, iteration_id: int) -> None:
         items,
         iteration_id=iteration_id,
         distance_matrix_func=lambda items: compute_custom_distance_matrix(
-            items, text_distance_ratio=0.7
+            items, text_distance_ratio=text_distance_ratio
         ),
     )
     session.add_all(group_category_entries)
@@ -237,7 +247,8 @@ def group_by_name(session: Session, iteration_id: int) -> None:
     refine_groups(session, group_category_entries, iteration_id, next_group_id)
 
 
-def group_within_folder(session: Session, iteration_id: int) -> None:
+def group_within_folder(session: Session, text_distance_ratio =0.6) -> None:
+    iteration_id = get_next_iteration_id(session)
     stmt = (
         select(GroupCategoryEntry, Folder)
         .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
@@ -251,8 +262,9 @@ def group_within_folder(session: Session, iteration_id: int) -> None:
         items,
         iteration_id=iteration_id,
         distance_matrix_func=lambda items: compute_same_folder_distance_matrix(
-            items, text_distance_ratio=0.5
+            items, text_distance_ratio=text_distance_ratio
         ),
+        distance_threshold=.8
     )
     session.add_all(group_category_entries)
     session.commit()
@@ -262,11 +274,12 @@ def group_within_folder(session: Session, iteration_id: int) -> None:
     refine_groups(session, group_category_entries, iteration_id, next_group_id)
 
 
-def pre_process_groups(session: Session, iteration_id: int) -> None:
+def pre_process_groups(session: Session) -> None:
     """
-    Run a single iteration of the grouping process
+    Clean up compound entries - split out hyphen-delineated values
     """
     # Get last round's entries
+    iteration_id = get_next_iteration_id(session)
     stmt = select(GroupCategoryEntry).where(
         GroupCategoryEntry.iteration_id == iteration_id - 1
     )
@@ -310,6 +323,52 @@ def pre_process_groups(session: Session, iteration_id: int) -> None:
     session.commit()
 
 
+def compact_groups(session: Session):
+    """
+    Compact groups for each folder, making sure that folders don't have duplicate category entries
+    """
+    iteration_id = get_next_iteration_id(session)
+    folders = session.execute(select(Folder)).scalars().all()
+    for folder in folders:
+        groups = (
+            session.execute(
+                select(GroupCategoryEntry)
+                .where(GroupCategoryEntry.folder_id == folder.id)
+                .where(GroupCategoryEntry.iteration_id == iteration_id - 1)
+            )
+            .scalars()
+            .all()
+        )
+        new_group_name_map: dict[str, GroupCategoryEntry] = {}
+        for group in groups:
+            processed_name = group.processed_name
+            if processed_name in new_group_name_map:
+                existing_group = new_group_name_map[processed_name]
+                existing_group.confidence = min(existing_group.confidence, group.confidence)
+                if existing_group.pre_processed_name != group.pre_processed_name:
+                    existing_group.pre_processed_name = (
+                        existing_group.pre_processed_name
+                        + ";"
+                        + group.pre_processed_name
+                    )
+
+            else:
+                new_entry = GroupCategoryEntry(
+                    folder_id=folder.id,
+                    group_id=group.group_id,
+                    processed_name=group.processed_name,
+                    pre_processed_name=group.pre_processed_name,
+                    derived_names=group.derived_names,
+                    path = group.path,
+                    confidence=group.confidence,
+                    iteration_id=iteration_id
+                )
+                session.add(new_entry)
+                new_group_name_map[processed_name] = new_entry
+    session.commit()
+
+
+
 def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
     """
     Grouping steps:
@@ -331,7 +390,13 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
-        process_folders_to_groups(session, 0, 0)
-        pre_process_groups(session, 1)
-        group_within_folder(session, 2)
-        group_by_name(session, 3)
+        process_folders_to_groups(session, 0)
+        pre_process_groups(session)
+        # group_within_folder(session, 0.6)
+        
+        # New tag decomposition stage
+        from grouping.tag_decomposition import decompose_compound_tags
+        decompose_compound_tags(session)
+        
+        # group_by_name(session, 0.9)
+        compact_groups(session)

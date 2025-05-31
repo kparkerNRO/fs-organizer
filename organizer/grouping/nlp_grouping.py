@@ -65,8 +65,7 @@ def compute_same_folder_distance_matrix(folders: list[ClusterItem], text_distanc
                     np.linalg.norm(text_vec_i) * np.linalg.norm(text_vec_j) + 1e-8
                 )
                 # Optionally, you can keep struct_dist as 0 since they are in the same folder
-                struct_dist = 0
-                dist = alpha * text_dist + (1 - alpha) * struct_dist
+                dist = text_dist
             else:
                 dist = LARGE_DISTANCE
 
@@ -134,7 +133,7 @@ def prepare_records(
     return items
 
 
-def cluster_with_custom_metric(cluster_items, iteration_id, distance_matrix_func) -> list[GroupCategoryEntry]:
+def cluster_with_custom_metric(cluster_items, iteration_id, distance_matrix_func, distance_threshold=DISTANCE_THRESHOLD) -> list[GroupCategoryEntry]:
     """
     Cluster the calculated categories into groups using a custom distance metric.
     """
@@ -145,7 +144,7 @@ def cluster_with_custom_metric(cluster_items, iteration_id, distance_matrix_func
     # Step 2: run Agglomerative (or DBSCAN) with precomputed distance
     clusterer = AgglomerativeClustering(
         n_clusters=None,
-        distance_threshold=DISTANCE_THRESHOLD,
+        distance_threshold=distance_threshold,
         metric="precomputed",
         linkage="average",
     )

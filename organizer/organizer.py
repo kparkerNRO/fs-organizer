@@ -84,6 +84,7 @@ def group(db_path: str = typer.Argument(...)):
     """
     typer.echo(f"Grouping folders in: {db_path}")
     group_folders(Path(db_path))
+    calculate_categories(db_path)
     typer.echo("Grouping complete.")
 
 

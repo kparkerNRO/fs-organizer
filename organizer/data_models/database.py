@@ -102,10 +102,10 @@ class File(Base):
     folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
     depth = Column(Integer)
 
-    parent_folder_id =  Column(Integer, ForeignKey("folders.id"), nullable=True)
+    parent_folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
     groups = Column(JsonList)
     original_path = Column(String, nullable=True)
-    new_path = Column(String, nullable=True) 
+    new_path = Column(String, nullable=True)
 
     # Relationship
     # folder = relationship("Folder")
@@ -113,7 +113,7 @@ class File(Base):
     def __repr__(self):
         return f"File(id={self.id}, name={self.file_name})"
 
-    
+
 class FolderStructure(Base):
     """
     Represents the most-recently calculated folder structure
@@ -121,9 +121,10 @@ class FolderStructure(Base):
     data_models.api.FolderV2 and data_models.api.File objects via
     pydantic
     """
+
     __tablename__ = "folder_structure"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    structure_type = Column(String, nullable=False) 
+    structure_type = Column(String, nullable=False)
     structure = Column(JsonDict, nullable=False)
 
 
@@ -216,7 +217,7 @@ class GroupCategoryEntry(Base):
     # group = relationship("GroupCategory", back_populates="entries")
 
     def __repr__(self):
-        return f"GroupCategoryEntry(id={self.id}, original={self.pre_processed_name})"
+        return f"GroupCategoryEntry(id={self.id}, original={self.pre_processed_name}, processed={self.processed_name})"
 
 
 # Database management functions
