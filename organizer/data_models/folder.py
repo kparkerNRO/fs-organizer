@@ -1,10 +1,10 @@
-
 from dataclasses import dataclass
 
 from data_models.categorize import Category
 
+
 @dataclass
-class Folder():
+class Folder:
     id: int
     name: str
     parent_path: str
@@ -14,8 +14,9 @@ class Folder():
     categories: dict[str, Category]
     original_name: str
 
+
 @dataclass
-class CategorySummary():
+class CategorySummary:
     id: int
     name: str
     total_count: int

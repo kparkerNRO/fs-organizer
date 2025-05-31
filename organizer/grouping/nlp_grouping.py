@@ -43,7 +43,9 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     return (len(A_path.parts) - i) + (len(B_path.parts) - i)
 
 
-def compute_same_folder_distance_matrix(folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO) -> np.ndarray:
+def compute_same_folder_distance_matrix(
+    folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO
+) -> np.ndarray:
     """
     Computes a distance matrix where only items within the same folder (i.e., same parent path) are compared.
     Items in different folders are assigned a large distance (effectively preventing clustering together).
@@ -75,7 +77,9 @@ def compute_same_folder_distance_matrix(folders: list[ClusterItem], text_distanc
     return D
 
 
-def compute_custom_distance_matrix(folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO) -> np.ndarray:
+def compute_custom_distance_matrix(
+    folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO
+) -> np.ndarray:
     """
     folders: list of dicts with keys:
       - 'id'
@@ -109,6 +113,7 @@ def compute_custom_distance_matrix(folders: list[ClusterItem], text_distance_rat
 
     return D
 
+
 def prepare_records(
     previous_round_groups: list[tuple[GroupCategoryEntry, Folder]],
 ):
@@ -133,7 +138,12 @@ def prepare_records(
     return items
 
 
-def cluster_with_custom_metric(cluster_items, iteration_id, distance_matrix_func, distance_threshold=DISTANCE_THRESHOLD) -> list[GroupCategoryEntry]:
+def cluster_with_custom_metric(
+    cluster_items,
+    iteration_id,
+    distance_matrix_func,
+    distance_threshold=DISTANCE_THRESHOLD,
+) -> list[GroupCategoryEntry]:
     """
     Cluster the calculated categories into groups using a custom distance metric.
     """

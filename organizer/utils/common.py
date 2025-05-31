@@ -18,7 +18,6 @@ class FileMoveException(Exception):
     pass
 
 
-
 def _get_files_in_dir(dir):
     if isinstance(dir, str):
         dir = Path(dir)
@@ -51,20 +50,24 @@ def try_move_file(source_file: Path, target_dir: Path, should_execute, copy_file
             target_dir.mkdir(parents=True, exist_ok=True)
         file_path = target_dir / source_file.name
         if file_path.exists():
-            logger.info(f"Found a duplicate file moving \n{source_file}\n\tto\n{target_dir}")
+            logger.info(
+                f"Found a duplicate file moving \n{source_file}\n\tto\n{target_dir}"
+            )
             if not filecmp.cmp(file_path, source_file):
                 # TODO support 2+
                 basename, ext = os.path.split(file_path)
                 new_file_path = basename + "-1." + ext
-                logger.info(f"\tFiles are different. Renaming {file_path} to {new_file_path}")
-                file_path = target_dir/new_file_path
+                logger.info(
+                    f"\tFiles are different. Renaming {file_path} to {new_file_path}"
+                )
+                file_path = target_dir / new_file_path
             else:
                 logger.info("\tfiles are identical")
-                if not copy_file: 
+                if not copy_file:
                     logger.info("\tRemoving original file")
                     source_file.unlink()
                     return
-        
+
         if copy_file:
             shutil.copy2(source_file, file_path)
         else:

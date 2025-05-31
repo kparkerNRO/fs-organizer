@@ -1,4 +1,6 @@
 import typer
+import logging
+import sys
 from datetime import datetime
 from pathlib import Path
 import shutil
@@ -9,6 +11,15 @@ from pipeline.gather import gather_folder_structure_and_store, clean_file_name_p
 from pipeline.classify import classify_folders
 from grouping.group import group_folders
 from pipeline.categorize import calculate_categories
+
+# Configure root logger to output to stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+
+logger = logging.getLogger(__name__)
 
 app = typer.Typer()
 

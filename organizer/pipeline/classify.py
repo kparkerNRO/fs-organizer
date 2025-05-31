@@ -1,4 +1,3 @@
-
 import re
 import sqlite3
 from pathlib import Path
@@ -16,7 +15,6 @@ nltk.download("stopwords")
 
 
 STOPWORDS = set(stopwords.words("english"))
-
 
 
 # def parse_name(name: str) -> tuple[list[str], list[str]]:
@@ -130,6 +128,7 @@ STOPWORDS = set(stopwords.words("english"))
 #                 )
 #                 category_lookup.classification = ClassificationType.SUBJECT
 #     session.commit()
+
 
 def classify_folders(db_path: Path):
     """

@@ -7,6 +7,7 @@ generate folder paths based on that
 
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,8 @@ from sqlalchemy import select
 
 from grouping.group import GroupCategoryEntry
 from utils.folder_structure import insert_file_in_structure
+
+logger = logging.getLogger(__name__)
 
 
 def get_parent_folder(
@@ -95,13 +98,13 @@ def calculate_categories(db_path: Path):
             select(func.max(GroupCategoryEntry.iteration_id))
         ).scalar_one()
         total_files = len(files)
-        print(f"Processing {total_files} files...")
+        logger.info(f"Processing {total_files} files...")
 
         # Process each file
         folder_structure = FolderV2(name="Root")
         for i, file in enumerate(files, 1):
             if i % 1000 == 0:
-                print(f"Processed {i}/{total_files} files")
+                logger.info(f"Processed {i}/{total_files} files")
 
             categories = get_categories_for_path(
                 session,

@@ -44,36 +44,33 @@ def sort_folder_structure(folder_data: dict) -> dict:
     """
     if not isinstance(folder_data, dict):
         return folder_data
-    
+
     # Create a new FolderV2 object to ensure proper structure
-    if 'name' in folder_data and 'children' in folder_data:
+    if "name" in folder_data and "children" in folder_data:
         # This is a folder object
         sorted_children = []
-        
+
         # Sort children by name
-        children = folder_data.get('children', [])
+        children = folder_data.get("children", [])
         if children:
             # Separate files and folders
-            files = [child for child in children if 'id' in child]
-            folders = [child for child in children if 'id' not in child]
-            
+            files = [child for child in children if "id" in child]
+            folders = [child for child in children if "id" not in child]
+
             # Sort files by name
-            files.sort(key=lambda x: x.get('name', '').lower())
-            
+            files.sort(key=lambda x: x.get("name", "").lower())
+
             # Sort folders by name and recursively sort their children
-            folders.sort(key=lambda x: x.get('name', '').lower())
+            folders.sort(key=lambda x: x.get("name", "").lower())
             for folder in folders:
                 sorted_children.append(sort_folder_structure(folder))
-            
+
             # Add files after folders
             sorted_children.extend(files)
-        
+
         # Return sorted folder
-        return {
-            **folder_data,
-            'children': sorted_children
-        }
-    
+        return {**folder_data, "children": sorted_children}
+
     return folder_data
 
 

@@ -28,14 +28,16 @@ from sqlalchemy import func, select
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
 log = getLogger(__name__)
 
+
 def get_next_iteration_id(session: Session):
     result = session.execute(
-            select(func.max(GroupCategoryEntry.iteration_id))
-        ).scalar_one()
+        select(func.max(GroupCategoryEntry.iteration_id))
+    ).scalar_one()
 
     if result is None:
         return 0
-    return result+1
+    return result + 1
+
 
 def process_folders_to_groups(session, group_id: int):
     """
@@ -70,7 +72,7 @@ def refine_groups(
     which are unable to be grouped.
 
     """
-    print(f"Refining groups, starting at {next_group_id=}")
+    log.info(f"Refining groups, starting at next_group_id={next_group_id}")
     clusters: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
     for entry in current_group_categories:
         clusters[entry.cluster_id].append(entry)
@@ -247,7 +249,7 @@ def group_by_name(session: Session, text_distance_ratio) -> None:
     refine_groups(session, group_category_entries, iteration_id, next_group_id)
 
 
-def group_within_folder(session: Session, text_distance_ratio =0.6) -> None:
+def group_within_folder(session: Session, text_distance_ratio=0.6) -> None:
     iteration_id = get_next_iteration_id(session)
     stmt = (
         select(GroupCategoryEntry, Folder)
@@ -264,7 +266,7 @@ def group_within_folder(session: Session, text_distance_ratio =0.6) -> None:
         distance_matrix_func=lambda items: compute_same_folder_distance_matrix(
             items, text_distance_ratio=text_distance_ratio
         ),
-        distance_threshold=.8
+        distance_threshold=0.8,
     )
     session.add_all(group_category_entries)
     session.commit()
@@ -344,7 +346,9 @@ def compact_groups(session: Session):
             processed_name = group.processed_name
             if processed_name in new_group_name_map:
                 existing_group = new_group_name_map[processed_name]
-                existing_group.confidence = min(existing_group.confidence, group.confidence)
+                existing_group.confidence = min(
+                    existing_group.confidence, group.confidence
+                )
                 if existing_group.pre_processed_name != group.pre_processed_name:
                     existing_group.pre_processed_name = (
                         existing_group.pre_processed_name
@@ -359,14 +363,13 @@ def compact_groups(session: Session):
                     processed_name=group.processed_name,
                     pre_processed_name=group.pre_processed_name,
                     derived_names=group.derived_names,
-                    path = group.path,
+                    path=group.path,
                     confidence=group.confidence,
-                    iteration_id=iteration_id
+                    iteration_id=iteration_id,
                 )
                 session.add(new_entry)
                 new_group_name_map[processed_name] = new_entry
     session.commit()
-
 
 
 def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
@@ -393,10 +396,11 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
         process_folders_to_groups(session, 0)
         pre_process_groups(session)
         # group_within_folder(session, 0.6)
-        
+
         # New tag decomposition stage
         from grouping.tag_decomposition import decompose_compound_tags
+
         decompose_compound_tags(session)
-        
+
         # group_by_name(session, 0.9)
         compact_groups(session)

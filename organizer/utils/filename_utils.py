@@ -3,7 +3,12 @@ import logging
 
 from utils.common import VIEW_TYPES
 from pathlib import Path
-from utils.config import CLEAN_EXCEPTIONS, REPLACE_EXCEPTIONS, CREATOR_REMOVES, FILE_NAME_EXCEPTIONS
+from utils.config import (
+    CLEAN_EXCEPTIONS,
+    REPLACE_EXCEPTIONS,
+    CREATOR_REMOVES,
+    FILE_NAME_EXCEPTIONS,
+)
 
 PATH_EXTRAS = " -,()/"
 
@@ -40,11 +45,12 @@ def get_max_common_string(tokens, name_to_comp):
     shared_tokens = " ".join(tokens[: len(working_token)])
     return shared_tokens
 
+
 def get_max_common_words(tokens, name_to_comp):
     base_token = tokens[0]
     working_token = [base_token]
     lower_tokens = [token.lower() for token in tokens]
-    
+
     lower_name = name_to_comp.lower()
     lower_comp_tokens = lower_name.split(" ")
 
@@ -59,6 +65,7 @@ def get_max_common_words(tokens, name_to_comp):
 
     shared_tokens = " ".join(tokens[: len(working_token)])
     return shared_tokens
+
 
 def split_view_type(base_name, view_types=VIEW_TYPES):
     """
@@ -75,6 +82,7 @@ def split_view_type(base_name, view_types=VIEW_TYPES):
             break
 
     return f_name, f_suffix
+
 
 def process_file_name(name, final_token, has_suffix, use_suffix=False):
     """

@@ -1,4 +1,5 @@
 import zipfile
+import logging
 from pathlib import Path
 from typing import Set, List, Tuple
 from sqlalchemy import select
@@ -14,6 +15,8 @@ from data_models.database import (
 from utils.filename_utils import clean_filename
 import os
 from utils.folder_structure import insert_file_in_structure
+
+logger = logging.getLogger(__name__)
 
 
 def should_ignore(name: str) -> bool:
@@ -89,7 +92,7 @@ def process_zip(
             ]
             if preserve_modules and matching_foundry_module:
                 # HACK: this creates an artificial folder to tag foundry modules
-                folder_name = "Foundry Module " + zip_name 
+                folder_name = "Foundry Module " + zip_name
                 new_folder = dbFolder(
                     folder_name=folder_name,
                     folder_path=str(parent_path / folder_name),
@@ -179,7 +182,9 @@ def process_zip(
                                         session,
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
-                                print(f"Error processing nested zip {entry}: {e}")
+                                logger.error(
+                                    f"Error processing nested zip {entry}: {e}"
+                                )
                         else:
                             new_file = dbFile(
                                 file_name=file_name,
@@ -191,7 +196,7 @@ def process_zip(
             session.commit()
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
-        print(f"Error processing zip {zip_name}: {e}")
+        logger.error(f"Error processing zip {zip_name}: {e}")
         session.rollback()
 
 
@@ -199,12 +204,12 @@ def calculate_structure(session: Session, root_dir: Path):
     files = session.execute(select(dbFile)).scalars().all()
 
     total_files = len(files)
-    print(f"Processing {total_files} files...")
+    logger.info(f"Processing {total_files} files...")
 
     folder_structure = FolderV2(name=str(root_dir))
     for i, file in enumerate(files, 1):
         if i % 100 == 0:
-            print(f"Processed {i}/{total_files} folders")
+            logger.info(f"Processed {i}/{total_files} folders")
 
         file_path = Path(file.file_path)
         file_path = file_path.relative_to(root_dir)
@@ -266,7 +271,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                     try:
                         process_zip(file_path, Path(root), f, depth, session)
                     except zipfile.BadZipFile as e:
-                        print(f"Error processing zip file {file_path}: {e}")
+                        logger.error(f"Error processing zip file {file_path}: {e}")
                     continue
 
                 # new_file = dbFile(file_name=f, file_path=str(file_path), depth=depth)
@@ -278,7 +283,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
         session.commit()
 
     except Exception as e:
-        print(f"Error gathering folder structure: {e}")
+        logger.error(f"Error gathering folder structure: {e}")
         session.rollback()
         raise
     finally:

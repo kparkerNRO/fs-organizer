@@ -1,17 +1,20 @@
 import json
+import logging
 from pathlib import Path
 import os
-from sqlalchemy import  select
+from sqlalchemy import select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 import typer
-from data_models.api import  StructureType
+from data_models.api import StructureType
 from data_models.database import FolderStructure
 from data_models.database import (
     Folder as dbFolder,
     GroupCategoryEntry,
     get_sessionmaker,
 )
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -20,7 +23,8 @@ def generate_api_folder_structure_folder(
     session: Session, file: dbFolder, working_representation={}
 ):
     pass
-    
+
+
 def generate_api_folder_structure_file(
     session: Session, file: str, working_representation={}
 ):
@@ -36,12 +40,15 @@ def generate_api_folder_structure_file(
     file_path = Path(file)
 
     for parent in file_path.parents:
-        groups = session.execute(
-            select(GroupCategoryEntry)
-            .join(dbFolder, GroupCategoryEntry.folder_id == dbFolder.id)
-            .where(dbFolder.folder_path == str(parent))
-        ).scalars().all()
-
+        groups = (
+            session.execute(
+                select(GroupCategoryEntry)
+                .join(dbFolder, GroupCategoryEntry.folder_id == dbFolder.id)
+                .where(dbFolder.folder_path == str(parent))
+            )
+            .scalars()
+            .all()
+        )
 
 
 def generate_api_heirarchy(session: Session, column):
@@ -87,14 +94,13 @@ def generate_folder_heirarchy_session(session: Session, column):
     return folder_hierarchy
 
 
-def generate_folder_heirarchy(db_path: str,type:StructureType ):
-    print(os.getcwd())
+def generate_folder_heirarchy(db_path: str, type: StructureType):
+    logger.debug(f"Current working directory: {os.getcwd()}")
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
-        
         newest_entry = session.execute(
             select(FolderStructure)
             .where(FolderStructure.structure_type == type)
@@ -106,7 +112,7 @@ def generate_folder_heirarchy(db_path: str,type:StructureType ):
         # return newest_entry.structure
         # folders = generate_folder_heirarchy_session(session, column)
         # json_output = json.dumps(newest_entry.structure, indent=4, sort_keys=True)
-        print(entry)
+        logger.info(entry)
         return newest_entry.structure
 
 
@@ -121,12 +127,11 @@ def main(
     Args:
         db_path: Path to the SQLite database file
     """
-    # print(os.path.abspath(db_path))
-    print(os.getcwd())
+    logger.debug(f"Current working directory: {os.getcwd()}")
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
-    print(f"Processing database at: {db_path}")
+    logger.info(f"Processing database at: {db_path}")
     generate_folder_heirarchy(db_path)
 
 
