@@ -32,21 +32,17 @@ from data_models.database import GroupCategoryEntry
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    )
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
 
 # Configuration constants
 MIN_COMPOUND_LENGTH = 2  # Minimum words for compound analysis
 MIN_COMPONENT_FREQUENCY = (
     2  # Minimum frequency for component to be considered significant
 )
-MIN_DECOMPOSITION_CONFIDENCE = 0.4  # Minimum confidence to create decomposed tags
+MIN_DECOMPOSITION_CONFIDENCE = 0.55  # Minimum confidence to create decomposed tags
 SEMANTIC_SIMILARITY_THRESHOLD = 0.3  # Threshold for semantic similarity
+MIN_COMPONENT_LENGTH = (
+    1  # Minimum character length for components (excluding stop words)
+)
 
 # Title case configuration
 STOP_WORDS = {
@@ -142,10 +138,83 @@ COMMON_ACRONYMS = {
     "gz",
 }
 HIGH_FREQUENCY_THRESHOLD = (
-    3  # Words appearing this many times are considered significant
+    10  # Words appearing this many times are considered significant
 )
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Sentence transformer model
 MIN_HIERARCHICAL_GROUP_SIZE = 2  # Minimum tags needed for hierarchical analysis
+MAX_NGAM_SIZE = 4
+
+
+def is_valid_component(component: str) -> bool:
+    """
+    Check if a component is valid for decomposition.
+    Filters out stop words, very short components, and low-quality components.
+    """
+    if not component or not component.strip():
+        return False
+
+    component_clean = component.strip().lower()
+
+    # Reject stop words unless they're part of a meaningful phrase
+    if component_clean in STOP_WORDS:
+        return False
+
+    # Reject very short components (unless they're common acronyms)
+    # if len(component_clean) < MIN_COMPONENT_LENGTH and component_clean not in COMMON_ACRONYMS:
+    #     return False
+
+    # Reject single characters or numbers only
+    if len(component_clean) == 1 or component_clean.isdigit():
+        return False
+
+    # Reject components that are mostly punctuation
+    if len([c for c in component_clean if c.isalnum()]) < len(component_clean) * 0.7:
+        return False
+
+    return True
+
+
+def is_meaningful_phrase(phrase: str) -> bool:
+    """
+    Check if a phrase should be kept intact rather than decomposed.
+    Uses heuristics to identify proper nouns, titles, and meaningful phrases.
+    """
+    if not phrase or not phrase.strip():
+        return False
+
+    words = phrase.strip().split()
+
+    # Single words are generally meaningful
+    if len(words) == 1:
+        return True
+
+    # Check for title-like patterns (multiple capitalized words)
+    capitalized_words = sum(1 for word in words if word and word[0].isupper())
+    if capitalized_words >= 2 and capitalized_words == len(words):
+        return True  # Likely a proper noun or title
+
+    # Check for common phrase patterns that shouldn't be broken
+    # Like "Game of Thrones", "Lord of the Rings", etc.
+    if len(words) >= 3:
+        # If it has stop words in the middle but meaningful words at start/end
+        first_word_meaningful = words[0].lower() not in STOP_WORDS and len(words[0]) > 2
+        last_word_meaningful = (
+            words[-1].lower() not in STOP_WORDS and len(words[-1]) > 2
+        )
+
+        if first_word_meaningful and last_word_meaningful:
+            # Check if middle words are mostly stop words
+            middle_words = words[1:-1]
+            stop_word_ratio = (
+                sum(1 for w in middle_words if w.lower() in STOP_WORDS)
+                / len(middle_words)
+                if middle_words
+                else 0
+            )
+            if stop_word_ratio > 0.5:  # More than half are stop words
+                return True  # Keep phrases like "Lord of the Rings" intact
+
+    return False
 
 
 def format_tag_title_case(tag: str) -> str:
@@ -244,7 +313,7 @@ class TagDecomposer:
         # Initialize ML models
         self.vectorizer = TfidfVectorizer(
             stop_words=None,
-            ngram_range=(1, 2),  # Include both unigrams and bigrams
+            ngram_range=(1, 3),  # Include both unigrams and bigrams
             min_df=1,
             max_features=1000,
         )
@@ -316,8 +385,8 @@ class TagDecomposer:
 
             total_compounds += 1
 
-            # Extract n-grams (1-4 words)
-            for n in range(1, min(5, len(words) + 1)):
+            # Extract n-grams
+            for n in range(1, min(MAX_NGAM_SIZE + 1, len(words) + 1)):
                 for i in range(len(words) - n + 1):
                     ngram = " ".join(words[i : i + n])
                     if len(ngram.strip()) > 1:
@@ -407,7 +476,9 @@ class TagDecomposer:
         # Compute semantic embeddings
         try:
             logger.info("Generating semantic embeddings...")
-            embeddings = self.embedding_model.encode(self.vocabulary)
+            embeddings = self.embedding_model.encode(
+                self.vocabulary, show_progress_bar=False
+            )
             logger.info(f"Generated embeddings with shape: {embeddings.shape}")
         except Exception as e:
             logger.warning(f"Failed to compute embeddings: {e}")
@@ -482,7 +553,7 @@ class TagDecomposer:
         return np.mean(context_overlap_scores) if context_overlap_scores else 0.0
 
     def extract_ngram_components(
-        self, max_n: int = 4
+        self,
     ) -> Tuple[Dict[str, List[Tuple[List[str], float]]], Dict[str, int]]:
         """Extract potential components using n-gram analysis"""
         logger.info("Extracting n-gram components...")
@@ -494,7 +565,7 @@ class TagDecomposer:
         frequent_ngrams = {
             ngram: count
             for ngram, count in self.component_stats.ngram_frequencies.items()
-            if count >= self.min_component_frequency and len(ngram.split()) <= 3
+            if count >= self.min_component_frequency
         }
 
         logger.info(f"Found {len(frequent_ngrams)} frequent n-gram components")
@@ -516,6 +587,10 @@ class TagDecomposer:
         self, tag: str, components: Dict[str, int]
     ) -> List[Tuple[List[str], float]]:
         """Find all ways to decompose a tag using available components"""
+        # First check if this is a meaningful phrase that shouldn't be decomposed
+        if is_meaningful_phrase(tag):
+            return []  # Don't decompose meaningful phrases
+
         words = tag.split()
         tag_length = len(words)
 
@@ -523,15 +598,16 @@ class TagDecomposer:
 
         def find_decompositions(start_idx: int, current_components: List[str]):
             if start_idx == tag_length:
-                if len(current_components) >= 2:  # Must have at least 2 components
-                    valid_decompositions.append(current_components.copy())
+                if len(current_components) >= 2:
+                    if all(is_valid_component(comp) for comp in current_components):
+                        valid_decompositions.append(current_components.copy())
                 return
 
             # Try components of different lengths starting from current position
             for length in range(1, tag_length - start_idx + 1):
                 candidate = " ".join(words[start_idx : start_idx + length])
 
-                if candidate in components:
+                if candidate in components and is_valid_component(candidate):
                     current_components.append(candidate)
                     find_decompositions(start_idx + length, current_components)
                     current_components.pop()
@@ -555,23 +631,55 @@ class TagDecomposer:
         component_frequencies: Dict[str, int],
     ) -> float:
         """Score how good a decomposition is"""
+        num_components = len(components)
+        num_original_components = len(original_tag.split())
+
         # Base score from component frequencies (more frequent = better)
         freq_score = np.mean([component_frequencies[comp] for comp in components])
-        freq_score = min(freq_score / 10, 1.0)  # Normalize
+        freq_score = min(freq_score / 10, 1.0)
 
-        # Penalty for too many tiny components
-        length_penalty = 1.0 if len(components) <= 3 else 0.8
+        # Alternative calculation
+        # max_freq = max(component_frequencies.values(), default=0)
+        # freq_score = 1+ freq_score /max_freq
+
+        # Penalty for too many components
+        length_penalty = 0.9 if num_components == num_original_components else 1.0
 
         # Bonus for components that exist as standalone tags
-        standalone_bonus = sum(
-            1 for comp in components if comp in self.tag_to_idx
-        ) / len(components)
+        standalone_bonus = (
+            1
+            + (
+                sum(1 for comp in components if comp in self.tag_to_idx)
+                / num_components
+            )
+            * 0.5
+        )
 
         # Penalty for leaving single character components
         char_penalty = 1.0 if all(len(comp) > 1 for comp in components) else 0.7
 
+        # heavy penalty for starting with a special character
+        special_char_penalty = (
+            1.0 if all(comp[0:1].isalnum() for comp in components) else 0.2
+        )
+
+        # Heavy penalty for stop words
+        stop_word_penalty = 1.0
+        stop_word_percent = (
+            sum(1 for comp in components if comp.lower() in STOP_WORDS) / num_components
+        )
+        if stop_word_percent > 0.45:
+            stop_word_penalty = (
+                0.1  # Severely penalize any decomposition with mostly stop words
+            )
+
         total_score = (
-            freq_score * length_penalty * (1 + standalone_bonus * 0.5) * char_penalty
+            freq_score
+            * length_penalty
+            * standalone_bonus
+            * char_penalty
+            * stop_word_penalty
+            * special_char_penalty
         )
 
         return total_score
@@ -624,7 +732,9 @@ class TagDecomposer:
                     component_embeddings.append(self.embeddings[comp_idx])
                 else:
                     # Generate embedding for unknown component
-                    comp_emb = self.embedding_model.encode([component])[0]
+                    comp_emb = self.embedding_model.encode(
+                        [component], show_progress_bar=False
+                    )[0]
                     component_embeddings.append(comp_emb)
 
             if len(component_embeddings) >= 2:
@@ -889,6 +999,10 @@ class TagDecomposer:
                 best_score = 0
 
                 for split_components in possible_splits:
+                    # Validate all components in the split
+                    if not all(is_valid_component(comp) for comp in split_components):
+                        continue
+
                     # Check if all components exist in vocabulary or are meaningful
                     component_embeddings = []
 
@@ -899,7 +1013,9 @@ class TagDecomposer:
                         else:
                             # Generate embedding for unknown component
                             try:
-                                comp_emb = self.embedding_model.encode([component])[0]
+                                comp_emb = self.embedding_model.encode(
+                                    [component], show_progress_bar=False
+                                )[0]
                                 component_embeddings.append(comp_emb)
                             except Exception as e:
                                 logger.debug(
@@ -1028,10 +1144,10 @@ class TagDecomposer:
 
         # Run all analysis methods
         ngram_candidates, frequent_ngrams = self.extract_ngram_components()
-        pattern_candidates = self.detect_prefix_suffix_patterns()
-        hierarchical_candidates = self.analyze_hierarchical_patterns()
-        embedding_candidates = self.analyze_embedding_compositionality()
-        cooccurrence_candidates = self.analyze_cooccurrence_patterns()
+        # pattern_candidates = self.detect_prefix_suffix_patterns()
+        # hierarchical_candidates = self.analyze_hierarchical_patterns()
+        # embedding_candidates = self.analyze_embedding_compositionality()
+        # cooccurrence_candidates = self.analyze_cooccurrence_patterns()
 
         # Combine results with confidence scoring
         combined_candidates = {}
@@ -1044,114 +1160,114 @@ class TagDecomposer:
                 "confidence": decompositions[0][1] if decompositions else 0,
             }
 
-        # Add embedding evidence
-        for tag, info in embedding_candidates.items():
-            if tag in combined_candidates:
-                combined_candidates[tag]["evidence"].append("embedding")
-                combined_candidates[tag]["confidence"] += (
-                    info["compositionality_score"] * 0.5
-                )
-            else:
-                combined_candidates[tag] = {
-                    "decompositions": [
-                        (info["components"], info["compositionality_score"])
-                    ],
-                    "evidence": ["embedding"],
-                    "confidence": info["compositionality_score"],
-                }
+        # # Add embedding evidence
+        # for tag, info in embedding_candidates.items():
+        #     if tag in combined_candidates:
+        #         combined_candidates[tag]["evidence"].append("embedding")
+        #         combined_candidates[tag]["confidence"] += (
+        #             info["compositionality_score"] * 0.5
+        #         )
+        #     else:
+        #         combined_candidates[tag] = {
+        #             "decompositions": [
+        #                 (info["components"], info["compositionality_score"])
+        #             ],
+        #             "evidence": ["embedding"],
+        #             "confidence": info["compositionality_score"],
+        #         }
 
-        # Add co-occurrence evidence
-        for tag, info in cooccurrence_candidates.items():
-            if tag in combined_candidates:
-                combined_candidates[tag]["evidence"].append("cooccurrence")
-                combined_candidates[tag]["confidence"] += 0.2
+        # # Add co-occurrence evidence
+        # for tag, info in cooccurrence_candidates.items():
+        #     if tag in combined_candidates:
+        #         combined_candidates[tag]["evidence"].append("cooccurrence")
+        #         combined_candidates[tag]["confidence"] += 0.2
 
-        # Add pattern evidence
-        for pattern_key, info in pattern_candidates.items():
-            for tag in info["tags"]:
-                if tag in combined_candidates:
-                    combined_candidates[tag]["evidence"].append("pattern")
-                    combined_candidates[tag]["confidence"] += 0.3
+        # # Add pattern evidence
+        # for pattern_key, info in pattern_candidates.items():
+        #     for tag in info["tags"]:
+        #         if tag in combined_candidates:
+        #             combined_candidates[tag]["evidence"].append("pattern")
+        #             combined_candidates[tag]["confidence"] += 0.3
 
-        # Add hierarchical evidence (high priority)
-        for pattern_key, info in hierarchical_candidates.items():
-            base_tag = info["base_component"]
+        # # Add hierarchical evidence (high priority)
+        # for pattern_key, info in hierarchical_candidates.items():
+        #     base_tag = info["base_component"]
 
-            # Create decomposition for each extended tag
-            for extended_tag in info["extended_tags"]:
-                if extended_tag in self.vocabulary:
-                    # Find which extension this tag uses
-                    tag_words = extended_tag.split()
-                    base_words = base_tag.split()
-                    extension_words = tag_words[len(base_words) :]
-                    extension = " ".join(extension_words)
+        #     # Create decomposition for each extended tag
+        #     for extended_tag in info["extended_tags"]:
+        #         if extended_tag in self.vocabulary:
+        #             # Find which extension this tag uses
+        #             tag_words = extended_tag.split()
+        #             base_words = base_tag.split()
+        #             extension_words = tag_words[len(base_words) :]
+        #             extension = " ".join(extension_words)
 
-                    # Check if the extension itself can be further decomposed
-                    components = [base_tag]
+        #             # Check if the extension itself can be further decomposed
+        #             components = [base_tag]
 
-                    # Be more conservative about decomposing extensions
-                    if len(extension_words) > 1:
-                        # Only decompose multi-word extensions if they meet certain criteria
-                        should_decompose = False
+        #             # Be more conservative about decomposing extensions
+        #             if len(extension_words) > 1:
+        #                 # Only decompose multi-word extensions if they meet certain criteria
+        #                 should_decompose = False
 
-                        # Decompose if extension words are common/frequent enough
-                        extension_word_frequencies = [
-                            self.component_stats.word_frequencies.get(word, 0)
-                            for word in extension_words
-                        ]
+        #                 # Decompose if extension words are common/frequent enough
+        #                 extension_word_frequencies = [
+        #                     self.component_stats.word_frequencies.get(word, 0)
+        #                     for word in extension_words
+        #                 ]
 
-                        # Only decompose if most words appear frequently elsewhere
-                        frequent_extension_words = sum(
-                            1 for freq in extension_word_frequencies if freq >= 2
-                        )
-                        if (
-                            frequent_extension_words >= len(extension_words) * 0.7
-                        ):  # 70% of words are frequent
-                            should_decompose = True
+        #                 # Only decompose if most words appear frequently elsewhere
+        #                 frequent_extension_words = sum(
+        #                     1 for freq in extension_word_frequencies if freq >= 2
+        #                 )
+        #                 if (
+        #                     frequent_extension_words >= len(extension_words) * 0.7
+        #                 ):  # 70% of words are frequent
+        #                     should_decompose = True
 
-                        # Special case: very common patterns like "Location Type"
-                        if len(extension_words) == 2:
-                            # Check if both words appear in other contexts frequently
-                            word1_freq = self.component_stats.word_frequencies.get(
-                                extension_words[0], 0
-                            )
-                            word2_freq = self.component_stats.word_frequencies.get(
-                                extension_words[1], 0
-                            )
-                            if word1_freq >= 2 and word2_freq >= 2:
-                                should_decompose = True
+        #                 # Special case: very common patterns like "Location Type"
+        #                 if len(extension_words) == 2:
+        #                     # Check if both words appear in other contexts frequently
+        #                     word1_freq = self.component_stats.word_frequencies.get(
+        #                         extension_words[0], 0
+        #                     )
+        #                     word2_freq = self.component_stats.word_frequencies.get(
+        #                         extension_words[1], 0
+        #                     )
+        #                     if word1_freq >= 2 and word2_freq >= 2:
+        #                         should_decompose = True
 
-                        if should_decompose:
-                            # Decompose into individual words
-                            for word in extension_words:
-                                if len(word.strip()) > 0:
-                                    components.append(word.strip())
-                        else:
-                            # Keep as single extension
-                            components.append(extension)
-                    else:
-                        # Single word extension
-                        components.append(extension)
+        #                 if should_decompose:
+        #                     # Decompose into individual words
+        #                     for word in extension_words:
+        #                         if len(word.strip()) > 0:
+        #                             components.append(word.strip())
+        #                 else:
+        #                     # Keep as single extension
+        #                     components.append(extension)
+        #             else:
+        #                 # Single word extension
+        #                 components.append(extension)
 
-                    if extended_tag in combined_candidates:
-                        # Update existing candidate with hierarchical evidence
-                        combined_candidates[extended_tag]["evidence"].append(
-                            "hierarchical"
-                        )
-                        combined_candidates[extended_tag]["confidence"] += (
-                            0.6  # High boost for hierarchical
-                        )
-                        # Update decomposition if hierarchical is better
-                        combined_candidates[extended_tag]["decompositions"] = [
-                            (components, info["confidence"])
-                        ]
-                    else:
-                        # Create new candidate
-                        combined_candidates[extended_tag] = {
-                            "decompositions": [(components, info["confidence"])],
-                            "evidence": ["hierarchical"],
-                            "confidence": info["confidence"],
-                        }
+        #             if extended_tag in combined_candidates:
+        #                 # Update existing candidate with hierarchical evidence
+        #                 combined_candidates[extended_tag]["evidence"].append(
+        #                     "hierarchical"
+        #                 )
+        #                 combined_candidates[extended_tag]["confidence"] += (
+        #                     0.6  # High boost for hierarchical
+        #                 )
+        #                 # Update decomposition if hierarchical is better
+        #                 combined_candidates[extended_tag]["decompositions"] = [
+        #                     (components, info["confidence"])
+        #                 ]
+        #             else:
+        #                 # Create new candidate
+        #                 combined_candidates[extended_tag] = {
+        #                     "decompositions": [(components, info["confidence"])],
+        #                     "evidence": ["hierarchical"],
+        #                     "confidence": info["confidence"],
+        #                 }
 
         # Normalize confidence scores
         for tag in combined_candidates:
