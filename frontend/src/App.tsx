@@ -3,12 +3,14 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { FolderStructurePage } from "./pages/FolderStructurePage";
+import { ImportWizardPage } from "./pages/ImportWizardPage";
 import { NavBar, NavItem } from "./components/NavBar";
 
 // Navigation items
 const navItems: NavItem[] = [
   { id: "categories", label: "Categorize" },
-  { id: "folders", label: "Folder Structure" }
+  { id: "folders", label: "Folder Structure" },
+  { id: "import", label: "Import Wizard" }
 ];
 
 function App() {
@@ -17,6 +19,7 @@ function App() {
     const path = window.location.pathname;
     if (path === '/categories') return 'categories';
     if (path === '/folders') return 'folders';
+    if (path === '/import') return 'import';
     return 'categories'; // default
   };
 
@@ -40,7 +43,7 @@ function App() {
     
     // Set initial URL if needed
     const currentPath = window.location.pathname;
-    if (currentPath === '/' || (!currentPath.startsWith('/categories') && !currentPath.startsWith('/folders'))) {
+    if (currentPath === '/' || (!currentPath.startsWith('/categories') && !currentPath.startsWith('/folders') && !currentPath.startsWith('/import'))) {
       window.history.replaceState(null, '', '/categories');
       setActiveView('categories');
     }
@@ -60,8 +63,10 @@ function App() {
       <MainContent>
         {activeView === "categories" ? (
           <CategoriesPage />
-        ) : (
+        ) : activeView === "folders" ? (
           <FolderStructurePage />
+        ) : (
+          <ImportWizardPage />
         )}
       </MainContent>
     </AppContainer>
