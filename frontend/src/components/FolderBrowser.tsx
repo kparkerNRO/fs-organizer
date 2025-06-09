@@ -224,7 +224,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           )}
           <FolderName
             $isFile={isFile}
-            $confidence={!isFile ? (node as FolderV2).confidence : undefined}
+            $confidence={!isFile && showConfidence ? (node as FolderV2).confidence : undefined}
             style={{ display: "flex", alignItems: "center" }}
           >
             <span

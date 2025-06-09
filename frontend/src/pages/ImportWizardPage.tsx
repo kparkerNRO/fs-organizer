@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import { FolderV2 } from "../types/types";
 import { importFolder, groupFolders, organizeFolders, applyOrganization } from "../mock_data/mockApi";
-import { selectFolder, isFileSystemAccessSupported } from "../utils/folderSelection";
+import { selectFolder } from "../utils/folderSelection";
+import { FolderBrowser, FolderBrowserViewType } from "../components/FolderBrowser";
 
 interface ImportWizardState {
   currentStep: number;
@@ -223,9 +224,15 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 
 
       <ContentContainer isLoading={state.isLoading}>
-        <SectionTitle>Imported Structure:</SectionTitle>
         {state.originalStructure ? (
-          <FolderTree folder={state.originalStructure} level={0} />
+          <FolderBrowser
+            folderViewResponse={{ original: state.originalStructure, new: state.originalStructure }}
+            onSelectItem={() => {}}
+            viewType={FolderBrowserViewType.ORIGINAL}
+            externalSelectedFile={null}
+            shouldSync={false}
+            showConfidence={false}
+          />
         ) : (
           <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
             Folder structure will appear here after import...
@@ -276,7 +283,14 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
         <Panel>
           <SectionTitle>Original Structure</SectionTitle>
           {state.originalStructure ? (
-            <FolderTree folder={state.originalStructure} level={0} />
+            <FolderBrowser
+              folderViewResponse={{ original: state.originalStructure, new: state.originalStructure }}
+              onSelectItem={() => {}}
+              viewType={FolderBrowserViewType.ORIGINAL}
+              externalSelectedFile={null}
+              shouldSync={false}
+              showConfidence={false}
+            />
           ) : (
             <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
               Original folder structure will appear here...
@@ -286,7 +300,14 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
         <Panel>
           <SectionTitle>Grouped Structure</SectionTitle>
           {state.groupedStructure ? (
-            <FolderTree folder={state.groupedStructure} level={0} />
+            <FolderBrowser
+              folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
+              onSelectItem={() => {}}
+              viewType={FolderBrowserViewType.ORIGINAL}
+              externalSelectedFile={null}
+              shouldSync={false}
+              showConfidence={true}
+            />
           ) : (
             <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
               Grouped structure will appear here after processing...
@@ -340,7 +361,14 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
         <Panel>
           <SectionTitle>Grouped Structure</SectionTitle>
           {state.groupedStructure ? (
-            <FolderTree folder={state.groupedStructure} level={0} />
+            <FolderBrowser
+              folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
+              onSelectItem={() => {}}
+              viewType={FolderBrowserViewType.ORIGINAL}
+              externalSelectedFile={null}
+              shouldSync={false}
+              showConfidence={true}
+            />
           ) : (
             <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
               Grouped structure will appear here...
@@ -350,7 +378,14 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
         <Panel>
           <SectionTitle>Final Organization</SectionTitle>
           {state.organizedStructure ? (
-            <FolderTree folder={state.organizedStructure} level={0} />
+            <FolderBrowser
+              folderViewResponse={{ original: state.organizedStructure, new: state.organizedStructure }}
+              onSelectItem={() => {}}
+              viewType={FolderBrowserViewType.ORIGINAL}
+              externalSelectedFile={null}
+              shouldSync={false}
+              showConfidence={false}
+            />
           ) : (
             <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
               Final organization will appear here after processing...
@@ -471,8 +506,16 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
           </SettingGroup>
         </Panel>
         <Panel>
-          <SectionTitle>Final Structure Preview:</SectionTitle>
-          {state.organizedStructure && <FolderTree folder={state.organizedStructure} level={0} />}
+          {state.organizedStructure && (
+            <FolderBrowser
+              folderViewResponse={{ original: state.organizedStructure, new: state.organizedStructure }}
+              onSelectItem={() => {}}
+              viewType={FolderBrowserViewType.ORIGINAL}
+              externalSelectedFile={null}
+              shouldSync={false}
+              showConfidence={false}
+            />
+          )}
         </Panel>
       </ComparisonView>
 
@@ -497,18 +540,6 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
   );
 };
 
-const FolderTree: React.FC<{ folder: FolderV2; level: number }> = ({ folder, level }) => {
-  return (
-    <TreeContainer>
-      <TreeItem level={level}>
-        📁 {folder.name} ({folder.count} items, {Math.round(folder.confidence * 100)}% confidence)
-      </TreeItem>
-      {folder.children.map((child, index) => (
-        <FolderTree key={index} folder={child as FolderV2} level={level + 1} />
-      ))}
-    </TreeContainer>
-  );
-};
 
 // Styled Components
 const WizardContainer = styled.div`
@@ -607,30 +638,7 @@ const StepContainer = styled.div`
   min-height: 0;
 `;
 
-const StepTitle = styled.h2`
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 0.5rem 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0;
-  height: 60px;
-  display: flex;
-  align-items: center;
-`;
 
-const StepDescription = styled.p`
-  color: #64748b;
-  margin: 0 0 1rem 0;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  max-width: 65ch;
-  flex-shrink: 0;
-  height: 40px;
-  display: flex;
-  align-items: center;
-`;
 
 const FolderSelectSection = styled.div`
   display: flex;
@@ -701,26 +709,6 @@ const ProcessButton = styled.button.withConfig({
 
 
 
-// Standardized button components
-const PrimaryButton = styled.button`
-  padding: 0.75rem 2rem;
-  background-color: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-size: 1rem;
-  
-  &:hover:not(:disabled) {
-    background-color: #1d4ed8;
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
 
 // New loading overlay components
 const LoadingOverlay = styled.div`
@@ -755,16 +743,6 @@ const LoadingModal = styled.div`
   text-align: center;
 `;
 
-const LoadingSection = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  height: 100%;
-  min-height: 150px;
-  padding: 2rem 0;
-`;
 
 const LoadingSpinner = styled.div`
   width: 40px;
@@ -933,15 +911,6 @@ const WarningButton = styled.button`
   }
 `;
 
-const TreeContainer = styled.div`
-  font-family: monospace;
-`;
-
-const TreeItem = styled.div<{ level: number }>`
-  padding: 0.25rem 0;
-  margin-left: ${props => props.level * 1.5}rem;
-  color: #374151;
-`;
 
 
 const SettingGroup = styled.div`
