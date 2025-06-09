@@ -41,6 +41,13 @@ export const ImportWizardPage: React.FC = () => {
     }
   };
 
+  const goToStep = (stepNumber: number) => {
+    // Only allow going to previous steps or current step
+    if (stepNumber <= state.currentStep && stepNumber >= 1) {
+      updateState({ currentStep: stepNumber });
+    }
+  };
+
   const renderStep = () => {
     switch (state.currentStep) {
       case 1:
@@ -57,25 +64,45 @@ export const ImportWizardPage: React.FC = () => {
   };
 
   return (
-    <WizardContainer>
+    <WizardContainer data-testid="wizard-container">
       <WizardHeader>
         <Title>Import Wizard</Title>
         <StepIndicator>
-          <StepItem active={state.currentStep === 1} completed={state.currentStep > 1}>
+          <StepItem 
+            active={state.currentStep === 1} 
+            completed={state.currentStep > 1}
+            clickable={1 <= state.currentStep}
+            onClick={() => goToStep(1)}
+          >
             1. Import
           </StepItem>
-          <StepItem active={state.currentStep === 2} completed={state.currentStep > 2}>
+          <StepItem 
+            active={state.currentStep === 2} 
+            completed={state.currentStep > 2}
+            clickable={2 <= state.currentStep}
+            onClick={() => goToStep(2)}
+          >
             2. Group
           </StepItem>
-          <StepItem active={state.currentStep === 3} completed={state.currentStep > 3}>
+          <StepItem 
+            active={state.currentStep === 3} 
+            completed={state.currentStep > 3}
+            clickable={3 <= state.currentStep}
+            onClick={() => goToStep(3)}
+          >
             3. Organize
           </StepItem>
-          <StepItem active={state.currentStep === 4} completed={false}>
+          <StepItem 
+            active={state.currentStep === 4} 
+            completed={false}
+            clickable={4 <= state.currentStep}
+            onClick={() => goToStep(4)}
+          >
             4. Review
           </StepItem>
         </StepIndicator>
       </WizardHeader>
-      <WizardContent>
+      <WizardContent data-testid="wizard-content">
         {renderStep()}
       </WizardContent>
     </WizardContainer>
@@ -90,13 +117,28 @@ interface StepProps {
 }
 
 const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
-  const handleFolderSelect = async () => {
-    if (!state.sourcePath.trim()) return;
+  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
+
+  const handleFolderSelect = async (folderPath: string) => {
+    if (!folderPath.trim()) return;
     
-    updateState({ isLoading: true, loadingMessage: 'Processing folder structure...' });
+    // Create abort controller for this import operation
+    const controller = new AbortController();
+    setAbortController(controller);
+    
+    updateState({ 
+      sourcePath: folderPath,
+      isLoading: true, 
+      loadingMessage: 'Processing folder structure...' 
+    });
     
     try {
-      const importedStructure = await importFolder(state.sourcePath);
+      const importedStructure = await importFolder(folderPath);
+      
+      // Check if operation was cancelled
+      if (controller.signal.aborted) {
+        return;
+      }
       
       updateState({ 
         originalStructure: importedStructure,
@@ -104,9 +146,25 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
         loadingMessage: ''
       });
     } catch (error) {
-      updateState({ isLoading: false, loadingMessage: '' });
-      console.error('Error importing folder:', error);
+      if (!controller.signal.aborted) {
+        updateState({ isLoading: false, loadingMessage: '' });
+        console.error('Error importing folder:', error);
+      }
+    } finally {
+      setAbortController(null);
     }
+  };
+
+  const handleCancelImport = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    updateState({ 
+      isLoading: false, 
+      loadingMessage: '',
+      sourcePath: '' 
+    });
   };
 
   return (
@@ -117,16 +175,20 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
           placeholder="Enter folder path or click Browse..."
           value={state.sourcePath}
           onChange={(e) => updateState({ sourcePath: e.target.value })}
+          disabled={state.isLoading}
         />
-        <BrowseButton onClick={() => updateState({ sourcePath: '/Users/example/messy-folder' })}>
+        <BrowseButton 
+          onClick={() => handleFolderSelect('/Users/example/messy-folder')}
+          disabled={state.isLoading}
+        >
           Browse
         </BrowseButton>
       </FolderSelectSection>
 
-      {state.sourcePath && !state.originalStructure && (
-        <PrimaryButton onClick={handleFolderSelect} disabled={state.isLoading}>
-          {state.isLoading ? 'Processing...' : 'Import Folder'}
-        </PrimaryButton>
+      {state.isLoading && (
+        <CancelButton onClick={handleCancelImport}>
+          Cancel Import
+        </CancelButton>
       )}
 
       <ContentContainer isLoading={state.isLoading}>
@@ -150,7 +212,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       
       {state.originalStructure && (
         <ButtonRow>
-          <SuccessButton onClick={onNext}>Next: Group Similar Items</SuccessButton>
+          <SuccessButton onClick={onNext}>Next</SuccessButton>
         </ButtonRow>
       )}
     </StepContainer>
@@ -214,7 +276,7 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton onClick={() => alert('Grouping saved!')}>Save Changes</WarningButton>
         <SuccessButton onClick={onNext} disabled={state.isLoading}>
-          Next: Organize Structure
+          Next
         </SuccessButton>
       </ButtonRow>
     </StepContainer>
@@ -278,7 +340,7 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton onClick={() => alert('Organization saved!')}>Save Changes</WarningButton>
         <SuccessButton onClick={onNext} disabled={state.isLoading}>
-          Next: Review & Apply
+          Next
         </SuccessButton>
       </ButtonRow>
     </StepContainer>
@@ -336,12 +398,17 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
           <SectionTitle>Configuration Settings</SectionTitle>
           <SettingGroup>
             <SettingLabel>Target Folder:</SettingLabel>
-            <FolderInput
-              type="text"
-              placeholder="Choose destination folder..."
-              value={state.targetPath}
-              onChange={(e) => updateState({ targetPath: e.target.value })}
-            />
+            <FolderSelectSection>
+              <FolderInput
+                type="text"
+                placeholder="Choose destination folder..."
+                value={state.targetPath}
+                onChange={(e) => updateState({ targetPath: e.target.value })}
+              />
+              <BrowseButton onClick={() => updateState({ targetPath: '/Users/example/organized-folder' })}>
+                Browse
+              </BrowseButton>
+            </FolderSelectSection>
           </SettingGroup>
 
           <SettingGroup>
@@ -399,42 +466,48 @@ const FolderTree: React.FC<{ folder: FolderV2; level: number }> = ({ folder, lev
 
 // Styled Components
 const WizardContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
   padding: 1.5rem;
   background-color: #f8fafc;
-  border-radius: 1rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 `;
 
 const WizardHeader = styled.div`
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+  height: 60px;
 `;
 
 const Title = styled.h1`
-  font-size: 2.25rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 1rem;
-  text-align: center;
+  font-size: 2rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
 `;
 
 const StepIndicator = styled.div`
   display: flex;
   gap: 1rem;
-  justify-content: center;
   align-items: center;
 `;
 
-const StepItem = styled.div<{ active: boolean; completed: boolean }>`
+const StepItem = styled.div<{ active: boolean; completed: boolean; clickable: boolean }>`
   padding: 0.75rem 1.5rem;
   border-radius: 0.75rem;
   font-weight: 600;
   font-size: 0.95rem;
   transition: all 0.2s ease;
   border: 2px solid transparent;
+  cursor: ${props => props.clickable ? 'pointer' : 'default'};
+  user-select: none;
   background-color: ${props => 
     props.active ? '#2563eb' : 
     props.completed ? '#10b981' : '#e2e8f0'
@@ -442,62 +515,75 @@ const StepItem = styled.div<{ active: boolean; completed: boolean }>`
   color: ${props => 
     props.active || props.completed ? 'white' : '#64748b'
   };
+  opacity: ${props => props.clickable ? 1 : 0.6};
+  
   ${props => props.active && `
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
     border-color: #1d4ed8;
+  `}
+  
+  ${props => props.clickable && !props.active && `
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      ${props.completed ? `
+        background-color: #059669;
+      ` : `
+        background-color: #cbd5e1;
+      `}
+    }
+  `}
+  
+  ${props => !props.clickable && `
+    cursor: not-allowed;
   `}
 `;
 
 const WizardContent = styled.div`
   background: white;
-  border-radius: 1rem;
-  padding: 2rem;
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   position: relative;
-  width: 100%;
-  height: 700px;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -2px;
-    left: -2px;
-    right: -2px;
-    bottom: -2px;
-    background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
-    border-radius: 1rem;
-    z-index: -1;
-    opacity: 0.1;
-  }
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 `;
 
 const StepContainer = styled.div`
-  height: 600px;
+  flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
-  width: 100%;
+  overflow: hidden;
+  min-height: 0;
 `;
 
 const StepTitle = styled.h2`
   font-size: 1.75rem;
   font-weight: 700;
   color: #0f172a;
-  margin-bottom: 0.5rem;
+  margin: 0 0 0.5rem 0;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  height: 60px;
+  display: flex;
+  align-items: center;
 `;
 
 const StepDescription = styled.p`
   color: #64748b;
-  margin-bottom: 1.5rem;
+  margin: 0 0 1rem 0;
   font-size: 1.1rem;
   line-height: 1.6;
   max-width: 65ch;
+  flex-shrink: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
 `;
 
 const FolderSelectSection = styled.div`
@@ -533,8 +619,13 @@ const BrowseButton = styled.button`
   font-weight: 500;
   white-space: nowrap;
   
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: #4b5563;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
@@ -626,13 +717,10 @@ const LoadingText = styled.div`
 
 // Standardized content containers
 const ContentContainer = styled.div<{ isLoading?: boolean }>`
-  margin: 1.5rem 0;
   padding: 1.5rem;
   border: 2px solid #e2e8f0;
   border-radius: 0.75rem;
   background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  height: 400px;
-  width: 100%;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.05),
     0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -641,6 +729,8 @@ const ContentContainer = styled.div<{ isLoading?: boolean }>`
   opacity: ${props => props.isLoading ? 0.5 : 1};
   pointer-events: ${props => props.isLoading ? 'none' : 'auto'};
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   
   &:hover {
     border-color: #cbd5e1;
@@ -676,13 +766,12 @@ const ComparisonView = styled.div<{ isLoading?: boolean }>`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
-  margin: 1.5rem 0;
   position: relative;
   opacity: ${props => props.isLoading ? 0.5 : 1};
   pointer-events: ${props => props.isLoading ? 'none' : 'auto'};
   transition: opacity 0.2s ease;
-  width: 100%;
-  height: 400px;
+  flex: 1;
+  min-height: 0;
 `;
 
 const Panel = styled.div`
@@ -690,13 +779,14 @@ const Panel = styled.div`
   border: 2px solid #e2e8f0;
   border-radius: 0.75rem;
   background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  height: 400px;
-  width: 100%;
   box-shadow: 
     0 0 0 1px rgba(0, 0, 0, 0.05),
     0 4px 6px -1px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   
   &:hover {
     border-color: #cbd5e1;
@@ -719,10 +809,12 @@ const ButtonRow = styled.div`
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #e2e8f0;
   flex-wrap: wrap;
+  flex-shrink: 0;
+  height: 60px;
+  align-items: center;
 `;
 
 const SecondaryButton = styled.button`
@@ -856,5 +948,21 @@ const DangerButton = styled.button`
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+`;
+
+const CancelButton = styled.button`
+  padding: 0.75rem 2rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 1rem;
+  
+  &:hover {
+    background-color: #dc2626;
   }
 `;
