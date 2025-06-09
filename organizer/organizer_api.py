@@ -1,6 +1,8 @@
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from pathlib import Path
 import json
+import shutil
+from datetime import datetime
 
 from sqlalchemy import Cast, String, select
 from data_models.database import (
@@ -8,6 +10,7 @@ from data_models.database import (
     get_session,
     GroupCategory,
     GroupCategoryEntry,
+    setup_gather,
 )
 
 from data_models.api import (
@@ -21,6 +24,13 @@ from data_models.api import (
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import func
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
+from pipeline.classify import classify_folders
+from grouping.group import group_folders
+from pipeline.categorize import calculate_categories
+from pipeline.folder_reconstruction import generate_folder_heirarchy
 
 app = FastAPI()
 app.add_middleware(
@@ -34,8 +44,48 @@ app.add_middleware(
 db_path = "outputs/latest/latest.db"
 
 
+class GatherRequest(BaseModel):
+    base_path: str
+    output_dir: str
+
+
+class ProcessRequest(BaseModel):
+    db_path: str
+
+
+class GatherResponse(BaseModel):
+    message: str
+    db_path: str
+    run_dir: str
+    folder_structure: dict | None = None
+
+
+class ProcessResponse(BaseModel):
+    message: str
+    folder_structure: dict | None = None
+
+
 def get_db_session():
     return get_session(Path(db_path))
+
+
+def get_folder_structure_from_db(db_path_str: str) -> dict | None:
+    """Get the latest folder structure from the database"""
+    try:
+        session = get_session(Path(db_path_str))
+        newest_entry = session.execute(
+            select(FolderStructure)
+            .where(FolderStructure.structure_type == StructureType.new)
+            .order_by(FolderStructure.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        
+        if newest_entry:
+            parsed_entry = json.loads(newest_entry.structure)
+            return sort_folder_structure(parsed_entry)
+        return None
+    except Exception:
+        return None
 
 
 def sort_folder_structure(folder_data: dict) -> dict:
@@ -183,3 +233,122 @@ async def get_folders(
     sorted_new = sort_folder_structure(parsed_new_entry)
 
     return FolderViewResponse(original=sorted_original, new=sorted_new)
+
+
+@app.post("/api/gather")
+async def api_gather(request: GatherRequest) -> GatherResponse:
+    """
+    API endpoint version of the gather command.
+    1) Create a timestamped subfolder in output_dir,
+    2) Create a run_data.db,
+    3) Gather folder/file data,
+    4) Insert freq counts.
+    """
+    try:
+        base_path = Path(request.base_path)
+        output_dir = Path(request.output_dir)
+        
+        # Validate paths
+        if not base_path.exists() or not base_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"Base path does not exist or is not a directory: {base_path}")
+        
+        # Create output directory if it doesn't exist
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create timestamped run directory
+        timestamp_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        run_dir = output_dir / timestamp_str
+        run_dir.mkdir()
+        
+        # Set up database
+        db_path = run_dir / "run_data.db"
+        setup_gather(db_path)
+        
+        # Gather folder structure
+        gather_folder_structure_and_store(base_path, db_path)
+        clean_file_name_post(db_path)
+        
+        # Update latest symlinks
+        latest_dir = output_dir / "latest"
+        latest_db = latest_dir / "latest.db"
+        
+        # Remove existing latest directory if it exists
+        if latest_dir.exists():
+            shutil.rmtree(latest_dir)
+        
+        # Create new latest directory
+        latest_dir.mkdir()
+        
+        # Copy the current run's database to latest.db
+        shutil.copy2(db_path, latest_db)
+        
+        return GatherResponse(
+            message="Gather complete",
+            db_path=str(db_path),
+            run_dir=str(run_dir),
+            folder_structure=None  # Gather doesn't generate folder structure yet
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during gather: {str(e)}")
+
+
+@app.post("/api/group")
+async def api_group(request: ProcessRequest) -> ProcessResponse:
+    """
+    API endpoint version of the group command.
+    Classify and group folders in the given database.
+    """
+    try:
+        db_path = Path(request.db_path)
+        
+        # Validate database path
+        if not db_path.exists():
+            raise HTTPException(status_code=400, detail=f"Database path does not exist: {db_path}")
+        
+        # Run classification first
+        classify_folders(db_path)
+        
+        # Run grouping
+        group_folders(db_path)
+        calculate_categories(str(db_path))
+        
+        # Get folder structure if available
+        folder_structure = get_folder_structure_from_db(str(db_path))
+        
+        return ProcessResponse(
+            message="Grouping complete",
+            folder_structure=folder_structure
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during grouping: {str(e)}")
+
+
+@app.post("/api/folders")
+async def api_folders(request: ProcessRequest) -> ProcessResponse:
+    """
+    API endpoint version of the folders command.
+    Generate a folder hierarchy from the cleaned paths in the database.
+    """
+    try:
+        db_path = request.db_path
+        
+        # Validate database path
+        if not Path(db_path).exists():
+            raise HTTPException(status_code=400, detail=f"Database path does not exist: {db_path}")
+        
+        # Calculate categories and generate folder hierarchy
+        calculate_categories(db_path)
+        generate_folder_heirarchy(db_path, type=StructureType.new)
+        
+        # Get the newly generated folder structure
+        folder_structure = get_folder_structure_from_db(db_path)
+        
+        return ProcessResponse(
+            message="Folder hierarchy generation complete",
+            folder_structure=folder_structure
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error during folder hierarchy generation: {str(e)}")
