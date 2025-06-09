@@ -67,3 +67,20 @@ electron_1.app.on('window-all-closed', () => {
         electron_1.app.quit();
     }
 });
+// Handle folder selection dialog
+electron_1.ipcMain.handle('dialog:selectFolder', async () => {
+    const result = await electron_1.dialog.showOpenDialog({
+        properties: ['openDirectory'],
+        title: 'Select Folder to Organize'
+    });
+    if (result.canceled) {
+        return {
+            success: false,
+            error: 'Folder selection was cancelled'
+        };
+    }
+    return {
+        success: true,
+        path: result.filePaths[0]
+    };
+});

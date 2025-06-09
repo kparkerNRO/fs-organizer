@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import styled from "styled-components";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { FolderStructurePage } from "./pages/FolderStructurePage";
@@ -14,44 +14,11 @@ const navItems: NavItem[] = [
 ];
 
 function App() {
-  // Get initial view from URL path
-  const getInitialView = () => {
-    const path = window.location.pathname;
-    if (path === '/categories') return 'categories';
-    if (path === '/folders') return 'folders';
-    if (path === '/import') return 'import';
-    return 'categories'; // default
-  };
+  const [activeView, setActiveView] = useState<string>('import');
 
-  const [activeView, setActiveView] = useState<string>(getInitialView);
-
-  // Update URL when view changes
   const handleNavItemClick = (itemId: string) => {
     setActiveView(itemId);
-    const newPath = `/${itemId}`;
-    window.history.pushState(null, '', newPath);
   };
-
-  // Listen for browser back/forward navigation
-  useEffect(() => {
-    const handlePopState = () => {
-      const newView = getInitialView();
-      setActiveView(newView);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    
-    // Set initial URL if needed
-    const currentPath = window.location.pathname;
-    if (currentPath === '/' || (!currentPath.startsWith('/categories') && !currentPath.startsWith('/folders') && !currentPath.startsWith('/import'))) {
-      window.history.replaceState(null, '', '/categories');
-      setActiveView('categories');
-    }
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
 
   return (
     <AppContainer>

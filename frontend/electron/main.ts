@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -48,4 +48,24 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+// Handle folder selection dialog
+ipcMain.handle('dialog:selectFolder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+    title: 'Select Folder to Organize'
+  });
+  
+  if (result.canceled) {
+    return {
+      success: false,
+      error: 'Folder selection was cancelled'
+    };
+  }
+  
+  return {
+    success: true,
+    path: result.filePaths[0]
+  };
 });

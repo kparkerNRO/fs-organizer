@@ -9,6 +9,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    target: 'chrome114', // Electron v36 uses Chrome 114
+    rollupOptions: {
+      output: {
+        manualChunks: undefined, // Simpler chunking for Electron
+      },
+    },
   },
   test: {
     globals: true,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import styled from "styled-components";
 import { FolderV2 } from "../types/types";
 import { importFolder, groupFolders, organizeFolders, applyOrganization } from "../mock_data/mockApi";
@@ -27,9 +27,9 @@ export const ImportWizardPage: React.FC = () => {
     loadingMessage: ''
   });
 
-  const updateState = (updates: Partial<ImportWizardState>) => {
+  const updateState = useCallback((updates: Partial<ImportWizardState>) => {
     setState(prev => ({ ...prev, ...updates }));
-  };
+  }, []);
 
   const nextStep = () => {
     if (state.currentStep < 4) {
@@ -576,7 +576,9 @@ const StepIndicator = styled.div`
   align-items: center;
 `;
 
-const StepItem = styled.div<{ active: boolean; completed: boolean; clickable: boolean }>`
+const StepItem = styled.div.withConfig({
+  shouldForwardProp: (prop) => !['active', 'completed', 'clickable'].includes(prop)
+})<{ active: boolean; completed: boolean; clickable: boolean }>`
   padding: 0.75rem 1.5rem;
   border-radius: 0.75rem;
   font-weight: 600;
