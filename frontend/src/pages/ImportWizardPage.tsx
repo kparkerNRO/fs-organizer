@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import styled from "styled-components";
 import { FolderV2 } from "../types/types";
 import { importFolder, groupFolders, organizeFolders, applyOrganization } from "../mock_data/mockApi";
+import { selectFolder, isFileSystemAccessSupported } from "../utils/folderSelection";
 
 interface ImportWizardState {
   currentStep: number;
@@ -119,6 +120,21 @@ interface StepProps {
 const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
   const [abortController, setAbortController] = React.useState<AbortController | null>(null);
 
+  const handleBrowseFolder = async () => {
+    const result = await selectFolder();
+    
+    if (!result.success) {
+      if (result.error && !result.error.includes('cancelled')) {
+        alert(result.error);
+      }
+      return;
+    }
+    
+    if (result.path) {
+      updateState({ sourcePath: result.path });
+    }
+  };
+
   const handleFolderSelect = async (folderPath: string) => {
     if (!folderPath.trim()) return;
     
@@ -129,7 +145,11 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
     updateState({ 
       sourcePath: folderPath,
       isLoading: true, 
-      loadingMessage: 'Processing folder structure...' 
+      loadingMessage: 'Processing folder structure...',
+      // Clear previous results when processing a new folder
+      originalStructure: undefined,
+      groupedStructure: undefined,
+      organizedStructure: undefined
     });
     
     try {
@@ -162,8 +182,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
     }
     updateState({ 
       isLoading: false, 
-      loadingMessage: '',
-      sourcePath: '' 
+      loadingMessage: ''
     });
   };
 
@@ -172,24 +191,36 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       <FolderSelectSection>
         <FolderInput
           type="text"
-          placeholder="Enter folder path or click Browse..."
+          placeholder="Select folder or enter path..."
           value={state.sourcePath}
           onChange={(e) => updateState({ sourcePath: e.target.value })}
           disabled={state.isLoading}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && state.sourcePath.trim()) {
+              handleFolderSelect(state.sourcePath);
+            }
+          }}
         />
         <BrowseButton 
-          onClick={() => handleFolderSelect('/Users/example/messy-folder')}
+          onClick={handleBrowseFolder}
           disabled={state.isLoading}
         >
           Browse
         </BrowseButton>
+        <ProcessButton 
+          onClick={state.isLoading ? handleCancelImport : () => handleFolderSelect(state.sourcePath)}
+          disabled={!state.sourcePath.trim() && !state.isLoading}
+          $isCancel={state.isLoading}
+          title={
+            state.isLoading ? "Cancel folder processing" : 
+            !state.sourcePath.trim() ? "Select a folder first" : 
+            "Process selected folder"
+          }
+        >
+          {state.isLoading ? 'Cancel' : 'Process'}
+        </ProcessButton>
       </FolderSelectSection>
 
-      {state.isLoading && (
-        <CancelButton onClick={handleCancelImport}>
-          Cancel Import
-        </CancelButton>
-      )}
 
       <ContentContainer isLoading={state.isLoading}>
         <SectionTitle>Imported Structure:</SectionTitle>
@@ -351,6 +382,21 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
   const [isApplying, setIsApplying] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  const handleBrowseTargetFolder = async () => {
+    const result = await selectFolder();
+    
+    if (!result.success) {
+      if (result.error && !result.error.includes('cancelled')) {
+        alert(result.error);
+      }
+      return;
+    }
+    
+    if (result.path) {
+      updateState({ targetPath: result.path });
+    }
+  };
+
   const handleApply = async () => {
     if (!state.organizedStructure || !state.targetPath) return;
     
@@ -405,7 +451,7 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
                 value={state.targetPath}
                 onChange={(e) => updateState({ targetPath: e.target.value })}
               />
-              <BrowseButton onClick={() => updateState({ targetPath: '/Users/example/organized-folder' })}>
+              <BrowseButton onClick={handleBrowseTargetFolder}>
                 Browse
               </BrowseButton>
             </FolderSelectSection>
@@ -629,6 +675,32 @@ const BrowseButton = styled.button`
   }
 `;
 
+const ProcessButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => !['$isCancel'].includes(prop)
+})<{ $isCancel?: boolean }>`
+  padding: 0.75rem 1.5rem;
+  background-color: ${props => props.$isCancel ? '#ef4444' : '#2563eb'};
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+  
+  &:hover:not(:disabled) {
+    background-color: ${props => props.$isCancel ? '#dc2626' : '#1d4ed8'};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+
+
 // Standardized button components
 const PrimaryButton = styled.button`
   padding: 0.75rem 2rem;
@@ -716,7 +788,9 @@ const LoadingText = styled.div`
 `;
 
 // Standardized content containers
-const ContentContainer = styled.div<{ isLoading?: boolean }>`
+const ContentContainer = styled.div.withConfig({
+  shouldForwardProp: (prop) => !['isLoading'].includes(prop)
+})<{ isLoading?: boolean }>`
   padding: 1.5rem;
   border: 2px solid #e2e8f0;
   border-radius: 0.75rem;
@@ -762,7 +836,9 @@ const SuccessButton = styled.button`
   }
 `;
 
-const ComparisonView = styled.div<{ isLoading?: boolean }>`
+const ComparisonView = styled.div.withConfig({
+  shouldForwardProp: (prop) => !['isLoading'].includes(prop)
+})<{ isLoading?: boolean }>`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1.5rem;
@@ -867,7 +943,6 @@ const TreeItem = styled.div<{ level: number }>`
   color: #374151;
 `;
 
-// Remove SettingsSection - using ContentContainer instead
 
 const SettingGroup = styled.div`
   margin-bottom: 1rem;
@@ -951,18 +1026,3 @@ const DangerButton = styled.button`
   }
 `;
 
-const CancelButton = styled.button`
-  padding: 0.75rem 2rem;
-  background-color: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-size: 1rem;
-  margin-top: 1rem;
-  
-  &:hover {
-    background-color: #dc2626;
-  }
-`;
