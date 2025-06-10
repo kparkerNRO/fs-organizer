@@ -14,7 +14,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from data_models.api import FolderV2, StructureType
+from api.api import FolderV2, StructureType
 from data_models.database import (
     Folder,
     get_sessionmaker,
@@ -90,7 +90,9 @@ def get_categories_for_path(
     return categories
 
 
-def calculate_categories(db_path: Path):
+def calculate_folder_structure(
+    db_path: Path, structure_type: StructureType = StructureType.organized
+):
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
         files = session.execute(select(dbFile)).scalars().all()
@@ -124,7 +126,7 @@ def calculate_categories(db_path: Path):
 
         session.add(
             FolderStructure(
-                structure_type=StructureType.organized,
+                structure_type=structure_type,
                 structure=folder_structure.model_dump_json(),
             )
         )

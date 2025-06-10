@@ -20,6 +20,7 @@ interface ImportWizardState {
   hasTriggeredGather: boolean;
   hasTriggeredGroup: boolean;
   hasTriggeredFolders: boolean;
+  selectedFileId: number | null;
 }
 
 export const ImportWizardPage: React.FC = () => {
@@ -33,7 +34,8 @@ export const ImportWizardPage: React.FC = () => {
     progress: 0,
     hasTriggeredGather: false,
     hasTriggeredGroup: false,
-    hasTriggeredFolders: false
+    hasTriggeredFolders: false,
+    selectedFileId: null
   });
 
   // Load existing structures on component mount
@@ -71,20 +73,20 @@ export const ImportWizardPage: React.FC = () => {
 
   const nextStep = () => {
     if (state.currentStep < 4) {
-      updateState({ currentStep: state.currentStep + 1 });
+      updateState({ currentStep: state.currentStep + 1, selectedFileId: null });
     }
   };
 
   const prevStep = () => {
     if (state.currentStep > 1) {
-      updateState({ currentStep: state.currentStep - 1 });
+      updateState({ currentStep: state.currentStep - 1, selectedFileId: null });
     }
   };
 
   const goToStep = (stepNumber: number) => {
     // Only allow going to previous steps or current step
     if (stepNumber <= state.currentStep && stepNumber >= 1) {
-      updateState({ currentStep: stepNumber });
+      updateState({ currentStep: stepNumber, selectedFileId: null });
     }
   };
 
@@ -189,7 +191,8 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       // Clear previous results when processing a new folder
       originalStructure: undefined,
       groupedStructure: undefined,
-      organizedStructure: undefined
+      organizedStructure: undefined,
+      selectedFileId: null
     });
     
     try {
@@ -318,6 +321,10 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
   const [abortController, setAbortController] = React.useState<AbortController | null>(null);
   
+  const handleFileSelect = (fileId: number | null) => {
+    updateState({ selectedFileId: fileId });
+  };
+  
   React.useEffect(() => {
     // Only trigger grouping if we don't have a grouped structure and haven't triggered it yet
     if (!state.groupedStructure && state.originalStructure && !state.hasTriggeredGroup) {
@@ -345,7 +352,8 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
             groupedStructure: folderStructure || undefined,
             isLoading: false,
             loadingMessage: '',
-            progress: 0
+            progress: 0,
+            selectedFileId: null
           });
         })
         .catch(error => {
@@ -368,10 +376,10 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
           {state.originalStructure ? (
             <FolderBrowser
               folderViewResponse={{ original: state.originalStructure, new: state.originalStructure }}
-              onSelectItem={() => {}}
+              onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
-              externalSelectedFile={null}
-              shouldSync={false}
+              externalSelectedFile={state.selectedFileId}
+              shouldSync={true}
               showConfidence={false}
             />
           ) : (
@@ -385,10 +393,10 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
           {state.groupedStructure ? (
             <FolderBrowser
               folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
-              onSelectItem={() => {}}
+              onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
-              externalSelectedFile={null}
-              shouldSync={false}
+              externalSelectedFile={state.selectedFileId}
+              shouldSync={true}
               showConfidence={true}
             />
           ) : (
@@ -411,7 +419,7 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton 
           onClick={() => {
-            updateState({ hasTriggeredGroup: false, groupedStructure: undefined });
+            updateState({ hasTriggeredGroup: false, groupedStructure: undefined, selectedFileId: null });
           }}
           disabled={state.isLoading}
         >
@@ -427,6 +435,10 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
 
 const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
   const [abortController, setAbortController] = React.useState<AbortController | null>(null);
+  
+  const handleFileSelect = (fileId: number | null) => {
+    updateState({ selectedFileId: fileId });
+  };
   
   React.useEffect(() => {
     // Only trigger folder generation if we don't have an organized structure and haven't triggered it yet
@@ -455,7 +467,8 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
             organizedStructure: folderStructure || undefined,
             isLoading: false,
             loadingMessage: '',
-            progress: 0
+            progress: 0,
+            selectedFileId: null
           });
         })
         .catch(error => {
@@ -478,10 +491,10 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
           {state.groupedStructure ? (
             <FolderBrowser
               folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
-              onSelectItem={() => {}}
+              onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
-              externalSelectedFile={null}
-              shouldSync={false}
+              externalSelectedFile={state.selectedFileId}
+              shouldSync={true}
               showConfidence={true}
             />
           ) : (
@@ -495,10 +508,10 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
           {state.organizedStructure ? (
             <FolderBrowser
               folderViewResponse={{ original: state.organizedStructure, new: state.organizedStructure }}
-              onSelectItem={() => {}}
+              onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
-              externalSelectedFile={null}
-              shouldSync={false}
+              externalSelectedFile={state.selectedFileId}
+              shouldSync={true}
               showConfidence={false}
             />
           ) : (
@@ -521,7 +534,7 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton 
           onClick={() => {
-            updateState({ hasTriggeredFolders: false, organizedStructure: undefined });
+            updateState({ hasTriggeredFolders: false, organizedStructure: undefined, selectedFileId: null });
           }}
           disabled={state.isLoading}
         >

@@ -4,13 +4,13 @@ import sys
 from datetime import datetime
 from pathlib import Path
 import shutil
-from data_models.api import StructureType
+from api.api import StructureType
 from data_models.database import setup_gather
-from pipeline.folder_reconstruction import generate_folder_heirarchy
+from pipeline.folder_reconstruction import get_folder_heirarchy
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from pipeline.classify import classify_folders
 from grouping.group import group_folders
-from pipeline.categorize import calculate_categories
+from pipeline.categorize import calculate_folder_structure
 
 # Configure root logger to output to stdout
 logging.basicConfig(
@@ -95,7 +95,7 @@ def group(db_path: str = typer.Argument(...)):
     """
     typer.echo(f"Grouping folders in: {db_path}")
     group_folders(Path(db_path))
-    calculate_categories(db_path)
+    calculate_folder_structure(db_path)
     typer.echo("Grouping complete.")
 
 
@@ -105,8 +105,8 @@ def folders(db_path: str = typer.Argument(...)):
     Generate a folder hierarchy from the cleaned paths in the database.
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
-    calculate_categories(db_path)
-    generate_folder_heirarchy(db_path, type=StructureType.organized)
+    calculate_folder_structure(db_path)
+    get_folder_heirarchy(db_path, type=StructureType.organized)
     typer.echo("Folder hierarchy generation complete.")
 
 

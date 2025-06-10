@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 import typer
-from data_models.api import StructureType
+from api.api import StructureType
 from data_models.database import FolderStructure
 from data_models.database import (
     Folder as dbFolder,
@@ -94,7 +94,7 @@ def generate_folder_heirarchy_session(session: Session, column):
     return folder_hierarchy
 
 
-def generate_folder_heirarchy(db_path: str, type: StructureType):
+def get_folder_heirarchy(db_path: str, type: StructureType):
     logger.debug(f"Current working directory: {os.getcwd()}")
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
@@ -109,9 +109,6 @@ def generate_folder_heirarchy(db_path: str, type: StructureType):
         ).scalar_one_or_none()
         entry = newest_entry.structure
         entry = json.dumps(json.loads(entry), indent=4)
-        # return newest_entry.structure
-        # folders = generate_folder_heirarchy_session(session, column)
-        # json_output = json.dumps(newest_entry.structure, indent=4, sort_keys=True)
         logger.info(entry)
         return newest_entry.structure
 
@@ -132,7 +129,7 @@ def main(
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
     logger.info(f"Processing database at: {db_path}")
-    generate_folder_heirarchy(db_path)
+    get_folder_heirarchy(db_path)
 
 
 if __name__ == "__main__":

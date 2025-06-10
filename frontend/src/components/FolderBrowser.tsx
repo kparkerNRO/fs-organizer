@@ -73,6 +73,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   );
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToSelection = useRef<boolean>(false);
 
   const synchronizeFolders = (folderTree: FolderV2, selectedId: number) => {
     const path = getFilePathInTree(folderTree, selectedId);
@@ -127,6 +128,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   useEffect(() => {
     if (externalSelectedFile !== selectedFileId) {
       setSelectedFileId(externalSelectedFile);
+      shouldScrollToSelection.current = true; // Mark that we should scroll
 
       // Expand all parent folders to the selected item
       if (externalSelectedFile && folderViewResponse && folderTree) {
@@ -145,8 +147,11 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       // Expand all parent folders to the selected item
       if (selectedFileId && folderViewResponse && folderTree) {
         synchronizeFolders(folderTree, selectedFileId);
-        // Scroll to the selected file if shouldSync is enabled
-        scrollToSelectedFile(selectedFileId);
+        // Only scroll if this change originated from external selection
+        if (shouldScrollToSelection.current) {
+          scrollToSelectedFile(selectedFileId);
+          shouldScrollToSelection.current = false; // Reset the flag
+        }
       }
     }
   }, [selectedFileId, shouldSync]);
@@ -165,6 +170,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
   const handleFileClick = (fileNode: File) => {
     if (isFileNode(fileNode)) {
+      shouldScrollToSelection.current = true; // Allow scrolling for user-initiated selection
       setSelectedFileId(fileNode.id);
     }
   };

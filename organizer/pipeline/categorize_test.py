@@ -7,7 +7,7 @@ from unittest.mock import patch
 from pipeline.categorize import (
     get_parent_folder,
     get_categories_for_path,
-    calculate_categories,
+    calculate_folder_structure,
 )
 from data_models.database import (
     Base,
@@ -16,7 +16,7 @@ from data_models.database import (
     GroupCategoryEntry,
     FolderStructure,
 )
-from data_models.api import StructureType
+from api.api import StructureType
 
 
 @pytest.fixture
@@ -281,7 +281,7 @@ class TestCalculateCategories:
         )
         session.commit()
 
-        calculate_categories(db_path)
+        calculate_folder_structure(db_path)
 
         # Verify sessionmaker was called
         mock_get_sessionmaker.assert_called_once_with(db_path)
@@ -319,7 +319,7 @@ class TestCalculateCategories:
         )
         session.commit()
 
-        calculate_categories(db_path)
+        calculate_folder_structure(db_path)
 
         # Check that all files were processed and updated
         files = session.query(File).all()
@@ -359,7 +359,7 @@ class TestCalculateCategories:
         )
         session.commit()
 
-        calculate_categories(db_path)
+        calculate_folder_structure(db_path)
 
         # Check that categories were used to create new paths
         files = session.query(File).all()
@@ -382,7 +382,7 @@ class TestCalculateCategories:
         )
         session.commit()
 
-        calculate_categories(db_path)
+        calculate_folder_structure(db_path)
 
         # Should not process any files since there are none
         files = session.query(File).all()
@@ -404,7 +404,7 @@ class TestCalculateCategories:
         session.commit()
 
         with patch("pipeline.categorize.get_categories_for_path", return_value=[]):
-            calculate_categories(db_path)
+            calculate_folder_structure(db_path)
 
         # Check that empty categories result in empty new_path
         files = session.query(File).all()
@@ -439,5 +439,5 @@ class TestEdgeCases:
 
         # No GroupCategoryEntry in database - function returns None instead of raising
         # This test verifies the function handles the case gracefully
-        result = calculate_categories(db_path)
+        result = calculate_folder_structure(db_path)
         assert result is None

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Set, List, Tuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from data_models.api import FolderV2, StructureType
+from api.api import FolderV2, StructureType
 from data_models.database import (
     FolderStructure,
     setup_folder_categories,
@@ -273,9 +273,6 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                     except zipfile.BadZipFile as e:
                         logger.error(f"Error processing zip file {file_path}: {e}")
                     continue
-
-                # new_file = dbFile(file_name=f, file_path=str(file_path), depth=depth)
-                # session.add(new_file)
 
             session.commit()
 
