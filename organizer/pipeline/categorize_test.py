@@ -296,7 +296,7 @@ class TestCalculateCategories:
         # Check that FolderStructure entry was created
         folder_structures = session.query(FolderStructure).all()
         assert len(folder_structures) == 1
-        assert folder_structures[0].structure_type == StructureType.new
+        assert folder_structures[0].structure_type == StructureType.organized
 
     @patch("pipeline.categorize.insert_file_in_structure")
     @patch("pipeline.categorize.get_sessionmaker")

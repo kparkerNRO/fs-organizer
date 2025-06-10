@@ -106,7 +106,7 @@ def folders(db_path: str = typer.Argument(...)):
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
     calculate_categories(db_path)
-    generate_folder_heirarchy(db_path, type=StructureType.new)
+    generate_folder_heirarchy(db_path, type=StructureType.organized)
     typer.echo("Folder hierarchy generation complete.")
 
 

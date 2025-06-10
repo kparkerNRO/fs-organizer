@@ -217,7 +217,7 @@ def calculate_structure(session: Session, root_dir: Path):
 
     session.add(
         FolderStructure(
-            structure_type=StructureType.old,
+            structure_type=StructureType.original,
             structure=folder_structure.model_dump_json(),
         )
     )

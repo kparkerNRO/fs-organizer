@@ -1,7 +1,7 @@
 // src/api.ts
 
 import { fetchMockCategoryData, fetchMockFolderStructure, fetchMockFolderStructureComparison } from "./mock_data/mockApi";
-import { Folder, FolderV2, FolderViewResponse } from "./types/types";
+import { Folder, FolderV2, FolderViewResponse, AsyncTaskResponse, TaskInfo } from "./types/types";
 import { env } from "./config/env";
 
 export interface FetchCategoriesParams {
@@ -19,6 +19,195 @@ export interface FetchCategoriesResponse {
 }
 
 const isMockMode = false;
+
+// Pipeline API functions
+export const gatherFiles = async (
+  basePath: string,
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal
+): Promise<TaskInfo> => {
+  // Start the gather task
+  const response = await fetch(`${env.apiUrl}/api/gather`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ base_path: basePath }),
+    signal: abortSignal,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to start gather task: ${response.statusText}`);
+  }
+  
+  const taskResponse: AsyncTaskResponse = await response.json();
+  
+  // Poll for completion
+  return await pollTaskToCompletion(taskResponse.task_id, onProgress, abortSignal);
+};
+
+export const groupFolders = async (
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal
+): Promise<TaskInfo> => {
+  // Start the group task
+  const response = await fetch(`${env.apiUrl}/api/group`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    signal: abortSignal,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to start group task: ${response.statusText}`);
+  }
+  
+  const taskResponse: AsyncTaskResponse = await response.json();
+  
+  // Poll for completion
+  return await pollTaskToCompletion(taskResponse.task_id, onProgress, abortSignal);
+};
+
+export const generateFolders = async (
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal
+): Promise<TaskInfo> => {
+  // Start the folders task
+  const response = await fetch(`${env.apiUrl}/api/folders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    signal: abortSignal,
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to start folders task: ${response.statusText}`);
+  }
+  
+  const taskResponse: AsyncTaskResponse = await response.json();
+  
+  // Poll for completion
+  return await pollTaskToCompletion(taskResponse.task_id, onProgress, abortSignal);
+};
+
+// Stage structure GET endpoints
+export const getGatherStructure = async (): Promise<FolderV2 | null> => {
+  if (isMockMode) {
+    return null; // Mock mode doesn't support existing structures
+  }
+  
+  try {
+    const response = await fetch(`${env.apiUrl}/api/gather/structure`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No structure found
+      }
+      throw new Error(`Failed to get gather structure: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.folder_structure;
+  } catch (error) {
+    console.error('Error fetching gather structure:', error);
+    return null;
+  }
+};
+
+export const getGroupStructure = async (): Promise<FolderV2 | null> => {
+  if (isMockMode) {
+    return null; // Mock mode doesn't support existing structures
+  }
+  
+  try {
+    const response = await fetch(`${env.apiUrl}/api/group/structure`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No structure found
+      }
+      throw new Error(`Failed to get group structure: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.folder_structure;
+  } catch (error) {
+    console.error('Error fetching group structure:', error);
+    return null;
+  }
+};
+
+export const getFoldersStructure = async (): Promise<FolderV2 | null> => {
+  if (isMockMode) {
+    return null; // Mock mode doesn't support existing structures
+  }
+  
+  try {
+    const response = await fetch(`${env.apiUrl}/api/folders/structure`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No structure found
+      }
+      throw new Error(`Failed to get folders structure: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.folder_structure;
+  } catch (error) {
+    console.error('Error fetching folders structure:', error);
+    return null;
+  }
+};
+
+// Task polling utilities
+export const getTaskStatus = async (taskId: string): Promise<TaskInfo> => {
+  const response = await fetch(`${env.apiUrl}/api/tasks/${taskId}`);
+  
+  if (!response.ok) {
+    throw new Error(`Failed to get task status: ${response.statusText}`);
+  }
+  
+  return await response.json();
+};
+
+export const pollTaskToCompletion = async (
+  taskId: string,
+  onProgress?: (progress: number) => void,
+  abortSignal?: AbortSignal,
+  pollInterval: number = 1000
+): Promise<TaskInfo> => {
+  return new Promise((resolve, reject) => {
+    const poll = async () => {
+      try {
+        if (abortSignal?.aborted) {
+          reject(new Error('Task was aborted'));
+          return;
+        }
+        
+        const taskInfo = await getTaskStatus(taskId);
+        
+        if (onProgress && typeof taskInfo.progress === 'number') {
+          onProgress(taskInfo.progress);
+        }
+        
+        if (taskInfo.status === 'completed') {
+          resolve(taskInfo);
+          return;
+        }
+        
+        if (taskInfo.status === 'failed') {
+          reject(new Error(taskInfo.error || 'Task failed'));
+          return;
+        }
+        
+        // Continue polling if task is pending or running
+        setTimeout(poll, pollInterval);
+        
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    poll();
+  });
+};
 
 export const fetchCategories = async (
   params: FetchCategoriesParams

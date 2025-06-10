@@ -105,26 +105,31 @@ def create_task(message: str) -> str:
     """Create a new task and return its ID"""
     task_id = str(uuid.uuid4())
     now = datetime.now()
-    
+
     task = TaskInfo(
         task_id=task_id,
         status=TaskStatus.PENDING,
         message=message,
         created_at=now,
-        updated_at=now
+        updated_at=now,
     )
-    
+
     tasks[task_id] = task
     return task_id
 
 
-def update_task(task_id: str, status: TaskStatus | None = None, message: str | None = None, 
-                progress: float | None = None, result: Dict[str, Any] | None = None, 
-                error: str | None = None):
+def update_task(
+    task_id: str,
+    status: TaskStatus | None = None,
+    message: str | None = None,
+    progress: float | None = None,
+    result: Dict[str, Any] | None = None,
+    error: str | None = None,
+):
     """Update an existing task"""
     if task_id not in tasks:
         return
-    
+
     task = tasks[task_id]
     if status is not None:
         task.status = status
@@ -136,21 +141,23 @@ def update_task(task_id: str, status: TaskStatus | None = None, message: str | N
         task.result = result
     if error is not None:
         task.error = error
-    
+
     task.updated_at = datetime.now()
 
 
-def get_folder_structure_from_db(db_path_str: str) -> dict | None:
+def get_folder_structure_from_db(
+    db_path_str: str, stage: StructureType = StructureType.organized
+) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
         session = get_session(Path(db_path_str))
         newest_entry = session.execute(
             select(FolderStructure)
-            .where(FolderStructure.structure_type == StructureType.new)
+            .where(FolderStructure.structure_type == stage)
             .order_by(FolderStructure.id.desc())
             .limit(1)
         ).scalar_one_or_none()
-        
+
         if newest_entry:
             parsed_entry = json.loads(newest_entry.structure)
             return sort_folder_structure(parsed_entry)
@@ -284,7 +291,7 @@ async def get_folders(
 ):
     newest_entry = session.execute(
         select(FolderStructure)
-        .where(FolderStructure.structure_type == StructureType.new)
+        .where(FolderStructure.structure_type == StructureType.organized)
         .order_by(FolderStructure.id.desc())
         .limit(1)
     ).scalar_one_or_none()
@@ -293,7 +300,7 @@ async def get_folders(
 
     old_entry = session.execute(
         select(FolderStructure)
-        .where(FolderStructure.structure_type == StructureType.old)
+        .where(FolderStructure.structure_type == StructureType.original)
         .order_by(FolderStructure.id.desc())
         .limit(1)
     ).scalar_one_or_none()
@@ -311,7 +318,7 @@ async def get_task_status(task_id: str) -> TaskInfo:
     """Get the status of a task"""
     if task_id not in tasks:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     return tasks[task_id]
 
 
@@ -321,129 +328,185 @@ async def get_all_tasks() -> Dict[str, TaskInfo]:
     return tasks
 
 
+@app.get("/api/gather/structure")
+async def get_gather_structure():
+    """Get the original folder structure from the gather stage"""
+    structure = get_folder_structure_from_db(db_path, StructureType.original)
+    if structure is None:
+        raise HTTPException(status_code=404, detail="No gather structure found")
+    return {"folder_structure": structure}
+
+
+@app.get("/api/group/structure")
+async def get_group_structure():
+    """Get the folder structure after grouping stage"""
+    structure = get_folder_structure_from_db(db_path, StructureType.organized)
+    if structure is None:
+        raise HTTPException(status_code=404, detail="No group structure found")
+    return {"folder_structure": structure}
+
+
+@app.get("/api/folders/structure")
+async def get_folders_structure():
+    """Get the final organized folder structure"""
+    structure = get_folder_structure_from_db(db_path, StructureType.organized)
+    if structure is None:
+        raise HTTPException(status_code=404, detail="No organized structure found")
+    return {"folder_structure": structure}
+
+
 def run_gather_task(task_id: str, base_path_str: str):
     """Background task to run gather command"""
     try:
-        update_task(task_id, status=TaskStatus.RUNNING, message="Starting gather process", progress=0.1)
-        
+        update_task(
+            task_id,
+            status=TaskStatus.RUNNING,
+            message="Starting gather process",
+            progress=0.1,
+        )
+
         base_path = Path(base_path_str)
         output_dir_path = Path(output_dir)
-        
+
         # Validate paths
         if not base_path.exists() or not base_path.is_dir():
-            update_task(task_id, status=TaskStatus.FAILED, error=f"Base path does not exist or is not a directory: {base_path}")
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error=f"Base path does not exist or is not a directory: {base_path}",
+            )
             return
-        
+
         update_task(task_id, message="Creating directories", progress=0.2)
-        
+
         # Create output directory if it doesn't exist
         output_dir_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Create timestamped run directory
         timestamp_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
         run_dir = output_dir_path / timestamp_str
         run_dir.mkdir()
-        
+
         update_task(task_id, message="Setting up database", progress=0.3)
-        
+
         # Set up database
         db_path = run_dir / "run_data.db"
         setup_gather(db_path)
-        
+
         update_task(task_id, message="Gathering folder structure", progress=0.4)
-        
+
         # Gather folder structure
         gather_folder_structure_and_store(base_path, db_path)
-        
+
         update_task(task_id, message="Post-processing filenames", progress=0.7)
-        
+
         clean_file_name_post(db_path)
-        
+
         update_task(task_id, message="Updating latest symlinks", progress=0.9)
-        
+
         # Update latest symlinks
         latest_dir = output_dir_path / "latest"
         latest_db = latest_dir / "latest.db"
-        
+
         # Remove existing latest directory if it exists
         if latest_dir.exists():
             shutil.rmtree(latest_dir)
-        
+
         # Create new latest directory
         latest_dir.mkdir()
-        
+
         # Copy the current run's database to latest.db
         shutil.copy2(db_path, latest_db)
-        
+
         result = {
             "message": "Gather complete",
             "db_path": str(db_path),
             "run_dir": str(run_dir),
-            "folder_structure": None
+            "folder_structure": get_folder_structure_from_db(
+                db_path, StructureType.original
+            ),
         }
-        
-        update_task(task_id, status=TaskStatus.COMPLETED, message="Gather complete", progress=1.0, result=result)
-        
+
+        update_task(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            message="Gather complete",
+            progress=1.0,
+            result=result,
+        )
+
     except Exception as e:
         update_task(task_id, status=TaskStatus.FAILED, error=str(e))
 
 
 @app.post("/api/gather")
-async def api_gather(request: GatherRequest, background_tasks: BackgroundTasks) -> AsyncTaskResponse:
+async def api_gather(
+    request: GatherRequest, background_tasks: BackgroundTasks
+) -> AsyncTaskResponse:
     """
     API endpoint version of the gather command (async).
     Returns a task ID that can be used to track progress.
     """
     task_id = create_task("Gather task created")
-    
+
     # Start the background task
     background_tasks.add_task(run_gather_task, task_id, request.base_path)
-    
+
     return AsyncTaskResponse(
-        task_id=task_id,
-        message="Gather task started",
-        status=TaskStatus.PENDING
+        task_id=task_id, message="Gather task started", status=TaskStatus.PENDING
     )
 
 
 def run_group_task(task_id: str):
     """Background task to run group command"""
     try:
-        update_task(task_id, status=TaskStatus.RUNNING, message="Starting grouping process", progress=0.1)
-        
+        update_task(
+            task_id,
+            status=TaskStatus.RUNNING,
+            message="Starting grouping process",
+            progress=0.1,
+        )
+
         db_path_obj = Path(db_path)
-        
+
         # Validate database path
         if not db_path_obj.exists():
-            update_task(task_id, status=TaskStatus.FAILED, error=f"Database path does not exist: {db_path}")
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error=f"Database path does not exist: {db_path}",
+            )
             return
-        
+
         update_task(task_id, message="Classifying folders", progress=0.2)
-        
+
         # Run classification first
         classify_folders(db_path_obj)
-        
+
         update_task(task_id, message="Grouping folders", progress=0.5)
-        
+
         # Run grouping
         group_folders(db_path_obj)
-        
+
         update_task(task_id, message="Calculating categories", progress=0.8)
-        
+
         calculate_categories(db_path)
-        
+
         update_task(task_id, message="Getting folder structure", progress=0.9)
-        
+
         # Get folder structure if available
         folder_structure = get_folder_structure_from_db(db_path)
-        
-        result = {
-            "message": "Grouping complete",
-            "folder_structure": folder_structure
-        }
-        
-        update_task(task_id, status=TaskStatus.COMPLETED, message="Grouping complete", progress=1.0, result=result)
-        
+
+        result = {"message": "Grouping complete", "folder_structure": folder_structure}
+
+        update_task(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            message="Grouping complete",
+            progress=1.0,
+            result=result,
+        )
+
     except Exception as e:
         update_task(task_id, status=TaskStatus.FAILED, error=str(e))
 
@@ -455,48 +518,61 @@ async def api_group(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     Returns a task ID that can be used to track progress.
     """
     task_id = create_task("Group task created")
-    
+
     # Start the background task
     background_tasks.add_task(run_group_task, task_id)
-    
+
     return AsyncTaskResponse(
-        task_id=task_id,
-        message="Group task started", 
-        status=TaskStatus.PENDING
+        task_id=task_id, message="Group task started", status=TaskStatus.PENDING
     )
 
 
 def run_folders_task(task_id: str):
     """Background task to run folders command"""
     try:
-        update_task(task_id, status=TaskStatus.RUNNING, message="Starting folder hierarchy generation", progress=0.1)
-        
+        update_task(
+            task_id,
+            status=TaskStatus.RUNNING,
+            message="Starting folder hierarchy generation",
+            progress=0.1,
+        )
+
         # Validate database path
         if not Path(db_path).exists():
-            update_task(task_id, status=TaskStatus.FAILED, error=f"Database path does not exist: {db_path}")
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error=f"Database path does not exist: {db_path}",
+            )
             return
-        
+
         update_task(task_id, message="Calculating categories", progress=0.3)
-        
+
         # Calculate categories and generate folder hierarchy
         calculate_categories(db_path)
-        
+
         update_task(task_id, message="Generating folder hierarchy", progress=0.6)
-        
-        generate_folder_heirarchy(db_path, type=StructureType.new)
-        
+
+        generate_folder_heirarchy(db_path, type=StructureType.organized)
+
         update_task(task_id, message="Getting folder structure", progress=0.9)
-        
+
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(db_path)
-        
+
         result = {
             "message": "Folder hierarchy generation complete",
-            "folder_structure": folder_structure
+            "folder_structure": folder_structure,
         }
-        
-        update_task(task_id, status=TaskStatus.COMPLETED, message="Folder hierarchy generation complete", progress=1.0, result=result)
-        
+
+        update_task(
+            task_id,
+            status=TaskStatus.COMPLETED,
+            message="Folder hierarchy generation complete",
+            progress=1.0,
+            result=result,
+        )
+
     except Exception as e:
         update_task(task_id, status=TaskStatus.FAILED, error=str(e))
 
@@ -508,12 +584,10 @@ async def api_folders(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     Returns a task ID that can be used to track progress.
     """
     task_id = create_task("Folders task created")
-    
+
     # Start the background task
     background_tasks.add_task(run_folders_task, task_id)
-    
+
     return AsyncTaskResponse(
-        task_id=task_id,
-        message="Folders task started",
-        status=TaskStatus.PENDING
+        task_id=task_id, message="Folders task started", status=TaskStatus.PENDING
     )

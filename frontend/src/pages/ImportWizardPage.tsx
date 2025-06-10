@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from "react";
 import styled from "styled-components";
-import { FolderV2 } from "../types/types";
-import { importFolder, groupFolders, organizeFolders, applyOrganization } from "../mock_data/mockApi";
+import { FolderV2, TaskInfo } from "../types/types";
+import { gatherFiles, groupFolders as apiGroupFolders, generateFolders, getGatherStructure, getGroupStructure, getFoldersStructure } from "../api";
+import { applyOrganization } from "../mock_data/mockApi";
 import { selectFolder } from "../utils/folderSelection";
 import { FolderBrowser, FolderBrowserViewType } from "../components/FolderBrowser";
 
@@ -15,6 +16,10 @@ interface ImportWizardState {
   duplicateHandling: 'newest' | 'largest' | 'both' | 'both-if-different';
   isLoading: boolean;
   loadingMessage: string;
+  progress: number;
+  hasTriggeredGather: boolean;
+  hasTriggeredGroup: boolean;
+  hasTriggeredFolders: boolean;
 }
 
 export const ImportWizardPage: React.FC = () => {
@@ -24,8 +29,41 @@ export const ImportWizardPage: React.FC = () => {
     targetPath: '',
     duplicateHandling: 'newest',
     isLoading: false,
-    loadingMessage: ''
+    loadingMessage: '',
+    progress: 0,
+    hasTriggeredGather: false,
+    hasTriggeredGroup: false,
+    hasTriggeredFolders: false
   });
+
+  // Load existing structures on component mount
+  React.useEffect(() => {
+    const loadExistingStructures = async () => {
+      try {
+        // Check for existing gather structure
+        const gatherStructure = await getGatherStructure();
+        if (gatherStructure) {
+          updateState({ originalStructure: gatherStructure });
+        }
+
+        // Check for existing group structure
+        const groupStructure = await getGroupStructure();
+        if (groupStructure) {
+          updateState({ groupedStructure: groupStructure });
+        }
+
+        // Check for existing organized structure
+        const foldersStructure = await getFoldersStructure();
+        if (foldersStructure) {
+          updateState({ organizedStructure: foldersStructure });
+        }
+      } catch (error) {
+        console.error('Error loading existing structures:', error);
+      }
+    };
+
+    loadExistingStructures();
+  }, []);
 
   const updateState = useCallback((updates: Partial<ImportWizardState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -147,6 +185,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       sourcePath: folderPath,
       isLoading: true, 
       loadingMessage: 'Processing folder structure...',
+      hasTriggeredGather: true,
       // Clear previous results when processing a new folder
       originalStructure: undefined,
       groupedStructure: undefined,
@@ -154,17 +193,27 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
     });
     
     try {
-      const importedStructure = await importFolder(folderPath);
+      const taskResult = await gatherFiles(
+        folderPath,
+        (progress) => {
+          updateState({ progress: Math.round(progress * 100) });
+        },
+        controller.signal
+      );
       
       // Check if operation was cancelled
       if (controller.signal.aborted) {
         return;
       }
       
+      // Extract folder structure from task result if available
+      const folderStructure = taskResult.result?.folder_structure;
+      
       updateState({ 
-        originalStructure: importedStructure,
+        originalStructure: folderStructure || undefined,
         isLoading: false,
-        loadingMessage: ''
+        loadingMessage: '',
+        progress: 0
       });
     } catch (error) {
       if (!controller.signal.aborted) {
@@ -183,7 +232,8 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
     }
     updateState({ 
       isLoading: false, 
-      loadingMessage: ''
+      loadingMessage: '',
+      progress: 0
     });
   };
 
@@ -243,6 +293,14 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
             <LoadingModal>
               <LoadingSpinner />
               <LoadingText>{state.loadingMessage}</LoadingText>
+              {state.progress > 0 && (
+                <ProgressSection>
+                  <ProgressBar>
+                    <ProgressFill style={{ width: `${state.progress}%` }} />
+                  </ProgressBar>
+                  <ProgressText>{state.progress}% complete</ProgressText>
+                </ProgressSection>
+              )}
             </LoadingModal>
           </LoadingOverlay>
         )}
@@ -258,24 +316,49 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 };
 
 const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
+  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
+  
   React.useEffect(() => {
-    if (!state.groupedStructure && state.originalStructure) {
-      updateState({ isLoading: true, loadingMessage: 'Analyzing folder similarities...' });
+    // Only trigger grouping if we don't have a grouped structure and haven't triggered it yet
+    if (!state.groupedStructure && state.originalStructure && !state.hasTriggeredGroup) {
+      const controller = new AbortController();
+      setAbortController(controller);
       
-      groupFolders(state.originalStructure)
-        .then(groupedStructure => {
+      updateState({ 
+        isLoading: true, 
+        loadingMessage: 'Analyzing folder similarities...', 
+        progress: 0,
+        hasTriggeredGroup: true
+      });
+      
+      apiGroupFolders(
+        (progress) => {
+          updateState({ progress: Math.round(progress * 100) });
+        },
+        controller.signal
+      )
+        .then(taskResult => {
+          if (controller.signal.aborted) return;
+          
+          const folderStructure = taskResult.result?.folder_structure;
           updateState({ 
-            groupedStructure,
+            groupedStructure: folderStructure || undefined,
             isLoading: false,
-            loadingMessage: ''
+            loadingMessage: '',
+            progress: 0
           });
         })
         .catch(error => {
-          console.error('Error grouping folders:', error);
-          updateState({ isLoading: false, loadingMessage: '' });
+          if (!controller.signal.aborted) {
+            console.error('Error grouping folders:', error);
+            updateState({ isLoading: false, loadingMessage: '', progress: 0 });
+          }
+        })
+        .finally(() => {
+          setAbortController(null);
         });
     }
-  }, [state.groupedStructure, state.originalStructure, updateState]);
+  }, [state.groupedStructure, state.originalStructure, state.hasTriggeredGroup, updateState]);
 
   return (
     <StepContainer>
@@ -326,8 +409,15 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
 
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton onClick={() => alert('Grouping saved!')}>Save Changes</WarningButton>
-        <SuccessButton onClick={onNext} disabled={state.isLoading}>
+        <WarningButton 
+          onClick={() => {
+            updateState({ hasTriggeredGroup: false, groupedStructure: undefined });
+          }}
+          disabled={state.isLoading}
+        >
+          Re-run Grouping
+        </WarningButton>
+        <SuccessButton onClick={onNext} disabled={state.isLoading || !state.groupedStructure}>
           Next
         </SuccessButton>
       </ButtonRow>
@@ -336,24 +426,49 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
 };
 
 const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
+  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
+  
   React.useEffect(() => {
-    if (!state.organizedStructure && state.groupedStructure) {
-      updateState({ isLoading: true, loadingMessage: 'Generating final organization...' });
+    // Only trigger folder generation if we don't have an organized structure and haven't triggered it yet
+    if (!state.organizedStructure && state.groupedStructure && !state.hasTriggeredFolders) {
+      const controller = new AbortController();
+      setAbortController(controller);
       
-      organizeFolders(state.groupedStructure)
-        .then(organizedStructure => {
+      updateState({ 
+        isLoading: true, 
+        loadingMessage: 'Generating final organization...', 
+        progress: 0,
+        hasTriggeredFolders: true
+      });
+      
+      generateFolders(
+        (progress) => {
+          updateState({ progress: Math.round(progress * 100) });
+        },
+        controller.signal
+      )
+        .then(taskResult => {
+          if (controller.signal.aborted) return;
+          
+          const folderStructure = taskResult.result?.folder_structure;
           updateState({ 
-            organizedStructure,
+            organizedStructure: folderStructure || undefined,
             isLoading: false,
-            loadingMessage: ''
+            loadingMessage: '',
+            progress: 0
           });
         })
         .catch(error => {
-          console.error('Error organizing folders:', error);
-          updateState({ isLoading: false, loadingMessage: '' });
+          if (!controller.signal.aborted) {
+            console.error('Error organizing folders:', error);
+            updateState({ isLoading: false, loadingMessage: '', progress: 0 });
+          }
+        })
+        .finally(() => {
+          setAbortController(null);
         });
     }
-  }, [state.organizedStructure, state.groupedStructure, updateState]);
+  }, [state.organizedStructure, state.groupedStructure, state.hasTriggeredFolders, updateState]);
 
   return (
     <StepContainer>
@@ -404,8 +519,15 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
 
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton onClick={() => alert('Organization saved!')}>Save Changes</WarningButton>
-        <SuccessButton onClick={onNext} disabled={state.isLoading}>
+        <WarningButton 
+          onClick={() => {
+            updateState({ hasTriggeredFolders: false, organizedStructure: undefined });
+          }}
+          disabled={state.isLoading}
+        >
+          Re-run Organization
+        </WarningButton>
+        <SuccessButton onClick={onNext} disabled={state.isLoading || !state.organizedStructure}>
           Next
         </SuccessButton>
       </ButtonRow>

@@ -4,8 +4,10 @@ from pydantic import BaseModel
 
 
 class StructureType(str, Enum):
-    old = "old"
-    new = "new"
+    original = "old"
+    organized = "new"
+    grouped = "grouped"
+    
 
 
 class File(BaseModel):

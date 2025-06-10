@@ -124,7 +124,7 @@ def calculate_categories(db_path: Path):
 
         session.add(
             FolderStructure(
-                structure_type=StructureType.new,
+                structure_type=StructureType.organized,
                 structure=folder_structure.model_dump_json(),
             )
         )

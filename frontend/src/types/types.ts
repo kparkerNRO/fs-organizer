@@ -84,3 +84,23 @@ export interface FolderViewResponse {
 
 // Legacy interface for backward compatibility
 export interface Folder extends FolderV2 {}
+
+// Async task management types
+export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface AsyncTaskResponse {
+  task_id: string;
+  message: string;
+  status: TaskStatus;
+}
+
+export interface TaskInfo {
+  task_id: string;
+  status: TaskStatus;
+  message: string;
+  progress: number;
+  result?: Record<string, any> | null;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
+}
