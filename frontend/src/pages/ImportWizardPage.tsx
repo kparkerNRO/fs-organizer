@@ -1,10 +1,20 @@
 import React, { useState, useCallback } from "react";
 import styled from "styled-components";
 import { FolderV2, TaskInfo } from "../types/types";
-import { gatherFiles, groupFolders as apiGroupFolders, generateFolders, getGatherStructure, getGroupStructure, getFoldersStructure } from "../api";
+import {
+  gatherFiles,
+  groupFolders as apiGroupFolders,
+  generateFolders,
+  getGatherStructure,
+  getGroupStructure,
+  getFoldersStructure,
+} from "../api";
 import { applyOrganization } from "../mock_data/mockApi";
 import { selectFolder } from "../utils/folderSelection";
-import { FolderBrowser, FolderBrowserViewType } from "../components/FolderBrowser";
+import {
+  FolderBrowser,
+  FolderBrowserViewType,
+} from "../components/FolderBrowser";
 
 interface ImportWizardState {
   currentStep: number;
@@ -13,7 +23,7 @@ interface ImportWizardState {
   groupedStructure?: FolderV2;
   organizedStructure?: FolderV2;
   targetPath: string;
-  duplicateHandling: 'newest' | 'largest' | 'both' | 'both-if-different';
+  duplicateHandling: "newest" | "largest" | "both" | "both-if-different";
   isLoading: boolean;
   loadingMessage: string;
   progress: number;
@@ -26,16 +36,16 @@ interface ImportWizardState {
 export const ImportWizardPage: React.FC = () => {
   const [state, setState] = useState<ImportWizardState>({
     currentStep: 1,
-    sourcePath: '',
-    targetPath: '',
-    duplicateHandling: 'newest',
+    sourcePath: "",
+    targetPath: "",
+    duplicateHandling: "newest",
     isLoading: false,
-    loadingMessage: '',
+    loadingMessage: "",
     progress: 0,
     hasTriggeredGather: false,
     hasTriggeredGroup: false,
     hasTriggeredFolders: false,
-    selectedFileId: null
+    selectedFileId: null,
   });
 
   // Load existing structures on component mount
@@ -60,7 +70,7 @@ export const ImportWizardPage: React.FC = () => {
           updateState({ organizedStructure: foldersStructure });
         }
       } catch (error) {
-        console.error('Error loading existing structures:', error);
+        console.error("Error loading existing structures:", error);
       }
     };
 
@@ -68,7 +78,7 @@ export const ImportWizardPage: React.FC = () => {
   }, []);
 
   const updateState = useCallback((updates: Partial<ImportWizardState>) => {
-    setState(prev => ({ ...prev, ...updates }));
+    setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const nextStep = () => {
@@ -93,49 +103,82 @@ export const ImportWizardPage: React.FC = () => {
   const renderStep = () => {
     switch (state.currentStep) {
       case 1:
-        return <ImportStep state={state} updateState={updateState} onNext={nextStep} />;
+        return (
+          <ImportStep
+            state={state}
+            updateState={updateState}
+            onNext={nextStep}
+          />
+        );
       case 2:
-        return <GroupStep state={state} updateState={updateState} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <GroupStep
+            state={state}
+            updateState={updateState}
+            onNext={nextStep}
+            onPrev={prevStep}
+          />
+        );
       case 3:
-        return <OrganizeStep state={state} updateState={updateState} onNext={nextStep} onPrev={prevStep} />;
+        return (
+          <OrganizeStep
+            state={state}
+            updateState={updateState}
+            onNext={nextStep}
+            onPrev={prevStep}
+          />
+        );
       case 4:
-        return <ReviewStep state={state} updateState={updateState} onPrev={prevStep} />;
+        return (
+          <ReviewStep
+            state={state}
+            updateState={updateState}
+            onPrev={prevStep}
+          />
+        );
       default:
-        return <ImportStep state={state} updateState={updateState} onNext={nextStep} />;
+        return (
+          <ImportStep
+            state={state}
+            updateState={updateState}
+            onNext={nextStep}
+          />
+        );
     }
   };
 
   return (
     <WizardContainer data-testid="wizard-container">
       <WizardHeader>
+        <div style={{ width: '120px', flexShrink: 0 }} /> {/* Spacer for centering */}
         <Title>Import Wizard</Title>
         <StepIndicator>
-          <StepItem 
-            active={state.currentStep === 1} 
+          <StepItem
+            active={state.currentStep === 1}
             completed={state.currentStep > 1}
             clickable={1 <= state.currentStep}
             onClick={() => goToStep(1)}
           >
             1. Import
           </StepItem>
-          <StepItem 
-            active={state.currentStep === 2} 
+          <StepItem
+            active={state.currentStep === 2}
             completed={state.currentStep > 2}
             clickable={2 <= state.currentStep}
             onClick={() => goToStep(2)}
           >
             2. Group
           </StepItem>
-          <StepItem 
-            active={state.currentStep === 3} 
+          <StepItem
+            active={state.currentStep === 3}
             completed={state.currentStep > 3}
             clickable={3 <= state.currentStep}
             onClick={() => goToStep(3)}
           >
             3. Organize
           </StepItem>
-          <StepItem 
-            active={state.currentStep === 4} 
+          <StepItem
+            active={state.currentStep === 4}
             completed={false}
             clickable={4 <= state.currentStep}
             onClick={() => goToStep(4)}
@@ -144,9 +187,7 @@ export const ImportWizardPage: React.FC = () => {
           </StepItem>
         </StepIndicator>
       </WizardHeader>
-      <WizardContent data-testid="wizard-content">
-        {renderStep()}
-      </WizardContent>
+      <WizardContent data-testid="wizard-content">{renderStep()}</WizardContent>
     </WizardContainer>
   );
 };
@@ -159,18 +200,19 @@ interface StepProps {
 }
 
 const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
-  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
+  const [abortController, setAbortController] =
+    React.useState<AbortController | null>(null);
 
   const handleBrowseFolder = async () => {
     const result = await selectFolder();
-    
+
     if (!result.success) {
-      if (result.error && !result.error.includes('cancelled')) {
+      if (result.error && !result.error.includes("cancelled")) {
         alert(result.error);
       }
       return;
     }
-    
+
     if (result.path) {
       updateState({ sourcePath: result.path });
     }
@@ -178,23 +220,23 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 
   const handleFolderSelect = async (folderPath: string) => {
     if (!folderPath.trim()) return;
-    
+
     // Create abort controller for this import operation
     const controller = new AbortController();
     setAbortController(controller);
-    
-    updateState({ 
+
+    updateState({
       sourcePath: folderPath,
-      isLoading: true, 
-      loadingMessage: 'Processing folder structure...',
+      isLoading: true,
+      loadingMessage: "Processing folder structure...",
       hasTriggeredGather: true,
       // Clear previous results when processing a new folder
       originalStructure: undefined,
       groupedStructure: undefined,
       organizedStructure: undefined,
-      selectedFileId: null
+      selectedFileId: null,
     });
-    
+
     try {
       const taskResult = await gatherFiles(
         folderPath,
@@ -203,25 +245,25 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
         },
         controller.signal
       );
-      
+
       // Check if operation was cancelled
       if (controller.signal.aborted) {
         return;
       }
-      
+
       // Extract folder structure from task result if available
       const folderStructure = taskResult.result?.folder_structure;
-      
-      updateState({ 
+
+      updateState({
         originalStructure: folderStructure || undefined,
         isLoading: false,
-        loadingMessage: '',
-        progress: 0
+        loadingMessage: "",
+        progress: 0,
       });
     } catch (error) {
       if (!controller.signal.aborted) {
-        updateState({ isLoading: false, loadingMessage: '' });
-        console.error('Error importing folder:', error);
+        updateState({ isLoading: false, loadingMessage: "" });
+        console.error("Error importing folder:", error);
       }
     } finally {
       setAbortController(null);
@@ -233,15 +275,15 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       abortController.abort();
       setAbortController(null);
     }
-    updateState({ 
-      isLoading: false, 
-      loadingMessage: '',
-      progress: 0
+    updateState({
+      isLoading: false,
+      loadingMessage: "",
+      progress: 0,
     });
   };
 
   return (
-    <StepContainer>      
+    <StepContainer>
       <FolderSelectSection>
         <FolderInput
           type="text"
@@ -250,36 +292,41 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
           onChange={(e) => updateState({ sourcePath: e.target.value })}
           disabled={state.isLoading}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && state.sourcePath.trim()) {
+            if (e.key === "Enter" && state.sourcePath.trim()) {
               handleFolderSelect(state.sourcePath);
             }
           }}
         />
-        <BrowseButton 
-          onClick={handleBrowseFolder}
-          disabled={state.isLoading}
-        >
+        <BrowseButton onClick={handleBrowseFolder} disabled={state.isLoading}>
           Browse
         </BrowseButton>
-        <ProcessButton 
-          onClick={state.isLoading ? handleCancelImport : () => handleFolderSelect(state.sourcePath)}
+        <ProcessButton
+          onClick={
+            state.isLoading
+              ? handleCancelImport
+              : () => handleFolderSelect(state.sourcePath)
+          }
           disabled={!state.sourcePath.trim() && !state.isLoading}
           $isCancel={state.isLoading}
           title={
-            state.isLoading ? "Cancel folder processing" : 
-            !state.sourcePath.trim() ? "Select a folder first" : 
-            "Process selected folder"
+            state.isLoading
+              ? "Cancel folder processing"
+              : !state.sourcePath.trim()
+                ? "Select a folder first"
+                : "Process selected folder"
           }
         >
-          {state.isLoading ? 'Cancel' : 'Process'}
+          {state.isLoading ? "Cancel" : "Process"}
         </ProcessButton>
       </FolderSelectSection>
-
 
       <ContentContainer isLoading={state.isLoading}>
         {state.originalStructure ? (
           <FolderBrowser
-            folderViewResponse={{ original: state.originalStructure, new: state.originalStructure }}
+            folderViewResponse={{
+              original: state.originalStructure,
+              new: state.originalStructure,
+            }}
             onSelectItem={() => {}}
             viewType={FolderBrowserViewType.ORIGINAL}
             externalSelectedFile={null}
@@ -287,7 +334,13 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
             showConfidence={false}
           />
         ) : (
-          <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
+          <div
+            style={{
+              color: "#64748b",
+              textAlign: "center",
+              padding: "1.5rem 1rem",
+            }}
+          >
             Folder structure will appear here after import...
           </div>
         )}
@@ -308,7 +361,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
           </LoadingOverlay>
         )}
       </ContentContainer>
-      
+
       {state.originalStructure && (
         <ButtonRow>
           <SuccessButton onClick={onNext}>Next</SuccessButton>
@@ -318,64 +371,81 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
   );
 };
 
-const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
-  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
-  
+const GroupStep: React.FC<StepProps> = ({
+  state,
+  updateState,
+  onNext,
+  onPrev,
+}) => {
+  const [abortController, setAbortController] =
+    React.useState<AbortController | null>(null);
+
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
   };
-  
+
   React.useEffect(() => {
     // Only trigger grouping if we don't have a grouped structure and haven't triggered it yet
-    if (!state.groupedStructure && state.originalStructure && !state.hasTriggeredGroup) {
+    if (
+      !state.groupedStructure &&
+      state.originalStructure &&
+      !state.hasTriggeredGroup
+    ) {
       const controller = new AbortController();
       setAbortController(controller);
-      
-      updateState({ 
-        isLoading: true, 
-        loadingMessage: 'Analyzing folder similarities...', 
+
+      updateState({
+        isLoading: true,
+        loadingMessage: "Analyzing folder similarities...",
         progress: 0,
-        hasTriggeredGroup: true
+        hasTriggeredGroup: true,
       });
-      
-      apiGroupFolders(
-        (progress) => {
-          updateState({ progress: Math.round(progress * 100) });
-        },
-        controller.signal
-      )
-        .then(taskResult => {
+
+      apiGroupFolders((progress) => {
+        updateState({ progress: Math.round(progress * 100) });
+      }, controller.signal)
+        .then((taskResult) => {
           if (controller.signal.aborted) return;
-          
+
           const folderStructure = taskResult.result?.folder_structure;
-          updateState({ 
+          updateState({
             groupedStructure: folderStructure || undefined,
             isLoading: false,
-            loadingMessage: '',
+            loadingMessage: "",
             progress: 0,
-            selectedFileId: null
+            selectedFileId: null,
           });
         })
-        .catch(error => {
+        .catch((error) => {
           if (!controller.signal.aborted) {
-            console.error('Error grouping folders:', error);
-            updateState({ isLoading: false, loadingMessage: '', progress: 0 });
+            console.error("Error grouping folders:", error);
+            updateState({ isLoading: false, loadingMessage: "", progress: 0 });
           }
         })
         .finally(() => {
           setAbortController(null);
         });
     }
-  }, [state.groupedStructure, state.originalStructure, state.hasTriggeredGroup, updateState]);
+  }, [
+    state.groupedStructure,
+    state.originalStructure,
+    state.hasTriggeredGroup,
+    updateState,
+  ]);
 
   return (
     <StepContainer>
       <ComparisonView isLoading={state.isLoading}>
         <Panel>
-          <SectionTitle>Original Structure</SectionTitle>
+          <SectionTitle>
+            <span>Original Structure</span>
+          </SectionTitle>
           {state.originalStructure ? (
             <FolderBrowser
-              folderViewResponse={{ original: state.originalStructure, new: state.originalStructure }}
+              folderViewResponse={{
+                original: state.originalStructure,
+                new: state.originalStructure,
+              }}
               onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
@@ -383,16 +453,27 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
               showConfidence={false}
             />
           ) : (
-            <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
+            <div
+              style={{
+                color: "#64748b",
+                textAlign: "center",
+                padding: "1.5rem 1rem",
+              }}
+            >
               Original folder structure will appear here...
             </div>
           )}
         </Panel>
         <Panel>
-          <SectionTitle>Grouped Structure</SectionTitle>
+          <SectionTitle>
+            <span>Grouped Structure</span>
+          </SectionTitle>
           {state.groupedStructure ? (
             <FolderBrowser
-              folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
+              folderViewResponse={{
+                original: state.groupedStructure,
+                new: state.groupedStructure,
+              }}
               onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
@@ -400,7 +481,13 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
               showConfidence={true}
             />
           ) : (
-            <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
+            <div
+              style={{
+                color: "#64748b",
+                textAlign: "center",
+                padding: "1.5rem 1rem",
+              }}
+            >
               Grouped structure will appear here after processing...
             </div>
           )}
@@ -417,15 +504,22 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
 
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton 
+        <WarningButton
           onClick={() => {
-            updateState({ hasTriggeredGroup: false, groupedStructure: undefined, selectedFileId: null });
+            updateState({
+              hasTriggeredGroup: false,
+              groupedStructure: undefined,
+              selectedFileId: null,
+            });
           }}
           disabled={state.isLoading}
         >
           Re-run Grouping
         </WarningButton>
-        <SuccessButton onClick={onNext} disabled={state.isLoading || !state.groupedStructure}>
+        <SuccessButton
+          onClick={onNext}
+          disabled={state.isLoading || !state.groupedStructure}
+        >
           Next
         </SuccessButton>
       </ButtonRow>
@@ -433,64 +527,81 @@ const GroupStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) 
   );
 };
 
-const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev }) => {
-  const [abortController, setAbortController] = React.useState<AbortController | null>(null);
-  
+const OrganizeStep: React.FC<StepProps> = ({
+  state,
+  updateState,
+  onNext,
+  onPrev,
+}) => {
+  const [abortController, setAbortController] =
+    React.useState<AbortController | null>(null);
+
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
   };
-  
+
   React.useEffect(() => {
     // Only trigger folder generation if we don't have an organized structure and haven't triggered it yet
-    if (!state.organizedStructure && state.groupedStructure && !state.hasTriggeredFolders) {
+    if (
+      !state.organizedStructure &&
+      state.groupedStructure &&
+      !state.hasTriggeredFolders
+    ) {
       const controller = new AbortController();
       setAbortController(controller);
-      
-      updateState({ 
-        isLoading: true, 
-        loadingMessage: 'Generating final organization...', 
+
+      updateState({
+        isLoading: true,
+        loadingMessage: "Generating final organization...",
         progress: 0,
-        hasTriggeredFolders: true
+        hasTriggeredFolders: true,
       });
-      
-      generateFolders(
-        (progress) => {
-          updateState({ progress: Math.round(progress * 100) });
-        },
-        controller.signal
-      )
-        .then(taskResult => {
+
+      generateFolders((progress) => {
+        updateState({ progress: Math.round(progress * 100) });
+      }, controller.signal)
+        .then((taskResult) => {
           if (controller.signal.aborted) return;
-          
+
           const folderStructure = taskResult.result?.folder_structure;
-          updateState({ 
+          updateState({
             organizedStructure: folderStructure || undefined,
             isLoading: false,
-            loadingMessage: '',
+            loadingMessage: "",
             progress: 0,
-            selectedFileId: null
+            selectedFileId: null,
           });
         })
-        .catch(error => {
+        .catch((error) => {
           if (!controller.signal.aborted) {
-            console.error('Error organizing folders:', error);
-            updateState({ isLoading: false, loadingMessage: '', progress: 0 });
+            console.error("Error organizing folders:", error);
+            updateState({ isLoading: false, loadingMessage: "", progress: 0 });
           }
         })
         .finally(() => {
           setAbortController(null);
         });
     }
-  }, [state.organizedStructure, state.groupedStructure, state.hasTriggeredFolders, updateState]);
+  }, [
+    state.organizedStructure,
+    state.groupedStructure,
+    state.hasTriggeredFolders,
+    updateState,
+  ]);
 
   return (
     <StepContainer>
       <ComparisonView isLoading={state.isLoading}>
         <Panel>
-          <SectionTitle>Grouped Structure</SectionTitle>
+          <SectionTitle>
+            <span>Grouped Structure</span>
+          </SectionTitle>
           {state.groupedStructure ? (
             <FolderBrowser
-              folderViewResponse={{ original: state.groupedStructure, new: state.groupedStructure }}
+              folderViewResponse={{
+                original: state.groupedStructure,
+                new: state.groupedStructure,
+              }}
               onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
@@ -498,16 +609,27 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
               showConfidence={true}
             />
           ) : (
-            <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
+            <div
+              style={{
+                color: "#64748b",
+                textAlign: "center",
+                padding: "1.5rem 1rem",
+              }}
+            >
               Grouped structure will appear here...
             </div>
           )}
         </Panel>
         <Panel>
-          <SectionTitle>Final Organization</SectionTitle>
+          <SectionTitle>
+            <span>Final Organization</span>
+          </SectionTitle>
           {state.organizedStructure ? (
             <FolderBrowser
-              folderViewResponse={{ original: state.organizedStructure, new: state.organizedStructure }}
+              folderViewResponse={{
+                original: state.organizedStructure,
+                new: state.organizedStructure,
+              }}
               onSelectItem={handleFileSelect}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
@@ -515,7 +637,13 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
               showConfidence={false}
             />
           ) : (
-            <div style={{ color: '#64748b', textAlign: 'center', padding: '3rem' }}>
+            <div
+              style={{
+                color: "#64748b",
+                textAlign: "center",
+                padding: "1.5rem 1rem",
+              }}
+            >
               Final organization will appear here after processing...
             </div>
           )}
@@ -532,15 +660,22 @@ const OrganizeStep: React.FC<StepProps> = ({ state, updateState, onNext, onPrev 
 
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton 
+        <WarningButton
           onClick={() => {
-            updateState({ hasTriggeredFolders: false, organizedStructure: undefined, selectedFileId: null });
+            updateState({
+              hasTriggeredFolders: false,
+              organizedStructure: undefined,
+              selectedFileId: null,
+            });
           }}
           disabled={state.isLoading}
         >
           Re-run Organization
         </WarningButton>
-        <SuccessButton onClick={onNext} disabled={state.isLoading || !state.organizedStructure}>
+        <SuccessButton
+          onClick={onNext}
+          disabled={state.isLoading || !state.organizedStructure}
+        >
           Next
         </SuccessButton>
       </ButtonRow>
@@ -554,14 +689,14 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
 
   const handleBrowseTargetFolder = async () => {
     const result = await selectFolder();
-    
+
     if (!result.success) {
-      if (result.error && !result.error.includes('cancelled')) {
+      if (result.error && !result.error.includes("cancelled")) {
         alert(result.error);
       }
       return;
     }
-    
+
     if (result.path) {
       updateState({ targetPath: result.path });
     }
@@ -569,14 +704,14 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
 
   const handleApply = async () => {
     if (!state.organizedStructure || !state.targetPath) return;
-    
+
     setIsApplying(true);
     setProgress(0);
 
     try {
       // Simulate progress updates
       const progressInterval = setInterval(() => {
-        setProgress(prev => {
+        setProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressInterval);
             return 90;
@@ -586,24 +721,24 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
       }, 300);
 
       const result = await applyOrganization(
-        state.organizedStructure, 
-        state.targetPath, 
+        state.organizedStructure,
+        state.targetPath,
         state.duplicateHandling
       );
 
       clearInterval(progressInterval);
       setProgress(100);
-      
+
       setTimeout(() => {
         alert(result.message);
         setIsApplying(false);
         setProgress(0);
       }, 500);
     } catch (error) {
-      console.error('Error applying organization:', error);
+      console.error("Error applying organization:", error);
       setIsApplying(false);
       setProgress(0);
-      alert('Error applying organization. Please try again.');
+      alert("Error applying organization. Please try again.");
     }
   };
 
@@ -611,7 +746,9 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
     <StepContainer>
       <ComparisonView>
         <Panel>
-          <SectionTitle>Configuration Settings</SectionTitle>
+          <SectionTitle>
+            <span>Configuration Settings</span>
+          </SectionTitle>
           <SettingGroup>
             <SettingLabel>Target Folder:</SettingLabel>
             <FolderSelectSection>
@@ -631,19 +768,26 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
             <SettingLabel>Duplicate Handling:</SettingLabel>
             <Select
               value={state.duplicateHandling}
-              onChange={(e) => updateState({ duplicateHandling: e.target.value as any })}
+              onChange={(e) =>
+                updateState({ duplicateHandling: e.target.value as any })
+              }
             >
               <option value="newest">Keep Newest</option>
               <option value="largest">Keep Largest</option>
               <option value="both">Keep Both</option>
-              <option value="both-if-different">Keep Both if Not Identical</option>
+              <option value="both-if-different">
+                Keep Both if Not Identical
+              </option>
             </Select>
           </SettingGroup>
         </Panel>
         <Panel>
           {state.organizedStructure && (
             <FolderBrowser
-              folderViewResponse={{ original: state.organizedStructure, new: state.organizedStructure }}
+              folderViewResponse={{
+                original: state.organizedStructure,
+                new: state.organizedStructure,
+              }}
               onSelectItem={() => {}}
               viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={null}
@@ -667,21 +811,23 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
         <SecondaryButton onClick={onPrev} disabled={isApplying}>
           Previous
         </SecondaryButton>
-        <DangerButton onClick={handleApply} disabled={isApplying || !state.targetPath}>
-          {isApplying ? 'Applying...' : 'Apply Organization'}
+        <DangerButton
+          onClick={handleApply}
+          disabled={isApplying || !state.targetPath}
+        >
+          {isApplying ? "Applying..." : "Apply Organization"}
         </DangerButton>
       </ButtonRow>
     </StepContainer>
   );
 };
 
-
 // Styled Components
 const WizardContainer = styled.div`
   width: 100vw;
   height: 100vh;
   margin: 0;
-  padding: 1.5rem;
+  padding: 0.25rem;
   background-color: #f8fafc;
   overflow: hidden;
   display: flex;
@@ -693,70 +839,88 @@ const WizardHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   flex-shrink: 0;
-  height: 60px;
+  height: 48px;
+  position: relative;
+  min-width: 0;
 `;
 
 const Title = styled.h1`
-  font-size: 2rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
   color: #1f2937;
   margin: 0;
+  padding-top: 0;
+  line-height: 1.1;
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const StepIndicator = styled.div`
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   align-items: center;
+  flex-shrink: 0;
 `;
 
 const StepItem = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['active', 'completed', 'clickable'].includes(prop)
+  shouldForwardProp: (prop) =>
+    !["active", "completed", "clickable"].includes(prop),
 })<{ active: boolean; completed: boolean; clickable: boolean }>`
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.75rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.875rem;
   transition: all 0.2s ease;
-  border: 2px solid transparent;
-  cursor: ${props => props.clickable ? 'pointer' : 'default'};
+  border: 1px solid transparent;
+  cursor: ${(props) => (props.clickable ? "pointer" : props.clickable === false ? "not-allowed" : "default")};
   user-select: none;
-  background-color: ${props => 
-    props.active ? '#2563eb' : 
-    props.completed ? '#10b981' : '#e2e8f0'
-  };
-  color: ${props => 
-    props.active || props.completed ? 'white' : '#64748b'
-  };
-  opacity: ${props => props.clickable ? 1 : 0.6};
-  
-  ${props => props.active && `
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
-    border-color: #1d4ed8;
-  `}
-  
-  ${props => props.clickable && !props.active && `
+  opacity: ${(props) => (props.clickable ? 1 : 0.6)};
+
+  // Background and text colors
+  ${(props) => {
+    if (props.active) {
+      return `
+        background-color: #2563eb;
+        color: white;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        border-color: #1d4ed8;
+      `;
+    } else if (props.completed) {
+      return `
+        background-color: #10b981;
+        color: white;
+      `;
+    } else {
+      return `
+        background-color: #e2e8f0;
+        color: #64748b;
+      `;
+    }
+  }}
+
+  // Hover effects for clickable items
+  ${(props) =>
+    props.clickable &&
+    !props.active &&
+    `
     &:hover {
       transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      ${props.completed ? `
-        background-color: #059669;
-      ` : `
-        background-color: #cbd5e1;
-      `}
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      background-color: ${props.completed ? "#059669" : "#cbd5e1"};
     }
-  `}
-  
-  ${props => !props.clickable && `
-    cursor: not-allowed;
   `}
 `;
 
 const WizardContent = styled.div`
   background: white;
-  border-radius: 0.5rem;
-  padding: 1.5rem;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   position: relative;
   flex: 1;
@@ -775,23 +939,21 @@ const StepContainer = styled.div`
   min-height: 0;
 `;
 
-
-
 const FolderSelectSection = styled.div`
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
   align-items: stretch;
 `;
 
 const FolderInput = styled.input`
   flex: 1;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border: 1px solid #d1d5db;
   border-radius: 0.375rem;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-family: inherit;
-  
+
   &:focus {
     outline: none;
     border-color: #2563eb;
@@ -799,61 +961,47 @@ const FolderInput = styled.input`
   }
 `;
 
-const BrowseButton = styled.button`
-  padding: 0.75rem 1.5rem;
-  background-color: #6b7280;
-  color: white;
+// Base button styles
+const BaseButton = styled.button`
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 0.375rem;
   cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  white-space: nowrap;
-  
-  &:hover:not(:disabled) {
-    background-color: #4b5563;
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const ProcessButton = styled.button.withConfig({
-  shouldForwardProp: (prop) => !['$isCancel'].includes(prop)
-})<{ $isCancel?: boolean }>`
-  padding: 0.75rem 1.5rem;
-  background-color: ${props => props.$isCancel ? '#ef4444' : '#2563eb'};
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
   transition: background-color 0.2s ease;
-  
-  &:hover:not(:disabled) {
-    background-color: ${props => props.$isCancel ? '#dc2626' : '#1d4ed8'};
-  }
-  
+
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 `;
 
+const BrowseButton = styled(BaseButton)`
+  background-color: #6b7280;
+  color: white;
 
+  &:hover:not(:disabled) {
+    background-color: #4b5563;
+  }
+`;
 
+const ProcessButton = styled(BaseButton).withConfig({
+  shouldForwardProp: (prop) => !["$isCancel"].includes(prop),
+})<{ $isCancel?: boolean }>`
+  background-color: ${(props) => (props.$isCancel ? "#ef4444" : "#2563eb")};
+  color: white;
 
-// New loading overlay components
+  &:hover:not(:disabled) {
+    background-color: ${(props) => (props.$isCancel ? "#dc2626" : "#1d4ed8")};
+  }
+`;
+
+// Loading components
 const LoadingOverlay = styled.div`
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.3);
   display: flex;
   align-items: center;
@@ -864,194 +1012,170 @@ const LoadingOverlay = styled.div`
 
 const LoadingModal = styled.div`
   background: white;
-  padding: 2rem 3rem;
-  border-radius: 1rem;
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 20px 25px -5px rgba(0, 0, 0, 0.2),
-    0 10px 10px -5px rgba(0, 0, 0, 0.1);
-  border: 2px solid #e2e8f0;
+  padding: 1.5rem 2rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  min-width: 300px;
-  max-width: 400px;
+  gap: 1rem;
+  min-width: 280px;
+  max-width: 350px;
   text-align: center;
 `;
 
-
 const LoadingSpinner = styled.div`
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top: 4px solid #2563eb;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #2563eb;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  
+
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
   }
 `;
 
 const LoadingText = styled.div`
   color: #374151;
   font-weight: 500;
-  font-size: 1.1rem;
-  line-height: 1.5;
+  font-size: 1rem;
 `;
 
-// Standardized content containers
-const ContentContainer = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['isLoading'].includes(prop)
+// Base container with loading state
+const BaseContainer = styled.div.withConfig({
+  shouldForwardProp: (prop) => !["isLoading"].includes(prop),
 })<{ isLoading?: boolean }>`
-  padding: 1.5rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
   background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   position: relative;
-  opacity: ${props => props.isLoading ? 0.5 : 1};
-  pointer-events: ${props => props.isLoading ? 'none' : 'auto'};
+  opacity: ${(props) => (props.isLoading ? 0.5 : 1)};
+  pointer-events: ${(props) => (props.isLoading ? "none" : "auto")};
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  
+
   &:hover {
     border-color: #cbd5e1;
-    box-shadow: 
-      0 0 0 1px rgba(0, 0, 0, 0.05),
-      0 8px 25px -5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.1);
   }
 `;
 
+const ContentContainer = styled(BaseContainer)``;
+
 // Remove PreviewTitle - will use SectionTitle instead
 
-const SuccessButton = styled.button`
+// Large button base for wizard navigation
+const LargeButton = styled(BaseButton)`
   padding: 0.75rem 2rem;
+  font-size: 1rem;
+`;
+
+const SuccessButton = styled(LargeButton)`
   background-color: #10b981;
   color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-size: 1rem;
-  
+
   &:hover:not(:disabled) {
     background-color: #059669;
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 `;
 
 const ComparisonView = styled.div.withConfig({
-  shouldForwardProp: (prop) => !['isLoading'].includes(prop)
+  shouldForwardProp: (prop) => !["isLoading"].includes(prop),
 })<{ isLoading?: boolean }>`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 0.75rem;
   position: relative;
-  opacity: ${props => props.isLoading ? 0.5 : 1};
-  pointer-events: ${props => props.isLoading ? 'none' : 'auto'};
+  opacity: ${(props) => (props.isLoading ? 0.5 : 1)};
+  pointer-events: ${(props) => (props.isLoading ? "none" : "auto")};
   transition: opacity 0.2s ease;
   flex: 1;
   min-height: 0;
 `;
 
-const Panel = styled.div`
-  padding: 1.5rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 0.75rem;
-  background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  
-  &:hover {
-    border-color: #cbd5e1;
-    box-shadow: 
-      0 0 0 1px rgba(0, 0, 0, 0.05),
-      0 8px 25px -5px rgba(0, 0, 0, 0.1);
+const SectionTitle = styled.h4`
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  position: relative;
+  text-align: center;
+  margin-bottom: 0.5rem;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 0.75rem);
+    height: 1px;
+    background-color: #f1f5f9;
+    opacity: 0.6;
+  }
+
+  &::before {
+    left: 0;
+  }
+
+  &::after {
+    right: 0;
+  }
+
+  span {
+    background: #fafbfc;
+    padding: 0 0.5rem;
+    position: relative;
+    z-index: 1;
+    transition: background-color 0.2s ease;
   }
 `;
 
-const SectionTitle = styled.h4`
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: #0f172a;
-  font-size: 1.25rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e2e8f0;
+const Panel = styled(BaseContainer)`
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
 `;
 
 const ButtonRow = styled.div`
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   justify-content: flex-end;
-  padding-top: 1rem;
+  padding: 0.75rem 0;
   border-top: 1px solid #e2e8f0;
   flex-wrap: wrap;
   flex-shrink: 0;
-  height: 60px;
+  min-height: 56px;
   align-items: center;
 `;
 
-const SecondaryButton = styled.button`
-  padding: 0.75rem 2rem;
+const SecondaryButton = styled(LargeButton)`
   background-color: #6b7280;
   color: white;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  
+
   &:hover:not(:disabled) {
     background-color: #4b5563;
   }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
-const WarningButton = styled.button`
-  padding: 0.75rem 2rem;
+const WarningButton = styled(LargeButton)`
   background-color: #f59e0b;
   color: white;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  
+
   &:hover:not(:disabled) {
     background-color: #d97706;
   }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
-
-
 const SettingGroup = styled.div`
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 `;
 
 const SettingLabel = styled.label`
@@ -1070,7 +1194,7 @@ const Select = styled.select`
   font-size: 1rem;
   font-family: inherit;
   background-color: white;
-  
+
   &:focus {
     outline: none;
     border-color: #2563eb;
@@ -1080,17 +1204,14 @@ const Select = styled.select`
 
 // Remove FinalPreview - will use ContentContainer instead
 
-const ProgressSection = styled.div`
-  margin: 1.5rem 0;
-  padding: 1.5rem;
-  background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  border-radius: 0.75rem;
-  border: 2px solid #e2e8f0;
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 4px 6px -1px rgba(0, 0, 0, 0.1);
+const ProgressSection = styled(BaseContainer)`
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  flex: none;
 `;
 
+// Progress components
 const ProgressBar = styled.div`
   width: 100%;
   height: 8px;
@@ -1112,23 +1233,11 @@ const ProgressText = styled.div`
   font-weight: 500;
 `;
 
-const DangerButton = styled.button`
-  padding: 0.75rem 2rem;
+const DangerButton = styled(LargeButton)`
   background-color: #dc2626;
   color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-size: 1rem;
-  
+
   &:hover:not(:disabled) {
     background-color: #b91c1c;
   }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
-

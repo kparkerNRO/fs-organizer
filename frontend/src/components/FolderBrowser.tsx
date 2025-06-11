@@ -218,14 +218,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           {!isFile && hasChildren ? (
             <ExpandIcon>
               {isExpanded ? (
-                <ChevronDown size={14} />
+                <ChevronDown size={10} />
               ) : (
-                <ChevronRight size={14} />
+                <ChevronRight size={10} />
               )}
             </ExpandIcon>
           ) : (
             <ExpandIcon style={{ opacity: 0.7 }}>
-              {isFile ? <FileIcon size={14} /> : <FolderIcon size={14} />}
+              {isFile ? <FileIcon size={10} /> : <FolderIcon size={10} />}
             </ExpandIcon>
           )}
           <FolderName
@@ -290,7 +290,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             <div
               style={{
                 display: "flex",
-                gap: "2rem",
+                gap: "0.75rem",
                 height: "100%",
                 width: "100%",
               }}
@@ -311,9 +311,9 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 const ContentContainer = styled.div`
   width: 100%;
   background-color: white;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  padding: 1.5rem;
+  padding: 0.25rem;
   box-sizing: border-box;
   overflow: hidden;
   display: flex;
@@ -323,7 +323,7 @@ const ContentContainer = styled.div`
 `;
 
 const FolderTree = styled.div`
-  margin-top: 0.5rem;
+  margin-top: 0.125rem;
   flex: 1;
   overflow-y: auto;
   min-height: 0; /* Critical for proper flexbox behavior with scrolling */
@@ -331,17 +331,17 @@ const FolderTree = styled.div`
 
   /* Modern scrollbar styling */
   &::-webkit-scrollbar {
-    width: 8px;
+    width: 4px;
   }
 
   &::-webkit-scrollbar-track {
     background: #f1f1f1;
-    border-radius: 4px;
+    border-radius: 2px;
   }
 
   &::-webkit-scrollbar-thumb {
     background: #c1c1c1;
-    border-radius: 4px;
+    border-radius: 2px;
   }
 
   &::-webkit-scrollbar-thumb:hover {
@@ -360,13 +360,14 @@ const FolderItem = styled.div<{
   align-items: center;
   width: 100%;
   box-sizing: border-box;
-  padding: 0.35rem 0.5rem;
-  padding-left: ${(props) => props.$level * 0.9 + 0.6}rem;
+  padding: 0.1875rem 0.3rem;
+  padding-left: ${(props) => props.$level * 0.625 + 0.3}rem;
   cursor: pointer;
-  border-radius: 0.15rem;
+  border-radius: 0.125rem;
   transition: all 0.15s ease;
-  margin: 1px 0;
-  font-size: 0.9rem;
+  margin: 0.25px 0;
+  font-size: 0.8125rem;
+  line-height: 1.3;
   color: ${(props) => (props.$isFile ? "#4b5563" : "#000")};
   background-color: ${(props) => {
     if (props.$isDraggedOver) return "#e2f0fd";
@@ -397,9 +398,9 @@ const ExpandIcon = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-right: 0.3rem;
-  width: 16px;
-  height: 16px;
+  margin-right: 0.1875rem;
+  width: 12px;
+  height: 12px;
 `;
 
 const FolderName = styled.span<{
