@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
-import { FolderV2, FolderViewResponse } from "../types/types";
+import { FolderV2, File, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FileIcon, FolderIcon } from "lucide-react";
 
 export enum FolderBrowserViewType {
@@ -13,19 +13,6 @@ const isFileNode = (node: FolderV2 | File): node is File => {
   return "id" in node;
 };
 
-// Helper function to find a file in a tree structure
-const findFileInTree = (tree: FolderV2 | File, fileId: number): File | null => {
-  if (isFileNode(tree) && tree.id === fileId) {
-    return tree;
-  }
-  if (!isFileNode(tree) && tree.children) {
-    for (const child of tree.children) {
-      const found = findFileInTree(child, fileId);
-      if (found) return found;
-    }
-  }
-  return null;
-};
 
 // Helper function to get the path to a file
 const getFilePathInTree = (
@@ -137,6 +124,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         scrollToSelectedFile(externalSelectedFile);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalSelectedFile, folderViewResponse, folderTree, shouldSync]);
 
   // Keep externalSelectedFile in sync if selectedFileId changes internally
@@ -154,6 +142,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFileId, shouldSync]);
 
   const toggleFolder = (folderPath: string) => {
@@ -191,13 +180,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     const isHighlighted = isFile && selectedFileId === node.id;
 
     // Check if this folder is in the path to the selected file
-    const isInSelectedPath =
-      selectedFileId && folderViewResponse
-        ? getFilePathInTree(folderTree, selectedFileId)?.some(
-            (pathSegment) =>
-              nodePath.endsWith(pathSegment) || nodePath === pathSegment
-          )
-        : false;
+    const isInSelectedPath = !isFile && selectedFileId && folderViewResponse ? (() => {
+      const pathToFile = getFilePathInTree(folderTree!, selectedFileId);
+      if (!pathToFile) return false;
+      
+      // Build the full path segments to compare against nodePath
+      let currentPath = "";
+      for (const segment of pathToFile) {
+        currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+        if (currentPath === nodePath) {
+          return true;
+        }
+      }
+      return false;
+    })() : false;
 
     return (
       <div key={nodePath}>
@@ -251,15 +247,15 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                 </ConfidenceInline>
               )}
           </FolderName>
-          {isFile && "fileType" in node && node.fileType && (
-            <FileType>{node.fileType}</FileType>
-          )}
-          {isFile && "size" in node && node.size && (
-            <FileSize>{node.size}</FileSize>
-          )}
-          {!isFile && "path" in node && node.path && nodePath !== "root" && (
-            <FolderPath>{node.path}</FolderPath>
-          )}
+          {isFile && (node as File).fileType ? (
+            <FileType>{(node as File).fileType}</FileType>
+          ) : null}
+          {isFile && (node as File).size ? (
+            <FileSize>{(node as File).size}</FileSize>
+          ) : null}
+          {!isFile && (node as FolderV2).path && nodePath !== "root" ? (
+            <FolderPath>{(node as FolderV2).path}</FolderPath>
+          ) : null}
         </FolderItem>
 
         {!isFile && isExpanded && hasChildren && (
@@ -296,7 +292,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               }}
             >
               <div style={{ flex: 1 }}>
-                {renderNode(folderTree, 0, expandedFolders, "")}
+                {folderTree && renderNode(folderTree, 0, expandedFolders, "")}
               </div>
             </div>
           </FolderTree>
@@ -461,12 +457,6 @@ const ConfidenceInline = styled.span<{ $confidence: number }>`
   color: rgb(51, 55, 61); /* Grey text */
   margin-left: auto; /* Push to the right */
   padding-left: 0.5rem;
-`;
-
-const LoadingMessage = styled.div`
-  text-align: center;
-  padding: 2rem;
-  color: #6b7280;
 `;
 
 const ErrorMessage = styled.div`

@@ -68,6 +68,8 @@ export interface File extends Selectable {
   possibleClassifications: string[];
   originalPath: string;
   newPath: string | null;
+  fileType?: string;
+  size?: string;
 }
 
 export interface FolderV2 extends Selectable, Expandable {
@@ -75,6 +77,7 @@ export interface FolderV2 extends Selectable, Expandable {
   count: number;
   confidence: number;
   children: (File | FolderV2)[];
+  path?: string;
 }
 
 export interface FolderViewResponse {
@@ -83,7 +86,10 @@ export interface FolderViewResponse {
 }
 
 // Legacy interface for backward compatibility
-export interface Folder extends FolderV2 {}
+export interface Folder extends FolderV2 {
+  // Legacy properties for backward compatibility
+  legacy?: boolean;
+}
 
 // Async task management types
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -99,7 +105,7 @@ export interface TaskInfo {
   status: TaskStatus;
   message: string;
   progress: number;
-  result?: Record<string, any> | null;
+  result?: Record<string, unknown> | null;
   error?: string | null;
   created_at: string;
   updated_at: string;

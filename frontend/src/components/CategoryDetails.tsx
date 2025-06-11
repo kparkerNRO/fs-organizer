@@ -331,35 +331,6 @@ const ConfidenceFill = styled.div`
   transition: width 0.3s ease;
 `;
 
-const GroupMembersSection = styled.div`
-  margin-top: 1.5rem;
-`;
-
-const GroupTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-`;
-
-const MembersGrid = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const HeaderRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-  align-items: center;
-`;
-
-const MemberRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-`;
-
 const DetailHeader = styled.div`
   display: flex;
   align-items: center;

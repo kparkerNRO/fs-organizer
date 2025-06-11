@@ -1,4 +1,4 @@
-import React, { useState, useEffect, act } from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import {
   Folder,
@@ -121,6 +121,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   // Update persisted state when expandedCategories changes
   useEffect(() => {
     updateExpandedCategories(expandedCategories);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedCategories]);
 
   // Handle updates to selection
@@ -132,6 +133,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       onSelectItem({ category: activeCategory, folder: selectedFolders[0] });
       updateSelectedItem(selectedFolders[0].id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFolders, onSelectItem]);
 
   useEffect(() => {
@@ -139,6 +141,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       onSelectItem({ category: activeCategory, folder: null });
       updateSelectedItem(activeCategory.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCategory, selectedFolders.length, onSelectItem]);
 
   const handleContextMenu = (
@@ -295,7 +298,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
       if (sourceCategoryId === targetCategory.id) return;
 
-      const foldersToMove = folders.map((folder: any) => ({ ...folder }));
+      const foldersToMove = folders.map((folder: LegacyFolder) => ({ ...folder }));
 
       const updatedCategories = categories.map((category) => {
         // source case
@@ -538,10 +541,6 @@ const HeaderContainer = styled.div`
   margin-bottom: 2rem;
 `;
 
-const Title = styled.h1`
-  font-size: 2.25rem;
-  font-weight: 600;
-`;
 
 const SearchInput = styled.input`
   padding: 0.5rem 1rem;

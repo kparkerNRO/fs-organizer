@@ -10,12 +10,4 @@ interface EnvConfig {
     nodeEnv: import.meta.env.NODE_ENV || 'development',
   };
   
-  // Type definitions for environment variables
-  interface ImportMetaEnv {
-    readonly VITE_API_URL: string;
-    readonly NODE_ENV: string;
-  }
   
-  interface ImportMeta {
-    readonly env: ImportMetaEnv;
-  }

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import styled from "styled-components";
-import { FolderV2, TaskInfo } from "../types/types";
+import { FolderV2 } from "../types/types";
 import {
   gatherFiles,
   groupFolders as apiGroupFolders,
@@ -75,6 +75,7 @@ export const ImportWizardPage: React.FC = () => {
     };
 
     loadExistingStructures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateState = useCallback((updates: Partial<ImportWizardState>) => {
@@ -252,7 +253,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       }
 
       // Extract folder structure from task result if available
-      const folderStructure = taskResult.result?.folder_structure;
+      const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
 
       updateState({
         originalStructure: folderStructure || undefined,
@@ -377,7 +378,8 @@ const GroupStep: React.FC<StepProps> = ({
   onNext,
   onPrev,
 }) => {
-  const [abortController, setAbortController] =
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_abortController, setAbortController] =
     React.useState<AbortController | null>(null);
 
   const handleFileSelect = (fileId: number | null) => {
@@ -407,7 +409,7 @@ const GroupStep: React.FC<StepProps> = ({
         .then((taskResult) => {
           if (controller.signal.aborted) return;
 
-          const folderStructure = taskResult.result?.folder_structure;
+          const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
           updateState({
             groupedStructure: folderStructure || undefined,
             isLoading: false,
@@ -533,7 +535,8 @@ const OrganizeStep: React.FC<StepProps> = ({
   onNext,
   onPrev,
 }) => {
-  const [abortController, setAbortController] =
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_abortController, setAbortController] =
     React.useState<AbortController | null>(null);
 
   const handleFileSelect = (fileId: number | null) => {
@@ -563,7 +566,7 @@ const OrganizeStep: React.FC<StepProps> = ({
         .then((taskResult) => {
           if (controller.signal.aborted) return;
 
-          const folderStructure = taskResult.result?.folder_structure;
+          const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
           updateState({
             organizedStructure: folderStructure || undefined,
             isLoading: false,
@@ -769,7 +772,7 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
             <Select
               value={state.duplicateHandling}
               onChange={(e) =>
-                updateState({ duplicateHandling: e.target.value as any })
+                updateState({ duplicateHandling: e.target.value as ImportWizardState['duplicateHandling'] })
               }
             >
               <option value="newest">Keep Newest</option>

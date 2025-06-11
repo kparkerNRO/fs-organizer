@@ -1,5 +1,5 @@
 import { vi } from 'vitest'
-import { FetchCategoriesResponse, FetchCategoriesParams } from '../api'
+import { FetchCategoriesResponse } from '../api'
 import { FolderV2, FolderViewResponse } from '../types/types'
 
 // Mock fetch globally
@@ -41,8 +41,8 @@ export const mockFolderViewResponse: FolderViewResponse = {
 }
 
 // Helper to mock successful fetch responses
-export const mockFetchSuccess = (data: any) => {
-  (fetch as any).mockResolvedValueOnce({
+export const mockFetchSuccess = (data: unknown) => {
+  (fetch as unknown).mockResolvedValueOnce({
     ok: true,
     json: async () => data,
   })
@@ -50,7 +50,7 @@ export const mockFetchSuccess = (data: any) => {
 
 // Helper to mock failed fetch responses
 export const mockFetchError = (message: string = 'Network error') => {
-  (fetch as any).mockRejectedValueOnce(new Error(message))
+  (fetch as unknown).mockRejectedValueOnce(new Error(message))
 }
 
 // Reset mocks helper

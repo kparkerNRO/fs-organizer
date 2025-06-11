@@ -6,6 +6,7 @@ import { FolderV2, FolderViewResponse } from "../types/types";
 
 
 export const fetchMockCategoryData = (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _params: FetchCategoriesParams
 ): Promise<FetchCategoriesResponse> => {
   const mockData = {
@@ -169,6 +170,7 @@ export const organizeFolders = (groupedStructure: FolderV2): Promise<FolderV2> =
 export const applyOrganization = (
   organizedStructure: FolderV2,
   targetPath: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   duplicateHandling: string
 ): Promise<{ success: boolean; message: string }> => {
   return new Promise((resolve) => {

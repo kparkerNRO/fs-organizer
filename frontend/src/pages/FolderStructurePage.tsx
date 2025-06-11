@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { fetchFolderStructureComparison } from "../api";
-import { FolderV2, File, FolderViewResponse } from "../types/types";
+import { FolderViewResponse } from "../types/types";
 import {
   Folder as FolderIcon,
 } from "lucide-react";
@@ -12,42 +12,7 @@ import {
   FolderBrowser,
 } from "../components/FolderBrowser";
 
-// Helper function to determine if a node is a file (has id property) or folder
-const isFileNode = (node: FolderV2 | File): node is File => {
-  return "id" in node;
-};
 
-// Helper function to find a file in a tree structure
-const findFileInTree = (tree: FolderV2 | File, fileId: number): File | null => {
-  if (isFileNode(tree) && tree.id === fileId) {
-    return tree;
-  }
-  if (!isFileNode(tree) && tree.children) {
-    for (const child of tree.children) {
-      const found = findFileInTree(child, fileId);
-      if (found) return found;
-    }
-  }
-  return null;
-};
-
-// Helper function to get the path to a file
-const getFilePathInTree = (
-  tree: FolderV2 | File,
-  fileId: number,
-  path: string[] = []
-): string[] | null => {
-  if (isFileNode(tree) && tree.id === fileId) {
-    return path;
-  }
-  if (!isFileNode(tree) && tree.children) {
-    for (const child of tree.children) {
-      const childPath = getFilePathInTree(child, fileId, [...path, tree.name]);
-      if (childPath) return childPath;
-    }
-  }
-  return null;
-};
 
 // Cache keys for localStorage
 const CACHE_KEYS = {

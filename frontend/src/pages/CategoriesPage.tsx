@@ -17,7 +17,7 @@ interface PaginationState {
 }
 
 export const CategoriesPage: React.FC = () => {
-  const [data, setData] = useState<any[]>([]);
+  const [data] = useState<Folder[]>([]);
   const [selectedItem, setSelectedItem] = useState<CategoryDetailsProps>({
     category: null,
     folder: null,
@@ -53,6 +53,7 @@ export const CategoriesPage: React.FC = () => {
 
   useEffect(() => {
     fetchCategoryData(pagination.currentPage, pagination.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePageChange = async (page: number) => {

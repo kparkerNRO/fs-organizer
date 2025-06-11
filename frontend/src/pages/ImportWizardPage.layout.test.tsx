@@ -51,7 +51,7 @@ describe('ImportWizardPage Layout Consistency', () => {
   };
 
   it('should maintain consistent container dimensions across all wizard steps', async () => {
-    const { rerender } = render(<ImportWizardPage />);
+    render(<ImportWizardPage />);
     
     // Step 1: Initial dimensions
     const step1Dimensions = getContainerDimensions();
