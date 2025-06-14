@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { FolderV2, File, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FileIcon, FolderIcon } from "lucide-react";
+import { ContextMenu } from "./ContextMenu";
 
 export enum FolderBrowserViewType {
   ORIGINAL = "ORIGINAL",
@@ -66,6 +67,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollToSelection = useRef<boolean>(false);
   const [selectedFolderPaths, setSelectedFolderPaths] = useState<string[]>([]);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    item: FolderV2 | File;
+    itemPath: string;
+  } | null>(null);
 
   const synchronizeFolders = (folderTree: FolderV2, selectedId: number) => {
     const path = getFilePathInTree(folderTree, selectedId);
@@ -165,6 +172,29 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFileId, shouldSync]);
 
+  // Handle escape key to clear selection
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        // Clear all selections
+        setSelectedFileId(null);
+        setSelectedFolderPath(null);
+        setSelectedFolderPaths([]);
+        onSelectItem(null);
+        if (onSelectFolder) {
+          onSelectFolder(null);
+        }
+        // Close context menu if open
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onSelectItem, onSelectFolder]);
+
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev);
@@ -177,14 +207,16 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     });
   };
 
-  
-
   const handleChevronClick = (event: React.MouseEvent, folderPath: string) => {
     event.stopPropagation(); // Prevent the folder row click from triggering
     toggleFolder(folderPath);
   };
 
-  const handleItemClick = (item: FolderV2 | File, itemPath: string, e: React.MouseEvent) => {
+  const handleItemClick = (
+    item: FolderV2 | File,
+    itemPath: string,
+    e: React.MouseEvent
+  ) => {
     const isFile = isFileNode(item);
 
     if (isFile) {
@@ -203,18 +235,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         setSelectedFolderPath(itemPath);
 
         setSelectedFolderPaths((prev) => {
-            const isAlreadySelected = prev.some((f) => f === itemPath);
-            const newSelection = isAlreadySelected
-              ? prev.filter((f) => f !== itemPath)
-              : [...prev, itemPath];
+          const isAlreadySelected = prev.some((f) => f === itemPath);
+          const newSelection = isAlreadySelected
+            ? prev.filter((f) => f !== itemPath)
+            : [...prev, itemPath];
 
-            return newSelection;
-          });
+          return newSelection;
+        });
 
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
-
       } else {
         // Set folder selection
         setSelectedFolderPath(itemPath);
@@ -224,6 +255,132 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         }
       }
     }
+  };
+
+  const handleItemRightClick = (
+    item: FolderV2 | File,
+    itemPath: string,
+    e: React.MouseEvent
+  ) => {
+    e.preventDefault();
+
+    const isFile = isFileNode(item);
+
+    // Select the item if it's not already selected
+    if (isFile) {
+      if (selectedFileId !== item.id) {
+        setSelectedFileId(item.id);
+        // Clear folder selection
+        if (selectedFolderPath) {
+          setSelectedFolderPath(null);
+          setSelectedFolderPaths([]);
+          if (onSelectFolder) {
+            onSelectFolder(null);
+          }
+        }
+      }
+    } else {
+      if (!selectedFolderPaths.includes(itemPath)) {
+        setSelectedFolderPath(itemPath);
+        setSelectedFolderPaths([itemPath]);
+        if (onSelectFolder) {
+          onSelectFolder(itemPath);
+        }
+        // Clear file selection
+        if (selectedFileId !== null) {
+          setSelectedFileId(null);
+          onSelectItem(null);
+        }
+      }
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      item,
+      itemPath,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const getContextMenuItems = (item: FolderV2 | File, itemPath: string) => {
+    const isFile = isFileNode(item);
+    const menuItems = [];
+
+    if (isFile) {
+      menuItems.push(
+        {
+          text: "Rename file",
+          onClick: () => {
+            closeContextMenu();
+          },
+        },
+        {
+          text: "View File Details",
+          onClick: () => {
+            console.log("View file details:", item);
+            closeContextMenu();
+          },
+        },
+        {
+          text: "Copy File Path",
+          onClick: () => {
+            // Files don't have a path property, use itemPath instead
+            navigator.clipboard.writeText(itemPath);
+            closeContextMenu();
+          },
+        }
+      );
+    } else {
+      if (selectedFolderPaths.length == 1) {
+        menuItems.push({
+          text: "Rename folder",
+          onClick: () => {
+            closeContextMenu();
+          },
+        });
+      }
+      if (selectedFolderPaths.length >= 2) {
+        menuItems.push(
+          {
+            text: "Merge Folders",
+            onClick: () => {
+              closeContextMenu();
+            },
+          },
+          {
+            text: "Combine Folders",
+            onClick: () => {
+              closeContextMenu();
+            },
+          }
+        );
+      }
+
+      if (selectedFolderPaths.length >= 2) {
+        // Check if all selected folders have a parent/child relationship
+        const hasParentChildRelationship = selectedFolderPaths.every((path, index) => {
+          return selectedFolderPaths.some((otherPath, otherIndex) => {
+            if (index === otherIndex) return false;
+            return path.startsWith(otherPath + '/') || otherPath.startsWith(path + '/');
+          });
+        });
+
+        if (hasParentChildRelationship) {
+          menuItems.push({
+            text: "Flatten folders",
+            onClick: () => {
+              closeContextMenu();
+            },
+          });
+        }
+      }
+    }
+
+    return menuItems;
   };
 
   const renderNode = (
@@ -272,6 +429,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           data-file-id={isFile ? node.id : undefined}
           data-folder-path={!isFile ? nodePath : undefined}
           onClick={(e) => handleItemClick(node, nodePath, e)}
+          onContextMenu={(e) => handleItemRightClick(node, nodePath, e)}
         >
           {!isFile && hasChildren ? (
             <ExpandIcon onClick={(e) => handleChevronClick(e, nodePath)}>
@@ -361,6 +519,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         </>
       ) : (
         <ErrorMessage>Failed to load folder structure</ErrorMessage>
+      )}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
+          menu_items={getContextMenuItems(
+            contextMenu.item,
+            contextMenu.itemPath
+          )}
+        />
       )}
     </ContentContainer>
   );
