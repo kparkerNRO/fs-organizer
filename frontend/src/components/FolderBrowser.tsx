@@ -164,6 +164,19 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
+  const handleChevronClick = (event: React.MouseEvent, folderPath: string) => {
+    event.stopPropagation(); // Prevent the folder row click from triggering
+    toggleFolder(folderPath);
+  };
+
+  const handleFolderClick =(folderNode: FolderV2) => {
+    if (selectedFileId !== null) {
+      setSelectedFileId(null)
+    }
+    // setSelectedItem(folderNode.id)
+    folderNode.isSelected = true
+  };
+
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
@@ -177,7 +190,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       !isFile &&
       (node as FolderV2).children &&
       (node as FolderV2).children!.length > 0;
-    const isHighlighted = isFile && selectedFileId === node.id;
+    const isHighlighted = (isFile && selectedFileId === node.id) || node.isSelected;
 
     // Check if this folder is in the path to the selected file
     const isInSelectedPath = !isFile && selectedFileId && folderViewResponse ? (() => {
@@ -206,13 +219,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           onClick={() => {
             if (isFile) {
               handleFileClick(node as File);
-            } else {
-              if (hasChildren) toggleFolder(nodePath);
+            }
+            else {
+              handleFolderClick(node)
             }
           }}
         >
           {!isFile && hasChildren ? (
-            <ExpandIcon>
+            <ExpandIcon onClick={(e) => handleChevronClick(e, nodePath)}>
               {isExpanded ? (
                 <ChevronDown size={10} />
               ) : (
