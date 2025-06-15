@@ -4,7 +4,6 @@ from pathlib import Path
 from nltk.stem import PorterStemmer
 from nltk.tokenize import word_tokenize
 import nltk
-from utils.filename_utils import get_max_common_string, strip_part_from_base
 from nltk.corpus import stopwords
 from nltk.metrics import edit_distance
 

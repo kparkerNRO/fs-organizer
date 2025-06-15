@@ -205,7 +205,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
       setState((prev) => ({ ...prev, isOperationInProgress: true }));
 
       try {
-        const result = mergeFolders(activeTree, sourcePaths, targetName);
+        const result = mergeFolders(activeTree, sourcePaths);
 
         if (result.success && result.newTree) {
           const operation: FolderTreeOperation = {

@@ -11,8 +11,8 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "electron": "electron dist-electron/main.js",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron dist-electron/main.js\"",
+    "electron": "electron dist-electron/main.js --no-sandbox --disable-dev-shm-usage",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron dist-electron/main.js --no-sandbox --disable-dev-shm-usage\"",
     "electron:pack": "npm run build:electron && electron-builder",
     "electron:dist": "npm run build:electron && electron-builder --publish=never",
     "build:electron": "vite build && npx tsc electron/main.ts electron/preload.ts --outDir dist-electron --target es2020 --module commonjs --moduleResolution node --skipLibCheck --esModuleInterop && echo '{\"type\": \"commonjs\"}' > dist-electron/package.json"
