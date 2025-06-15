@@ -12,6 +12,7 @@ import {
   findParentByPath,
   isFileNode,
   flattenFolders,
+  invertFolder,
 } from "../utils/folderTreeOperations";
 
 export interface FolderTreeState {
@@ -54,6 +55,9 @@ export interface FolderTreeActions {
   ) => Promise<FolderTreeOperationResult>;
   flattenItems: (
     sourcePaths: FolderTreePath[]
+  ) => Promise<FolderTreeOperationResult>;
+  invertItems: (
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
 
   // Utility functions
@@ -153,6 +157,8 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             lastOperation: operation,
             operationHistory: [...prev.operationHistory, operation],
             isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
           }));
         } else {
           setState((prev) => ({ ...prev, isOperationInProgress: false }));
@@ -198,6 +204,8 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             lastOperation: operation,
             operationHistory: [...prev.operationHistory, operation],
             isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
           }));
         } else {
           setState((prev) => ({ ...prev, isOperationInProgress: false }));
@@ -242,6 +250,8 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             lastOperation: operation,
             operationHistory: [...prev.operationHistory, operation],
             isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
           }));
         } else {
           setState((prev) => ({ ...prev, isOperationInProgress: false }));
@@ -285,6 +295,8 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             lastOperation: operation,
             operationHistory: [...prev.operationHistory, operation],
             isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
           }));
         } else {
           setState((prev) => ({ ...prev, isOperationInProgress: false }));
@@ -306,6 +318,50 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     },
     []
   );
+
+  const invertItems = useCallback(
+    async (
+      targetPath: FolderTreePath
+    ): Promise<FolderTreeOperationResult> => {
+      if (!activeTree) {
+        return { success: false, error: "No tree data available" };
+      }
+
+      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+
+      try {
+        const result = invertFolder(activeTree, targetPath);
+
+        if (result.success && result.newTree) {
+          const operation: FolderTreeOperation = {
+            type: "invert",
+            sourcePath: targetPath,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            modifiedTree: result.newTree!,
+            hasModifications: true,
+            lastOperation: operation,
+            operationHistory: [...prev.operationHistory, operation],
+            isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
+          }));
+        } else {
+          setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        }
+
+        return result;
+      } catch {
+        setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        return { success: false, error: "Failed to invert folder" };
+      }
+    },
+    [activeTree]
+  );
+
+  
 
   // Utility functions
   const findNode = useCallback(
@@ -336,6 +392,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     mergeItems,
     deleteItem,
     flattenItems,
+    invertItems,
     findNode,
     getNodeParent,
   };

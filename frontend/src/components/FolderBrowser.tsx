@@ -9,6 +9,7 @@ import {
   buildNodePath,
   canFlattenFolders,
   getFilePathInTree,
+  canInvertFolder,
 } from "../utils/folderTreeOperations";
 
 interface FolderBrowserProps {
@@ -386,6 +387,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const getContextMenuItems = (item: FolderV2 | File, itemPath: string) => {
     const isFile = isFileNode(item);
     const menuItems = [];
+    // Get the current active tree to ensure we have the most up-to-date reference
+    const currentTree = folderTreeHook.modifiedTree || folderTreeHook.originalTree;
 
     if (isFile) {
       menuItems.push(
@@ -420,35 +423,32 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         });
       }
       if (treeState.selectedFolderPaths.length >= 2) {
-        menuItems.push({
-          text: "Merge Folders",
-          onClick: () => {
-            closeContextMenu();
-            setTimeout(async () => {
-              try {
-                const result = await folderTreeHook.mergeItems(
-                  treeState.selectedFolderPaths,
-                  "Merged Folder"
-                );
-                if (result.success) {
-                  console.log("Successfully merged folders");
-                } else {
-                  console.error("Merge failed:", result.error);
+        menuItems.push(
+          {
+            text: "Merge Folders",
+            onClick: () => {
+              closeContextMenu();
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.mergeItems(treeState.selectedFolderPaths, "Merged Folder");
+                  if (result.success) {
+                    console.log("Successfully merged folders");
+                  } else {
+                    console.error("Merge failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Merge operation failed:", error);
                 }
-              } catch (error) {
-                console.error("Merge operation failed:", error);
-              }
-            }, 0);
+              }, 0);
+            },
           },
-        });
+          
+        );
       }
 
-      if (treeState.selectedFolderPaths.length >= 2 && treeState.tree) {
+      if (treeState.selectedFolderPaths.length >= 2 && currentTree) {
         // Check if the selected folders can be flattened using the validation function
-        const flattenCheck = canFlattenFolders(
-          treeState.tree,
-          treeState.selectedFolderPaths
-        );
+        const flattenCheck = canFlattenFolders(currentTree, treeState.selectedFolderPaths);
 
         if (flattenCheck.canFlatten) {
           menuItems.push({
@@ -458,9 +458,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               // Use setTimeout to ensure the context menu closes before starting the async operation
               setTimeout(async () => {
                 try {
-                  const result = await folderTreeHook.flattenItems(
-                    treeState.selectedFolderPaths
-                  );
+                  const result = await folderTreeHook.flattenItems(treeState.selectedFolderPaths);
                   if (result.success) {
                     console.log("Successfully flattened folders");
                   } else {
@@ -468,6 +466,33 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                   }
                 } catch (error) {
                   console.error("Flatten operation failed:", error);
+                }
+              }, 0);
+            },
+          });
+        }
+      }
+
+      // Add invert with children option for single folder selection
+      if (treeState.selectedFolderPaths.length === 1 && currentTree) {
+        const invertCheck = canInvertFolder(currentTree, itemPath);
+        
+        if (invertCheck.canInvert) {
+          menuItems.push({
+            text: "Invert with children",
+            onClick: () => {
+              closeContextMenu();
+              // Use setTimeout to ensure the context menu closes before starting the async operation
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.invertItems(itemPath);
+                  if (result.success) {
+                    console.log("Successfully inverted folder with children");
+                  } else {
+                    console.error("Invert failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Invert operation failed:", error);
                 }
               }, 0);
             },
