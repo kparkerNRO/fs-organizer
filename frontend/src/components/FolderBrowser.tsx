@@ -4,7 +4,7 @@ import { FolderV2, File, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FileIcon, FolderIcon } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
 import { useFolderTree } from "../hooks/useFolderTree";
-import { isFileNode, buildNodePath, canFlattenFolders } from "../utils/folderTreeOperations";
+import { isFileNode, buildNodePath, canFlattenFolders, canInvertFolder } from "../utils/folderTreeOperations";
 
 export enum FolderBrowserViewType {
   ORIGINAL = "ORIGINAL",
@@ -300,6 +300,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     const isFile = isFileNode(item);
     const menuItems = [];
     const selectedFolderPaths = folderTreeHook.selectedFolderPaths;
+    // Get the current active tree to ensure we have the most up-to-date reference
+    const currentTree = folderTreeHook.modifiedTree || folderTreeHook.originalTree;
 
     if (isFile) {
       menuItems.push(
@@ -353,30 +355,13 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               }, 0);
             },
           },
-          {
-            text: "Combine Folders",
-            onClick: () => {
-              closeContextMenu();
-              setTimeout(async () => {
-                try {
-                  const result = await folderTreeHook.mergeItems(selectedFolderPaths, "Combined Folder");
-                  if (result.success) {
-                    console.log("Successfully combined folders");
-                  } else {
-                    console.error("Combine failed:", result.error);
-                  }
-                } catch (error) {
-                  console.error("Combine operation failed:", error);
-                }
-              }, 0);
-            },
-          }
+          
         );
       }
 
-      if (selectedFolderPaths.length >= 2 && folderTree) {
+      if (selectedFolderPaths.length >= 2 && currentTree) {
         // Check if the selected folders can be flattened using the validation function
-        const flattenCheck = canFlattenFolders(folderTree, selectedFolderPaths);
+        const flattenCheck = canFlattenFolders(currentTree, selectedFolderPaths);
 
         if (flattenCheck.canFlatten) {
           menuItems.push({
@@ -394,6 +379,33 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                   }
                 } catch (error) {
                   console.error("Flatten operation failed:", error);
+                }
+              }, 0);
+            },
+          });
+        }
+      }
+
+      // Add invert with children option for single folder selection
+      if (selectedFolderPaths.length === 1 && currentTree) {
+        const invertCheck = canInvertFolder(currentTree, itemPath);
+        
+        if (invertCheck.canInvert) {
+          menuItems.push({
+            text: "Invert with children",
+            onClick: () => {
+              closeContextMenu();
+              // Use setTimeout to ensure the context menu closes before starting the async operation
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.invertItems(itemPath);
+                  if (result.success) {
+                    console.log("Successfully inverted folder with children");
+                  } else {
+                    console.error("Invert failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Invert operation failed:", error);
                 }
               }, 0);
             },
