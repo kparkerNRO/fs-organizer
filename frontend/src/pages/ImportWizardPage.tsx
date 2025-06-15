@@ -11,10 +11,7 @@ import {
 } from "../api";
 import { applyOrganization } from "../mock_data/mockApi";
 import { selectFolder } from "../utils/folderSelection";
-import {
-  FolderBrowser,
-  FolderBrowserViewType,
-} from "../components/FolderBrowser";
+import { FolderBrowser } from "../components/FolderBrowser";
 
 interface ImportWizardState {
   currentStep: number;
@@ -151,7 +148,8 @@ export const ImportWizardPage: React.FC = () => {
   return (
     <WizardContainer data-testid="wizard-container">
       <WizardHeader>
-        <div style={{ width: '120px', flexShrink: 0 }} /> {/* Spacer for centering */}
+        <div style={{ width: "120px", flexShrink: 0 }} />{" "}
+        {/* Spacer for centering */}
         <Title>Import Wizard</Title>
         <StepIndicator>
           <StepItem
@@ -253,7 +251,9 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       }
 
       // Extract folder structure from task result if available
-      const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
+      const folderStructure = taskResult.result?.folder_structure as
+        | FolderV2
+        | undefined;
 
       updateState({
         originalStructure: folderStructure || undefined,
@@ -324,12 +324,8 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
       <ContentContainer isLoading={state.isLoading}>
         {state.originalStructure ? (
           <FolderBrowser
-            folderViewResponse={{
-              original: state.originalStructure,
-              new: state.originalStructure,
-            }}
+            folderTree={state.originalStructure}
             onSelectItem={() => {}}
-            viewType={FolderBrowserViewType.ORIGINAL}
             externalSelectedFile={null}
             shouldSync={false}
             showConfidence={false}
@@ -409,7 +405,9 @@ const GroupStep: React.FC<StepProps> = ({
         .then((taskResult) => {
           if (controller.signal.aborted) return;
 
-          const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
+          const folderStructure = taskResult.result?.folder_structure as
+            | FolderV2
+            | undefined;
           updateState({
             groupedStructure: folderStructure || undefined,
             isLoading: false,
@@ -444,12 +442,8 @@ const GroupStep: React.FC<StepProps> = ({
           </SectionTitle>
           {state.originalStructure ? (
             <FolderBrowser
-              folderViewResponse={{
-                original: state.originalStructure,
-                new: state.originalStructure,
-              }}
+              folderTree={state.originalStructure}
               onSelectItem={handleFileSelect}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
               shouldSync={true}
               showConfidence={false}
@@ -472,12 +466,8 @@ const GroupStep: React.FC<StepProps> = ({
           </SectionTitle>
           {state.groupedStructure ? (
             <FolderBrowser
-              folderViewResponse={{
-                original: state.groupedStructure,
-                new: state.groupedStructure,
-              }}
+              folderTree={state.groupedStructure}
               onSelectItem={handleFileSelect}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
               shouldSync={true}
               showConfidence={true}
@@ -566,7 +556,9 @@ const OrganizeStep: React.FC<StepProps> = ({
         .then((taskResult) => {
           if (controller.signal.aborted) return;
 
-          const folderStructure = taskResult.result?.folder_structure as FolderV2 | undefined;
+          const folderStructure = taskResult.result?.folder_structure as
+            | FolderV2
+            | undefined;
           updateState({
             organizedStructure: folderStructure || undefined,
             isLoading: false,
@@ -601,12 +593,8 @@ const OrganizeStep: React.FC<StepProps> = ({
           </SectionTitle>
           {state.groupedStructure ? (
             <FolderBrowser
-              folderViewResponse={{
-                original: state.groupedStructure,
-                new: state.groupedStructure,
-              }}
+              folderTree={state.groupedStructure}
               onSelectItem={handleFileSelect}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
               shouldSync={true}
               showConfidence={true}
@@ -629,12 +617,8 @@ const OrganizeStep: React.FC<StepProps> = ({
           </SectionTitle>
           {state.organizedStructure ? (
             <FolderBrowser
-              folderViewResponse={{
-                original: state.organizedStructure,
-                new: state.organizedStructure,
-              }}
+              folderTree={state.organizedStructure}
               onSelectItem={handleFileSelect}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={state.selectedFileId}
               shouldSync={true}
               showConfidence={false}
@@ -772,7 +756,10 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
             <Select
               value={state.duplicateHandling}
               onChange={(e) =>
-                updateState({ duplicateHandling: e.target.value as ImportWizardState['duplicateHandling'] })
+                updateState({
+                  duplicateHandling: e.target
+                    .value as ImportWizardState["duplicateHandling"],
+                })
               }
             >
               <option value="newest">Keep Newest</option>
@@ -787,12 +774,8 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
         <Panel>
           {state.organizedStructure && (
             <FolderBrowser
-              folderViewResponse={{
-                original: state.organizedStructure,
-                new: state.organizedStructure,
-              }}
+              folderTree={state.organizedStructure}
               onSelectItem={() => {}}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={null}
               shouldSync={false}
               showConfidence={false}
@@ -881,7 +864,12 @@ const StepItem = styled.div.withConfig({
   font-size: 0.875rem;
   transition: all 0.2s ease;
   border: 1px solid transparent;
-  cursor: ${(props) => (props.clickable ? "pointer" : props.clickable === false ? "not-allowed" : "default")};
+  cursor: ${(props) =>
+    props.clickable
+      ? "pointer"
+      : props.clickable === false
+        ? "not-allowed"
+        : "default"};
   user-select: none;
   opacity: ${(props) => (props.clickable ? 1 : 0.6)};
 
@@ -1017,7 +1005,9 @@ const LoadingModal = styled.div`
   background: white;
   padding: 1.5rem 2rem;
   border-radius: 0.75rem;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.2);
   border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
@@ -1037,7 +1027,9 @@ const LoadingSpinner = styled.div`
   animation: spin 1s linear infinite;
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 `;
 
@@ -1055,7 +1047,9 @@ const BaseContainer = styled.div.withConfig({
   border: 1px solid #e2e8f0;
   border-radius: 0.375rem;
   background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   position: relative;
   opacity: ${(props) => (props.isLoading ? 0.5 : 1)};
@@ -1066,7 +1060,9 @@ const BaseContainer = styled.div.withConfig({
 
   &:hover {
     border-color: #cbd5e1;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 12px -2px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.05),
+      0 4px 12px -2px rgba(0, 0, 0, 0.1);
   }
 `;
 
