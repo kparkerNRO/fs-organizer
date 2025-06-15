@@ -322,18 +322,491 @@ describe('folderTreeOperations', () => {
       
       const result = mergeFolders(commonTree, ['root/project frontend', 'root/project backend']);
       
-      // The merge may fail due to findSharedString limitations with 2-element arrays
-      // Just verify it doesn't crash and returns a result
-      expect(result).toBeDefined();
-      if (result.success) {
-        expect(result.newTree).toBeDefined();
-        expect(result.affectedPaths).toEqual(['root/project frontend', 'root/project backend']);
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+      expect(result.affectedPaths).toEqual(['root/project frontend', 'root/project backend']);
+      
+      // Check that the merged folder has the common name
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/project');
+      expect(mergedFolder?.name).toBe('project');
+      
+      // Verify original folders are removed from their parent
+      const originalFrontend = findNodeByPath(result.newTree!, 'root/project frontend');
+      const originalBackend = findNodeByPath(result.newTree!, 'root/project backend');
+      expect(originalFrontend).toBeNull();
+      expect(originalBackend).toBeNull();
+      
+      // Verify the merged folder contains the renamed subfolders
+      if (!isFileNode(mergedFolder!) && mergedFolder!.children) {
+        const subfolders = mergedFolder!.children.filter(child => !isFileNode(child));
+        expect(subfolders).toHaveLength(2);
         
-        // Check that the merged folder has the common name
-        const mergedFolder = findNodeByPath(result.newTree!, 'root/project');
-        expect(mergedFolder?.name).toBe('project');
-      } else {
-        expect(result.error).toBeDefined();
+        const subfoldersNames = subfolders.map(f => f.name);
+        expect(subfoldersNames).toContain('frontend');
+        expect(subfoldersNames).toContain('backend');
+        
+        // Verify files are preserved in subfolders
+        const frontendSubfolder = subfolders.find(f => f.name === 'frontend');
+        const backendSubfolder = subfolders.find(f => f.name === 'backend');
+        
+        if (!isFileNode(frontendSubfolder!) && frontendSubfolder!.children) {
+          const frontendFiles = frontendSubfolder!.children.filter(isFileNode);
+          expect(frontendFiles).toHaveLength(1);
+          expect(frontendFiles[0].name).toBe('app.js');
+        }
+        
+        if (!isFileNode(backendSubfolder!) && backendSubfolder!.children) {
+          const backendFiles = backendSubfolder!.children.filter(isFileNode);
+          expect(backendFiles).toHaveLength(1);
+          expect(backendFiles[0].name).toBe('server.js');
+        }
+      }
+    });
+
+    it('should merge folders with multi-word common prefixes', () => {
+      // Test the specific case mentioned: Foundry Module folders
+      const foundryTree = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'CzePeku',
+            path: '/root/CzePeku',
+            confidence: 1.0,
+            count: 3,
+            children: [
+              {
+                name: 'Foundry Module',
+                path: '/root/CzePeku/Foundry Module',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 1,
+                    name: 'base.json',
+                    fileType: 'json',
+                    size: '1KB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/base.json',
+                    newPath: '/new/base.json'
+                  }
+                ]
+              },
+              {
+                name: 'Foundry Module CzepekuScenes CelestialGate',
+                path: '/root/CzePeku/Foundry Module CzepekuScenes CelestialGate',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 2,
+                    name: 'celestial.json',
+                    fileType: 'json',
+                    size: '2KB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/celestial.json',
+                    newPath: '/new/celestial.json'
+                  }
+                ]
+              },
+              {
+                name: 'Foundry Module CzepekuScenes TombOfSand',
+                path: '/root/CzePeku/Foundry Module CzepekuScenes TombOfSand',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 3,
+                    name: 'tomb.json',
+                    fileType: 'json',
+                    size: '1.5KB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/tomb.json',
+                    newPath: '/new/tomb.json'
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+      
+      const result = mergeFolders(foundryTree, [
+        'root/CzePeku/Foundry Module',
+        'root/CzePeku/Foundry Module CzepekuScenes CelestialGate',
+        'root/CzePeku/Foundry Module CzepekuScenes TombOfSand'
+      ]);
+      
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+      
+      // Check that the merged folder has the multi-word common name
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/CzePeku/Foundry Module');
+      expect(mergedFolder?.name).toBe('Foundry Module');
+      
+      // Verify original folders are removed from their parent
+      const originalCelestial = findNodeByPath(result.newTree!, 'root/CzePeku/Foundry Module CzepekuScenes CelestialGate');
+      const originalTomb = findNodeByPath(result.newTree!, 'root/CzePeku/Foundry Module CzepekuScenes TombOfSand');
+      
+      expect(originalCelestial).toBeNull();
+      expect(originalTomb).toBeNull();
+      
+      // Verify the merged folder contains the renamed subfolders
+      if (!isFileNode(mergedFolder!) && mergedFolder!.children) {
+        const subfolders = mergedFolder!.children.filter(child => !isFileNode(child));
+        const files = mergedFolder!.children.filter(isFileNode);
+        
+        // Should have: original base file + 2 renamed subfolders
+        expect(files).toHaveLength(1);
+        expect(files[0].name).toBe('base.json');
+        
+        expect(subfolders).toHaveLength(2);
+        const subfoldersNames = subfolders.map(f => f.name.trim());
+        expect(subfoldersNames).toContain('CzepekuScenes CelestialGate');
+        expect(subfoldersNames).toContain('CzepekuScenes TombOfSand');
+      }
+    });
+
+    it('should merge folders with common word sequences at the end', () => {
+      // Test the specific case: Gnome/Goblin City Centre folders
+      const cityTree = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'CzePeku',
+            path: '/root/CzePeku',
+            confidence: 1.0,
+            count: 2,
+            children: [
+              {
+                name: 'Gnome City Centre',
+                path: '/root/CzePeku/Gnome City Centre',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 1,
+                    name: 'gnome_market.jpg',
+                    fileType: 'jpg',
+                    size: '2MB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/gnome_market.jpg',
+                    newPath: '/new/gnome_market.jpg'
+                  }
+                ]
+              },
+              {
+                name: 'Goblin City Centre',
+                path: '/root/CzePeku/Goblin City Centre',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 2,
+                    name: 'goblin_bazaar.jpg',
+                    fileType: 'jpg',
+                    size: '1.8MB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/goblin_bazaar.jpg',
+                    newPath: '/new/goblin_bazaar.jpg'
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+      
+      const result = mergeFolders(cityTree, [
+        'root/CzePeku/Gnome City Centre',
+        'root/CzePeku/Goblin City Centre'
+      ]);
+      
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+      
+      // Check that the merged folder has the common sequence name
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/CzePeku/City Centre');
+      expect(mergedFolder?.name).toBe('City Centre');
+      
+      // Verify original folders are removed from their parent
+      const originalGnome = findNodeByPath(result.newTree!, 'root/CzePeku/Gnome City Centre');
+      const originalGoblin = findNodeByPath(result.newTree!, 'root/CzePeku/Goblin City Centre');
+      
+      expect(originalGnome).toBeNull();
+      expect(originalGoblin).toBeNull();
+      
+      // Verify the merged folder contains the renamed subfolders
+      if (!isFileNode(mergedFolder!) && mergedFolder!.children) {
+        const subfolders = mergedFolder!.children.filter(child => !isFileNode(child));
+        
+        expect(subfolders).toHaveLength(2);
+        const subfoldersNames = subfolders.map(f => f.name.trim());
+        expect(subfoldersNames).toContain('Gnome');
+        expect(subfoldersNames).toContain('Goblin');
+        
+        // Verify files are preserved in their respective subfolders
+        const gnomeSubfolder = subfolders.find(f => f.name.trim() === 'Gnome');
+        const goblinSubfolder = subfolders.find(f => f.name.trim() === 'Goblin');
+        
+        if (!isFileNode(gnomeSubfolder!) && gnomeSubfolder!.children) {
+          const gnomeFiles = gnomeSubfolder!.children.filter(isFileNode);
+          expect(gnomeFiles).toHaveLength(1);
+          expect(gnomeFiles[0].name).toBe('gnome_market.jpg');
+        }
+        
+        if (!isFileNode(goblinSubfolder!) && goblinSubfolder!.children) {
+          const goblinFiles = goblinSubfolder!.children.filter(isFileNode);
+          expect(goblinFiles).toHaveLength(1);
+          expect(goblinFiles[0].name).toBe('goblin_bazaar.jpg');
+        }
+      }
+    });
+
+    it('should recursively merge folders with conflicting names', () => {
+      // Test the specific case: "stone palace" + "stone" with existing "palace" child
+      const conflictTree = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'folder',
+            path: '/root/folder',
+            confidence: 1.0,
+            count: 2,
+            children: [
+              {
+                name: 'stone palace',
+                path: '/root/folder/stone palace',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    id: 1,
+                    name: 'palace_main.jpg',
+                    fileType: 'jpg',
+                    size: '3MB',
+                    confidence: 1.0,
+                    possibleClassifications: [],
+                    originalPath: '/original/palace_main.jpg',
+                    newPath: '/new/palace_main.jpg'
+                  }
+                ]
+              },
+              {
+                name: 'stone',
+                path: '/root/folder/stone',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    name: 'palace',
+                    path: '/root/folder/stone/palace',
+                    confidence: 0.7,
+                    count: 1,
+                    children: [
+                      {
+                        id: 2,
+                        name: 'palace_interior.jpg',
+                        fileType: 'jpg',
+                        size: '2.5MB',
+                        confidence: 1.0,
+                        possibleClassifications: [],
+                        originalPath: '/original/palace_interior.jpg',
+                        newPath: '/new/palace_interior.jpg'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+      
+      const result = mergeFolders(conflictTree, [
+        'root/folder/stone palace',
+        'root/folder/stone'
+      ]);
+      
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+      
+      // Check that the merged folder has the common name "stone"
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/folder/stone');
+      expect(mergedFolder?.name).toBe('stone');
+      
+      // Verify original folders are removed from their parent
+      const originalStonePalace = findNodeByPath(result.newTree!, 'root/folder/stone palace');
+      expect(originalStonePalace).toBeNull();
+      
+      // Verify the merged folder structure
+      if (!isFileNode(mergedFolder!) && mergedFolder!.children) {
+        // Should have one "palace" subfolder that contains merged content
+        const subfolders = mergedFolder!.children.filter(child => !isFileNode(child));
+        expect(subfolders).toHaveLength(1);
+        expect(subfolders[0].name).toBe('palace');
+        
+        const palaceFolder = subfolders[0];
+        if (!isFileNode(palaceFolder) && palaceFolder.children) {
+          // The palace folder should contain files from both sources
+          const files = palaceFolder.children.filter(isFileNode);
+          expect(files).toHaveLength(2);
+          
+          const fileNames = files.map(f => f.name);
+          expect(fileNames).toContain('palace_main.jpg');     // From "stone palace"
+          expect(fileNames).toContain('palace_interior.jpg'); // From "stone/palace"
+        }
+      }
+    });
+
+    it('should handle multiple levels of recursive merging', () => {
+      // Test deeper nesting conflicts
+      const deepConflictTree = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'assets',
+            path: '/root/assets',
+            confidence: 1.0,
+            count: 3,
+            children: [
+              {
+                name: 'game textures',
+                path: '/root/assets/game textures',
+                confidence: 0.8,
+                count: 2,
+                children: [
+                  {
+                    name: 'environment',
+                    path: '/root/assets/game textures/environment',
+                    confidence: 0.7,
+                    count: 1,
+                    children: [
+                      {
+                        id: 1,
+                        name: 'tree.png',
+                        fileType: 'png',
+                        size: '1MB',
+                        confidence: 1.0,
+                        possibleClassifications: [],
+                        originalPath: '/original/tree.png',
+                        newPath: '/new/tree.png'
+                      }
+                    ]
+                  },
+                  {
+                    name: 'characters',
+                    path: '/root/assets/game textures/characters',
+                    confidence: 0.7,
+                    count: 1,
+                    children: [
+                      {
+                        id: 2,
+                        name: 'hero.png',
+                        fileType: 'png',
+                        size: '800KB',
+                        confidence: 1.0,
+                        possibleClassifications: [],
+                        originalPath: '/original/hero.png',
+                        newPath: '/new/hero.png'
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                name: 'game',
+                path: '/root/assets/game',
+                confidence: 0.8,
+                count: 1,
+                children: [
+                  {
+                    name: 'environment',
+                    path: '/root/assets/game/environment',
+                    confidence: 0.7,
+                    count: 1,
+                    children: [
+                      {
+                        id: 3,
+                        name: 'rock.png',
+                        fileType: 'png',
+                        size: '1.2MB',
+                        confidence: 1.0,
+                        possibleClassifications: [],
+                        originalPath: '/original/rock.png',
+                        newPath: '/new/rock.png'
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+      
+      const result = mergeFolders(deepConflictTree, [
+        'root/assets/game textures',
+        'root/assets/game'
+      ]);
+      
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+      
+      // Check that the merged folder is named "game"
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/assets/game');
+      expect(mergedFolder?.name).toBe('game');
+      
+      // Verify the merged structure
+      if (!isFileNode(mergedFolder!) && mergedFolder!.children) {
+        const subfolders = mergedFolder!.children.filter(child => !isFileNode(child));
+        const subfolderNames = subfolders.map(f => f.name);
+        
+        // Should have environment folder (which gets merged from both sources)
+        expect(subfolderNames).toContain('environment');
+        
+        // Should also have textures folder (from "game textures" -> "textures")
+        // The exact structure depends on how the merge resolves conflicts
+        expect(subfolders.length).toBeGreaterThanOrEqual(1);
+        
+        // Check that the environment folder exists and contains files
+        const envFolder = subfolders.find(f => f.name === 'environment');
+        if (!isFileNode(envFolder!) && envFolder!.children) {
+          const envFiles = envFolder!.children.filter(isFileNode);
+          expect(envFiles.length).toBeGreaterThanOrEqual(1);
+          
+          const envFileNames = envFiles.map(f => f.name);
+          // Should contain at least one of the expected files
+          const hasExpectedFiles = envFileNames.includes('tree.png') || envFileNames.includes('rock.png');
+          expect(hasExpectedFiles).toBe(true);
+        }
+        
+        // Check if characters folder exists - it might be under "textures" subfolder
+        const texturesFolder = subfolders.find(f => f.name === 'textures');
+        if (texturesFolder && !isFileNode(texturesFolder) && texturesFolder.children) {
+          const charFolder = texturesFolder.children.find(child => !isFileNode(child) && child.name === 'characters');
+          if (charFolder && !isFileNode(charFolder) && charFolder.children) {
+            const charFiles = charFolder.children.filter(isFileNode);
+            expect(charFiles).toHaveLength(1);
+            expect(charFiles[0].name).toBe('hero.png');
+          }
+        }
       }
     });
   });
@@ -558,6 +1031,49 @@ describe('folderTreeOperations', () => {
       expect(result.success).toBe(true);
       expect(result.affectedPaths).toContain('root/documents');
       expect(result.affectedPaths).toContain('root/documents/images');
+    });
+
+    it('should generate consistent flattened names regardless of selection order', () => {
+      // Create test tree with animated/scenes structure
+      const testTree = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'animated',
+            path: '/root/animated',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              {
+                name: 'scenes',
+                path: '/root/animated/scenes',
+                confidence: 1.0,
+                count: 0,
+                children: []
+              }
+            ]
+          }
+        ]
+      };
+
+      // Test both selection orders
+      const result1 = flattenFolders(testTree, ['root/animated', 'root/animated/scenes']);
+      const result2 = flattenFolders(testTree, ['root/animated/scenes', 'root/animated']);
+
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+
+      // Both should result in the same flattened name: "animated scenes"
+      const flattened1 = findNodeByPath(result1.newTree!, 'root/animated scenes');
+      const flattened2 = findNodeByPath(result2.newTree!, 'root/animated scenes');
+
+      expect(flattened1).toBeDefined();
+      expect(flattened2).toBeDefined();
+      expect(flattened1?.name).toBe('animated scenes');
+      expect(flattened2?.name).toBe('animated scenes');
     });
 
     it('should validate complex invalid cases', () => {
@@ -1137,16 +1653,69 @@ describe('folderTreeOperations', () => {
       const result = generateFlattenedName(paths);
       expect(result).toBe('project src components');
     });
+
+    it('should generate consistent names when paths are pre-sorted by hierarchy', () => {
+      // generateFlattenedName expects paths to be sorted by length (hierarchy)
+      const sortedPaths = ['root/animated', 'root/animated/scenes'];
+      const result = generateFlattenedName(sortedPaths);
+      expect(result).toBe('animated scenes');
+    });
   });
 
   describe('findSharedString', () => {
     it('should find common string in folder names', () => {
-      // Note: The current implementation has issues with 2-element arrays
       const paths = ['root/project frontend', 'root/project backend', 'root/project mobile'];
       const result = findSharedString(paths);
-      // The algorithm may not work as expected due to loop bounds
-      // Even with 3 elements, it may not find common strings
-      expect(typeof result).toBe('string');
+      expect(result).toBe('project');
+    });
+
+    it('should find common prefix sequences in folder names', () => {
+      const paths = [
+        'root/Foundry Module',
+        'root/Foundry Module CzepekuScenes CelestialGate', 
+        'root/Foundry Module CzepekuScenes TombOfSand'
+      ];
+      const result = findSharedString(paths);
+      expect(result).toBe('Foundry Module');
+    });
+
+    it('should handle multi-word prefixes correctly', () => {
+      const paths = [
+        'root/React Native App',
+        'root/React Native App iOS',
+        'root/React Native App Android'
+      ];
+      const result = findSharedString(paths);
+      expect(result).toBe('React Native App');
+    });
+
+    it('should find common word sequences in the middle/end of names', () => {
+      const paths = [
+        'root/Gnome City Centre',
+        'root/Goblin City Centre'
+      ];
+      const result = findSharedString(paths);
+      expect(result).toBe('City Centre');
+    });
+
+    it('should prefer longer sequences over individual words', () => {
+      const paths = [
+        'root/Big Red Dragon',
+        'root/Small Red Dragon',
+        'root/Ancient Red Dragon'
+      ];
+      const result = findSharedString(paths);
+      expect(result).toBe('Red Dragon');
+    });
+
+    it('should find sequences in any position', () => {
+      const paths = [
+        'root/Forest Temple Ancient',
+        'root/Mountain Forest Temple',
+        'root/Desert Forest Temple Ruins'
+      ];
+      const result = findSharedString(paths);
+      expect(result).toBe('Forest Temple');
     });
 
     it('should return empty string when no common string found', () => {

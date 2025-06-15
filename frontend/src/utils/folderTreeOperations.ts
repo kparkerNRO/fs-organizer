@@ -134,6 +134,11 @@ export const renameNode = (
 
   const oldName = node.name;
   node.name = newName.trim();
+  
+  // Set confidence to 100% if it's a folder
+  if (!isFileNode(node)) {
+    setConfidenceToMax(node);
+  }
 
   // Calculate new path for the renamed node
   const pathParts = targetPath.split("/");
@@ -304,7 +309,7 @@ export const flattenFolders = (
 
   const sortedPaths = [...sourcePaths].sort((a, b) => a.length - b.length);
 
-  const targetName = generateFlattenedName(sourcePaths);
+  const targetName = generateFlattenedName(sortedPaths);
   const topLevelPath = sortedPaths[0];
 
   const newTree = cloneTreeNode(tree) as FolderV2;
@@ -344,6 +349,9 @@ export const flattenFolders = (
   });
 
   targetFolder.name = targetName;
+  
+  // Set confidence to 100% for the target folder
+  setConfidenceToMax(targetFolder);
 
   const pathParts = topLevelPath.split("/");
   pathParts[pathParts.length - 1] = targetName;
@@ -366,58 +374,92 @@ export const flattenFolders = (
  * @returns
  */
 export const findSharedString = (sourcePaths: FolderTreePath[]): string => {
-  if (sourcePaths.length === 0) return "";
+  if (sourcePaths.length < 2) return "";
 
   const pathNames = pathNamesToRootPath(sourcePaths);
 
-  // Split each name into words
-  const wordArrays = pathNames.map((name) => {
-    return name.split(/[\s]+/).filter((word) => word.length > 0);
-  });
-
-  const calcSharedStrings = (words1: string[], words2: string[]): string[] => {
-    // Find the words that overlap at all
-    const sharedWords = words1.filter((p) => words2.includes(p));
-
-    const subWords = [];
-    for (let i = 0; i < sharedWords.length - 2; i++) {
-      for (let j = 1; j < sharedWords.length - 1; j++) {
-        subWords.push(sharedWords.slice(i, j).join(""));
+  // Helper function to find all possible contiguous word sequences in a name
+  const getAllWordSequences = (name: string): string[] => {
+    const words = name.split(/[\s]+/).filter(word => word.length > 0);
+    const sequences: string[] = [];
+    
+    // Generate all contiguous subsequences
+    for (let start = 0; start < words.length; start++) {
+      for (let end = start + 1; end <= words.length; end++) {
+        sequences.push(words.slice(start, end).join(" "));
       }
     }
-
-    const word1 = words1.join(" ");
-    const word2 = words2.join(" ");
-    const validSubwords = subWords.filter(
-      (p) => word1.includes(p) && word2.includes(p)
-    );
-    return validSubwords.sort((a, b) => b.length - a.length);
+    
+    return sequences;
   };
 
-  const sharedStrings = [];
-  for (let i = 0; i < wordArrays.length - 2; i++) {
-    for (let j = 1; j < wordArrays.length - 1; j++) {
-      sharedStrings.push(calcSharedStrings(wordArrays[i], wordArrays[j]));
+  // Get all possible sequences from the first name
+  const allSequencesFromFirstName = getAllWordSequences(pathNames[0]);
+  const commonSequences: string[] = [];
+
+  for (const sequence of allSequencesFromFirstName) {
+    // Check if this sequence appears in all other names
+    const appearsInAll = pathNames.slice(1).every(name => {
+      // Check if the sequence appears as complete words (word boundaries)
+      const regex = new RegExp(`\\b${sequence.replace(/\s+/g, '\\s+')}\\b`);
+      return regex.test(name);
+    });
+    
+    if (appearsInAll) {
+      commonSequences.push(sequence);
     }
   }
 
-  // Calculate instance counts
-  const stringCountMap: Record<string, number> = {};
-  for (const arr of sharedStrings) {
-    for (const str of arr) {
-      stringCountMap[str] = (stringCountMap[str] || 0) + 1;
-    }
+  if (commonSequences.length > 0) {
+    // Return the longest common sequence
+    return commonSequences.sort((a, b) => b.length - a.length)[0];
   }
 
-  const possibleValues = Object.keys(stringCountMap).filter(
-    (p) => stringCountMap[p] == sourcePaths.length
-  );
+  return "";
+};
 
-  if (possibleValues.length === 0) return "";
+// Helper function to set confidence to 100% for impacted folders
+export const setConfidenceToMax = (node: FolderTreeNode): void => {
+  if (!isFileNode(node)) {
+    node.confidence = 1;
+    if (node.children) {
+      node.children.forEach(child => {
+        if (!isFileNode(child)) {
+          setConfidenceToMax(child);
+        }
+      });
+    }
+  }
+};
 
-  const orderdValues = possibleValues.sort((a, b) => b.length - a.length);
+// Helper function to recursively merge a node into a target folder
+const mergeNodeIntoFolder = (targetFolder: FolderV2, nodeToMerge: FolderTreeNode): void => {
+  if (!targetFolder.children) {
+    targetFolder.children = [];
+  }
 
-  return orderdValues[0];
+  // If it's a file, just add it (files can have duplicate names)
+  if (isFileNode(nodeToMerge)) {
+    targetFolder.children.push(nodeToMerge);
+    return;
+  }
+
+  // It's a folder - check if a folder with the same name already exists
+  const existingFolder = targetFolder.children.find(
+    child => !isFileNode(child) && child.name === nodeToMerge.name
+  ) as FolderV2 | undefined;
+
+  if (existingFolder) {
+    // Merge the contents of nodeToMerge into the existing folder
+    if (nodeToMerge.children) {
+      for (const childToMerge of nodeToMerge.children) {
+        mergeNodeIntoFolder(existingFolder, childToMerge);
+      }
+    }
+  } else {
+    // No conflict, just add the folder
+    targetFolder.children.push(nodeToMerge);
+  }
 };
 
 // Merge multiple folders into one
@@ -425,10 +467,7 @@ export const mergeFolders = (
   tree: FolderV2,
   sourcePaths: FolderTreePath[]
 ): FolderTreeOperationResult => {
-  // const nameValidation = validateNodeName(targetName);
-  // if (!nameValidation.valid) {
-  //   return { success: false, error: nameValidation.error };
-  // }
+
   const newTree = cloneTreeNode(tree) as FolderV2;
 
   if (sourcePaths.length < 2) {
@@ -458,27 +497,33 @@ export const mergeFolders = (
   // If the target folder isn't named the common string, move the rest of the name to the children
   if (targetFolder.name !== commonString) {
     const targetFolderCopy = cloneTreeNode(targetFolder) as FolderV2;
-    targetFolderCopy.name = targetFolder.name.replace(commonString, "");
+    targetFolderCopy.name = targetFolder.name.replace(commonString, "").trim();
     targetFolder.name = commonString;
     targetFolder.children = [targetFolderCopy];
   }
 
   for (const path of sourcePaths) {
+    // Skip the target folder itself
+    if (path === topLevelPath) continue;
+    
     const node = findNodeByPath(newTree, path);
     if (!node) continue;
 
-    const { parent, parentPath } = findParentByPath(tree, path);
+    const { parent } = findParentByPath(newTree, path);
 
     if (parent && parent.children) {
       parent.children = parent.children.filter((child) => child !== node);
     }
 
     if (node && typeof node.name === "string") {
-      node.name = node.name.replace(commonString, "");
+      node.name = node.name.replace(commonString, "").trim();
     }
 
-    targetFolder.children.push(node);
+    mergeNodeIntoFolder(targetFolder, node);
   }
+
+  // Set confidence to 100% for the target folder
+  setConfidenceToMax(targetFolder);
 
   return {
     success: true,

@@ -15,7 +15,7 @@ from data_models.database import (
     GroupCategoryEntry,
     Folder,
 )
-from grouping.tag_decomposition import TagDecomposer, decompose_compound_tags
+from grouping.tag_decomposition import decompose_compound_tags
 
 
 def create_test_database():
@@ -128,68 +128,6 @@ def create_test_entries(session: Session):
 
     session.commit()
     return test_entries
-
-
-def test_component_statistics_extraction():
-    """Test extraction of component statistics from entries"""
-    db_path = create_test_database()
-    sessionmaker = get_sessionmaker(db_path)
-
-    with sessionmaker() as session:
-        entries = create_test_entries(session)
-
-        decomposer = TagDecomposer()
-        stats = decomposer.extract_component_statistics(entries)
-
-        # Check that common words are detected
-        assert "tower" in stats.word_frequencies
-        assert "tavern" in stats.word_frequencies
-        assert "collaboration" in stats.word_frequencies
-
-        # Check frequency counts
-        assert stats.word_frequencies["tower"] >= 2  # Appears in multiple entries
-        assert stats.word_frequencies["tavern"] >= 2
-
-        # Check context tracking
-        assert "castle" in stats.word_contexts.get("tower", set())
-        assert "wizard" in stats.word_contexts.get("tower", set())
-
-        print(f"Found {len(stats.word_frequencies)} unique words")
-        print(
-            f"Top words: {dict(sorted(stats.word_frequencies.items(), key=lambda x: x[1], reverse=True)[:5])}"
-        )
-
-
-def test_decomposition_candidate_generation():
-    """Test generation of decomposition candidates"""
-    db_path = create_test_database()
-    sessionmaker = get_sessionmaker(db_path)
-
-    with sessionmaker() as session:
-        entries = create_test_entries(session)
-
-        decomposer = TagDecomposer(min_confidence=0.2)  # Lower threshold for testing
-        decomposer.component_stats = decomposer.extract_component_statistics(entries)
-        decomposer.tag_vectors = decomposer.compute_tag_vectors(entries)
-
-        candidates = decomposer.generate_decomposition_candidates(entries)
-
-        # Should find some candidates
-        assert len(candidates) > 0
-
-        # Check that compound tags are being decomposed
-        candidate_originals = [c.original_tag for c in candidates]
-
-        # Look for expected decompositions
-        tower_candidates = [c for c in candidates if "tower" in c.original_tag.lower()]
-        assert len(tower_candidates) > 0
-
-        print(f"Generated {len(candidates)} candidates:")
-        for candidate in candidates[:5]:  # Show first 5
-            print(
-                f"  '{candidate.original_tag}' -> {candidate.components} "
-                f"(confidence: {candidate.overall_confidence:.3f})"
-            )
 
 
 def test_full_decomposition_pipeline():

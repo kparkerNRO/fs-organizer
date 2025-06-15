@@ -73,7 +73,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   // Initialize tree data when folderViewResponse changes
   useEffect(() => {
     folderTreeHook.setTreeData(folderViewResponse, viewType === FolderBrowserViewType.NEW ? 'NEW' : 'ORIGINAL');
-  }, [folderViewResponse, viewType]);
+  }, [folderViewResponse, viewType, folderTreeHook.setTreeData]);
 
   const scrollToSelectedFile = (fileId: number) => {
     if (!shouldSync || !scrollContainerRef.current) return;
