@@ -3,23 +3,15 @@ import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { fetchFolderStructureComparison } from "../api";
 import { FolderViewResponse } from "../types/types";
-import {
-  Folder as FolderIcon,
-} from "lucide-react";
+import { Folder as FolderIcon } from "lucide-react";
 import { ResetButton } from "../components/ResetButton";
-import {
-  FolderBrowserViewType,
-  FolderBrowser,
-} from "../components/FolderBrowser";
-
-
+import { FolderBrowser } from "../components/FolderBrowser";
 
 // Cache keys for localStorage
 const CACHE_KEYS = {
   FOLDER_DATA: "fs_organizer_folderData",
   FOLDER_STATE: "fs_organizer_folderState",
 };
-
 
 export const FolderStructurePage: React.FC = () => {
   const [folderComparison, setFolderComparison] =
@@ -57,70 +49,72 @@ export const FolderStructurePage: React.FC = () => {
   };
 
   // Load state from cache on component mount
-    useEffect(() => {
-      const loadInitialState = () => {
-        // Load folder state only from localStorage cache
-        const cachedState = localStorage.getItem(CACHE_KEYS.FOLDER_STATE);
-        let folderState: number | null = null;
-  
-        if (cachedState) {
-          try {
-            folderState = JSON.parse(cachedState);
-            console.log("Restoring folder state:", folderState);
-  
-            if (folderState) {
-              // Restore state from cache
-                setSelectedFileId(folderState);
-            }
-          } catch (e) {
-            console.warn("Failed to parse cached folder state:", e);
-          }
-        } 
-  
-        setIsStateLoaded(true);
-      };
-  
-      const loadFolderStructure = async () => {
-        try {
-          setLoading(true);
-  
-          // Load initial state first
-          loadInitialState();
-  
-          // Try to load from cache first
-          const cachedData = localStorage.getItem(CACHE_KEYS.FOLDER_DATA);
-          if (cachedData) {
-            const parsed = JSON.parse(cachedData);
-            setFolderComparison(parsed);
-            setLoading(false);
-            return;
-          }
-  
-          // Fetch fresh data if no cache
-          const data = await fetchFolderStructureComparison();
-          setFolderComparison(data);
-  
-          // Save to cache
-          localStorage.setItem(CACHE_KEYS.FOLDER_DATA, JSON.stringify(data));
-        } catch (error) {
-          console.error("Error loading folder structure:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-  
-      loadFolderStructure();
-    }, []);
+  useEffect(() => {
+    const loadInitialState = () => {
+      // Load folder state only from localStorage cache
+      const cachedState = localStorage.getItem(CACHE_KEYS.FOLDER_STATE);
+      let folderState: number | null = null;
 
-    // Save folder state to localStorage whenever it changes (but only after initial load)
+      if (cachedState) {
+        try {
+          folderState = JSON.parse(cachedState);
+          console.log("Restoring folder state:", folderState);
+
+          if (folderState) {
+            // Restore state from cache
+            setSelectedFileId(folderState);
+          }
+        } catch (e) {
+          console.warn("Failed to parse cached folder state:", e);
+        }
+      }
+
+      setIsStateLoaded(true);
+    };
+
+    const loadFolderStructure = async () => {
+      try {
+        setLoading(true);
+
+        // Load initial state first
+        loadInitialState();
+
+        // Try to load from cache first
+        const cachedData = localStorage.getItem(CACHE_KEYS.FOLDER_DATA);
+        if (cachedData) {
+          const parsed = JSON.parse(cachedData);
+          setFolderComparison(parsed);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch fresh data if no cache
+        const data = await fetchFolderStructureComparison();
+        setFolderComparison(data);
+
+        // Save to cache
+        localStorage.setItem(CACHE_KEYS.FOLDER_DATA, JSON.stringify(data));
+      } catch (error) {
+        console.error("Error loading folder structure:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFolderStructure();
+  }, []);
+
+  // Save folder state to localStorage whenever it changes (but only after initial load)
   useEffect(() => {
     if (!isStateLoaded) return; // Don't save during initial state loading
 
-
-      if(selectedFileId){
+    if (selectedFileId) {
       console.log("Saving folder state:", selectedFileId);
-      localStorage.setItem(CACHE_KEYS.FOLDER_STATE, JSON.stringify(selectedFileId));
-      }
+      localStorage.setItem(
+        CACHE_KEYS.FOLDER_STATE,
+        JSON.stringify(selectedFileId)
+      );
+    }
   }, [selectedFileId, isStateLoaded]);
 
   // Handle keyboard shortcuts
@@ -199,9 +193,8 @@ export const FolderStructurePage: React.FC = () => {
               Original
             </span>
             <FolderBrowser
-              folderViewResponse={folderComparison}
+              folderTree={folderComparison?.original || null}
               onSelectItem={setSelectedFileId}
-              viewType={FolderBrowserViewType.ORIGINAL}
               externalSelectedFile={selectedFileId}
               shouldSync={shouldSync}
             />
@@ -216,9 +209,8 @@ export const FolderStructurePage: React.FC = () => {
           >
             <span style={{ fontWeight: 500, marginBottom: "0.5rem" }}>New</span>
             <FolderBrowser
-              folderViewResponse={folderComparison}
+              folderTree={folderComparison?.new || null}
               onSelectItem={setSelectedFileId}
-              viewType={FolderBrowserViewType.NEW}
               externalSelectedFile={selectedFileId}
               shouldSync={shouldSync}
               showConfidence={true}
@@ -270,7 +262,6 @@ const Title = styled.h1`
   color: #1f2937;
 `;
 
-
 const InstructionsButton = styled.button`
   width: 20px;
   height: 20px;
@@ -309,7 +300,7 @@ const SyncToggle = styled.div<{ $isEnabled: boolean }>`
   cursor: pointer;
   transition: background-color 0.2s ease;
   position: relative;
-  
+
   &:hover {
     background-color: ${(props) => (props.$isEnabled ? "#2563eb" : "#9ca3af")};
   }
@@ -326,4 +317,3 @@ const SyncToggleThumb = styled.div<{ $isEnabled: boolean }>`
   transition: left 0.2s ease;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 `;
-
