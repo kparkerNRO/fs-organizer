@@ -3,16 +3,15 @@ import styled from "styled-components";
 import { FolderV2, File, FolderViewResponse } from "../types/types";
 import { ChevronDown, ChevronRight, FileIcon, FolderIcon } from "lucide-react";
 import { ContextMenu } from "./ContextMenu";
+import { useFolderTree } from "../hooks/useFolderTree";
+import { isFileNode, buildNodePath, canFlattenFolders } from "../utils/folderTreeOperations";
 
 export enum FolderBrowserViewType {
   ORIGINAL = "ORIGINAL",
   NEW = "NEW",
 }
 
-// Helper function to determine if a node is a file (has id property) or folder
-const isFileNode = (node: FolderV2 | File): node is File => {
-  return "id" in node;
-};
+// isFileNode is now imported from utils
 
 // Helper function to get the path to a file
 const getFilePathInTree = (
@@ -51,43 +50,30 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   shouldSync = true,
   showConfidence = false,
 }) => {
-  const folderTree =
-    folderViewResponse &&
-    (viewType === FolderBrowserViewType.NEW
-      ? folderViewResponse.new
-      : folderViewResponse.original);
-
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
-    new Set()
-  );
-  const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
-  const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(
-    null
-  );
+  // Use the custom hook for all tree operations
+  const folderTreeHook = useFolderTree();
+  
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollToSelection = useRef<boolean>(false);
-  const [selectedFolderPaths, setSelectedFolderPaths] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     item: FolderV2 | File;
     itemPath: string;
   } | null>(null);
+  const [renamingItem, setRenamingItem] = useState<{
+    item: FolderV2 | File;
+    itemPath: string;
+    newName: string;
+  } | null>(null);
 
-  const synchronizeFolders = (folderTree: FolderV2, selectedId: number) => {
-    const path = getFilePathInTree(folderTree, selectedId);
-    if (path) {
-      setExpandedFolders((prev) => {
-        const newSet = new Set(prev);
-        let currentPath = "";
-        for (const segment of path) {
-          currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-          newSet.add(currentPath);
-        }
-        return newSet;
-      });
-    }
-  };
+  // Get the active tree from the hook
+  const folderTree = folderTreeHook.modifiedTree || folderTreeHook.originalTree;
+
+  // Initialize tree data when folderViewResponse changes
+  useEffect(() => {
+    folderTreeHook.setTreeData(folderViewResponse, viewType === FolderBrowserViewType.NEW ? 'NEW' : 'ORIGINAL');
+  }, [folderViewResponse, viewType]);
 
   const scrollToSelectedFile = (fileId: number) => {
     if (!shouldSync || !scrollContainerRef.current) return;
@@ -125,61 +111,49 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
   // Keep selectedFileId in sync with externalSelectedFile and expand parent folders
   useEffect(() => {
-    if (externalSelectedFile !== selectedFileId) {
-      setSelectedFileId(externalSelectedFile);
+    if (externalSelectedFile !== folderTreeHook.selectedFileId) {
+      folderTreeHook.selectFile(externalSelectedFile);
       shouldScrollToSelection.current = true; // Mark that we should scroll
 
-      // Clear folder selection when file is selected externally
-      if (externalSelectedFile && selectedFolderPath) {
-        setSelectedFolderPath(null);
-        setSelectedFolderPaths([]);
-      }
-
       // Expand all parent folders to the selected item
-      if (externalSelectedFile && folderViewResponse && folderTree) {
-        synchronizeFolders(folderTree, externalSelectedFile);
+      if (externalSelectedFile && folderTree) {
+        folderTreeHook.expandToFile(externalSelectedFile);
         // Scroll to the selected file if shouldSync is enabled
         scrollToSelectedFile(externalSelectedFile);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalSelectedFile, folderViewResponse, folderTree, shouldSync]);
+  }, [externalSelectedFile, folderTree, shouldSync]);
 
   // Keep externalSelectedFile in sync if selectedFileId changes internally
   useEffect(() => {
-    if (selectedFileId !== externalSelectedFile) {
-      onSelectItem(selectedFileId);
-
-      // Clear folder selection when file is selected
-      if (selectedFileId && selectedFolderPath) {
-        setSelectedFolderPath(null);
-        setSelectedFolderPaths([]);
-        if (onSelectFolder) {
-          onSelectFolder(null);
-        }
-      }
+    if (folderTreeHook.selectedFileId !== externalSelectedFile) {
+      onSelectItem(folderTreeHook.selectedFileId);
 
       // Expand all parent folders to the selected item
-      if (selectedFileId && folderViewResponse && folderTree) {
-        synchronizeFolders(folderTree, selectedFileId);
+      if (folderTreeHook.selectedFileId && folderTree) {
+        folderTreeHook.expandToFile(folderTreeHook.selectedFileId);
         // Only scroll if this change originated from external selection
         if (shouldScrollToSelection.current) {
-          scrollToSelectedFile(selectedFileId);
+          scrollToSelectedFile(folderTreeHook.selectedFileId);
           shouldScrollToSelection.current = false; // Reset the flag
         }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFileId, shouldSync]);
+  }, [folderTreeHook.selectedFileId, shouldSync]);
 
-  // Handle escape key to clear selection
+  // Handle escape key to clear selection and cancel renaming
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Cancel renaming if in progress
+        if (renamingItem) {
+          setRenamingItem(null);
+          return;
+        }
         // Clear all selections
-        setSelectedFileId(null);
-        setSelectedFolderPath(null);
-        setSelectedFolderPaths([]);
+        folderTreeHook.clearSelection();
         onSelectItem(null);
         if (onSelectFolder) {
           onSelectFolder(null);
@@ -193,23 +167,13 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onSelectItem, onSelectFolder]);
+  }, [onSelectItem, onSelectFolder, renamingItem, folderTreeHook]);
 
-  const toggleFolder = (folderPath: string) => {
-    setExpandedFolders((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(folderPath)) {
-        newSet.delete(folderPath);
-      } else {
-        newSet.add(folderPath);
-      }
-      return newSet;
-    });
-  };
+  // toggleFolder is now handled by the hook
 
   const handleChevronClick = (event: React.MouseEvent, folderPath: string) => {
     event.stopPropagation(); // Prevent the folder row click from triggering
-    toggleFolder(folderPath);
+    folderTreeHook.toggleFolder(folderPath);
   };
 
   const handleItemClick = (
@@ -222,34 +186,24 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     if (isFile) {
       if (!(e.ctrlKey || e.metaKey)) {
         shouldScrollToSelection.current = true; // Allow scrolling for user-initiated selection
-        setSelectedFileId(item.id);
+        folderTreeHook.selectFile(item.id);
       }
     } else {
-      // Clear file selection when folder is selected
-      if (selectedFileId !== null) {
-        setSelectedFileId(null);
-        onSelectItem(null);
-      }
-
       if (e.ctrlKey || e.metaKey) {
-        setSelectedFolderPath(itemPath);
+        // Multi-select folders
+        const currentSelection = folderTreeHook.selectedFolderPaths;
+        const isAlreadySelected = currentSelection.includes(itemPath);
+        const newSelection = isAlreadySelected
+          ? currentSelection.filter((f) => f !== itemPath)
+          : [...currentSelection, itemPath];
 
-        setSelectedFolderPaths((prev) => {
-          const isAlreadySelected = prev.some((f) => f === itemPath);
-          const newSelection = isAlreadySelected
-            ? prev.filter((f) => f !== itemPath)
-            : [...prev, itemPath];
-
-          return newSelection;
-        });
-
+        folderTreeHook.selectMultipleFolders(newSelection);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
       } else {
-        // Set folder selection
-        setSelectedFolderPath(itemPath);
-        setSelectedFolderPaths([itemPath]);
+        // Single folder selection
+        folderTreeHook.selectFolder(itemPath);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
@@ -268,29 +222,19 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
     // Select the item if it's not already selected
     if (isFile) {
-      if (selectedFileId !== item.id) {
-        setSelectedFileId(item.id);
-        // Clear folder selection
-        if (selectedFolderPath) {
-          setSelectedFolderPath(null);
-          setSelectedFolderPaths([]);
-          if (onSelectFolder) {
-            onSelectFolder(null);
-          }
+      if (folderTreeHook.selectedFileId !== item.id) {
+        folderTreeHook.selectFile(item.id);
+        if (onSelectFolder) {
+          onSelectFolder(null);
         }
       }
     } else {
-      if (!selectedFolderPaths.includes(itemPath)) {
-        setSelectedFolderPath(itemPath);
-        setSelectedFolderPaths([itemPath]);
+      if (!folderTreeHook.selectedFolderPaths.includes(itemPath)) {
+        folderTreeHook.selectFolder(itemPath);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
-        // Clear file selection
-        if (selectedFileId !== null) {
-          setSelectedFileId(null);
-          onSelectItem(null);
-        }
+        onSelectItem(null);
       }
     }
 
@@ -306,16 +250,53 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     setContextMenu(null);
   };
 
+  const startRenaming = (item: FolderV2 | File, itemPath: string) => {
+    setRenamingItem({
+      item,
+      itemPath,
+      newName: item.name,
+    });
+    closeContextMenu();
+  };
+
+  const handleRenameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renamingItem || !renamingItem.newName.trim()) {
+      setRenamingItem(null);
+      return;
+    }
+
+    const result = await folderTreeHook.renameItem(renamingItem.itemPath, renamingItem.newName.trim());
+    
+    if (result.success) {
+      console.log(`Successfully renamed to "${renamingItem.newName.trim()}"`);
+    } else {
+      console.error('Rename failed:', result.error);
+      // You could show a toast/notification here
+    }
+    
+    setRenamingItem(null);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRenameSubmit(e as any);
+    } else if (e.key === 'Escape') {
+      setRenamingItem(null);
+    }
+  };
+
   const getContextMenuItems = (item: FolderV2 | File, itemPath: string) => {
     const isFile = isFileNode(item);
     const menuItems = [];
+    const selectedFolderPaths = folderTreeHook.selectedFolderPaths;
 
     if (isFile) {
       menuItems.push(
         {
           text: "Rename file",
           onClick: () => {
-            closeContextMenu();
+            startRenaming(item, itemPath);
           },
         },
         {
@@ -328,18 +309,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         {
           text: "Copy File Path",
           onClick: () => {
-            // Files don't have a path property, use itemPath instead
             navigator.clipboard.writeText(itemPath);
             closeContextMenu();
           },
         }
       );
     } else {
-      if (selectedFolderPaths.length == 1) {
+      if (selectedFolderPaths.length === 1) {
         menuItems.push({
           text: "Rename folder",
           onClick: () => {
-            closeContextMenu();
+            startRenaming(item, itemPath);
           },
         });
       }
@@ -349,35 +329,85 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             text: "Merge Folders",
             onClick: () => {
               closeContextMenu();
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.mergeItems(selectedFolderPaths, "Merged Folder");
+                  if (result.success) {
+                    console.log("Successfully merged folders");
+                  } else {
+                    console.error("Merge failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Merge operation failed:", error);
+                }
+              }, 0);
             },
           },
           {
             text: "Combine Folders",
             onClick: () => {
               closeContextMenu();
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.mergeItems(selectedFolderPaths, "Combined Folder");
+                  if (result.success) {
+                    console.log("Successfully combined folders");
+                  } else {
+                    console.error("Combine failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Combine operation failed:", error);
+                }
+              }, 0);
             },
           }
         );
       }
 
-      if (selectedFolderPaths.length >= 2) {
-        // Check if all selected folders have a parent/child relationship
-        const hasParentChildRelationship = selectedFolderPaths.every((path, index) => {
-          return selectedFolderPaths.some((otherPath, otherIndex) => {
-            if (index === otherIndex) return false;
-            return path.startsWith(otherPath + '/') || otherPath.startsWith(path + '/');
-          });
-        });
+      if (selectedFolderPaths.length >= 2 && folderTree) {
+        // Check if the selected folders can be flattened using the validation function
+        const flattenCheck = canFlattenFolders(folderTree, selectedFolderPaths);
 
-        if (hasParentChildRelationship) {
+        if (flattenCheck.canFlatten) {
           menuItems.push({
             text: "Flatten folders",
             onClick: () => {
               closeContextMenu();
+              // Use setTimeout to ensure the context menu closes before starting the async operation
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.flattenItems(selectedFolderPaths);
+                  if (result.success) {
+                    console.log("Successfully flattened folders");
+                  } else {
+                    console.error("Flatten failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Flatten operation failed:", error);
+                }
+              }, 0);
             },
           });
         }
       }
+      
+      // Add standard folder options
+      menuItems.push(
+        {
+          text: folderTreeHook.expandedFolders.has(itemPath) ? "Collapse Folder" : "Expand Folder",
+          onClick: () => {
+            folderTreeHook.toggleFolder(itemPath);
+            closeContextMenu();
+          },
+        },
+        {
+          text: "Copy Folder Path",
+          onClick: () => {
+            navigator.clipboard.writeText((item as FolderV2).path || itemPath);
+            closeContextMenu();
+          },
+        }
+      );
     }
 
     return menuItems;
@@ -389,22 +419,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     expandedFolders: Set<string>,
     parentPath: string = ""
   ): React.ReactNode => {
-    const nodePath = parentPath ? `${parentPath}/${node.name}` : node.name;
+    const nodePath = buildNodePath(parentPath, node.name);
     const isFile = isFileNode(node);
-    const isExpanded = !isFile && expandedFolders.has(nodePath);
+    const isExpanded = !isFile && folderTreeHook.expandedFolders.has(nodePath);
     const hasChildren =
       !isFile &&
       (node as FolderV2).children &&
       (node as FolderV2).children!.length > 0;
-    const isHighlighted =
-      (isFile && selectedFileId === node.id) ||
-      (!isFile && selectedFolderPaths.includes(nodePath));
+    const isHighlighted = folderTreeHook.isNodeSelected(node, nodePath);
 
     // Check if this folder is in the path to the selected file
     const isInSelectedPath =
-      !isFile && selectedFileId && folderViewResponse
+      !isFile && folderTreeHook.selectedFileId && folderTree
         ? (() => {
-            const pathToFile = getFilePathInTree(folderTree!, selectedFileId);
+            const pathToFile = getFilePathInTree(folderTree, folderTreeHook.selectedFileId);
             if (!pathToFile) return false;
 
             // Build the full path segments to compare against nodePath
@@ -453,16 +481,31 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             }
             style={{ display: "flex", alignItems: "center" }}
           >
-            <span
-              style={{
-                flex: 1,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {node.name}
-            </span>
+            {renamingItem && 
+             renamingItem.itemPath === nodePath && 
+             renamingItem.item === node ? (
+              <form onSubmit={handleRenameSubmit} style={{ flex: 1 }}>
+                <RenameInput
+                  type="text"
+                  value={renamingItem.newName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRenamingItem({ ...renamingItem, newName: e.target.value })}
+                  onKeyDown={handleRenameKeyDown}
+                  onBlur={() => setRenamingItem(null)}
+                  autoFocus
+                />
+              </form>
+            ) : (
+              <span
+                style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {node.name}
+              </span>
+            )}
             {showConfidence &&
               !isFile &&
               (node as FolderV2).confidence !== undefined && (
@@ -486,7 +529,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         {!isFile && isExpanded && hasChildren && (
           <div>
             {(node as FolderV2).children?.map((child) =>
-              renderNode(child, level + 1, expandedFolders, nodePath)
+              renderNode(child, level + 1, folderTreeHook.expandedFolders, nodePath)
             )}
           </div>
         )}
@@ -512,7 +555,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               }}
             >
               <div style={{ flex: 1 }}>
-                {folderTree && renderNode(folderTree, 0, expandedFolders, "")}
+                {folderTree && renderNode(folderTree, 0, folderTreeHook.expandedFolders, "")}
               </div>
             </div>
           </FolderTree>
@@ -694,4 +737,19 @@ const ErrorMessage = styled.div`
   text-align: center;
   padding: 2rem;
   color: #ef4444;
+`;
+
+const RenameInput = styled.input`
+  width: 100%;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  outline: none;
+  
+  &:focus {
+    border-color: #1d4ed8;
+  }
 `;
