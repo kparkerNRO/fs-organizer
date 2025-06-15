@@ -15,7 +15,10 @@ import {
   findSharedString,
   generateFlattenedName,
   pathNamesToRootPath,
+  moveNode,
+  sortFolderChildren,
 } from './folderTreeOperations';
+import { FolderV2, File } from '../types/types';
 import {
   mockRootFolder,
   simpleTestTree,
@@ -24,8 +27,19 @@ import {
   mockFolder1,
   pathTestCases,
   nameValidationTestCases,
-  expectedPaths,
 } from '../test/folderTreeTestData';
+
+// Helper function to create valid File objects for tests
+const createTestFile = (id: number, name: string, fileType: string = 'txt', size: string = '1KB'): File => ({
+  id,
+  name,
+  fileType,
+  size,
+  confidence: 1.0,
+  possibleClassifications: [],
+  originalPath: `/${name}`,
+  newPath: null
+});
 
 describe('folderTreeOperations', () => {
   describe('isFileNode', () => {
@@ -1748,6 +1762,547 @@ describe('folderTreeOperations', () => {
       const result = findSharedString(paths);
       // The implementation may not find common strings due to algorithm limitations
       expect(typeof result).toBe('string');
+    });
+  });
+
+  describe('sortFolderChildren', () => {
+    it('should sort children with folders first, then files, alphabetically', () => {
+      const testFolder: FolderV2 = {
+        name: 'test',
+        path: '/test',
+        confidence: 1.0,
+        count: 5,
+        children: [
+          createTestFile(1, 'zebra.txt'),
+          { name: 'beta_folder', path: '/test/beta_folder', confidence: 1.0, count: 0, children: [] },
+          createTestFile(2, 'alpha.txt'),
+          { name: 'gamma_folder', path: '/test/gamma_folder', confidence: 1.0, count: 0, children: [] },
+          { name: 'alpha_folder', path: '/test/alpha_folder', confidence: 1.0, count: 0, children: [] }
+        ]
+      };
+
+      sortFolderChildren(testFolder);
+
+      expect(testFolder.children).toHaveLength(5);
+      
+      // First 3 should be folders (alphabetical)
+      expect(testFolder.children![0].name).toBe('alpha_folder');
+      expect(testFolder.children![1].name).toBe('beta_folder'); 
+      expect(testFolder.children![2].name).toBe('gamma_folder');
+      
+      // Last 2 should be files (alphabetical)
+      expect(testFolder.children![3].name).toBe('alpha.txt');
+      expect(testFolder.children![4].name).toBe('zebra.txt');
+    });
+
+    it('should handle empty children array', () => {
+      const testFolder: FolderV2 = {
+        name: 'empty',
+        path: '/empty',
+        confidence: 1.0,
+        count: 0,
+        children: []
+      };
+
+      sortFolderChildren(testFolder);
+      expect(testFolder.children).toHaveLength(0);
+    });
+
+    it('should handle folder with no children property', () => {
+      const testFolder: FolderV2 = {
+        name: 'no_children',
+        path: '/no_children',
+        confidence: 1.0,
+        count: 0
+      };
+
+      // Should not throw
+      expect(() => sortFolderChildren(testFolder)).not.toThrow();
+    });
+
+    it('should recursively sort subfolders', () => {
+      const testFolder: FolderV2 = {
+        name: 'parent',
+        path: '/parent',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'subfolder',
+            path: '/parent/subfolder',
+            confidence: 1.0,
+            count: 2,
+            children: [
+              { id: 1, name: 'z_file.txt', fileType: 'txt', size: '1KB' },
+              { id: 2, name: 'a_file.txt', fileType: 'txt', size: '1KB' }
+            ]
+          },
+          { id: 3, name: 'parent_file.txt', fileType: 'txt', size: '1KB' }
+        ]
+      };
+
+      sortFolderChildren(testFolder);
+
+      // Check parent level sorting
+      expect(testFolder.children![0].name).toBe('subfolder');
+      expect(testFolder.children![1].name).toBe('parent_file.txt');
+
+      // Check subfolder sorting
+      const subfolder = testFolder.children![0] as FolderV2;
+      expect(subfolder.children![0].name).toBe('a_file.txt');
+      expect(subfolder.children![1].name).toBe('z_file.txt');
+    });
+
+    it('should handle numeric sorting correctly', () => {
+      const testFolder: FolderV2 = {
+        name: 'numeric_test',
+        path: '/numeric_test',
+        confidence: 1.0,
+        count: 4,
+        children: [
+          { id: 1, name: 'file10.txt', fileType: 'txt', size: '1KB' },
+          { id: 2, name: 'file2.txt', fileType: 'txt', size: '1KB' },
+          { id: 3, name: 'file1.txt', fileType: 'txt', size: '1KB' },
+          { id: 4, name: 'file20.txt', fileType: 'txt', size: '1KB' }
+        ]
+      };
+
+      sortFolderChildren(testFolder);
+
+      // Should be in numeric order: file1, file2, file10, file20
+      expect(testFolder.children![0].name).toBe('file1.txt');
+      expect(testFolder.children![1].name).toBe('file2.txt');
+      expect(testFolder.children![2].name).toBe('file10.txt');
+      expect(testFolder.children![3].name).toBe('file20.txt');
+    });
+  });
+
+  describe('moveNode', () => {
+    it('should move a file to a different folder', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'source_folder',
+            path: '/root/source_folder',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 1, name: 'file_to_move.txt', fileType: 'txt', size: '1KB' }
+            ]
+          },
+          {
+            name: 'target_folder',
+            path: '/root/target_folder',
+            confidence: 1.0,
+            count: 0,
+            children: []
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/source_folder/file_to_move.txt', 'root/target_folder');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      // Verify file was moved
+      const targetFolder = findNodeByPath(result.newTree!, 'root/target_folder') as FolderV2;
+      expect(targetFolder.children).toHaveLength(1);
+      expect(targetFolder.children![0].name).toBe('file_to_move.txt');
+
+      // Verify file was removed from source
+      const sourceFolder = findNodeByPath(result.newTree!, 'root/source_folder') as FolderV2;
+      expect(sourceFolder.children).toHaveLength(0);
+    });
+
+    it('should move a folder to a different location', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'folder_to_move',
+            path: '/root/folder_to_move',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 1, name: 'content.txt', fileType: 'txt', size: '1KB' }
+            ]
+          },
+          {
+            name: 'target_folder',
+            path: '/root/target_folder',
+            confidence: 1.0,
+            count: 0,
+            children: []
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/folder_to_move', 'root/target_folder');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      // Verify folder was moved and target folder is sorted
+      const targetFolder = findNodeByPath(result.newTree!, 'root/target_folder') as FolderV2;
+      expect(targetFolder.children).toHaveLength(1);
+      expect(targetFolder.children![0].name).toBe('folder_to_move');
+
+      // Verify moved folder retains its content
+      const movedFolder = targetFolder.children![0] as FolderV2;
+      expect(movedFolder.children).toHaveLength(1);
+      expect(movedFolder.children![0].name).toBe('content.txt');
+
+      // Verify folder was removed from root
+      const rootChildren = result.newTree!.children!.filter(child => !isFileNode(child) && child.name === 'folder_to_move');
+      expect(rootChildren).toHaveLength(0);
+    });
+
+    it('should prevent circular moves (folder into its descendant)', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'parent',
+            path: '/root/parent',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              {
+                name: 'child',
+                path: '/root/parent/child',
+                confidence: 1.0,
+                count: 0,
+                children: []
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/parent', 'root/parent/child');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Cannot move folder into its own descendant');
+    });
+
+    it('should handle name conflicts by renaming files', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'source',
+            path: '/root/source',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 1, name: 'duplicate.txt', fileType: 'txt', size: '1KB' }
+            ]
+          },
+          {
+            name: 'target',
+            path: '/root/target',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 2, name: 'duplicate.txt', fileType: 'txt', size: '2KB' }
+            ]
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/source/duplicate.txt', 'root/target');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      const targetFolder = findNodeByPath(result.newTree!, 'root/target') as FolderV2;
+      expect(targetFolder.children).toHaveLength(2);
+
+      const fileNames = targetFolder.children!.map(child => child.name);
+      expect(fileNames).toContain('duplicate.txt');
+      expect(fileNames).toContain('duplicate.txt (1)');
+    });
+
+    it('should merge folders with same name', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'source',
+            path: '/root/source',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              {
+                name: 'shared_folder',
+                path: '/root/source/shared_folder',
+                confidence: 1.0,
+                count: 1,
+                children: [
+                  { id: 1, name: 'file1.txt', fileType: 'txt', size: '1KB' }
+                ]
+              }
+            ]
+          },
+          {
+            name: 'target',
+            path: '/root/target',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              {
+                name: 'shared_folder',
+                path: '/root/target/shared_folder',
+                confidence: 1.0,
+                count: 1,
+                children: [
+                  { id: 2, name: 'file2.txt', fileType: 'txt', size: '2KB' }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/source/shared_folder', 'root/target');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      const targetFolder = findNodeByPath(result.newTree!, 'root/target') as FolderV2;
+      expect(targetFolder.children).toHaveLength(1);
+
+      const mergedFolder = targetFolder.children![0] as FolderV2;
+      expect(mergedFolder.name).toBe('shared_folder');
+      
+      // The merge might include both files and the nested folder structure
+      // Let's check that both original files are present somewhere in the merged structure
+      const getAllFileNames = (folder: FolderV2): string[] => {
+        const fileNames: string[] = [];
+        if (folder.children) {
+          for (const child of folder.children) {
+            if (isFileNode(child)) {
+              fileNames.push(child.name);
+            } else {
+              fileNames.push(...getAllFileNames(child));
+            }
+          }
+        }
+        return fileNames;
+      };
+
+      const allFileNames = getAllFileNames(mergedFolder).sort();
+      expect(allFileNames).toEqual(['file1.txt', 'file2.txt']);
+    });
+
+    it('should sort folders after move operations', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 2,
+        children: [
+          {
+            name: 'source',
+            path: '/root/source',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 1, name: 'alpha_file.txt', fileType: 'txt', size: '1KB' }
+            ]
+          },
+          {
+            name: 'target',
+            path: '/root/target',
+            confidence: 1.0,
+            count: 2,
+            children: [
+              { name: 'zebra_folder', path: '/root/target/zebra_folder', confidence: 1.0, count: 0, children: [] },
+              { id: 2, name: 'zebra_file.txt', fileType: 'txt', size: '2KB' }
+            ]
+          }
+        ]
+      };
+
+      const result = moveNode(testTree, 'root/source/alpha_file.txt', 'root/target');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      const targetFolder = findNodeByPath(result.newTree!, 'root/target') as FolderV2;
+      expect(targetFolder.children).toHaveLength(3);
+
+      // Should be sorted: folder first, then files alphabetically
+      expect(targetFolder.children![0].name).toBe('zebra_folder');
+      expect(targetFolder.children![1].name).toBe('alpha_file.txt');
+      expect(targetFolder.children![2].name).toBe('zebra_file.txt');
+    });
+
+    it('should fail when source node does not exist', () => {
+      const result = moveNode(mockRootFolder, 'root/nonexistent', 'root/documents');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Source node not found');
+    });
+
+    it('should fail when target is not a folder', () => {
+      const result = moveNode(mockRootFolder, 'root/code', 'root/documents/document1.pdf');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Target must be a folder');
+    });
+
+    it('should fail when target folder does not exist', () => {
+      const result = moveNode(mockRootFolder, 'root/code', 'root/nonexistent');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Target must be a folder');
+    });
+  });
+
+  describe('operations with alphabetical sorting', () => {
+    it('should sort after rename operations', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 3,
+        children: [
+          { id: 1, name: 'beta.txt', fileType: 'txt', size: '1KB' },
+          { name: 'charlie_folder', path: '/root/charlie_folder', confidence: 1.0, count: 0, children: [] },
+          { id: 2, name: 'delta.txt', fileType: 'txt', size: '2KB' }
+        ]
+      };
+
+      const result = renameNode(testTree, 'root/charlie_folder', 'alpha_folder');
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      // Should be sorted after rename: alpha_folder (folder first), then beta.txt, delta.txt
+      const children = result.newTree!.children!;
+      expect(children).toHaveLength(3);
+      
+      // Check that we have the right elements
+      const names = children.map(child => child.name).sort();
+      expect(names).toEqual(['alpha_folder', 'beta.txt', 'delta.txt']);
+      
+      // Check specific ordering: folders first, then files alphabetically
+      expect(children[0].name).toBe('alpha_folder'); // Folder comes first
+      expect(isFileNode(children[0])).toBe(false);
+      expect(children[1].name).toBe('beta.txt'); // File comes after folder
+      expect(isFileNode(children[1])).toBe(true);
+      expect(children[2].name).toBe('delta.txt'); // Files in alphabetical order
+      expect(isFileNode(children[2])).toBe(true);
+    });
+
+    it('should sort after merge operations', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 3,
+        children: [
+          {
+            name: 'project frontend',
+            path: '/root/project frontend',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 1, name: 'app.js', fileType: 'js', size: '10KB' }
+            ]
+          },
+          {
+            name: 'project backend',
+            path: '/root/project backend',
+            confidence: 1.0,
+            count: 1,
+            children: [
+              { id: 2, name: 'server.js', fileType: 'js', size: '20KB' }
+            ]
+          },
+          { id: 3, name: 'readme.txt', fileType: 'txt', size: '1KB' }
+        ]
+      };
+
+      const result = mergeFolders(testTree, ['root/project frontend', 'root/project backend']);
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      const mergedFolder = findNodeByPath(result.newTree!, 'root/project') as FolderV2;
+      expect(mergedFolder).toBeDefined();
+      
+      // Children should be sorted within the merged folder
+      if (mergedFolder.children) {
+        const fileNames = mergedFolder.children.map(child => child.name);
+        const sortedFileNames = [...fileNames].sort();
+        expect(fileNames).toEqual(sortedFileNames);
+      }
+    });
+
+    it('should sort after flatten operations', () => {
+      const testTree: FolderV2 = {
+        name: 'root',
+        path: '/root',
+        confidence: 1.0,
+        count: 1,
+        children: [
+          {
+            name: 'photos',
+            path: '/root/photos',
+            confidence: 1.0,
+            count: 2,
+            children: [
+              { id: 1, name: 'zebra.jpg', fileType: 'jpg', size: '2MB' },
+              {
+                name: 'summer',
+                path: '/root/photos/summer',
+                confidence: 1.0,
+                count: 1,
+                children: [
+                  { id: 2, name: 'alpha.jpg', fileType: 'jpg', size: '1MB' }
+                ]
+              }
+            ]
+          }
+        ]
+      };
+
+      const result = flattenFolders(testTree, ['root/photos', 'root/photos/summer']);
+
+      expect(result.success).toBe(true);
+      expect(result.newTree).toBeDefined();
+
+      const flattenedFolder = findNodeByPath(result.newTree!, 'root/photos summer') as FolderV2;
+      expect(flattenedFolder).toBeDefined();
+      
+      if (flattenedFolder.children) {
+        const files = flattenedFolder.children.filter(isFileNode);
+        expect(files.length).toBeGreaterThan(0);
+        
+        // Files should be sorted alphabetically
+        const fileNames = files.map(f => f.name);
+        const sortedFileNames = [...fileNames].sort();
+        expect(fileNames).toEqual(sortedFileNames);
+      }
     });
   });
 });

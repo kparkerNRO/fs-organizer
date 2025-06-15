@@ -66,6 +66,15 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     itemPath: string;
     newName: string;
   } | null>(null);
+  const [dragState, setDragState] = useState<{
+    isDragging: boolean;
+    draggedItem: { item: FolderV2 | File; itemPath: string } | null;
+    dropTarget: string | null;
+  }>({
+    isDragging: false,
+    draggedItem: null,
+    dropTarget: null,
+  });
 
   // Get the active tree from the hook
   const folderTree = folderTreeHook.modifiedTree || folderTreeHook.originalTree;
@@ -280,7 +289,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
   const handleRenameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleRenameSubmit(e as any);
+      const event = e as unknown as React.FormEvent;
+      handleRenameSubmit(event);
     } else if (e.key === 'Escape') {
       setRenamingItem(null);
     }
@@ -413,10 +423,96 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     return menuItems;
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (
+    e: React.DragEvent,
+    item: FolderV2 | File,
+    itemPath: string
+  ) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", itemPath);
+    
+    setDragState({
+      isDragging: true,
+      draggedItem: { item, itemPath },
+      dropTarget: null,
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDragState({
+      isDragging: false,
+      draggedItem: null,
+      dropTarget: null,
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetPath: string, targetItem: FolderV2 | File) => {
+    e.preventDefault();
+    
+    // Only allow dropping on folders
+    if (isFileNode(targetItem)) {
+      return;
+    }
+
+    // Don't allow dropping on the dragged item itself or its descendants
+    if (dragState.draggedItem && 
+        (dragState.draggedItem.itemPath === targetPath || 
+         targetPath.startsWith(dragState.draggedItem.itemPath + "/"))) {
+      return;
+    }
+
+    e.dataTransfer.dropEffect = "move";
+    setDragState(prev => ({ ...prev, dropTarget: targetPath }));
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear drop target if we're leaving the current target element
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragState(prev => ({ ...prev, dropTarget: null }));
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetPath: string, targetItem: FolderV2 | File) => {
+    e.preventDefault();
+    
+    if (!dragState.draggedItem || isFileNode(targetItem)) {
+      return;
+    }
+
+    const sourcePath = dragState.draggedItem.itemPath;
+    
+    // Don't move if source and target are the same
+    if (sourcePath === targetPath) {
+      return;
+    }
+
+    try {
+      const result = await folderTreeHook.moveItem(sourcePath, targetPath);
+      if (result.success) {
+        console.log(`Successfully moved "${sourcePath}" to "${targetPath}"`);
+      } else {
+        console.error('Move failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Move operation failed:', error);
+    }
+
+    setDragState({
+      isDragging: false,
+      draggedItem: null,
+      dropTarget: null,
+    });
+  };
+
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
-    expandedFolders: Set<string>,
+    _expandedFolders: Set<string>,
     parentPath: string = ""
   ): React.ReactNode => {
     const nodePath = buildNodePath(parentPath, node.name);
@@ -447,17 +543,32 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           })()
         : false;
 
+    // Drag and drop state
+    const isDraggedOver = dragState.dropTarget === nodePath;
+    const isDragging = dragState.isDragging && dragState.draggedItem?.itemPath === nodePath;
+
     return (
       <div key={nodePath}>
         <FolderItem
           $level={level}
           $isFile={isFile}
           $isSelected={isHighlighted}
+          $isDraggedOver={isDraggedOver}
           $isInHighlightedPath={isInSelectedPath}
           data-file-id={isFile ? node.id : undefined}
           data-folder-path={!isFile ? nodePath : undefined}
+          draggable={true}
+          onDragStart={(e) => handleDragStart(e, node, nodePath)}
+          onDragEnd={handleDragEnd}
+          onDragOver={(e) => handleDragOver(e, nodePath, node)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, nodePath, node)}
           onClick={(e) => handleItemClick(node, nodePath, e)}
           onContextMenu={(e) => handleItemRightClick(node, nodePath, e)}
+          style={{
+            opacity: isDragging ? 0.5 : 1,
+            cursor: isDragging ? "grabbing" : "pointer",
+          }}
         >
           {!isFile && hasChildren ? (
             <ExpandIcon onClick={(e) => handleChevronClick(e, nodePath)}>

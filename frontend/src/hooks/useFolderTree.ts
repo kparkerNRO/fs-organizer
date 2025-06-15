@@ -7,12 +7,10 @@ import {
   FolderTreeOperationResult,
   renameNode,
   mergeFolders,
+  moveNode,
   findNodeByPath,
   findParentByPath,
-  getDescendantPaths,
   isFileNode,
-  buildNodePath,
-  cloneTreeNode,
   flattenFolders,
 } from "../utils/folderTreeOperations";
 
@@ -45,6 +43,10 @@ export interface FolderTreeActions {
   renameItem: (
     targetPath: FolderTreePath,
     newName: string
+  ) => Promise<FolderTreeOperationResult>;
+  moveItem: (
+    sourcePath: FolderTreePath,
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
   mergeItems: (
     sourcePaths: FolderTreePath[],
@@ -185,7 +187,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         }
 
         return result;
-      } catch (error) {
+      } catch {
         setState((prev) => ({ ...prev, isOperationInProgress: false }));
         return { success: false, error: "Failed to rename item" };
       }
@@ -230,9 +232,51 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         }
 
         return result;
-      } catch (error) {
+      } catch {
         setState((prev) => ({ ...prev, isOperationInProgress: false }));
         return { success: false, error: "Failed to merge items" };
+      }
+    },
+    [activeTree]
+  );
+
+  const moveItem = useCallback(
+    async (
+      sourcePath: FolderTreePath,
+      targetPath: FolderTreePath
+    ): Promise<FolderTreeOperationResult> => {
+      if (!activeTree) {
+        return { success: false, error: "No tree data available" };
+      }
+
+      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+
+      try {
+        const result = moveNode(activeTree, sourcePath, targetPath);
+
+        if (result.success && result.newTree) {
+          const operation: FolderTreeOperation = {
+            type: "move",
+            sourcePath,
+            targetPath,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            modifiedTree: result.newTree!,
+            hasModifications: true,
+            lastOperation: operation,
+            operationHistory: [...prev.operationHistory, operation],
+            isOperationInProgress: false,
+          }));
+        } else {
+          setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        }
+
+        return result;
+      } catch {
+        setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        return { success: false, error: "Failed to move item" };
       }
     },
     [activeTree]
@@ -273,7 +317,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         }
 
         return result;
-      } catch (error) {
+      } catch {
         setState((prev) => ({ ...prev, isOperationInProgress: false }));
         return { success: false, error: "Failed to flatten items" };
       }
@@ -282,7 +326,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
   );
 
   const deleteItem = useCallback(
-    async (targetPath: FolderTreePath): Promise<FolderTreeOperationResult> => {
+    async (): Promise<FolderTreeOperationResult> => {
       // Placeholder for delete operation
       return { success: false, error: "Delete operation not implemented yet" };
     },
@@ -406,6 +450,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     setTreeData,
     resetToOriginal,
     renameItem,
+    moveItem,
     mergeItems,
     deleteItem,
     flattenItems,
