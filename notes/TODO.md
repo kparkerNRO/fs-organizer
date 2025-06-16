@@ -5,20 +5,41 @@ End state:
 
 Features
     Backend
-        [] Ability to load files from disk
+        [x] Ability to load files from disk
         [] Categorize files
             [] based on file path
             [] based on file name
             [] based on type (?)
 
         Cateegorization feature
-            [] Identify category "types" - grouping, variant, media type, etc
-            [] De-duplicate and spelling correct categories
+            [x] Identify category "types" - grouping, variant, media type, etc
+            [x] De-duplicate and spelling correct categories
             [] generate folder heirarchies based on categories
-            [] Flag possible matches for manual review/low confidence
+            [x] Flag possible matches for manual review/low confidence
 
     Frontend
-        [] Provide path to load files on
-        [] Provide interface to review categories
+        [x] Provide path to load files on
+        [x] Provide interface to review categories
         [] Provide interface to review re-organization
         [] Issue the command to re-organize
+
+
+--------------
+# Next steps
+* Frontend
+    * Add context menus to add and remove folders
+    * validate that moving works correctly when folders should merge
+    * Filter visualization down to only non-confident answers
+        * Add some indication in a folder tree that there are non-confident children
+    * Disable editing on non-editable windows (except delete/remove)
+    * Add toast messages for operation failure and delete warning
+    * Implement save & undo
+    * Allow shift-ctl multi-select
+    
+
+* Backend
+    * implement save
+    * figure out why ebooks aren't loading into database
+
+* General
+    * Investigate allowing the user to load multiple folders at the start
