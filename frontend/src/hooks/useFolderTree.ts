@@ -51,18 +51,6 @@ export interface FolderTreeActions {
     sourcePaths: FolderTreePath[]
   ) => Promise<FolderTreeOperationResult>;
 
-  // Selection management
-  selectFile: (fileId: number | null) => void;
-  selectFolder: (folderPath: string | null) => void;
-  selectMultipleFolders: (folderPaths: string[]) => void;
-  clearSelection: () => void;
-
-  // Tree navigation
-  expandFolder: (folderPath: string) => void;
-  collapseFolder: (folderPath: string) => void;
-  toggleFolder: (folderPath: string) => void;
-  expandToFile: (fileId: number) => void;
-
   // Utility functions
   findNode: (targetPath: FolderTreePath) => FolderTreeNode | null;
   getNodeParent: (targetPath: FolderTreePath) => {
@@ -186,7 +174,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
       setState((prev) => ({ ...prev, isOperationInProgress: true }));
 
       try {
-        const result = mergeFolders(activeTree, sourcePaths, targetName);
+        const result = mergeFolders(activeTree, sourcePaths);
 
         if (result.success && result.newTree) {
           const operation: FolderTreeOperation = {
