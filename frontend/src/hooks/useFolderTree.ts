@@ -7,6 +7,7 @@ import {
   FolderTreeOperationResult,
   renameNode,
   mergeFolders,
+  moveNode,
   findNodeByPath,
   findParentByPath,
   isFileNode,
@@ -43,6 +44,10 @@ export interface FolderTreeActions {
   mergeItems: (
     sourcePaths: FolderTreePath[],
     targetName: string
+  ) => Promise<FolderTreeOperationResult>;
+   moveItem: (
+    sourcePath: FolderTreePath,
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
   deleteItem: (
     targetPath: FolderTreePath
@@ -207,6 +212,50 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     [activeTree]
   );
 
+
+
+  const moveItem = useCallback(
+    async (
+      sourcePath: FolderTreePath,
+      targetPath: FolderTreePath
+    ): Promise<FolderTreeOperationResult> => {
+      if (!activeTree) {
+        return { success: false, error: "No tree data available" };
+      }
+
+      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+
+      try {
+        const result = moveNode(activeTree, sourcePath, targetPath);
+
+        if (result.success && result.newTree) {
+          const operation: FolderTreeOperation = {
+            type: "move",
+            sourcePath,
+            targetPath,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            modifiedTree: result.newTree!,
+            hasModifications: true,
+            lastOperation: operation,
+            operationHistory: [...prev.operationHistory, operation],
+            isOperationInProgress: false,
+          }));
+        } else {
+          setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        }
+
+        return result;
+      } catch {
+        setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        return { success: false, error: "Failed to move item" };
+      }
+    },
+    [activeTree]
+  );
+
   const flattenItems = useCallback(
     async (
       sourcePaths: FolderTreePath[]
@@ -283,6 +332,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     setTreeData,
     resetToOriginal,
     renameItem,
+    moveItem,
     mergeItems,
     deleteItem,
     flattenItems,
