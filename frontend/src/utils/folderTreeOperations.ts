@@ -659,33 +659,44 @@ export const mergeFolders = (
     return { success: false, error: "At least 2 folders required for merging" };
   }
 
-  // Get the common string for all folders
-  const commonString = findSharedString(sourcePaths);
-  if (commonString === "") {
-    return {
-      success: false,
-      error: `Unable to find common string to merge to`,
-    };
+  // Validate that all source paths exist and are folders
+  for (const path of sourcePaths) {
+    const node = findNodeByPath(newTree, path);
+    if (!node) {
+      return {
+        success: false,
+        error: `Folder not found at path: ${path}`,
+      };
+    }
+    if (isFileNode(node)) {
+      return {
+        success: false,
+        error: `Path is not a folder: ${path}`,
+      };
+    }
   }
 
   // Find the target folder where all files will be moved
   const sortedPaths = [...sourcePaths].sort((a, b) => a.length - b.length);
   const topLevelPath = sortedPaths[0];
   const targetFolder = findNodeByPath(newTree, topLevelPath) as FolderV2;
-  if (!targetFolder) {
-    return {
-      success: false,
-      error: `Target folder not found at path: ${topLevelPath}`,
-    };
-  }
 
-  // If the target folder isn't named the common string, move the rest of the name to the children
-  if (targetFolder.name !== commonString) {
-    const targetFolderCopy = cloneTreeNode(targetFolder) as FolderV2;
-    targetFolderCopy.name = targetFolder.name.replace(commonString, "").trim();
-    targetFolder.name = commonString;
-    targetFolder.children = [targetFolderCopy];
+  // Get the common string for all folders
+  const commonString = findSharedString(sourcePaths);
+
+  // If we found a common string, rename the target folder to it
+  if (commonString !== "") {
+    // If the target folder isn't named the common string, move the rest of the name to the children
+    if (targetFolder.name !== commonString) {
+      const targetFolderCopy = cloneTreeNode(targetFolder) as FolderV2;
+      targetFolderCopy.name = targetFolder.name
+        .replace(commonString, "")
+        .trim();
+      targetFolder.name = commonString;
+      targetFolder.children = [targetFolderCopy];
+    }
   }
+  // If no common string found, just use the target folder as-is
 
   for (const path of sourcePaths) {
     // Skip the target folder itself
@@ -696,11 +707,13 @@ export const mergeFolders = (
 
     const { parent } = findParentByPath(newTree, path);
 
+    // remove the node from the parent
     if (parent && parent.children) {
       parent.children = parent.children.filter((child) => child !== node);
     }
 
-    if (node && typeof node.name === "string") {
+    // Only modify the node name if we found a common string to remove
+    if (node && typeof node.name === "string" && commonString !== "") {
       node.name = node.name.replace(commonString, "").trim();
     }
 
