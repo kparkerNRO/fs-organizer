@@ -41,13 +41,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   // Get the active tree from the hook or use the prop
   const folderTree = folderTreeHook.modifiedTree || propFolderTree;
 
-
   const [treeState, setTreeState] = useState<TreeState>({
     tree: folderTree || ({} as FolderV2),
     expandedFolders: new Set<string>(),
     selectedFileId: null,
     selectedFolderPaths: [],
   });
+
+  const [creatingFolder, setCreatingFolder] = useState<{
+    parentPath: string;
+    folderName: string;
+  } | null>(null);
 
   // Initialize tree data when propFolderTree changes
   useEffect(() => {
@@ -99,7 +103,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     newName: string;
   } | null>(null);
 
-    const [dragState, setDragState] = useState<{
+  const [dragState, setDragState] = useState<{
     isDragging: boolean;
     draggedItem: { item: FolderV2 | File; itemPath: string } | null;
     dropTarget: string | null;
@@ -384,11 +388,59 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
+  const startCreatingFolder = (parentPath: string) => {
+    setCreatingFolder({
+      parentPath,
+      folderName: "New Folder",
+    });
+
+    // Ensure the parent folder is expanded so the new folder input is visible
+    setTreeState((prev) => ({
+      ...prev,
+      expandedFolders: new Set([...prev.expandedFolders, parentPath]),
+    }));
+
+    closeContextMenu();
+  };
+
+  const handleCreateFolderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!creatingFolder || !creatingFolder.folderName.trim()) {
+      setCreatingFolder(null);
+      return;
+    }
+
+    const result = await folderTreeHook.createFolder(
+      creatingFolder.parentPath,
+      creatingFolder.folderName.trim()
+    );
+
+    if (result.success) {
+      console.log(
+        `Successfully created folder "${creatingFolder.folderName.trim()}"`
+      );
+    } else {
+      console.error("Create folder failed:", result.error);
+      // You could show a toast/notification here
+    }
+
+    setCreatingFolder(null);
+  };
+
+  const handleCreateFolderKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleCreateFolderSubmit(e as React.FormEvent);
+    } else if (e.key === "Escape") {
+      setCreatingFolder(null);
+    }
+  };
+
   const getContextMenuItems = (item: FolderV2 | File, itemPath: string) => {
     const isFile = isFileNode(item);
     const menuItems = [];
     // Get the current active tree to ensure we have the most up-to-date reference
-    const currentTree = folderTreeHook.modifiedTree || folderTreeHook.originalTree;
+    const currentTree =
+      folderTreeHook.modifiedTree || folderTreeHook.originalTree;
 
     if (isFile) {
       menuItems.push(
@@ -421,82 +473,93 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             startRenaming(item, itemPath);
           },
         });
-      }
-      if (treeState.selectedFolderPaths.length >= 2) {
-        menuItems.push(
-          {
-            text: "Merge Folders",
-            onClick: () => {
-              closeContextMenu();
-              setTimeout(async () => {
-                try {
-                  const result = await folderTreeHook.mergeItems(treeState.selectedFolderPaths, "Merged Folder");
-                  if (result.success) {
-                    console.log("Successfully merged folders");
-                  } else {
-                    console.error("Merge failed:", result.error);
-                  }
-                } catch (error) {
-                  console.error("Merge operation failed:", error);
-                }
-              }, 0);
-            },
+        menuItems.push({
+          text: "New folder",
+          onClick: () => {
+            startCreatingFolder(itemPath);
           },
-          
-        );
-      }
+        });
 
-      if (treeState.selectedFolderPaths.length >= 2 && currentTree) {
-        // Check if the selected folders can be flattened using the validation function
-        const flattenCheck = canFlattenFolders(currentTree, treeState.selectedFolderPaths);
+        if (currentTree) {
+          const invertCheck = canInvertFolder(currentTree, itemPath);
 
-        if (flattenCheck.canFlatten) {
-          menuItems.push({
-            text: "Flatten folders",
-            onClick: () => {
-              closeContextMenu();
-              // Use setTimeout to ensure the context menu closes before starting the async operation
-              setTimeout(async () => {
-                try {
-                  const result = await folderTreeHook.flattenItems(treeState.selectedFolderPaths);
-                  if (result.success) {
-                    console.log("Successfully flattened folders");
-                  } else {
-                    console.error("Flatten failed:", result.error);
+          // Add invert with children option for single folder selection
+          if (invertCheck.canInvert) {
+            menuItems.push({
+              text: "Invert with children",
+              onClick: () => {
+                closeContextMenu();
+                // Use setTimeout to ensure the context menu closes before starting the async operation
+                setTimeout(async () => {
+                  try {
+                    const result = await folderTreeHook.invertItems(itemPath);
+                    if (result.success) {
+                      console.log("Successfully inverted folder with children");
+                    } else {
+                      console.error("Invert failed:", result.error);
+                    }
+                  } catch (error) {
+                    console.error("Invert operation failed:", error);
                   }
-                } catch (error) {
-                  console.error("Flatten operation failed:", error);
-                }
-              }, 0);
-            },
-          });
+                }, 0);
+              },
+            });
+          }
         }
       }
-
-      // Add invert with children option for single folder selection
-      if (treeState.selectedFolderPaths.length === 1 && currentTree) {
-        const invertCheck = canInvertFolder(currentTree, itemPath);
-        
-        if (invertCheck.canInvert) {
-          menuItems.push({
-            text: "Invert with children",
-            onClick: () => {
-              closeContextMenu();
-              // Use setTimeout to ensure the context menu closes before starting the async operation
-              setTimeout(async () => {
-                try {
-                  const result = await folderTreeHook.invertItems(itemPath);
-                  if (result.success) {
-                    console.log("Successfully inverted folder with children");
-                  } else {
-                    console.error("Invert failed:", result.error);
-                  }
-                } catch (error) {
-                  console.error("Invert operation failed:", error);
+      if (treeState.selectedFolderPaths.length >= 2) {
+        menuItems.push({
+          text: "Merge Folders",
+          onClick: () => {
+            closeContextMenu();
+            setTimeout(async () => {
+              try {
+                const result = await folderTreeHook.mergeItems(
+                  treeState.selectedFolderPaths,
+                  "Merged Folder"
+                );
+                if (result.success) {
+                  console.log("Successfully merged folders");
+                } else {
+                  console.error("Merge failed:", result.error);
                 }
-              }, 0);
-            },
-          });
+              } catch (error) {
+                console.error("Merge operation failed:", error);
+              }
+            }, 0);
+          },
+        });
+
+        if (currentTree) {
+          // Check if the selected folders can be flattened using the validation function
+          const flattenCheck = canFlattenFolders(
+            currentTree,
+            treeState.selectedFolderPaths
+          );
+
+          if (flattenCheck.canFlatten) {
+            menuItems.push({
+              text: "Flatten folders",
+              onClick: () => {
+                closeContextMenu();
+                // Use setTimeout to ensure the context menu closes before starting the async operation
+                setTimeout(async () => {
+                  try {
+                    const result = await folderTreeHook.flattenItems(
+                      treeState.selectedFolderPaths
+                    );
+                    if (result.success) {
+                      console.log("Successfully flattened folders");
+                    } else {
+                      console.error("Flatten failed:", result.error);
+                    }
+                  } catch (error) {
+                    console.error("Flatten operation failed:", error);
+                  }
+                }, 0);
+              },
+            });
+          }
         }
       }
     }
@@ -510,9 +573,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       },
     });
 
+    menuItems.push({
+      text: "Delete",
+      onClick: async () => {
+        // Delete all selected folder paths at once
+        await folderTreeHook.deleteItems(treeState.selectedFolderPaths);
+        closeContextMenu();
+      },
+    });
+
     return menuItems;
   };
-
 
   // Drag and drop handlers
   const handleDragStart = (
@@ -522,7 +593,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   ) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", itemPath);
-    
+
     setDragState({
       isDragging: true,
       draggedItem: { item, itemPath },
@@ -538,23 +609,29 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     });
   };
 
-  const handleDragOver = (e: React.DragEvent, targetPath: string, targetItem: FolderV2 | File) => {
+  const handleDragOver = (
+    e: React.DragEvent,
+    targetPath: string,
+    targetItem: FolderV2 | File
+  ) => {
     e.preventDefault();
-    
+
     // Only allow dropping on folders
     if (isFileNode(targetItem)) {
       return;
     }
 
     // Don't allow dropping on the dragged item itself or its descendants
-    if (dragState.draggedItem && 
-        (dragState.draggedItem.itemPath === targetPath || 
-         targetPath.startsWith(dragState.draggedItem.itemPath + "/"))) {
+    if (
+      dragState.draggedItem &&
+      (dragState.draggedItem.itemPath === targetPath ||
+        targetPath.startsWith(dragState.draggedItem.itemPath + "/"))
+    ) {
       return;
     }
 
     e.dataTransfer.dropEffect = "move";
-    setDragState(prev => ({ ...prev, dropTarget: targetPath }));
+    setDragState((prev) => ({ ...prev, dropTarget: targetPath }));
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -562,21 +639,25 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = e.clientX;
     const y = e.clientY;
-    
+
     if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      setDragState(prev => ({ ...prev, dropTarget: null }));
+      setDragState((prev) => ({ ...prev, dropTarget: null }));
     }
   };
 
-  const handleDrop = async (e: React.DragEvent, targetPath: string, targetItem: FolderV2 | File) => {
+  const handleDrop = async (
+    e: React.DragEvent,
+    targetPath: string,
+    targetItem: FolderV2 | File
+  ) => {
     e.preventDefault();
-    
+
     if (!dragState.draggedItem || isFileNode(targetItem)) {
       return;
     }
 
     const sourcePath = dragState.draggedItem.itemPath;
-    
+
     // Don't move if source and target are the same
     if (sourcePath === targetPath) {
       return;
@@ -587,10 +668,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       if (result.success) {
         console.log(`Successfully moved "${sourcePath}" to "${targetPath}"`);
       } else {
-        console.error('Move failed:', result.error);
+        console.error("Move failed:", result.error);
       }
     } catch (error) {
-      console.error('Move operation failed:', error);
+      console.error("Move operation failed:", error);
     }
 
     setDragState({
@@ -599,7 +680,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       dropTarget: null,
     });
   };
-
 
   const renderNode = (
     node: FolderV2 | File,
@@ -640,10 +720,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           })()
         : false;
 
-        // Drag and drop state
+    // Drag and drop state
     const isDraggedOver = dragState.dropTarget === nodePath;
-    const isDragging = dragState.isDragging && dragState.draggedItem?.itemPath === nodePath;
-
+    const isDragging =
+      dragState.isDragging && dragState.draggedItem?.itemPath === nodePath;
 
     return (
       <div key={nodePath}>
@@ -741,10 +821,40 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           ) : null}
         </FolderItem>
 
-        {!isFile && isExpanded && hasChildren && (
+        {!isFile && isExpanded && (
           <div>
-            {(node as FolderV2).children?.map((child) =>
-              renderNode(child, level + 1, expandedFolders, nodePath)
+            {hasChildren &&
+              (node as FolderV2).children?.map((child) =>
+                renderNode(child, level + 1, expandedFolders, nodePath)
+              )}
+            {/* Render new folder input if creating folder in this location */}
+            {creatingFolder && creatingFolder.parentPath === nodePath && (
+              <div
+                style={{
+                  marginLeft: `${(level + 1) * 16}px`,
+                  display: "flex",
+                  alignItems: "center",
+                  height: "32px",
+                  paddingLeft: "0.5rem",
+                }}
+              >
+                <FolderIcon size={16} style={{ marginRight: "0.5rem" }} />
+                <form onSubmit={handleCreateFolderSubmit} style={{ flex: 1 }}>
+                  <RenameInput
+                    type="text"
+                    value={creatingFolder.folderName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setCreatingFolder({
+                        ...creatingFolder,
+                        folderName: e.target.value,
+                      })
+                    }
+                    onKeyDown={handleCreateFolderKeyDown}
+                    onBlur={() => setCreatingFolder(null)}
+                    autoFocus
+                  />
+                </form>
+              </div>
             )}
           </div>
         )}

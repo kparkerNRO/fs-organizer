@@ -13,6 +13,8 @@ import {
   isFileNode,
   flattenFolders,
   invertFolder,
+  deleteFolders,
+  createFolder,
 } from "../utils/folderTreeOperations";
 
 export interface FolderTreeState {
@@ -42,16 +44,20 @@ export interface FolderTreeActions {
     targetPath: FolderTreePath,
     newName: string
   ) => Promise<FolderTreeOperationResult>;
+  createFolder: (
+    parentPath: FolderTreePath,
+    folderName: string
+  ) => Promise<FolderTreeOperationResult>;
   mergeItems: (
     sourcePaths: FolderTreePath[],
     targetName: string
   ) => Promise<FolderTreeOperationResult>;
-   moveItem: (
+  moveItem: (
     sourcePath: FolderTreePath,
     targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
-  deleteItem: (
-    targetPath: FolderTreePath
+  deleteItems: (
+    targetPaths: FolderTreePath[]
   ) => Promise<FolderTreeOperationResult>;
   flattenItems: (
     sourcePaths: FolderTreePath[]
@@ -63,6 +69,7 @@ export interface FolderTreeActions {
   // Utility functions
   findNode: (targetPath: FolderTreePath) => FolderTreeNode | null;
   getNodeParent: (targetPath: FolderTreePath) => {
+    parent: FolderV2 | null;
     parentPath: string;
   };
 }
@@ -220,8 +227,6 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     [activeTree]
   );
 
-
-
   const moveItem = useCallback(
     async (
       sourcePath: FolderTreePath,
@@ -311,18 +316,50 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     [activeTree]
   );
 
-  const deleteItem = useCallback(
-    async (_targetPath: FolderTreePath): Promise<FolderTreeOperationResult> => {
-      // Placeholder for delete operation
-      return { success: false, error: "Delete operation not implemented yet" };
+  const deleteItems = useCallback(
+    async (
+      targetPaths: FolderTreePath[]
+    ): Promise<FolderTreeOperationResult> => {
+      if (!activeTree) {
+        return { success: false, error: "No tree data available" };
+      }
+
+      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+
+      try {
+        const result = deleteFolders(activeTree, targetPaths);
+
+        if (result.success && result.newTree) {
+          const operation: FolderTreeOperation = {
+            type: "delete",
+            sourcePath: targetPaths[0], // Use first path as primary
+          };
+
+          setState((prev) => ({
+            ...prev,
+            modifiedTree: result.newTree!,
+            hasModifications: true,
+            lastOperation: operation,
+            operationHistory: [...prev.operationHistory, operation],
+            isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
+          }));
+        } else {
+          setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        }
+
+        return result;
+      } catch {
+        setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        return { success: false, error: "Failed to delete item" };
+      }
     },
-    []
+    [activeTree]
   );
 
   const invertItems = useCallback(
-    async (
-      targetPath: FolderTreePath
-    ): Promise<FolderTreeOperationResult> => {
+    async (targetPath: FolderTreePath): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
       }
@@ -361,7 +398,49 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     [activeTree]
   );
 
-  
+  const createFolderMethod = useCallback(
+    async (
+      parentPath: FolderTreePath,
+      folderName: string
+    ): Promise<FolderTreeOperationResult> => {
+      if (!activeTree) {
+        return { success: false, error: "No tree data available" };
+      }
+
+      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+
+      try {
+        const result = createFolder(activeTree, parentPath, folderName);
+
+        if (result.success && result.newTree) {
+          const operation: FolderTreeOperation = {
+            type: "create",
+            sourcePath: parentPath,
+            newName: folderName,
+          };
+
+          setState((prev) => ({
+            ...prev,
+            modifiedTree: result.newTree!,
+            hasModifications: true,
+            lastOperation: operation,
+            operationHistory: [...prev.operationHistory, operation],
+            isOperationInProgress: false,
+            selectedFolderPaths: [], // Clear selection after tree modification
+            selectedFileId: null, // Clear file selection too
+          }));
+        } else {
+          setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        }
+
+        return result;
+      } catch {
+        setState((prev) => ({ ...prev, isOperationInProgress: false }));
+        return { success: false, error: "Failed to create folder" };
+      }
+    },
+    [activeTree]
+  );
 
   // Utility functions
   const findNode = useCallback(
@@ -388,9 +467,10 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     setTreeData,
     resetToOriginal,
     renameItem,
+    createFolder: createFolderMethod,
     moveItem,
     mergeItems,
-    deleteItem,
+    deleteItems,
     flattenItems,
     invertItems,
     findNode,

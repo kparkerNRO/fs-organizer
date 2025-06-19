@@ -5,7 +5,14 @@ export type FolderTreeNode = FolderV2 | File;
 export type FolderTreePath = string;
 
 export interface FolderTreeOperation {
-  type: "rename" | "move" | "merge" | "flatten" | "delete" | "create" | "invert";
+  type:
+    | "rename"
+    | "move"
+    | "merge"
+    | "flatten"
+    | "delete"
+    | "create"
+    | "invert";
   sourcePath: FolderTreePath;
   targetPath?: FolderTreePath;
   newName?: string;
@@ -150,7 +157,7 @@ export const renameNode = (
   }
 
   node.name = newName.trim();
-  
+
   // Set confidence to 100% if it's a folder
   if (!isFileNode(node)) {
     setConfidenceToMax(node);
@@ -305,7 +312,9 @@ export const pathNamesToRootPath = (pathNames: string[]): string[] => {
   });
 };
 
-export const generateFlattenedName = (sortedPaths: FolderTreePath[]): string => {
+export const generateFlattenedName = (
+  sortedPaths: FolderTreePath[]
+): string => {
   // Helper function to generate target name from selected folders
   // Extract the base folder name from each path
   const pathNames = pathNamesToRootPath(sortedPaths);
@@ -371,7 +380,7 @@ export const flattenFolders = (
   });
 
   targetFolder.name = targetName;
-  
+
   // Set confidence to 100% for the target folder
   setConfidenceToMax(targetFolder);
 
@@ -405,16 +414,16 @@ export const findSharedString = (sourcePaths: FolderTreePath[]): string => {
 
   // Helper function to find all possible contiguous word sequences in a name
   const getAllWordSequences = (name: string): string[] => {
-    const words = name.split(/[\s]+/).filter(word => word.length > 0);
+    const words = name.split(/[\s]+/).filter((word) => word.length > 0);
     const sequences: string[] = [];
-    
+
     // Generate all contiguous subsequences
     for (let start = 0; start < words.length; start++) {
       for (let end = start + 1; end <= words.length; end++) {
         sequences.push(words.slice(start, end).join(" "));
       }
     }
-    
+
     return sequences;
   };
 
@@ -424,12 +433,12 @@ export const findSharedString = (sourcePaths: FolderTreePath[]): string => {
 
   for (const sequence of allSequencesFromFirstName) {
     // Check if this sequence appears in all other names
-    const appearsInAll = pathNames.slice(1).every(name => {
+    const appearsInAll = pathNames.slice(1).every((name) => {
       // Check if the sequence appears as complete words (word boundaries)
-      const regex = new RegExp(`\\b${sequence.replace(/\s+/g, '\\s+')}\\b`);
+      const regex = new RegExp(`\\b${sequence.replace(/\s+/g, "\\s+")}\\b`);
       return regex.test(name);
     });
-    
+
     if (appearsInAll) {
       commonSequences.push(sequence);
     }
@@ -448,7 +457,7 @@ export const setConfidenceToMax = (node: FolderTreeNode): void => {
   if (!isFileNode(node)) {
     node.confidence = 1;
     if (node.children) {
-      node.children.forEach(child => {
+      node.children.forEach((child) => {
         if (!isFileNode(child)) {
           setConfidenceToMax(child);
         }
@@ -470,14 +479,14 @@ export const sortFolderChildren = (folder: FolderV2): void => {
     if (aIsFile && !bIsFile) return 1;
 
     // Within the same type (both files or both folders), sort alphabetically by name
-    return a.name.localeCompare(b.name, undefined, { 
-      numeric: true, 
-      sensitivity: 'base' 
+    return a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: "base",
     });
   });
 
   // Recursively sort all subfolders
-  folder.children.forEach(child => {
+  folder.children.forEach((child) => {
     if (!isFileNode(child)) {
       sortFolderChildren(child);
     }
@@ -485,7 +494,10 @@ export const sortFolderChildren = (folder: FolderV2): void => {
 };
 
 // Helper function to recursively merge a node into a target folder
-const mergeNodeIntoFolder = (targetFolder: FolderV2, nodeToMerge: FolderTreeNode): void => {
+const mergeNodeIntoFolder = (
+  targetFolder: FolderV2,
+  nodeToMerge: FolderTreeNode
+): void => {
   if (!targetFolder.children) {
     targetFolder.children = [];
   }
@@ -498,7 +510,7 @@ const mergeNodeIntoFolder = (targetFolder: FolderV2, nodeToMerge: FolderTreeNode
 
   // It's a folder - check if a folder with the same name already exists
   const existingFolder = targetFolder.children.find(
-    child => !isFileNode(child) && child.name === nodeToMerge.name
+    (child) => !isFileNode(child) && child.name === nodeToMerge.name
   ) as FolderV2 | undefined;
 
   if (existingFolder) {
@@ -527,18 +539,27 @@ export const moveNode = (
   // Find the source node
   const sourceNode = findNodeByPath(newTree, sourcePath);
   if (!sourceNode) {
-    return { success: false, error: `Source node not found at path: ${sourcePath}` };
+    return {
+      success: false,
+      error: `Source node not found at path: ${sourcePath}`,
+    };
   }
 
   // Find the target folder
   const targetFolder = findNodeByPath(newTree, targetPath);
   if (!targetFolder || isFileNode(targetFolder)) {
-    return { success: false, error: `Target must be a folder at path: ${targetPath}` };
+    return {
+      success: false,
+      error: `Target must be a folder at path: ${targetPath}`,
+    };
   }
 
   // Check if the source is being moved to a descendant of itself (circular reference)
   if (!isFileNode(sourceNode) && isAncestorPath(sourcePath, targetPath)) {
-    return { success: false, error: "Cannot move folder into its own descendant" };
+    return {
+      success: false,
+      error: "Cannot move folder into its own descendant",
+    };
   }
 
   // Find the source parent and remove the node
@@ -547,9 +568,14 @@ export const moveNode = (
     return { success: false, error: "Source parent not found" };
   }
 
-  const sourceIndex = sourceParent.children.findIndex(child => child === sourceNode);
+  const sourceIndex = sourceParent.children.findIndex(
+    (child) => child === sourceNode
+  );
   if (sourceIndex === -1) {
-    return { success: false, error: "Source node not found in parent's children" };
+    return {
+      success: false,
+      error: "Source node not found in parent's children",
+    };
   }
 
   sourceParent.children.splice(sourceIndex, 1);
@@ -560,13 +586,15 @@ export const moveNode = (
   }
 
   // Check for name conflicts and handle them
-  const existingChild = targetFolder.children.find(child => child.name === sourceNode.name);
+  const existingChild = targetFolder.children.find(
+    (child) => child.name === sourceNode.name
+  );
   if (existingChild) {
     if (isFileNode(sourceNode) && isFileNode(existingChild)) {
       // For files, append a number to make the name unique
       let counter = 1;
       let newName = `${sourceNode.name} (${counter})`;
-      while (targetFolder.children.some(child => child.name === newName)) {
+      while (targetFolder.children.some((child) => child.name === newName)) {
         counter++;
         newName = `${sourceNode.name} (${counter})`;
       }
@@ -574,22 +602,29 @@ export const moveNode = (
     } else if (!isFileNode(sourceNode) && !isFileNode(existingChild)) {
       // For folders, merge them
       mergeNodeIntoFolder(existingChild as FolderV2, sourceNode);
-      
+
       // Sort the merged folder's children
       sortFolderChildren(existingChild as FolderV2);
-      
+
       // Also sort the source parent folder
-      if (sourceParent && sourceParent.children && sourceParent.children.length > 0) {
+      if (
+        sourceParent &&
+        sourceParent.children &&
+        sourceParent.children.length > 0
+      ) {
         sortFolderChildren(sourceParent);
       }
-      
+
       return {
         success: true,
         newTree,
-        affectedPaths: [sourcePath, targetPath]
+        affectedPaths: [sourcePath, targetPath],
       };
     } else {
-      return { success: false, error: "Cannot move: name conflict between file and folder" };
+      return {
+        success: false,
+        error: "Cannot move: name conflict between file and folder",
+      };
     }
   }
 
@@ -599,14 +634,18 @@ export const moveNode = (
   sortFolderChildren(targetFolder);
 
   // Also sort the source parent folder if it's different from target
-  if (sourceParent !== targetFolder && sourceParent.children && sourceParent.children.length > 0) {
+  if (
+    sourceParent !== targetFolder &&
+    sourceParent.children &&
+    sourceParent.children.length > 0
+  ) {
     sortFolderChildren(sourceParent);
   }
 
   return {
     success: true,
     newTree,
-    affectedPaths: [sourcePath, targetPath]
+    affectedPaths: [sourcePath, targetPath],
   };
 };
 
@@ -614,7 +653,6 @@ export const mergeFolders = (
   tree: FolderV2,
   sourcePaths: FolderTreePath[]
 ): FolderTreeOperationResult => {
-
   const newTree = cloneTreeNode(tree) as FolderV2;
 
   if (sourcePaths.length < 2) {
@@ -652,7 +690,7 @@ export const mergeFolders = (
   for (const path of sourcePaths) {
     // Skip the target folder itself
     if (path === topLevelPath) continue;
-    
+
     const node = findNodeByPath(newTree, path);
     if (!node) continue;
 
@@ -688,27 +726,30 @@ export const canInvertFolder = (
   targetPath: FolderTreePath
 ): { canInvert: boolean; reason?: string } => {
   const folder = findNodeByPath(tree, targetPath);
-  
+
   if (!folder || isFileNode(folder)) {
     return { canInvert: false, reason: "Target must be a folder" };
   }
 
   const folderNode = folder as FolderV2;
-  
+
   if (!folderNode.children || folderNode.children.length === 0) {
     return { canInvert: false, reason: "Folder has no children" };
   }
 
   // Check if folder has any file children
-  const hasFiles = folderNode.children.some(child => isFileNode(child));
+  const hasFiles = folderNode.children.some((child) => isFileNode(child));
   if (hasFiles) {
     return { canInvert: false, reason: "Folder must not contain any files" };
   }
 
   // Check if folder has at least one folder child
-  const hasFolders = folderNode.children.some(child => !isFileNode(child));
+  const hasFolders = folderNode.children.some((child) => !isFileNode(child));
   if (!hasFolders) {
-    return { canInvert: false, reason: "Folder must contain at least one subfolder" };
+    return {
+      canInvert: false,
+      reason: "Folder must contain at least one subfolder",
+    };
   }
 
   return { canInvert: true };
@@ -726,35 +767,39 @@ export const invertFolder = (
   }
 
   const newTree = cloneTreeNode(tree) as FolderV2;
-  
+
   // Find the target folder and its parent
   const targetFolder = findNodeByPath(newTree, targetPath) as FolderV2;
   const { parent: targetParent } = findParentByPath(newTree, targetPath);
-  
+
   if (!targetFolder || !targetParent) {
     return { success: false, error: "Target folder or parent not found" };
   }
 
   // Store the original folder name
   const originalFolderName = targetFolder.name;
-  
+
   // Get all child folders (we already validated there are no files)
-  const childFolders = targetFolder.children!.filter(child => !isFileNode(child)) as FolderV2[];
-  
+  const childFolders = targetFolder.children!.filter(
+    (child) => !isFileNode(child)
+  ) as FolderV2[];
+
   // Remove the target folder from its parent
-  const targetIndex = targetParent.children!.findIndex(child => child === targetFolder);
+  const targetIndex = targetParent.children!.findIndex(
+    (child) => child === targetFolder
+  );
   targetParent.children!.splice(targetIndex, 1);
-  
+
   // Process each child folder
   for (const childFolder of childFolders) {
     // Clone the child folder to avoid mutation issues
     const childClone = cloneTreeNode(childFolder) as FolderV2;
-    
+
     // Check if a folder with the same name already exists in the parent
     const existingFolder = targetParent.children!.find(
-      child => !isFileNode(child) && child.name === childClone.name
+      (child) => !isFileNode(child) && child.name === childClone.name
     ) as FolderV2 | undefined;
-    
+
     if (existingFolder) {
       // If existing folder exists, we need to merge carefully
       // Create a new folder with the original name to hold the child's original children
@@ -762,15 +807,15 @@ export const invertFolder = (
         name: originalFolderName,
         children: childClone.children || [],
         confidence: 1,
-        count: (childClone.children || []).length
+        count: (childClone.children || []).length,
       };
-      
+
       // Add the new child folder directly to the existing folder
       if (!existingFolder.children) {
         existingFolder.children = [];
       }
       existingFolder.children.push(newChildFolder);
-      
+
       setConfidenceToMax(existingFolder);
       sortFolderChildren(existingFolder);
     } else {
@@ -780,27 +825,110 @@ export const invertFolder = (
         name: originalFolderName,
         children: childClone.children || [],
         confidence: 1,
-        count: (childClone.children || []).length
+        count: (childClone.children || []).length,
       };
-      
+
       // Set the child's children to contain the new folder with original name
       childClone.children = [newChildFolder];
-      
+
       // Set confidence for the new structure
       setConfidenceToMax(childClone);
       sortFolderChildren(childClone);
-      
+
       // Add the child folder directly to the parent
       targetParent.children!.push(childClone);
     }
   }
-  
+
   // Sort the parent folder's children
   sortFolderChildren(targetParent);
-  
+
   return {
     success: true,
     newTree,
-    affectedPaths: [targetPath, ...childFolders.map(child => `${targetPath}/${child.name}`)]
+    affectedPaths: [
+      targetPath,
+      ...childFolders.map((child) => `${targetPath}/${child.name}`),
+    ],
+  };
+};
+
+export const deleteFolders = (
+  tree: FolderV2,
+  targetPaths: FolderTreePath[]
+): FolderTreeOperationResult => {
+  const newTree = cloneTreeNode(tree) as FolderV2;
+
+  for (const path of targetPaths) {
+    const { parent } = findParentByPath(newTree, path);
+    if (!parent || !parent.children) {
+      continue; // Skip if parent not found or has no children
+    }
+    const baseName = path.split("/").slice(-1)[0];
+    parent.children = parent.children.filter(
+      (child) => child.name !== baseName
+    );
+  }
+
+  return {
+    success: true,
+    newTree,
+    affectedPaths: targetPaths,
+  };
+};
+
+export const createFolder = (
+  tree: FolderV2,
+  parentPath: FolderTreePath,
+  folderName: string
+): FolderTreeOperationResult => {
+  const newTree = cloneTreeNode(tree) as FolderV2;
+
+  // Find the parent folder where we want to create the new folder
+  const parentFolder = parentPath
+    ? (findNodeByPath(newTree, parentPath) as FolderV2)
+    : newTree;
+
+  if (!parentFolder || isFileNode(parentFolder)) {
+    return {
+      success: false,
+      error: `Parent folder not found: ${parentPath}`,
+    };
+  }
+
+  // Check if a folder with the same name already exists
+  const existingChild = parentFolder.children?.find(
+    (child) => child.name === folderName
+  );
+
+  if (existingChild) {
+    return {
+      success: false,
+      error: `A folder with the name "${folderName}" already exists`,
+    };
+  }
+
+  // Create the new folder
+  const newFolder: FolderV2 = {
+    name: folderName,
+    count: 0,
+    confidence: 1.0,
+    children: [],
+    isSelected: false,
+    isExpanded: false,
+  };
+
+  // Add the new folder to the parent's children
+  if (!parentFolder.children) {
+    parentFolder.children = [];
+  }
+  parentFolder.children.push(newFolder);
+
+  const newFolderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+
+  return {
+    success: true,
+    newTree,
+    affectedPaths: [newFolderPath],
   };
 };
