@@ -10,7 +10,10 @@ import {
   canFlattenFolders,
   getFilePathInTree,
   canInvertFolder,
+  findNodeByPath,
+  setConfidenceToMax,
 } from "../utils/folderTreeOperations";
+import { it } from "node:test";
 
 interface FolderBrowserProps {
   folderTree: FolderV2 | null;
@@ -70,6 +73,65 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       }));
     }
   }, [folderTreeHook.modifiedTree, propFolderTree]);
+
+  // Helper function to get all folder paths in the order they appear in the tree
+  const getAllFolderPathsInOrder = (
+    tree: FolderV2,
+    parentPath: string = ""
+  ): string[] => {
+    if (!tree) return [];
+
+    const paths: string[] = [];
+    const currentPath = buildNodePath(parentPath, tree.name);
+
+    // Add current folder path (skip root)
+    if (currentPath !== "root") {
+      paths.push(currentPath);
+    }
+
+    // Recursively add children folder paths
+    if (tree.children) {
+      for (const child of tree.children) {
+        if (!isFileNode(child)) {
+          paths.push(
+            ...getAllFolderPathsInOrder(child as FolderV2, currentPath)
+          );
+        }
+      }
+    }
+
+    return paths;
+  };
+
+  // Helper function to get folders at the same level as the given folder path
+  const getFoldersAtSameLevel = (
+    tree: FolderV2,
+    targetPath: string
+  ): string[] => {
+    if (!tree) return [];
+
+    // Get the parent path of the target
+    const pathParts = targetPath.split("/");
+    const parentPath =
+      pathParts.length > 1 ? pathParts.slice(0, -1).join("/") : "";
+
+    // Find the parent folder using the existing utility
+    const parentFolder = parentPath ? findNodeByPath(tree, parentPath) : tree;
+    if (!parentFolder || isFileNode(parentFolder)) return [];
+
+    // Get all folder children at this level
+    const sameLevelPaths: string[] = [];
+    if ((parentFolder as FolderV2).children) {
+      for (const child of (parentFolder as FolderV2).children!) {
+        if (!isFileNode(child)) {
+          const childPath = buildNodePath(parentPath, child.name);
+          sameLevelPaths.push(childPath);
+        }
+      }
+    }
+
+    return sameLevelPaths;
+  };
 
   const synchronizeFolders = (folderTree: FolderV2, selectedId: number) => {
     const path = getFilePathInTree(folderTree, selectedId);
@@ -275,10 +337,70 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           const isAlreadySelected = prev.selectedFolderPaths.some(
             (f) => f === itemPath
           );
-          // Multi-select folders
-          const newSelection = isAlreadySelected
-            ? prev.selectedFolderPaths.filter((f) => f !== itemPath)
-            : [...prev.selectedFolderPaths, itemPath];
+          if (e.ctrlKey || e.metaKey) {
+            // Multi-select folders
+            const newSelection = isAlreadySelected
+              ? prev.selectedFolderPaths.filter((f) => f !== itemPath)
+              : [...prev.selectedFolderPaths, itemPath];
+
+            return {
+              ...prev,
+              selectedFolderPaths: newSelection,
+            };
+          }
+          return prev;
+        });
+        if (onSelectFolder) {
+          onSelectFolder(itemPath);
+        }
+      } else if (e.shiftKey) {
+        // Contiguous selection at the same level only
+        setTreeState((prev) => {
+          const lastSelectedFolder =
+            prev.selectedFolderPaths[prev.selectedFolderPaths.length - 1];
+
+          if (!lastSelectedFolder) {
+            // No previous selection, just select current
+            return {
+              ...prev,
+              selectedFolderPaths: [itemPath],
+            };
+          }
+
+          // Get folders at the same level as the current clicked folder
+          const sameLevelFolders = getFoldersAtSameLevel(prev.tree, itemPath);
+
+          // Check if the last selected folder is at the same level
+          if (!sameLevelFolders.includes(lastSelectedFolder)) {
+            // Last selected folder is not at the same level, just select current
+            return {
+              ...prev,
+              selectedFolderPaths: [itemPath],
+            };
+          }
+
+          // Find indices of the last selected and current folders within the same level
+          const lastIndex = sameLevelFolders.indexOf(lastSelectedFolder);
+          const currentIndex = sameLevelFolders.indexOf(itemPath);
+
+          if (lastIndex === -1 || currentIndex === -1) {
+            // Fallback to single selection if we can't find the paths
+            return {
+              ...prev,
+              selectedFolderPaths: [itemPath],
+            };
+          }
+
+          // Get the range between the two folders (inclusive) at the same level only
+          const startIndex = Math.min(lastIndex, currentIndex);
+          const endIndex = Math.max(lastIndex, currentIndex);
+          const selectedRange = sameLevelFolders.slice(
+            startIndex,
+            endIndex + 1
+          );
+
+          // Replace selection with the new range (don't combine with existing selections from other levels)
+          const newSelection = Array.from(new Set(selectedRange));
 
           return {
             ...prev,
@@ -479,6 +601,16 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             startCreatingFolder(itemPath);
           },
         });
+
+        if (item.confidence < 1) {
+          menuItems.push({
+          text: "Mark as valid",
+          onClick: () => {
+            setConfidenceToMax(item)
+            closeContextMenu()
+          },
+        })
+      }
 
         if (currentTree) {
           const invertCheck = canInvertFolder(currentTree, itemPath);
@@ -681,6 +813,25 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     });
   };
 
+  // Helper function to check if a folder has any child folders with confidence < 1
+  const hasLowConfidenceChildFolders = (folder: FolderV2): boolean => {
+    if (!folder.children) return false;
+
+    for (const child of folder.children) {
+      if (!isFileNode(child)) {
+        const childFolder = child as FolderV2;
+        if (childFolder.confidence < 1) {
+          return true;
+        }
+        // Recursively check child folders
+        if (hasLowConfidenceChildFolders(childFolder)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
@@ -795,9 +946,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
                 {node.name}
+                {!isFile && hasLowConfidenceChildFolders(node as FolderV2) && (
+                  <RedDotIndicator />
+                )}
               </span>
             )}
 
@@ -1078,4 +1234,13 @@ const RenameInput = styled.input`
   &:focus {
     border-color: #1d4ed8;
   }
+`;
+
+const RedDotIndicator = styled.div`
+  width: 6px;
+  height: 6px;
+  background-color: rgb(220, 38, 38); /* Match low-certainty folder color */
+  border-radius: 50%;
+  margin-left: 4px;
+  flex-shrink: 0;
 `;
