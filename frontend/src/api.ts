@@ -161,23 +161,23 @@ export const getFoldersStructure = async (): Promise<FolderV2 | null> => {
   if (isMockMode) {
     return null; // Mock mode doesn't support existing structures
   }
-
-  try {
-    const response = await fetch(`${env.apiUrl}/api/folders/structure`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null; // No structure found
-      }
-      throw new Error(
-        `Failed to get folders structure: ${response.statusText}`
-      );
-    }
-    const data = await response.json();
-    return data.folder_structure;
-  } catch (error) {
-    console.error("Error fetching folders structure:", error);
-    return null;
-  }
+  return null
+  // try {
+  //   const response = await fetch(`${env.apiUrl}/api/folders/structure`);
+  //   if (!response.ok) {
+  //     if (response.status === 404) {
+  //       return null; // No structure found
+  //     }
+  //     throw new Error(
+  //       `Failed to get folders structure: ${response.statusText}`
+  //     );
+  //   }
+  //   const data = await response.json();
+  //   return data.folder_structure;
+  // } catch (error) {
+  //   console.error("Error fetching folders structure:", error);
+  //   return null;
+  // }
 };
 
 // Task polling utilities
