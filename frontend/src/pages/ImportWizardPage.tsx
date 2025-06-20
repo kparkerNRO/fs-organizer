@@ -203,6 +203,14 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
   const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
 
+  React.useEffect(() => {
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, []);
+
   const handleBrowseFolder = async () => {
     const result = await selectFolder();
 
@@ -375,9 +383,16 @@ const GroupStep: React.FC<StepProps> = ({
   onNext,
   onPrev,
 }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_abortController, setAbortController] =
+  const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, []);
 
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
@@ -537,8 +552,16 @@ const OrganizeStep: React.FC<StepProps> = ({
   onPrev,
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_abortController, setAbortController] =
+  const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (abortController) {
+        abortController.abort();
+      }
+    };
+  }, []);
 
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
