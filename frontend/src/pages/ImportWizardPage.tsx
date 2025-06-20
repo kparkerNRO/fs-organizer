@@ -8,6 +8,7 @@ import {
   getGatherStructure,
   getGroupStructure,
   getFoldersStructure,
+  saveGraph,
 } from "../api";
 import { applyOrganization } from "../mock_data/mockApi";
 import { selectFolder } from "../utils/folderSelection";
@@ -497,16 +498,26 @@ const GroupStep: React.FC<StepProps> = ({
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton
-          onClick={() => {
-            updateState({
-              hasTriggeredGroup: false,
-              groupedStructure: undefined,
-              selectedFileId: null,
-            });
+          onClick={async () => {
+            if (state.groupedStructure) {
+              try {
+                updateState({
+                  isLoading: true,
+                  loadingMessage: "Saving graph...",
+                });
+                await saveGraph(state.groupedStructure);
+                updateState({ isLoading: false });
+                // Optional: Show success message or notification
+              } catch (error) {
+                console.error("Failed to save graph:", error);
+                updateState({ isLoading: false });
+                // Optional: Show error message to user
+              }
+            }
           }}
-          disabled={state.isLoading}
+          disabled={state.isLoading || !state.groupedStructure}
         >
-          Re-run Grouping
+          Save
         </WarningButton>
         <SuccessButton
           onClick={onNext}
