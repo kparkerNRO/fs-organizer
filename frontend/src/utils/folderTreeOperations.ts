@@ -353,43 +353,75 @@ export const flattenFolders = (
       error: `Target folder not found at path: ${topLevelPath}`,
     };
   }
+  const workingFolder = cloneTreeNode(targetFolder) as FolderV2;
 
-  // Collect all children from nested folders that will be flattened
-  const processedPaths = new Set<string>();
-  for (const path of sortedPaths) {
-    if (path !== topLevelPath && !processedPaths.has(path)) {
-      const folder = findNodeByPath(newTree, path) as FolderV2;
-      if (folder) {
-        for (const child of folder.children) {
-          targetFolder.children.push(child);
-        }
-        processedPaths.add(path);
+  // By definition, we should be able to just move the children from the bottom to the top,
+  //  and drop the top's children
+  const lowestPath = sortedPaths[sortedPaths.length - 1];
+  const bottomFolder = findNodeByPath(newTree, lowestPath) as FolderV2;
+  if (!bottomFolder) {
+    return {
+      success: false,
+      error: `Lowest folder not found at path: ${lowestPath}`,
+    };
+  }
+  workingFolder.children = [...bottomFolder.children];
+
+  //add the files of all the children
+  const addChildren = (node: FolderV2) => {
+    for (const child of node.children || []) {
+      if (isFileNode(child)) {
+        workingFolder.children.push(child);
+      } else if (
+        child.path &&
+        sortedPaths.includes(child.path) &&
+        child.path !== lowestPath
+      ) {
+        addChildren(child);
       }
     }
+  };
+  addChildren(targetFolder);
+
+  const { parent: parentNode } = findParentByPath(newTree, topLevelPath);
+  if (parentNode) {
+    parentNode.children = parentNode.children.filter((p) => p !== targetFolder);
   }
-
-  // Remove the nested folder structure by updating the target folder's children
-  targetFolder.children = targetFolder.children.filter((child) => {
-    if (isFileNode(child)) {
-      return true;
-    } else {
-      // Keep folders that are not in the flatten list (except the target itself)
-      const childPath = buildNodePath(topLevelPath, child.name);
-      return !sourcePaths.includes(childPath) || childPath === topLevelPath;
-    }
-  });
-
-  targetFolder.name = targetName;
-
-  // Set confidence to 100% for the target folder
-  setConfidenceToMax(targetFolder);
-
-  // Sort the target folder's children alphabetically
-  sortFolderChildren(targetFolder);
 
   const pathParts = topLevelPath.split("/");
   pathParts[pathParts.length - 1] = targetName;
   const newPath = pathParts.join("/");
+
+  const existingTarget = findNodeByPath(newTree, newPath) as FolderV2;
+  if (existingTarget) {
+    if (parentNode) {
+      existingTarget.children = [
+        ...existingTarget.children,
+        ...workingFolder.children,
+      ];
+      sortFolderChildren(parentNode);
+    }
+  } else {
+    workingFolder.name = targetName;
+    if (parentNode) {
+      parentNode.children.push(workingFolder);
+      sortFolderChildren(parentNode);
+    }
+  }
+
+  const placedFolder = findNodeByPath(newTree, newPath) as FolderV2;
+  if (!placedFolder) {
+    return {
+      success: false,
+      error: `Failed to find placed folder at path: ${newPath}`,
+    };
+  }
+  placedFolder.name = targetName;
+  // Set confidence to 100% for the target folder
+  setConfidenceToMax(placedFolder);
+
+  // Sort the target folder's children alphabetically
+  sortFolderChildren(placedFolder);
 
   return {
     success: true,
