@@ -30,6 +30,41 @@ interface TreeState {
   selectedFolderPaths: string[];
 }
 
+class FolderBrowserErrorBoundary extends React.Component<
+  React.PropsWithChildren<{}>,
+  { hasError: boolean }
+> {
+  constructor(props: React.PropsWithChildren<{}>) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("FolderBrowser error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "20px", textAlign: "center", color: "#ef4444" }}>
+          <h3>Something went wrong with the folder browser.</h3>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            style={{ padding: "8px 16px", marginTop: "10px" }}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   folderTree: propFolderTree,
   onSelectItem,
@@ -607,165 +642,170 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
-  const getContextMenuItems = (item: FolderV2 | File, itemPath: string) => {
-    const isFile = isFileNode(item);
-    const menuItems = [];
-    // Get the current active tree to ensure we have the most up-to-date reference
-    const currentTree =
-      folderTreeHook.modifiedTree || folderTreeHook.originalTree;
+  const getContextMenuItems = React.useCallback(
+    (item: FolderV2 | File, itemPath: string) => {
+      const isFile = isFileNode(item);
+      const menuItems = [];
+      // Get the current active tree to ensure we have the most up-to-date reference
+      const currentTree =
+        folderTreeHook.modifiedTree || folderTreeHook.originalTree;
 
-    if (isFile) {
-      menuItems.push(
-        {
-          text: "Rename file",
-          onClick: () => {
-            startRenaming(item, itemPath);
-          },
-        },
-        {
-          text: "View File Details",
-          onClick: () => {
-            console.log("View file details:", item);
-            closeContextMenu();
-          },
-        },
-        {
-          text: "Copy File Path",
-          onClick: () => {
-            navigator.clipboard.writeText(itemPath);
-            closeContextMenu();
-          },
-        }
-      );
-    } else {
-      if (treeState.selectedFolderPaths.length === 1) {
-        menuItems.push({
-          text: "Rename folder",
-          onClick: () => {
-            startRenaming(item, itemPath);
-          },
-        });
-        menuItems.push({
-          text: "New folder",
-          onClick: () => {
-            startCreatingFolder(itemPath);
-          },
-        });
-
-        if (item.confidence < 1) {
-          menuItems.push({
-            text: "Mark as valid",
+      if (isFile) {
+        menuItems.push(
+          {
+            text: "Rename file",
             onClick: () => {
-              setConfidenceToMax(item);
+              startRenaming(item, itemPath);
+            },
+          },
+          {
+            text: "View File Details",
+            onClick: () => {
+              console.log("View file details:", item);
               closeContextMenu();
             },
-          });
-        }
-
-        if (currentTree) {
-          const invertCheck = canInvertFolder(currentTree, itemPath);
-
-          // Add invert with children option for single folder selection
-          if (invertCheck.canInvert) {
-            menuItems.push({
-              text: "Invert with children",
-              onClick: () => {
-                closeContextMenu();
-                // Use setTimeout to ensure the context menu closes before starting the async operation
-                setTimeout(async () => {
-                  try {
-                    const result = await folderTreeHook.invertItems(itemPath);
-                    if (result.success) {
-                      console.log("Successfully inverted folder with children");
-                    } else {
-                      console.error("Invert failed:", result.error);
-                    }
-                  } catch (error) {
-                    console.error("Invert operation failed:", error);
-                  }
-                }, 0);
-              },
-            });
-          }
-        }
-      }
-      if (treeState.selectedFolderPaths.length >= 2) {
-        menuItems.push({
-          text: "Merge Folders",
-          onClick: () => {
-            closeContextMenu();
-            setTimeout(async () => {
-              try {
-                const result = await folderTreeHook.mergeItems(
-                  treeState.selectedFolderPaths,
-                  "Merged Folder"
-                );
-                if (result.success) {
-                  console.log("Successfully merged folders");
-                } else {
-                  console.error("Merge failed:", result.error);
-                }
-              } catch (error) {
-                console.error("Merge operation failed:", error);
-              }
-            }, 0);
           },
-        });
+          {
+            text: "Copy File Path",
+            onClick: () => {
+              navigator.clipboard.writeText(itemPath);
+              closeContextMenu();
+            },
+          }
+        );
+      } else {
+        if (treeState.selectedFolderPaths.length === 1) {
+          menuItems.push({
+            text: "Rename folder",
+            onClick: () => {
+              startRenaming(item, itemPath);
+            },
+          });
+          menuItems.push({
+            text: "New folder",
+            onClick: () => {
+              startCreatingFolder(itemPath);
+            },
+          });
 
-        if (currentTree) {
-          // Check if the selected folders can be flattened using the validation function
-          const flattenCheck = canFlattenFolders(
-            currentTree,
-            treeState.selectedFolderPaths
-          );
-
-          if (flattenCheck.canFlatten) {
+          if (item.confidence < 1) {
             menuItems.push({
-              text: "Flatten folders",
+              text: "Mark as valid",
               onClick: () => {
+                setConfidenceToMax(item);
                 closeContextMenu();
-                // Use setTimeout to ensure the context menu closes before starting the async operation
-                setTimeout(async () => {
-                  try {
-                    const result = await folderTreeHook.flattenItems(
-                      treeState.selectedFolderPaths
-                    );
-                    if (result.success) {
-                      console.log("Successfully flattened folders");
-                    } else {
-                      console.error("Flatten failed:", result.error);
-                    }
-                  } catch (error) {
-                    console.error("Flatten operation failed:", error);
-                  }
-                }, 0);
               },
             });
           }
+
+          if (currentTree) {
+            const invertCheck = canInvertFolder(currentTree, itemPath);
+
+            // Add invert with children option for single folder selection
+            if (invertCheck.canInvert) {
+              menuItems.push({
+                text: "Invert with children",
+                onClick: () => {
+                  closeContextMenu();
+                  // Use setTimeout to ensure the context menu closes before starting the async operation
+                  setTimeout(async () => {
+                    try {
+                      const result = await folderTreeHook.invertItems(itemPath);
+                      if (result.success) {
+                        console.log(
+                          "Successfully inverted folder with children"
+                        );
+                      } else {
+                        console.error("Invert failed:", result.error);
+                      }
+                    } catch (error) {
+                      console.error("Invert operation failed:", error);
+                    }
+                  }, 0);
+                },
+              });
+            }
+          }
+        }
+        if (treeState.selectedFolderPaths.length >= 2) {
+          menuItems.push({
+            text: "Merge Folders",
+            onClick: () => {
+              closeContextMenu();
+              setTimeout(async () => {
+                try {
+                  const result = await folderTreeHook.mergeItems(
+                    treeState.selectedFolderPaths,
+                    "Merged Folder"
+                  );
+                  if (result.success) {
+                    console.log("Successfully merged folders");
+                  } else {
+                    console.error("Merge failed:", result.error);
+                  }
+                } catch (error) {
+                  console.error("Merge operation failed:", error);
+                }
+              }, 0);
+            },
+          });
+
+          if (currentTree) {
+            // Check if the selected folders can be flattened using the validation function
+            const flattenCheck = canFlattenFolders(
+              currentTree,
+              treeState.selectedFolderPaths
+            );
+
+            if (flattenCheck.canFlatten) {
+              menuItems.push({
+                text: "Flatten folders",
+                onClick: () => {
+                  closeContextMenu();
+                  // Use setTimeout to ensure the context menu closes before starting the async operation
+                  setTimeout(async () => {
+                    try {
+                      const result = await folderTreeHook.flattenItems(
+                        treeState.selectedFolderPaths
+                      );
+                      if (result.success) {
+                        console.log("Successfully flattened folders");
+                      } else {
+                        console.error("Flatten failed:", result.error);
+                      }
+                    } catch (error) {
+                      console.error("Flatten operation failed:", error);
+                    }
+                  }, 0);
+                },
+              });
+            }
+          }
         }
       }
-    }
 
-    // Add standard folder options
-    menuItems.push({
-      text: "Copy Folder Path",
-      onClick: () => {
-        navigator.clipboard.writeText((item as FolderV2).path || itemPath);
-        closeContextMenu();
-      },
-    });
+      // Add standard folder options
+      menuItems.push({
+        text: "Copy Folder Path",
+        onClick: () => {
+          navigator.clipboard.writeText((item as FolderV2).path || itemPath);
+          closeContextMenu();
+        },
+      });
 
-    menuItems.push({
-      text: "Delete",
-      onClick: async () => {
-        // Delete all selected folder paths at once
-        await folderTreeHook.deleteItems(treeState.selectedFolderPaths);
-        closeContextMenu();
-      },
-    });
+      menuItems.push({
+        text: "Delete",
+        onClick: async () => {
+          // Delete all selected folder paths at once
+          await folderTreeHook.deleteItems(treeState.selectedFolderPaths);
+          closeContextMenu();
+        },
+      });
 
-    return menuItems;
-  };
+      return menuItems;
+    },
+    [treeState.selectedFolderPaths, folderTreeHook]
+  );
 
   // Drag and drop handlers
   const handleDragStart = (
@@ -864,23 +904,26 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   };
 
   // Helper function to check if a folder has any child folders with confidence < 1
-  const hasLowConfidenceChildFolders = (folder: FolderV2): boolean => {
-    if (!folder.children) return false;
+  const hasLowConfidenceChildFolders = React.useCallback(
+    (folder: FolderV2): boolean => {
+      if (!folder.children) return false;
 
-    for (const child of folder.children) {
-      if (!isFileNode(child)) {
-        const childFolder = child as FolderV2;
-        if (childFolder.confidence < 1) {
-          return true;
-        }
-        // Recursively check child folders
-        if (hasLowConfidenceChildFolders(childFolder)) {
-          return true;
+      for (const child of folder.children) {
+        if (!isFileNode(child)) {
+          const childFolder = child as FolderV2;
+          if (childFolder.confidence < 1) {
+            return true;
+          }
+          // Recursively check child folders
+          if (hasLowConfidenceChildFolders(childFolder)) {
+            return true;
+          }
         }
       }
-    }
-    return false;
-  };
+      return false;
+    },
+    []
+  );
 
   const renderNode = (
     node: FolderV2 | File,
@@ -1073,40 +1116,47 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   }
 
   return (
-    <ContentContainer>
-      {treeState.tree ? (
-        <>
-          <FolderTree ref={scrollContainerRef}>
-            <div
-              style={{
-                display: "flex",
-                gap: "0.75rem",
-                height: "100%",
-                width: "100%",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                {treeState.tree &&
-                  renderNode(treeState.tree, 0, treeState.expandedFolders, "")}
+    <FolderBrowserErrorBoundary>
+      <ContentContainer>
+        {treeState.tree ? (
+          <>
+            <FolderTree ref={scrollContainerRef}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "0.75rem",
+                  height: "100%",
+                  width: "100%",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  {treeState.tree &&
+                    renderNode(
+                      treeState.tree,
+                      0,
+                      treeState.expandedFolders,
+                      ""
+                    )}
+                </div>
               </div>
-            </div>
-          </FolderTree>
-        </>
-      ) : (
-        <ErrorMessage>Failed to load folder structure</ErrorMessage>
-      )}
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onClose={closeContextMenu}
-          menu_items={getContextMenuItems(
-            contextMenu.item,
-            contextMenu.itemPath
-          )}
-        />
-      )}
-    </ContentContainer>
+            </FolderTree>
+          </>
+        ) : (
+          <ErrorMessage>Failed to load folder structure</ErrorMessage>
+        )}
+        {contextMenu && (
+          <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onClose={closeContextMenu}
+            menu_items={getContextMenuItems(
+              contextMenu.item,
+              contextMenu.itemPath
+            )}
+          />
+        )}
+      </ContentContainer>
+    </FolderBrowserErrorBoundary>
   );
 };
 
