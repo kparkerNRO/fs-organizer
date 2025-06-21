@@ -135,23 +135,26 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     return sameLevelPaths;
   };
 
-  const synchronizeFolders = React.useCallback((folderTree: FolderV2, selectedId: number) => {
-  const path = getFilePathInTree(folderTree, selectedId);
-  if (path) {
-    setTreeState((prev) => {
-      const newExpandedFolders = new Set(prev.expandedFolders);
-      let currentPath = "";
-      for (const segment of path) {
-        currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-        newExpandedFolders.add(currentPath);
+  const synchronizeFolders = React.useCallback(
+    (folderTree: FolderV2, selectedId: number) => {
+      const path = getFilePathInTree(folderTree, selectedId);
+      if (path) {
+        setTreeState((prev) => {
+          const newExpandedFolders = new Set(prev.expandedFolders);
+          let currentPath = "";
+          for (const segment of path) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            newExpandedFolders.add(currentPath);
+          }
+          return {
+            ...prev,
+            expandedFolders: newExpandedFolders,
+          };
+        });
       }
-      return {
-        ...prev,
-        expandedFolders: newExpandedFolders,
-      };
-    });
-  }
-}, []); 
+    },
+    []
+  );
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{
@@ -180,7 +183,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   // Synchronized scrolling
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldScrollToSelection = useRef<boolean>(false);
-  const scrollToSelectedFile =  React.useCallback((fileId: number) =>{
+  const scrollToSelectedFile = React.useCallback((fileId: number) => {
     if (!shouldSync || !scrollContainerRef.current) return;
 
     setTimeout(() => {
@@ -212,9 +215,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         }
       }
     }, 100); // Small delay to allow DOM updates
-  },[]);
+  }, []);
 
-  
   // Keep selectedFileId in sync with externalSelectedFile and expand parent folders
   useEffect(() => {
     // Only process external changes if they're not caused by our own component
@@ -248,7 +250,15 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         selectionSource.current = null;
       }, 0);
     }
-  }, [externalSelectedFile, propFolderTree, treeState.tree, shouldSync]);
+  }, [
+    externalSelectedFile,
+    propFolderTree,
+    treeState.tree,
+    shouldSync,
+    treeState.selectedFileId,
+    synchronizeFolders,
+    scrollToSelectedFile,
+  ]);
 
   // Keep externalSelectedFile in sync if selectedFileId changes internally
   useEffect(() => {
