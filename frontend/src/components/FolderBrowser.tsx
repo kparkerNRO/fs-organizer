@@ -13,7 +13,7 @@ import {
   findNodeByPath,
   setConfidenceToMax,
 } from "../utils/folderTreeOperations";
-import {TREE_TYPE} from "../types/enums"
+import { TREE_TYPE } from "../types/enums";
 
 interface FolderBrowserProps {
   folderTree: FolderV2 | null;
@@ -22,12 +22,10 @@ interface FolderBrowserProps {
   externalSelectedFile: number | null;
   shouldSync?: boolean;
   showConfidence?: boolean;
-  treeType: TREE_TYPE
-
+  treeType: TREE_TYPE;
 }
 
 const TREE_STATE_KEY = "treeState";
-
 
 interface TreeState {
   tree: FolderV2;
@@ -86,7 +84,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
   const [treeState, setTreeState] = useState<TreeState>({
     tree: folderTree || ({} as FolderV2),
-    expandedFolders: new Set<string>(),
+    expandedFolders: new Set<string>(folderTree ? [folderTree.name] : []), // Initialize with root folder expanded
     selectedFileId: null,
     selectedFolderPaths: [],
   });
@@ -103,19 +101,39 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   useEffect(() => {
     if (propFolderTree) {
       folderTreeHook.setTreeData(propFolderTree);
+      // Also ensure the tree state is initialized with root expanded if not already set
+      setTreeState((prev) => {
+        if (!prev.tree || prev.tree !== propFolderTree) {
+          return {
+            ...prev,
+            tree: propFolderTree,
+            expandedFolders: new Set<string>([propFolderTree.name]),
+          };
+        }
+        return prev;
+      });
     }
   }, [propFolderTree]);
 
   // Update tree state when folderTreeHook.modifiedTree changes
+  const previousTreeRef = useRef<FolderV2 | null>(null);
   useEffect(() => {
     const activeTree = folderTreeHook.modifiedTree || propFolderTree;
-    if (activeTree && activeTree !== treeState.tree) {
-      setTreeState((prev) => ({
-        ...prev,
-        tree: activeTree,
-      }));
+    if (activeTree && activeTree !== previousTreeRef.current) {
+      previousTreeRef.current = activeTree;
+      setTreeState((prev) => {
+        const newExpandedFolders = new Set<string>([
+          ...prev.expandedFolders,
+          activeTree.name,
+        ]);
+        return {
+          ...prev,
+          tree: activeTree,
+          expandedFolders: newExpandedFolders, // Ensure new root is expanded
+        };
+      });
     }
-  }, [folderTreeHook.modifiedTree, propFolderTree, treeState.tree]);
+  }, [folderTreeHook.modifiedTree, propFolderTree]);
 
   // Helper function to get all folder paths in the order they appear in the tree
   const getAllFolderPathsInOrder = (
@@ -562,14 +580,17 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     setContextMenu(null);
   };
 
-  const startRenaming = (item: FolderV2 | File, itemPath: string) => {
-    setRenamingItem({
-      item,
-      itemPath,
-      newName: item.name,
-    });
-    closeContextMenu();
-  };
+  const startRenaming = React.useCallback(
+    (item: FolderV2 | File, itemPath: string) => {
+      setRenamingItem({
+        item,
+        itemPath,
+        newName: item.name,
+      });
+      closeContextMenu();
+    },
+    []
+  );
 
   const handleRenameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -601,7 +622,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   };
 
-  const startCreatingFolder = (parentPath: string) => {
+  const startCreatingFolder = React.useCallback((parentPath: string) => {
     setCreatingFolder({
       parentPath,
       folderName: "New Folder",
@@ -614,7 +635,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }));
 
     closeContextMenu();
-  };
+  }, []);
 
   const handleCreateFolderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -652,9 +673,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     (item: FolderV2 | File, itemPath: string) => {
       const isFile = isFileNode(item);
       const menuItems = [];
-      // Get the current active tree to ensure we have the most up-to-date reference
-      const currentTree =
-        folderTreeHook.modifiedTree || folderTreeHook.originalTree;
 
       if (isFile) {
         menuItems.push(
@@ -680,6 +698,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           }
         );
       } else {
+        // Get the current active tree to ensure we have the most up-to-date reference
+        const currentTree =
+          folderTreeHook.modifiedTree ||
+          folderTreeHook.originalTree ||
+          propFolderTree;
+
         if (treeState.selectedFolderPaths.length === 1) {
           menuItems.push({
             text: "Rename folder",
@@ -708,7 +732,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             const invertCheck = canInvertFolder(currentTree, itemPath);
 
             // Add invert with children option for single folder selection
-            if (invertCheck.canInvert) {
+            if (invertCheck && invertCheck.canInvert) {
               menuItems.push({
                 text: "Invert with children",
                 onClick: () => {
@@ -763,7 +787,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               treeState.selectedFolderPaths
             );
 
-            if (flattenCheck.canFlatten) {
+
+            if (flattenCheck && flattenCheck.canFlatten) {
               menuItems.push({
                 text: "Flatten folders",
                 onClick: () => {
@@ -810,7 +835,13 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
       return menuItems;
     },
-    [treeState.selectedFolderPaths, folderTreeHook]
+    [
+      treeState.selectedFolderPaths,
+      folderTreeHook,
+      propFolderTree,
+      startCreatingFolder,
+      startRenaming,
+    ]
   );
 
   // Drag and drop handlers
@@ -999,7 +1030,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           }}
         >
           {!isFile && hasChildren ? (
-            <ExpandIcon onClick={(e) => handleChevronClick(e, nodePath)}>
+            <ExpandIcon
+              onClick={(e) => handleChevronClick(e, nodePath)}
+              role="button"
+            >
               {isExpanded ? (
                 <ChevronDown size={10} />
               ) : (
