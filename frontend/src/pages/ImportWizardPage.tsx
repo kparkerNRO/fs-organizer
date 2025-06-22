@@ -1102,23 +1102,6 @@ const BaseContainer = styled.div.withConfig({
 
 const ContentContainer = styled(BaseContainer)``;
 
-// Remove PreviewTitle - will use SectionTitle instead
-
-// Large button base for wizard navigation
-const LargeButton = styled(BaseButton)`
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-`;
-
-const SuccessButton = styled(LargeButton)`
-  background-color: #10b981;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #059669;
-  }
-`;
-
 const ComparisonView = styled.div.withConfig({
   shouldForwardProp: (prop) => !["isLoading"].includes(prop),
 })<{ isLoading?: boolean }>`
@@ -1189,6 +1172,21 @@ const ButtonRow = styled.div`
   align-items: center;
 `;
 
+// Large button base for wizard navigation
+const LargeButton = styled(BaseButton)`
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
+`;
+
+const SuccessButton = styled(LargeButton)`
+  background-color: #10b981;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: #059669;
+  }
+`;
+
 const SecondaryButton = styled(LargeButton)`
   background-color: #6b7280;
   color: white;
@@ -1204,6 +1202,15 @@ const WarningButton = styled(LargeButton)`
 
   &:hover:not(:disabled) {
     background-color: #d97706;
+  }
+`;
+
+const DangerButton = styled(LargeButton)`
+  background-color: #dc2626;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background-color: #b91c1c;
   }
 `;
 
@@ -1264,13 +1271,4 @@ const ProgressText = styled.div`
   margin-top: 0.5rem;
   color: #6b7280;
   font-weight: 500;
-`;
-
-const DangerButton = styled(LargeButton)`
-  background-color: #dc2626;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #b91c1c;
-  }
 `;

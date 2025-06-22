@@ -28,7 +28,7 @@ export interface FetchCategoriesResponse {
   currentPage: number;
 }
 
-const isMockMode = false;
+const isMockMode = true;
 
 // Pipeline API functions
 export const gatherFiles = async (

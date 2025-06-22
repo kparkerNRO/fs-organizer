@@ -13,6 +13,7 @@ import {
   findNodeByPath,
   setConfidenceToMax,
 } from "../utils/folderTreeOperations";
+import {TREE_TYPE} from "../types/enums"
 
 interface FolderBrowserProps {
   folderTree: FolderV2 | null;
@@ -21,7 +22,12 @@ interface FolderBrowserProps {
   externalSelectedFile: number | null;
   shouldSync?: boolean;
   showConfidence?: boolean;
+  treeType: TREE_TYPE
+
 }
+
+const TREE_STATE_KEY = "treeState";
+
 
 interface TreeState {
   tree: FolderV2;
@@ -109,7 +115,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         tree: activeTree,
       }));
     }
-  }, [folderTreeHook.modifiedTree, propFolderTree]);
+  }, [folderTreeHook.modifiedTree, propFolderTree, treeState.tree]);
 
   // Helper function to get all folder paths in the order they appear in the tree
   const getAllFolderPathsInOrder = (

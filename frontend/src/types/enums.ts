@@ -10,3 +10,10 @@ export enum SORT_FIELD {
   COUNT = "count",
   CONFIDENCE = "confidence",
 }
+
+
+export enum TREE_TYPE {
+  LOADED = "loaded",
+  ORGANIZED = "organized",
+  CATEGORIZED = "categorized"
+}
