@@ -1,88 +1,80 @@
-# CLAUDE.md
+## Project Purpose
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Analyzes messy directory structures (particularly Patreon RPG assets) and reorganizes them into consistent hierarchies using a multi-stage pipeline.
 
-## Project Overview
+## Architecture Overview
 
-FS-Organizer is a file system organization tool that analyzes messy directory structures (particularly from Patreon creators) and reorganizes them into consistent hierarchies. The system processes folders through a multi-stage pipeline: gather → postprocess → classify → group → generate folder hierarchy.
+```
+organizer/               # Python backend
+  ├── organizer.py       # CLI entry point (typer commands)
+  ├── organizer_api.py   # FastAPI server
+  ├── pipeline/          # Processing stages (gather, classify, categorize)
+  ├── grouping/          # NLP similarity detection and folder grouping
+  └── data_models/       # SQLAlchemy models (GroupCategory, GroupCategoryEntry)
 
-## Architecture
-
-The project consists of two main components:
-
-### Backend (organizer/)
-- **CLI Pipeline**: `organizer.py` provides typer commands for each stage
-- **Data Models**: SQLAlchemy models in `data_models/` for database operations
-- **Processing Pipeline**: `pipeline/` contains gather, classify, categorize modules
-- **Grouping Logic**: `grouping/` handles folder similarity detection and merging
-- **FastAPI Server**: `organizer_api.py` serves data to frontend
-
-### Frontend (frontend/)
-- **React + TypeScript**: Vite-based SPA with styled-components
-- **Two Main Views**: Categories page (folder grouping) and Folder Structure page
-- **Mock Mode**: Built-in mock data system for development without backend
-
-## Build & Development Commands
-
-### Backend (organizer/)
-```bash
-# Install dependencies
-pip install -e .
-
-# Run pipeline stages
-python organizer.py gather <input_path> <output_path>
-python organizer.py postprocess <db_path>
-python organizer.py classify <db_path>
-python organizer.py group <db_path>
-python organizer.py folders <db_path>
-
-# Start API server
-fastapi dev organizer_api.py
-
-# Testing
-pytest
-pytest <file>::<test_name> -v
-pytest -k "pattern"
-
-# Code quality
-ruff check .
-ruff format .
+frontend/                # Electron desktop app
+  ├── electron/          # Main process (main.ts) and preload (preload.ts)
+  └── src/
+      ├── components/    # React components (Categories, FolderStructure)
+      ├── types/         # TypeScript types
+      └── api.ts         # Backend API client (mock mode enabled)
 ```
 
-### Frontend (frontend/)
+## Pipeline Data Flow
+
+1. **gather** → Scan filesystem → SQLite database (`outputs/<timestamp>/<name>.db`)
+2. **postprocess** → Clean filenames → Add metadata
+3. **classify** → Label folders (variant/collection/subject/uncertain)
+4. **group** → NLP similarity → Group near-duplicates
+5. **folders** → Generate new hierarchy
+
+## Key Conventions
+
+### Backend (Python + SQLAlchemy)
+- **Commands**: Use `uv run` prefix for all Python commands
+- **Testing**: `uv run pytest` (parametrized tests, see existing tests for patterns)
+- **Database**: SQLite with SQLAlchemy ORM, timestamped outputs in `outputs/`
+- **Typing**: Strict typing with pydantic models
+- **Code Style**: ruff formatting, snake_case, 100 char line limit
+
+### Frontend (Electron + React + TypeScript)
+- **Node Version**: Use `nvm use` (Node 20 LTS via .nvmrc)
+- **Commands**: `npm run electron:dev` for development
+- **Mock Mode**: `isMockMode = true` in api.ts (no backend needed)
+- **Components**: Functional with React hooks, styled-components
+- **Testing**: Vitest with @testing-library/react
+- **Code Style**: ESLint + Prettier, PascalCase components, camelCase functions
+
+### Electron Architecture
+- **main.ts**: App lifecycle, native features, IPC handlers
+- **preload.ts**: Secure bridge between main and renderer
+- **src/**: React renderer process (Chromium environment)
+
+## Common Tasks
+
+### Run Full Pipeline
 ```bash
-# Development
-npm run dev          # Start dev server on http://localhost:5173
-npm run build        # Build for production
-npm run lint         # ESLint
-npm run preview      # Preview production build
+cd organizer
+uv run python organizer.py gather <input> outputs/run
+uv run python organizer.py postprocess outputs/run/run.db
+uv run python organizer.py classify outputs/run/run.db
+uv run python organizer.py group outputs/run/run.db
+uv run python organizer.py folders outputs/run/run.db
 ```
 
-## Key Data Flow
+### Development
+```bash
+just init        # First-time setup (nvm + uv + deps)
+just dev         # Start Electron app
+just dev-all     # Start backend API + Electron app
+just test        # Run all tests
+```
 
-1. **Gather**: Scans filesystem, stores folder/file metadata in SQLite database
-2. **Postprocess**: Cleans filenames and adds derived metadata
-3. **Classify**: Labels folders as variant/collection/subject/uncertain based on heuristics
-4. **Group**: Uses NLP similarity to group near-duplicate folder names
-5. **Categorize**: Generates new folder hierarchy based on classifications and groups
+## Critical Files
 
-## Database Schema
-
-- **GroupCategory**: Contains grouped folder categories with confidence scores
-- **GroupCategoryEntry**: Individual folders assigned to groups
-- Uses SQLite with timestamped runs in `outputs/` directory
-- Latest run symlinked as `outputs/latest/latest.db`
-
-## API Endpoints
-
-- `GET /groups`: Paginated category data with sorting/filtering
-- Frontend hardcoded to mock mode (`isMockMode = true` in api.ts)
-
-## Development Notes
-
-- Backend uses strict typing with pydantic models
-- Frontend components are functional with React hooks
-- Mock data system allows frontend development without backend
-- Database operations use SQLAlchemy ORM
-- Testing uses pytest with parametrized tests
-- Code formatting enforced by ruff (Python) and ESLint (TypeScript)
+- `organizer/data_models/` - Database schema (GroupCategory, GroupCategoryEntry)
+- `organizer/pipeline/` - Core processing logic
+- `organizer/grouping/` - Similarity detection algorithms
+- `frontend/src/api.ts` - API client and mock data
+- `frontend/src/components/` - Main UI components
+- `justfile` - Task runner commands

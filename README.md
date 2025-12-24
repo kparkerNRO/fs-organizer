@@ -25,7 +25,7 @@ FS-Organizer uses a multi-stage pipeline to process your chaotic folder structur
 4. **Group** - Uses NLP similarity detection to find near-duplicates and related folders
 5. **Generate Hierarchy** - Proposes a new, sensible folder structure
 
-The system comes with both a CLI for running the pipeline and a web UI for reviewing and managing the results.
+The system comes with both a CLI for running the pipeline and an Electron desktop app for reviewing and managing the results.
 
 ## Project Structure
 
@@ -37,39 +37,61 @@ organizer/          # Python backend
   ├── grouping/     # Similarity detection
   └── data_models/  # SQLAlchemy models
 
-frontend/           # React + TypeScript UI
+frontend/           # Electron desktop app (React + TypeScript)
+  ├── electron/     # Main and preload processes
   └── src/
       └── components/  # Browse and manage grouped folders
 ```
 
 ## Quick Start
 
-### Backend
+### Prerequisites
+- [nvm](https://github.com/nvm-sh/nvm) (Node Version Manager)
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- [just](https://github.com/casey/just) (command runner, optional but recommended)
+
+### One-Command Setup
+
+```bash
+# Initialize everything (requires nvm installed, will auto-install uv)
+just init
+
+# Start the Electron app in development mode
+just dev
+
+# Or start both backend API and Electron app
+just dev-all
+```
+
+### Manual Setup
+
+#### Backend
 
 ```bash
 cd organizer
-pip install -e .
+uv sync
 
 # Run the full pipeline
-python organizer.py gather /path/to/messy/folders outputs/my-run
-python organizer.py postprocess outputs/my-run/my-run.db
-python organizer.py classify outputs/my-run/my-run.db
-python organizer.py group outputs/my-run/my-run.db
-python organizer.py folders outputs/my-run/my-run.db
+uv run python organizer.py gather /path/to/messy/folders outputs/my-run
+uv run python organizer.py postprocess outputs/my-run/my-run.db
+uv run python organizer.py classify outputs/my-run/my-run.db
+uv run python organizer.py group outputs/my-run/my-run.db
+uv run python organizer.py folders outputs/my-run/my-run.db
 
-# Or start the API server to use with the frontend
-fastapi dev organizer_api.py
+# Or start the API server
+uv run fastapi dev organizer_api.py
 ```
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
+nvm use              # Switch to Node 20
 npm install
-npm run dev
+npm run electron:dev # Start Electron app
 ```
 
-The UI runs at http://localhost:5173 and has a built-in mock mode so you can explore it without running the backend.
+The Electron app has a built-in mock mode so you can explore it without running the backend.
 
 ## Current Status
 
@@ -86,6 +108,7 @@ I'm actively experimenting with different approaches, so expect things to change
 
 **Backend:**
 - Python with typer for CLI
+- uv for dependency management
 - SQLAlchemy for database operations
 - FastAPI for the API server
 - NLTK for text similarity
@@ -93,10 +116,17 @@ I'm actively experimenting with different approaches, so expect things to change
 - ruff for code formatting
 
 **Frontend:**
+- Electron for cross-platform desktop app
 - React + TypeScript
 - Vite for building
 - styled-components for styling
+- Vitest for testing
+- electron-builder for packaging
 - Mock data system for development
+
+**Development Tools:**
+- just command runner for unified task execution
+- nvm for Node.js version management
 
 ## Why This Exists
 
