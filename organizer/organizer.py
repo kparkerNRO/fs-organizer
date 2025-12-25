@@ -10,7 +10,7 @@ from pipeline.folder_reconstruction import (
     get_folder_heirarchy,
     recalculate_cleaned_paths_for_structure,
 )
-from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
+from pipeline.gather import gather_folder_structure_and_store
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
 

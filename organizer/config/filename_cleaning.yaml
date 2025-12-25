@@ -5,3 +5,16 @@ replace_exceptions:
   ItW: ""
 clean_exceptions:
   - 5e
+should_ignore:
+  - __MACOSX
+  - .DS_Store
+  - Thumbs.db
+  - .AppleDouble
+  - .LSOverride
+  - desktop.ini
+  - .fseventsd
+  - .Spotlight-V100
+  - .TemporaryItems
+  - .Trashes
+  - .DocumentRevisions-V100
+  - thumbs
