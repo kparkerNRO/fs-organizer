@@ -17,8 +17,6 @@ from data_models.database import (
     setup_group,
 )
 from grouping.group import (
-    # parse_name,
-    # heuristic_categorize,
     process_folders_to_groups,
     refine_groups,
     group_by_name,
