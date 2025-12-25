@@ -8,7 +8,6 @@ from api.api import StructureType
 from data_models.database import setup_gather
 from pipeline.folder_reconstruction import get_folder_heirarchy
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
-from pipeline.classify import classify_folders
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
 
@@ -74,17 +73,6 @@ def gather(
     shutil.copy2(db_path, latest_db)
     typer.echo(f"Copied latest run to: {latest_db}")
     typer.echo("Gather complete.")
-
-
-@app.command()
-def classify(db_path: str = typer.Argument(...)):
-    """
-    Classify folders in the given run_data.db
-    using known variant detection + structural heuristics.
-    """
-    typer.echo(f"Classifying folders in: {db_path}")
-    classify_folders(Path(db_path))
-    typer.echo("Classification complete.")
 
 
 @app.command()

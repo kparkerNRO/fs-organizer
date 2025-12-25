@@ -1,0 +1,158 @@
+variants:
+  winter:
+    synonyms: []
+    type: variant
+    grouping: season
+  summer:
+    synonyms: []
+    type: variant
+    grouping: season
+  spring:
+    synonyms: []
+    type: variant
+    grouping: season
+  fall:
+    synonyms: []
+    type: variant
+    grouping: season
+  autumn:
+    synonyms: []
+    type: variant
+    grouping: season
+  snow:
+    synonyms: []
+    type: variant
+    grouping: season
+  desert:
+    synonyms: []
+    type: variant
+    grouping: season
+  grass:
+    synonyms: []
+    type: variant
+    grouping: season
+  sandstorm:
+    synonyms: []
+    type: variant
+    grouping: season
+  rain:
+    synonyms: []
+    type: variant
+    grouping: season
+  mountain:
+    synonyms: []
+    type: variant
+    grouping: season
+  day:
+    synonyms: []
+    type: variant
+    grouping: time
+  night:
+    synonyms: []
+    type: variant
+    grouping: time
+  dawn:
+    synonyms: []
+    type: variant
+    grouping: time
+  dusk:
+    synonyms: []
+    type: variant
+    grouping: time
+  with-assets:
+    synonyms: []
+    type: variant
+    grouping: style
+  labels:
+    synonyms: []
+    type: variant
+    grouping: style
+  VTT:
+    synonyms: []
+    type: media_type
+    grouping: media
+  PDF:
+    synonyms: []
+    type: media_type
+    grouping: media
+  PDFs:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Print:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Jpeg:
+    synonyms: []
+    type: media_type
+    grouping: media
+  PNGS:
+    synonyms: []
+    type: media_type
+    grouping: media
+  PNG:
+    synonyms: []
+    type: media_type
+    grouping: media
+  WEBP:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Gridded:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Gridless:
+    synonyms: []
+    type: variant
+    grouping: layout
+  No Grid:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Music:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Tiles:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Transparent:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Interior:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Interiors:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Animated Scenes:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Variants:
+    synonyms: []
+    type: variant
+    grouping: other
+  Key & Design Notes:
+    synonyms: []
+    type: media_type
+    grouping: media
+  Exterior:
+    synonyms: []
+    type: variant
+    grouping: layout
+  Clean:
+    synonyms:
+      - clean
+    type: variant
+    grouping: style
+  Asset Pack:
+    synonyms: []
+    type: media_type
+    grouping: media

@@ -7,7 +7,6 @@ class StructureType(str, Enum):
     original = "old"
     organized = "new"
     grouped = "grouped"
-    
 
 
 class File(BaseModel):
