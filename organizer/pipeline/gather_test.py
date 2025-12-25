@@ -56,11 +56,14 @@ def test_process_zip_with_module_json(session):
     folders = session.query(Folder).all()
     files = session.query(File).all()
 
-    assert len(folders) == 0  # No folders should be created
+    assert len(folders) == 1  # Foundry module wrapper folder
     assert len(files) == 1  # Only the zip file itself should be added
 
     file_names = [file.file_name for file in files]
     assert file_names == ["test.zip"]
+
+    folder_names = [folder.folder_name for folder in folders]
+    assert folder_names == ["Foundry Module test.zip"]
 
 
 def test_process_zip_nested_zip(session):

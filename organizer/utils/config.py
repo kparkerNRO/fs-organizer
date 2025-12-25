@@ -121,6 +121,7 @@ class Config:
     file_name_exceptions: dict[str, str]
     replace_exceptions: dict[str, str]
     clean_exceptions: set[str]
+    should_ignore: set[str]
     grouping_exceptions: tuple[str, ...]
     variants: dict[str, dict[str, Any]]
     known_variant_tokens: set[str]
@@ -154,6 +155,7 @@ def get_config() -> Config:
     file_name_exceptions = filename_config.get("file_name_exceptions", {})
     replace_exceptions = filename_config.get("replace_exceptions", {})
     clean_exceptions = set(filename_config.get("clean_exceptions", []))
+    should_ignore = set(filename_config.get("should_ignore", []))
 
     grouping_exceptions = tuple(grouping_config.get("grouping_exceptions", []))
 
@@ -176,6 +178,7 @@ def get_config() -> Config:
         file_name_exceptions=file_name_exceptions,
         replace_exceptions=replace_exceptions,
         clean_exceptions=clean_exceptions,
+        should_ignore=should_ignore,
         grouping_exceptions=grouping_exceptions,
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],

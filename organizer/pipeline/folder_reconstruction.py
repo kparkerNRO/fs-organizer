@@ -108,7 +108,7 @@ def get_folder_heirarchy(db_path: str, type: StructureType):
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
-    sessionmaker = get_sessionmaker(db_path)
+    sessionmaker = get_sessionmaker(Path(db_path))
     with sessionmaker() as session:
         newest_entry = session.execute(
             select(FolderStructure)
@@ -124,8 +124,8 @@ def get_folder_heirarchy(db_path: str, type: StructureType):
 
 def _resolve_cleaned_name(folder: dbFolder) -> str:
     if folder.cleaned_name:
-        return folder.cleaned_name
-    base_name = folder.folder_name
+        return str(folder.cleaned_name)
+    base_name = str(folder.folder_name)
     if base_name.endswith(".zip"):
         base_name = base_name[:-4]
     return clean_filename(base_name)
@@ -136,14 +136,16 @@ def _build_cleaned_path(
     folder_by_path: Dict[str, dbFolder],
     cache: Dict[int, str],
 ) -> str:
-    if folder.id in cache:
-        return cache[folder.id]
+    folder_id = int(folder.id)
+    if folder_id in cache:
+        return cache[folder_id]
 
     name = _resolve_cleaned_name(folder)
-    if not folder.parent_path:
+    parent_path = str(folder.parent_path) if folder.parent_path else None
+    if not parent_path:
         cleaned_path = name
     else:
-        parent = folder_by_path.get(folder.parent_path)
+        parent = folder_by_path.get(parent_path)
         if parent is None:
             cleaned_path = name
         else:
@@ -153,12 +155,12 @@ def _build_cleaned_path(
             else:
                 cleaned_path = name
 
-    cache[folder.id] = cleaned_path
+    cache[folder_id] = cleaned_path
     return cleaned_path
 
 
 def recalculate_cleaned_paths(db_path: str) -> int:
-    sessionmaker = get_sessionmaker(db_path)
+    sessionmaker = get_sessionmaker(Path(db_path))
     with sessionmaker() as session:
         folders = session.execute(select(dbFolder)).scalars().all()
         folder_by_path = {folder.folder_path: folder for folder in folders}
@@ -178,7 +180,7 @@ def recalculate_cleaned_paths_for_structure(
     if structure_type == StructureType.original:
         return recalculate_cleaned_paths(db_path)
 
-    sessionmaker = get_sessionmaker(db_path)
+    sessionmaker = get_sessionmaker(Path(db_path))
     with sessionmaker() as session:
         iteration_id = session.execute(
             select(func.max(GroupCategoryEntry.iteration_id))
@@ -188,11 +190,11 @@ def recalculate_cleaned_paths_for_structure(
         for folder in folders:
             categories = get_categories_for_path(
                 session,
-                Path(folder.folder_path) / "__folder__",
+                Path(str(folder.folder_path)) / "__folder__",
                 iteration_id,
             )
             folder.cleaned_path = "/".join(
-                [category.processed_name for category in categories]
+                [str(category.processed_name) for category in categories]
             )
 
         session.commit()

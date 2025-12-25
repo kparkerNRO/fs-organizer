@@ -12,6 +12,7 @@ from data_models.database import (
     Folder as dbFolder,
     File as dbFile,
 )
+from utils.config import get_config
 from utils.filename_utils import clean_filename
 import os
 from utils.folder_structure import insert_file_in_structure
@@ -21,21 +22,8 @@ logger = logging.getLogger(__name__)
 
 def should_ignore(name: str) -> bool:
     """Check if a file or directory should be ignored."""
-    ignore_patterns = {
-        "__MACOSX",
-        ".DS_Store",
-        "Thumbs.db",
-        ".AppleDouble",
-        ".LSOverride",
-        "desktop.ini",
-        ".fseventsd",
-        ".Spotlight-V100",
-        ".TemporaryItems",
-        ".Trashes",
-        ".DocumentRevisions-V100",
-        "thumbs",
-    }
-    return name in ignore_patterns or name.startswith("._")
+    config = get_config()
+    return name in config.should_ignore or name.startswith("._")
 
 
 def count_zip_children(entries: List[str], target_dir: str = "") -> Tuple[int, int]:
@@ -197,7 +185,7 @@ def process_zip(
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
         logger.error(f"Error processing zip {zip_name}: {e}")
-        session.rollback()
+        raise
 
 
 def calculate_structure(session: Session, root_dir: Path):
@@ -227,7 +215,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
     """Gather folder structure and store in database using SQLAlchemy."""
     session = get_session(db_path)
 
-    try:
+    with session:
         for root, dirs, files in os.walk(base_path):
             # Filter out ignored files and directories
             dirs[:] = [d for d in dirs if not should_ignore(d)]
@@ -286,23 +274,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
         calculate_structure(session, base_path)
         session.commit()
 
-    except Exception as e:
-        logger.error(f"Error gathering folder structure: {e}")
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-    clean_file_name_post(db_path=db_path, update_table=True)
-
-
-def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
-    """Clean and update folder names in the database using SQLAlchemy."""
-    setup_folder_categories(db_path)
-    session = get_session(db_path)
-
-    try:
-        # Fetch all folders
+        # update all the folders with the cleaned filename
         folders = session.query(dbFolder).all()
 
         for folder in folders:
@@ -315,5 +287,3 @@ def clean_file_name_post(db_path: Path, update_table: bool = False) -> None:
             folder.cleaned_name = cleaned_name
 
         session.commit()
-    finally:
-        session.close()
