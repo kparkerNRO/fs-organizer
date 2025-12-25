@@ -7,7 +7,7 @@ from data_models.database import File as dbFile
 def insert_file_in_structure(
     folder_structure: FolderV2,
     file: dbFile,
-    parts: list[str | tuple],
+    parts: list[str | tuple] | tuple[str, ...],
     new_path: str | None = None,
 ):
     current_representation = folder_structure
@@ -25,9 +25,9 @@ def insert_file_in_structure(
 
     current_representation.children.append(
         File(
-            id=file.id,
-            name=file.file_name,
-            originalPath=file.file_path,
+            id=file.id,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be int
+            name=file.file_name,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be str
+            originalPath=file.file_path,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be str
             newPath=new_path,
         )
     )

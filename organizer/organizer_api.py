@@ -22,6 +22,7 @@ from data_models.database import (
 from api.api import (
     Category as CategoryAPI,
     CategoryResponse,
+    FolderV2,
     SortColumn,
     SortOrder,
     StructureType,
@@ -38,7 +39,7 @@ from pipeline.folder_reconstruction import get_folder_heirarchy
 
 app = FastAPI()
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly  
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -218,7 +219,10 @@ async def get_folders(
     sorted_original = sort_folder_structure(parsed_old_entry)
     sorted_new = sort_folder_structure(parsed_new_entry)
 
-    return FolderViewResponse(original=sorted_original, new=sorted_new)
+    return FolderViewResponse(
+        original=FolderV2.model_validate(sorted_original),
+        new=FolderV2.model_validate(sorted_new),
+    )
 
 
 @app.get("/api/tasks/{task_id}")
@@ -327,7 +331,7 @@ def run_gather_task(task_id: str, base_path_str: str):
             "db_path": str(db_path),
             "run_dir": str(run_dir),
             "folder_structure": get_folder_structure_from_db(
-                db_path, StructureType.original
+                str(db_path), StructureType.original
             ),
         }
 
@@ -391,7 +395,7 @@ def run_group_task(task_id: str):
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 
-        calculate_folder_structure(db_path, structure_type=StructureType.grouped)
+        calculate_folder_structure(Path(db_path), structure_type=StructureType.grouped)
 
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
@@ -458,7 +462,7 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
-        calculate_folder_structure(db_path, structure_type=StructureType.organized)
+        calculate_folder_structure(Path(db_path), structure_type=StructureType.organized)
 
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(

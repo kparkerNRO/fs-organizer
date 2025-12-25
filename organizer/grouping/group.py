@@ -116,7 +116,7 @@ def refine_groups(
                     [
                         entry.categories[1]
                         for entry in entries_by_name
-                        if len(entry.categories) > 1
+                        if entry.categories and len(entry.categories) > 1
                     ]
                 )
             )
@@ -153,12 +153,13 @@ def refine_groups(
                     entry.derived_names = group_entry.categories
                     entry.iteration_id = iteration_id
 
-                    entry.processed_name = group_entry.categories[0]
+                    if group_entry.categories and len(group_entry.categories) > 0:
+                        entry.processed_name = group_entry.categories[0]
 
                     member_confidences.append(entry.confidence)
                     group_members.append(entry)
 
-                    if len(group_entry.categories) > 1:
+                    if group_entry.categories and len(group_entry.categories) > 1:
                         subgroup = group_entry.categories[1]
                         subgroup_entry = GroupCategoryEntry(
                             folder_id=entry.folder_id,
@@ -240,7 +241,7 @@ def pre_process_groups(session: Session) -> None:
     ]
 
     for category in uncertain_categories:
-        split_name = category["processed_name"].split("-")
+        split_name = category["processed_name"].split("-")  # type: ignore[union-attr]  # ty bug: SQLAlchemy ORM attribute should be str
         categories = []
         for name in split_name:
             cleaned_name = clean_filename(name)
@@ -280,9 +281,9 @@ def compact_groups(session: Session):
         )
         new_group_name_map: dict[str, GroupCategoryEntry] = {}
         for group in groups:
-            processed_name = group.processed_name
+            processed_name = group.processed_name  # type: ignore[assignment]  # ty bug: SQLAlchemy ORM attribute should be str
             if processed_name in new_group_name_map:
-                existing_group = new_group_name_map[processed_name]
+                existing_group = new_group_name_map[processed_name]  # type: ignore[index]  # ty bug: processed_name is str at runtime
                 existing_group.confidence = min(
                     existing_group.confidence, group.confidence
                 )
@@ -305,7 +306,7 @@ def compact_groups(session: Session):
                     iteration_id=iteration_id,
                 )
                 session.add(new_entry)
-                new_group_name_map[processed_name] = new_entry
+                new_group_name_map[processed_name] = new_entry  # type: ignore[index]  # ty bug: processed_name is str at runtime
     session.commit()
 
 

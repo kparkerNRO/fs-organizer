@@ -211,7 +211,7 @@ def calculate_structure(session: Session, root_dir: Path):
         if i % 100 == 0:
             logger.info(f"Processed {i}/{total_files} folders")
 
-        file_path = Path(file.file_path)
+        file_path = Path(file.file_path)  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be str
         file_path = file_path.relative_to(root_dir)
         insert_file_in_structure(folder_structure, file, file_path.parent.parts)
 
