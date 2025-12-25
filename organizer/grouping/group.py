@@ -213,40 +213,6 @@ def refine_groups(
     return current_group_id
 
 
-def group_by_name(session: Session, text_distance_ratio) -> None:
-    """
-    Run a single iteration of the grouping process
-    """
-    # Get last round's entries
-    iteration_id = get_next_iteration_id(session)
-    uncertain_categories: tuple[GroupCategoryEntry, Folder] = (
-        session.query(GroupCategoryEntry, Folder)
-        .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
-        .filter(GroupCategoryEntry.iteration_id == iteration_id - 1)
-        .all()
-    )
-
-    items = prepare_records(uncertain_categories)
-    # if iteration_id <= 1:
-    #     text_distance_ratio = TEXT_DISTANCE_RATIO
-    # else:
-    #     text_distance_ratio = 0.8
-
-    group_category_entries = cluster_with_custom_metric(
-        items,
-        iteration_id=iteration_id,
-        distance_matrix_func=lambda items: compute_custom_distance_matrix(
-            items, text_distance_ratio=text_distance_ratio
-        ),
-    )
-    session.add_all(group_category_entries)
-    session.commit()
-
-    next_group_id = session.query(GroupCategory).count() + 1
-
-    refine_groups(session, group_category_entries, iteration_id, next_group_id)
-
-
 def pre_process_groups(session: Session) -> None:
     """
     Clean up compound entries - split out hyphen-delineated values
@@ -371,5 +337,4 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
         decompose_compound_tags(session)
 
-        # group_by_name(session, 0.9)
         compact_groups(session)

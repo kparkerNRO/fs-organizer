@@ -19,7 +19,6 @@ from data_models.database import (
 from grouping.group import (
     process_folders_to_groups,
     refine_groups,
-    group_by_name,
     group_folders,
 )
 from grouping.helpers import common_token_grouping
@@ -223,78 +222,6 @@ def test_refine_groups_clusters(test_db):
     assert banana_entry is not None
     assert banana_entry.processed is True
     assert banana_entry.processed_name == "banana"
-
-
-# Integration test for full group_iteration function
-def test_group_iteration(test_db):
-    # Set up test folders
-    folders = [
-        Folder(
-            id=1,
-            folder_name="apple pie",
-            folder_path="/test/apple pie",
-            cleaned_name="apple pie",
-        ),
-        Folder(
-            id=2,
-            folder_name="apple tart",
-            folder_path="/test/apple tart",
-            cleaned_name="apple tart",
-        ),
-        Folder(
-            id=3,
-            folder_name="banana bread",
-            folder_path="/test/banana bread",
-            cleaned_name="banana bread",
-        ),
-    ]
-    test_db.add_all(folders)
-
-    # Set up initial entries for iteration 0
-    entries = [
-        GroupCategoryEntry(
-            folder_id=1,
-            group_id=0,
-            pre_processed_name="apple pie",
-            processed_name="apple pie",
-            path="/test/apple pie",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-        GroupCategoryEntry(
-            folder_id=2,
-            group_id=0,
-            pre_processed_name="apple tart",
-            processed_name="apple tart",
-            path="/test/apple tart",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-        GroupCategoryEntry(
-            folder_id=3,
-            group_id=0,
-            pre_processed_name="banana bread",
-            processed_name="banana bread",
-            path="/test/banana bread",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-    ]
-    test_db.add_all(entries)
-    test_db.commit()
-
-    # Run the group iteration function
-    group_by_name(test_db, 1)
-
-    # Verify results
-    iteration_1_entries = (
-        test_db.query(GroupCategoryEntry).filter_by(iteration_id=1).all()
-    )
-    assert len(iteration_1_entries) == 3
-
-    # Verify groups were created
-    groups = test_db.query(GroupCategory).filter_by(iteration_id=1).all()
-    assert len(groups) == 3
 
 
 # Test common_token_grouping for integration with refine_groups
