@@ -6,8 +6,9 @@ Configuration data is managed separately via YAML files loaded in-memory
 (see organizer/utils/config.py).
 """
 
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Iterator
 from datetime import datetime
 
 from sqlalchemy import create_engine, event
@@ -199,7 +200,8 @@ class StorageManager:
         finally:
             session.close()
 
-    def get_index_session(self, read_only: bool = False) -> Session:
+    @contextmanager
+    def get_index_session(self, read_only: bool = False) -> Iterator[Session]:
         """Get SQLAlchemy session for index.db.
 
         Args:
@@ -207,7 +209,7 @@ class StorageManager:
                       Use for snapshot queries to prevent accidental mutations.
 
         Returns:
-            SQLAlchemy session
+            Context manager yielding a SQLAlchemy session
 
         IMPORTANT: Snapshots are immutable. When querying snapshots, prefer
         read_only=True to prevent accidental modifications via session.
@@ -224,16 +226,24 @@ class StorageManager:
                     "Snapshots are immutable after creation."
                 )
 
-        return session
+        try:
+            yield session
+        finally:
+            session.close()
 
-    def get_work_session(self) -> Session:
+    @contextmanager
+    def get_work_session(self) -> Iterator[Session]:
         """Get SQLAlchemy session for work.db.
 
         Returns:
-            SQLAlchemy session
+            Context manager yielding a SQLAlchemy session
         """
         Session = sessionmaker(bind=self.work_engine)
-        return Session()
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()
 
     # Referential integrity validation methods
 
@@ -246,11 +256,8 @@ class StorageManager:
         Returns:
             True if snapshot exists, False otherwise
         """
-        session = self.get_index_session(read_only=True)
-        try:
+        with self.get_index_session(read_only=True) as session:
             return session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first() is not None
-        finally:
-            session.close()
 
     def _validate_node_exists(self, node_id: int, snapshot_id: int) -> bool:
         """Check if node exists in index.db for given snapshot.
@@ -262,16 +269,13 @@ class StorageManager:
         Returns:
             True if node exists in snapshot, False otherwise
         """
-        session = self.get_index_session(read_only=True)
-        try:
+        with self.get_index_session(read_only=True) as session:
             return (
                 session.query(Node)
                 .filter_by(node_id=node_id, snapshot_id=snapshot_id)
                 .first()
                 is not None
             )
-        finally:
-            session.close()
 
     def _check_snapshot_has_runs(self, snapshot_id: int) -> bool:
         """Check if any runs reference this snapshot in work.db.
@@ -282,11 +286,8 @@ class StorageManager:
         Returns:
             True if runs exist that reference snapshot, False otherwise
         """
-        session = self.get_work_session()
-        try:
+        with self.get_work_session() as session:
             return session.query(Run).filter_by(snapshot_id=snapshot_id).first() is not None
-        finally:
-            session.close()
 
     def _validate_snapshot_id_matches_run(self, snapshot_id: int, run_id: int) -> bool:
         """Validate that provided snapshot_id matches the run's snapshot_id.
@@ -301,14 +302,11 @@ class StorageManager:
         Returns:
             True if snapshot_id matches run's snapshot_id, False otherwise
         """
-        session = self.get_work_session()
-        try:
+        with self.get_work_session() as session:
             run = session.query(Run).filter_by(run_id=run_id).first()
             if not run:
                 return False
             return run.snapshot_id == snapshot_id
-        finally:
-            session.close()
 
     # Deletion methods with referential integrity
 
@@ -329,14 +327,11 @@ class StorageManager:
             )
 
         # Safe to delete
-        session = self.get_index_session()
-        try:
+        with self.get_index_session() as session:
             snapshot = session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
             if snapshot:
                 session.delete(snapshot)  # Cascades to nodes, node_features via SQLAlchemy
                 session.commit()
-        finally:
-            session.close()
 
     def delete_run(self, run_id: int):
         """Delete run and all associated work data.
@@ -344,15 +339,12 @@ class StorageManager:
         Args:
             run_id: Run ID to delete
         """
-        session = self.get_work_session()
-        try:
+        with self.get_work_session() as session:
             run = session.query(Run).filter_by(run_id=run_id).first()
             if run:
                 # SQLAlchemy cascade deletes stages, group_iterations, etc.
                 session.delete(run)
                 session.commit()
-        finally:
-            session.close()
 
     # Placeholder methods for modification prevention
 
