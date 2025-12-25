@@ -249,12 +249,12 @@ class ComponentStatistics:
     """Statistics for component words and their relationships"""
 
     vocabulary: list[str]
-    tag_to_idx: dict[str:int]
+    tag_to_idx: dict[str, int]
     original_id_to_normalized: dict[
-        int:str
+        int, str
     ]  # Mapping from entry IDs to normalized versions
     normalized_to_original_id: dict[
-        str : list[int]
+        str, list[int]
     ]  # Mapping from normalized tags to list of entry IDs
 
     word_frequencies: Dict[str, int]
@@ -489,7 +489,7 @@ def _score_decomposition(
     num_original_components = len(original_tag.split())
 
     # Base score from component frequencies (more frequent = better)
-    freq_score = np.mean([component_frequencies[comp] for comp in components])
+    freq_score = float(np.mean([component_frequencies[comp] for comp in components]))
     freq_score = min(freq_score / 10, 1.0)
 
     # Alternative calculation
@@ -676,7 +676,7 @@ def detect_prefix_suffix_patterns(
                     prefix = " ".join(words[: -len(suffix_words)])
                     prefixes.append(prefix)
 
-            if _are_meaningful_components(prefixes):
+            if _are_meaningful_components(prefixes, component_stats.tag_to_idx):
                 significant_patterns[f"suffix:{suffix}"] = {
                     "type": "suffix",
                     "component": suffix,
@@ -1012,7 +1012,7 @@ def calculate_semantic_score(
             if comp2_lower in comp1_contexts or comp1_lower in comp2_contexts:
                 context_overlap_scores.append(0.5)
 
-    return np.mean(context_overlap_scores) if context_overlap_scores else 0.0
+    return float(np.mean(context_overlap_scores)) if context_overlap_scores else 0.0
 
 
 def calculate_structural_score(original_tag: str, components: List[str]) -> float:
@@ -1110,7 +1110,7 @@ def calculate_cooccurrence_score(
                 jaccard = overlap / union if union > 0 else 0.0
                 scores.append(jaccard)
 
-    return np.mean(scores) if scores else 0.0
+    return float(np.mean(scores)) if scores else 0.0
 
 
 def calculate_pattern_score(

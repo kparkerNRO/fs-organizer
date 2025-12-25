@@ -9,7 +9,7 @@ generate folder paths based on that
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -113,7 +113,7 @@ def calculate_folder_structure(
                 file.file_path,
                 iteration_id,
             )
-            names = [cat.processed_name for cat in categories]
+            names = [cast(str, cat.processed_name) for cat in categories]
             new_path = "/".join(names)
             file.new_path = new_path
             file.groups = names
