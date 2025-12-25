@@ -5,11 +5,28 @@ from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+import hashlib
 import re
 
 import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
+
+
+def compute_reference_hash() -> str:
+    """Compute hash of all YAML config files.
+
+    Returns a SHA-256 hash of all YAML config files in the config directory.
+    This is used to track config version per snapshot.
+
+    Returns:
+        Hexadecimal hash string
+    """
+    config_files = sorted(CONFIG_DIR.glob("*.yaml"))
+    hasher = hashlib.sha256()
+    for f in config_files:
+        hasher.update(f.read_bytes())
+    return hasher.hexdigest()
 
 
 class VariantGroup(Enum):
