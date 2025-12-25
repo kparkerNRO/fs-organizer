@@ -29,3 +29,4 @@ Possible classifications for folder paths:
 * media format - vtt, jpg, etc
 * media type - audio, map, tokens, music, tiles, adventure
 * variant - day, night, snow, sand, etc
+* other - "collaboration", ???

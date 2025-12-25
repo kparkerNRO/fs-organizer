@@ -6,7 +6,10 @@ from pathlib import Path
 import shutil
 from api.api import StructureType
 from data_models.database import setup_gather
-from pipeline.folder_reconstruction import get_folder_heirarchy
+from pipeline.folder_reconstruction import (
+    get_folder_heirarchy,
+    recalculate_cleaned_paths_for_structure,
+)
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
@@ -87,13 +90,23 @@ def group(db_path: str = typer.Argument(...)):
 
 
 @app.command()
-def folders(db_path: str = typer.Argument(...)):
+def folders(
+    db_path: str = typer.Argument(...),
+    structure_type: StructureType = typer.Option(
+        StructureType.organized,
+        "--structure-type",
+        "-s",
+        help="Folder structure type to generate and use for cleaned paths.",
+    ),
+):
     """
     Generate a folder hierarchy from the cleaned paths in the database.
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
-    calculate_folder_structure(db_path)
-    get_folder_heirarchy(db_path, type=StructureType.organized)
+    if structure_type != StructureType.original:
+        calculate_folder_structure(db_path, structure_type=structure_type)
+    recalculate_cleaned_paths_for_structure(db_path, structure_type=structure_type)
+    get_folder_heirarchy(db_path, type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
 
 

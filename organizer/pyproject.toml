@@ -21,3 +21,10 @@ dependencies = [
 dev = [
     "pyright>=1.1.407",
 ]
+
+classifier = [
+    "datasets>=4.4.2",
+    "scikit-learn>=1.6.0",
+    "sentence-transformers>=4.1.0",
+    "setfit>=1.1.3",
+]

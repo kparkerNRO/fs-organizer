@@ -274,6 +274,13 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                         logger.error(f"Error processing zip file {file_path}: {e}")
                     continue
 
+                new_file = dbFile(
+                        file_name=file_path.name,
+                        file_path=str(file_path),
+                        depth=depth,
+                    )
+                session.add(new_file)
+
             session.commit()
 
         calculate_structure(session, base_path)
