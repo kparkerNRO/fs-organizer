@@ -41,67 +41,6 @@ def test_db():
     session.close()
 
 
-# Test parse_name function
-# @pytest.mark.parametrize(
-#     "name, expected_categories, expected_variants",
-#     [
-#         ("apple", ["apple"], []),
-#         ("apple-banana", ["apple banana"], []),
-#         ("apple pdf", ["apple pdf"], []),
-#         ("apple v2 pdf", ["apple v2 pdf"], []),
-#         ("apple-v2-pdf", ["apple v2 pdf"], []),
-#         ("", [], []),
-#     ],
-# )
-# def test_parse_name(name, expected_categories, expected_variants):
-#     categories, variants = parse_name(name)
-#     assert categories == expected_categories
-#     assert variants == expected_variants
-
-
-# Test heuristic_categorize function
-# def test_heuristic_categorize(test_db):
-#     # Set up test data
-#     folders = [
-#         Folder(folder_name="apple pdf", folder_path="/test/apple pdf"),
-#         Folder(folder_name="banana v2", folder_path="/test/banana v2"),
-#         Folder(folder_name="cherry-pie", folder_path="/test/cherry-pie"),
-#         Folder(folder_name="data.zip", folder_path="/test/data.zip"),
-#     ]
-
-#     test_db.add_all(folders)
-#     test_db.commit()
-
-#     # Run the function
-#     heuristic_categorize(test_db)
-
-#     # Verify results
-#     folders = test_db.query(Folder).all()
-
-#     # Check folder classifications and cleaned names
-#     folder_data = {f.folder_name: (f.cleaned_name, f.classification) for f in folders}
-
-#     # The actual implementation's behavior differs from our expected test values
-#     # Just check that we have cleaned names assigned - content may vary
-#     assert folder_data["apple pdf"][0] is not None
-#     assert folder_data["banana v2"][0] is not None
-
-#     # Check that cherry-pie is processed
-#     cherry_folder = test_db.query(Folder).filter_by(folder_name="cherry-pie").first()
-#     assert cherry_folder is not None
-#     assert cherry_folder.cleaned_name is not None
-
-#     # Check PartialNameCategory entries
-#     categories = test_db.query(PartialNameCategory).all()
-#     assert len(categories) > 0
-
-#     # Check that categories were created
-#     apple_categories = test_db.query(PartialNameCategory).filter(
-#         PartialNameCategory.original_name.like("%apple%")
-#     ).all()
-#     assert len(apple_categories) > 0
-
-
 def test_process_folders_to_groups(test_db):
     # Set up test data
     folders = [
