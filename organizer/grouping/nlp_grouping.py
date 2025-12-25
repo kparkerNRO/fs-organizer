@@ -43,40 +43,6 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     return (len(A_path.parts) - i) + (len(B_path.parts) - i)
 
 
-def compute_same_folder_distance_matrix(
-    folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO
-) -> np.ndarray:
-    """
-    Computes a distance matrix where only items within the same folder (i.e., same parent path) are compared.
-    Items in different folders are assigned a large distance (effectively preventing clustering together).
-    """
-    n = len(folders)
-    D = np.zeros((n, n), dtype=float)
-    alpha = text_distance_ratio
-    LARGE_DISTANCE = 1e6  # Effectively infinite for clustering
-
-    for i in range(n):
-        for j in range(i + 1, n):
-            # Only compare if parent folders are the same
-            parent_i = folders[i].path.parent
-            parent_j = folders[j].path.parent
-            if parent_i == parent_j:
-                text_vec_i = folders[i].text_vec
-                text_vec_j = folders[j].text_vec
-                text_dist = 1.0 - np.dot(text_vec_i, text_vec_j) / (
-                    np.linalg.norm(text_vec_i) * np.linalg.norm(text_vec_j) + 1e-8
-                )
-                # Optionally, you can keep struct_dist as 0 since they are in the same folder
-                dist = text_dist
-            else:
-                dist = LARGE_DISTANCE
-
-            D[i, j] = dist
-            D[j, i] = dist
-
-    return D
-
-
 def compute_custom_distance_matrix(
     folders: list[ClusterItem], text_distance_ratio=TEXT_DISTANCE_RATIO
 ) -> np.ndarray:

@@ -17,11 +17,8 @@ from data_models.database import (
     setup_group,
 )
 from grouping.group import (
-    # parse_name,
-    # heuristic_categorize,
     process_folders_to_groups,
     refine_groups,
-    group_by_name,
     group_folders,
 )
 from grouping.helpers import common_token_grouping
@@ -39,67 +36,6 @@ def test_db():
     yield session
 
     session.close()
-
-
-# Test parse_name function
-# @pytest.mark.parametrize(
-#     "name, expected_categories, expected_variants",
-#     [
-#         ("apple", ["apple"], []),
-#         ("apple-banana", ["apple banana"], []),
-#         ("apple pdf", ["apple pdf"], []),
-#         ("apple v2 pdf", ["apple v2 pdf"], []),
-#         ("apple-v2-pdf", ["apple v2 pdf"], []),
-#         ("", [], []),
-#     ],
-# )
-# def test_parse_name(name, expected_categories, expected_variants):
-#     categories, variants = parse_name(name)
-#     assert categories == expected_categories
-#     assert variants == expected_variants
-
-
-# Test heuristic_categorize function
-# def test_heuristic_categorize(test_db):
-#     # Set up test data
-#     folders = [
-#         Folder(folder_name="apple pdf", folder_path="/test/apple pdf"),
-#         Folder(folder_name="banana v2", folder_path="/test/banana v2"),
-#         Folder(folder_name="cherry-pie", folder_path="/test/cherry-pie"),
-#         Folder(folder_name="data.zip", folder_path="/test/data.zip"),
-#     ]
-
-#     test_db.add_all(folders)
-#     test_db.commit()
-
-#     # Run the function
-#     heuristic_categorize(test_db)
-
-#     # Verify results
-#     folders = test_db.query(Folder).all()
-
-#     # Check folder classifications and cleaned names
-#     folder_data = {f.folder_name: (f.cleaned_name, f.classification) for f in folders}
-
-#     # The actual implementation's behavior differs from our expected test values
-#     # Just check that we have cleaned names assigned - content may vary
-#     assert folder_data["apple pdf"][0] is not None
-#     assert folder_data["banana v2"][0] is not None
-
-#     # Check that cherry-pie is processed
-#     cherry_folder = test_db.query(Folder).filter_by(folder_name="cherry-pie").first()
-#     assert cherry_folder is not None
-#     assert cherry_folder.cleaned_name is not None
-
-#     # Check PartialNameCategory entries
-#     categories = test_db.query(PartialNameCategory).all()
-#     assert len(categories) > 0
-
-#     # Check that categories were created
-#     apple_categories = test_db.query(PartialNameCategory).filter(
-#         PartialNameCategory.original_name.like("%apple%")
-#     ).all()
-#     assert len(apple_categories) > 0
 
 
 def test_process_folders_to_groups(test_db):
@@ -286,78 +222,6 @@ def test_refine_groups_clusters(test_db):
     assert banana_entry is not None
     assert banana_entry.processed is True
     assert banana_entry.processed_name == "banana"
-
-
-# Integration test for full group_iteration function
-def test_group_iteration(test_db):
-    # Set up test folders
-    folders = [
-        Folder(
-            id=1,
-            folder_name="apple pie",
-            folder_path="/test/apple pie",
-            cleaned_name="apple pie",
-        ),
-        Folder(
-            id=2,
-            folder_name="apple tart",
-            folder_path="/test/apple tart",
-            cleaned_name="apple tart",
-        ),
-        Folder(
-            id=3,
-            folder_name="banana bread",
-            folder_path="/test/banana bread",
-            cleaned_name="banana bread",
-        ),
-    ]
-    test_db.add_all(folders)
-
-    # Set up initial entries for iteration 0
-    entries = [
-        GroupCategoryEntry(
-            folder_id=1,
-            group_id=0,
-            pre_processed_name="apple pie",
-            processed_name="apple pie",
-            path="/test/apple pie",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-        GroupCategoryEntry(
-            folder_id=2,
-            group_id=0,
-            pre_processed_name="apple tart",
-            processed_name="apple tart",
-            path="/test/apple tart",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-        GroupCategoryEntry(
-            folder_id=3,
-            group_id=0,
-            pre_processed_name="banana bread",
-            processed_name="banana bread",
-            path="/test/banana bread",
-            confidence=1.0,
-            iteration_id=0,
-        ),
-    ]
-    test_db.add_all(entries)
-    test_db.commit()
-
-    # Run the group iteration function
-    group_by_name(test_db, 1)
-
-    # Verify results
-    iteration_1_entries = (
-        test_db.query(GroupCategoryEntry).filter_by(iteration_id=1).all()
-    )
-    assert len(iteration_1_entries) == 3
-
-    # Verify groups were created
-    groups = test_db.query(GroupCategory).filter_by(iteration_id=1).all()
-    assert len(groups) == 3
 
 
 # Test common_token_grouping for integration with refine_groups

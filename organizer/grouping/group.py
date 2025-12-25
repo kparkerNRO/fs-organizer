@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from data_models.database import (
     GroupCategory,
-    # setup_category_summarization,
     setup_folder_categories,
     setup_group,
     get_sessionmaker,
@@ -17,7 +16,6 @@ from grouping.nlp_grouping import (
     cluster_with_custom_metric,
     prepare_records,
     compute_custom_distance_matrix,
-    compute_same_folder_distance_matrix,
 )
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
@@ -215,67 +213,6 @@ def refine_groups(
     return current_group_id
 
 
-def group_by_name(session: Session, text_distance_ratio) -> None:
-    """
-    Run a single iteration of the grouping process
-    """
-    # Get last round's entries
-    iteration_id = get_next_iteration_id(session)
-    uncertain_categories: tuple[GroupCategoryEntry, Folder] = (
-        session.query(GroupCategoryEntry, Folder)
-        .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
-        .filter(GroupCategoryEntry.iteration_id == iteration_id - 1)
-        .all()
-    )
-
-    items = prepare_records(uncertain_categories)
-    # if iteration_id <= 1:
-    #     text_distance_ratio = TEXT_DISTANCE_RATIO
-    # else:
-    #     text_distance_ratio = 0.8
-
-    group_category_entries = cluster_with_custom_metric(
-        items,
-        iteration_id=iteration_id,
-        distance_matrix_func=lambda items: compute_custom_distance_matrix(
-            items, text_distance_ratio=text_distance_ratio
-        ),
-    )
-    session.add_all(group_category_entries)
-    session.commit()
-
-    next_group_id = session.query(GroupCategory).count() + 1
-
-    refine_groups(session, group_category_entries, iteration_id, next_group_id)
-
-
-def group_within_folder(session: Session, text_distance_ratio=0.6) -> None:
-    iteration_id = get_next_iteration_id(session)
-    stmt = (
-        select(GroupCategoryEntry, Folder)
-        .join(Folder, GroupCategoryEntry.folder_id == Folder.id, isouter=True)
-        .where(GroupCategoryEntry.iteration_id == iteration_id - 1)
-    )
-    uncertain_categories = session.execute(stmt).all()
-
-    items = prepare_records(uncertain_categories)
-
-    group_category_entries = cluster_with_custom_metric(
-        items,
-        iteration_id=iteration_id,
-        distance_matrix_func=lambda items: compute_same_folder_distance_matrix(
-            items, text_distance_ratio=text_distance_ratio
-        ),
-        distance_threshold=0.8,
-    )
-    session.add_all(group_category_entries)
-    session.commit()
-
-    next_group_id = session.query(GroupCategory).count() + 1
-
-    refine_groups(session, group_category_entries, iteration_id, next_group_id)
-
-
 def pre_process_groups(session: Session) -> None:
     """
     Clean up compound entries - split out hyphen-delineated values
@@ -388,19 +325,16 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
     # setup the database
     setup_folder_categories(db_path)
-    # setup_category_summarization(db_path)
     setup_group(db_path)
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
         process_folders_to_groups(session, 0)
         pre_process_groups(session)
-        # group_within_folder(session, 0.6)
 
         # New tag decomposition stage
         from grouping.tag_decomposition import decompose_compound_tags
 
         decompose_compound_tags(session)
 
-        # group_by_name(session, 0.9)
         compact_groups(session)
