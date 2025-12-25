@@ -30,17 +30,22 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     """
     Compute the distance between two paths by counting how far each is from the shared parent.
     """
+    def normalize_parts(path: Path) -> tuple[str, ...]:
+        parts = [part for part in path.parts if part not in (".", "")]
+        if parts and parts[0] == "/":
+            parts = parts[1:]
+        return tuple(parts)
+
+    a_parts = normalize_parts(A_path)
+    b_parts = normalize_parts(B_path)
+
     i = 0
-    while (
-        i < len(A_path.parts)
-        and i < len(B_path.parts)
-        and A_path.parts[i] == B_path.parts[i]
-    ):
+    while i < len(a_parts) and i < len(b_parts) and a_parts[i] == b_parts[i]:
         i += 1
     # i is now how many common segments they share
     # The distance "steps up" might be:
     # (len(A_path) - i) + (len(B_path) - i)
-    return (len(A_path.parts) - i) + (len(B_path.parts) - i)
+    return (len(a_parts) - i) + (len(b_parts) - i)
 
 
 def compute_custom_distance_matrix(

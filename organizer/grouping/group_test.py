@@ -347,7 +347,7 @@ def test_group_folders():
             session.commit()
 
         # Run the function with a single iteration
-        group_folders(db_path, max_iterations=1)
+        group_folders(db_path, max_iterations=1, config=get_minimal_config())
 
         # Verify results
         with Session(engine) as session:
