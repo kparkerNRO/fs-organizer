@@ -177,4 +177,4 @@ if __name__ == "__main__":
     print("Testing full decomposition pipeline...")
     test_full_decomposition_pipeline()
 
-    print("\nAll tests completed!")
+#     print("\nAll tests completed!")

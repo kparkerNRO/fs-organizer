@@ -1,18 +1,21 @@
 import json
 import logging
-from pathlib import Path
 import os
-from sqlalchemy import select
+from pathlib import Path
+from typing import Dict, Optional
+from sqlalchemy import func, select
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 import typer
 from api.api import StructureType
+from pipeline.categorize import get_categories_for_path
 from data_models.database import FolderStructure
 from data_models.database import (
     Folder as dbFolder,
     GroupCategoryEntry,
     get_sessionmaker,
 )
+from utils.filename_utils import clean_filename
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +23,18 @@ Base = declarative_base()
 
 
 def generate_api_folder_structure_folder(
-    session: Session, file: dbFolder, working_representation={}
+    session: Session, file: dbFolder, working_representation: Optional[Dict] = None
 ):
+    if working_representation is None:
+        working_representation = {}
     pass
 
 
 def generate_api_folder_structure_file(
-    session: Session, file: str, working_representation={}
+    session: Session, file: str, working_representation: Optional[Dict] = None
 ):
+    if working_representation is None:
+        working_representation = {}
     """
     class File(BaseModel):
     id: int
@@ -62,8 +69,10 @@ def generate_api_heirarchy(session: Session, column):
 
 
 def generate_folder_heirarchy_from_path(
-    session: Session, path: str, working_representation={}
+    session: Session, path: str, working_representation: Optional[Dict] = None
 ) -> dict:
+    if working_representation is None:
+        working_representation = {}
     cleaned_path = path
     if not cleaned_path:
         return working_representation
@@ -113,13 +122,91 @@ def get_folder_heirarchy(db_path: str, type: StructureType):
         return newest_entry.structure
 
 
+def _resolve_cleaned_name(folder: dbFolder) -> str:
+    if folder.cleaned_name:
+        return folder.cleaned_name
+    base_name = folder.folder_name
+    if base_name.endswith(".zip"):
+        base_name = base_name[:-4]
+    return clean_filename(base_name)
+
+
+def _build_cleaned_path(
+    folder: dbFolder,
+    folder_by_path: Dict[str, dbFolder],
+    cache: Dict[int, str],
+) -> str:
+    if folder.id in cache:
+        return cache[folder.id]
+
+    name = _resolve_cleaned_name(folder)
+    if not folder.parent_path:
+        cleaned_path = name
+    else:
+        parent = folder_by_path.get(folder.parent_path)
+        if parent is None:
+            cleaned_path = name
+        else:
+            parent_cleaned = _build_cleaned_path(parent, folder_by_path, cache)
+            if parent_cleaned:
+                cleaned_path = str(Path(parent_cleaned) / name)
+            else:
+                cleaned_path = name
+
+    cache[folder.id] = cleaned_path
+    return cleaned_path
+
+
+def recalculate_cleaned_paths(db_path: str) -> int:
+    sessionmaker = get_sessionmaker(db_path)
+    with sessionmaker() as session:
+        folders = session.execute(select(dbFolder)).scalars().all()
+        folder_by_path = {folder.folder_path: folder for folder in folders}
+        cache: Dict[int, str] = {}
+
+        for folder in folders:
+            folder.cleaned_path = _build_cleaned_path(folder, folder_by_path, cache)
+
+        session.commit()
+
+    return len(folders)
+
+
+def recalculate_cleaned_paths_for_structure(
+    db_path: str, structure_type: StructureType
+) -> int:
+    if structure_type == StructureType.original:
+        return recalculate_cleaned_paths(db_path)
+
+    sessionmaker = get_sessionmaker(db_path)
+    with sessionmaker() as session:
+        iteration_id = session.execute(
+            select(func.max(GroupCategoryEntry.iteration_id))
+        ).scalar_one()
+        folders = session.execute(select(dbFolder)).scalars().all()
+
+        for folder in folders:
+            categories = get_categories_for_path(
+                session,
+                Path(folder.folder_path) / "__folder__",
+                iteration_id,
+            )
+            folder.cleaned_path = "/".join(
+                [category.processed_name for category in categories]
+            )
+
+        session.commit()
+
+    return len(folders)
+
+
 def main(
     db_path: str = typer.Argument(
-        "organizer/outputs/latest/latest.db", help="Path to the SQLite database file"
+        "outputs/latest/latest.db", help="Path to the SQLite database file"
     ),
 ):
     """
-    Update folder paths in the database to use cleaned names.
+    Update folder cleaned paths in the database to use recalculated names.
 
     Args:
         db_path: Path to the SQLite database file
@@ -130,6 +217,8 @@ def main(
 
     logger.info(f"Processing database at: {db_path}")
     get_folder_heirarchy(db_path, StructureType.organized)
+    updated_count = recalculate_cleaned_paths(db_path)
+    logger.info(f"Updated cleaned_path for {updated_count} folders")
 
 
 if __name__ == "__main__":
