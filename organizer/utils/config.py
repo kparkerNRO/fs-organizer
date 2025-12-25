@@ -190,6 +190,37 @@ def get_config() -> Config:
     )
 
 
+def get_minimal_config() -> Config:
+    creators: dict[str, dict[str, Any]] = {}
+    variants: dict[str, dict[str, Any]] = {}
+
+    variant_cache = _build_variant_cache(variants)
+    creator_cache = _build_creator_remove_cache(creators)
+
+    relational_cache = {
+        "variant_tokens": variant_cache,
+        "creator_removes": creator_cache,
+    }
+
+    return Config(
+        creators=creators,
+        creator_removes=creator_cache["creator_to_removes"],
+        creator_strings=creator_cache["creator_strings"],
+        file_name_exceptions={},
+        replace_exceptions={},
+        clean_exceptions=set(),
+        should_ignore=set(),
+        grouping_exceptions=tuple(),
+        variants=variants,
+        known_variant_tokens=variant_cache["known_tokens"],
+        variant_type_by_string=variant_cache["type_by_token"],
+        variant_grouping_by_string=variant_cache["grouping_by_token"],
+        variant_types=set(),
+        media_types=set(),
+        relational_cache=relational_cache,
+    )
+
+
 _CONFIG = get_config()
 
 CREATOR_REMOVES = _CONFIG.creator_removes

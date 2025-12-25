@@ -17,7 +17,7 @@ from grouping.nlp_grouping import (
     prepare_records,
     compute_custom_distance_matrix,
 )
-from utils.config import KNOWN_VARIANT_TOKENS
+from utils.config import Config, get_config
 from utils.filename_utils import clean_filename, split_view_type
 
 from pathlib import Path
@@ -214,7 +214,7 @@ def refine_groups(
     return current_group_id
 
 
-def pre_process_groups(session: Session) -> None:
+def pre_process_groups(session: Session, config: Config | None = None) -> None:
     """
     Clean up compound entries - split out hyphen-delineated values
     """
@@ -240,14 +240,18 @@ def pre_process_groups(session: Session) -> None:
         for entry in uncertain_entries
     ]
 
+    config = config or get_config()
+
     for category in uncertain_categories:
         split_name = category["processed_name"].split("-")  # type: ignore[union-attr]  # ty bug: SQLAlchemy ORM attribute should be str
         categories = []
         for name in split_name:
-            cleaned_name = clean_filename(name)
+            cleaned_name = clean_filename(name, config=config)
             category_current = cleaned_name
             while category_current:
-                entry, variant = split_view_type(category_current, KNOWN_VARIANT_TOKENS)
+                entry, variant = split_view_type(
+                    category_current, config.known_variant_tokens
+                )
                 if entry and entry not in categories:
                     categories.append(entry)
                 if variant:
@@ -310,7 +314,60 @@ def compact_groups(session: Session):
     session.commit()
 
 
-def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) -> None:
+def _create_exact_groups(session: Session) -> None:
+    iteration_id = get_next_iteration_id(session) - 1
+    if iteration_id < 0:
+        return
+
+    entries = (
+        session.execute(
+            select(GroupCategoryEntry).where(
+                GroupCategoryEntry.iteration_id == iteration_id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not entries:
+        return
+
+    max_group_id = session.execute(select(func.max(GroupCategory.id))).scalar_one()
+    current_group_id = (max_group_id or 0) + 1
+
+    grouped_entries: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
+    for entry in entries:
+        group_name = entry.processed_name or entry.pre_processed_name
+        grouped_entries[group_name].append(entry)
+
+    for group_name, group_entries in grouped_entries.items():
+        confidences = [entry.confidence for entry in group_entries]
+        group_confidence = min(confidences) if confidences else 0.5
+
+        group_category = GroupCategory(
+            id=current_group_id,
+            name=group_name,
+            count=len(group_entries),
+            group_confidence=group_confidence,
+            iteration_id=iteration_id,
+            needs_review=group_confidence < REVIEW_CONFIDENCE_THRESHOLD,
+        )
+        session.add(group_category)
+        for entry in group_entries:
+            entry.group_id = current_group_id
+            entry.processed_name = group_name
+            entry.processed = True
+
+        current_group_id += 1
+
+    session.commit()
+
+
+def group_folders(
+    db_path: Path,
+    max_iterations: int = 2,
+    review_callback=None,
+    config: Config | None = None,
+) -> None:
     """
     Grouping steps:
         1. Using NLP heuristics, cluster the records in PartialNameCategory to find category names which should be grouped together
@@ -330,8 +387,9 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
 
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
+        config = config or get_config()
         process_folders_to_groups(session, 0)
-        pre_process_groups(session)
+        pre_process_groups(session, config=config)
 
         # New tag decomposition stage
         from grouping.tag_decomposition import decompose_compound_tags
@@ -339,3 +397,4 @@ def group_folders(db_path: Path, max_iterations: int = 2, review_callback=None) 
         decompose_compound_tags(session)
 
         compact_groups(session)
+        _create_exact_groups(session)

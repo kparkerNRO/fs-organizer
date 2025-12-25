@@ -22,7 +22,7 @@ from grouping.group import (
     group_folders,
 )
 from grouping.helpers import common_token_grouping
-from utils.config import KNOWN_VARIANT_TOKENS
+from utils.config import KNOWN_VARIANT_TOKENS, get_minimal_config
 
 
 # Helper function to create an in-memory DB for testing
@@ -352,7 +352,7 @@ def test_group_folders():
             session.commit()
 
         # Run the function with a single iteration
-        group_folders(db_path, max_iterations=1)
+        group_folders(db_path, max_iterations=1, config=get_minimal_config())
 
         # Verify results
         with Session(engine) as session:
