@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from data_models.database import (
     GroupCategory,
-    # setup_category_summarization,
     setup_folder_categories,
     setup_group,
     get_sessionmaker,
