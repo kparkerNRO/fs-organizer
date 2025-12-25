@@ -1,5 +1,4 @@
 import React from 'react';
-import styled from 'styled-components';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PaginationProps {
@@ -39,117 +38,67 @@ export const Pagination: React.FC<PaginationProps> = ({
   };
 
   return (
-    <PaginationContainer>
-      <PageSizeSelector>
+    <div className="flex items-center justify-between p-4 border-t border-gray-200">
+      <div className="flex items-center gap-2 text-gray-500 text-sm">
         <span>Show:</span>
-        <Select
+        <select
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          className="py-1 px-2 border border-gray-200 rounded outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         >
           {pageSizeOptions.map((size) => (
             <option key={size} value={size}>
               {size}
             </option>
           ))}
-        </Select>
+        </select>
         <span>items</span>
-      </PageSizeSelector>
+      </div>
 
-      <PageInfo>
+      <div className="text-gray-500 text-sm">
         Showing {Math.min((currentPage - 1) * pageSize + 1, totalItems)} to{' '}
         {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
-      </PageInfo>
+      </div>
 
-      <PaginationControls>
-        <PaginationButton
+      <div className="flex items-center gap-1">
+        <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
+          className={`p-1.5 border border-gray-200 rounded bg-white ${
+            currentPage === 1
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-700 cursor-pointer hover:bg-gray-100'
+          }`}
         >
           <ChevronLeft size={16} />
-        </PaginationButton>
+        </button>
 
         {getPageNumbers().map((page) => (
-          <PageNumber
+          <button
             key={page}
-            $active={page === currentPage}
             onClick={() => onPageChange(page)}
+            className={`py-1.5 px-3 border rounded cursor-pointer ${
+              page === currentPage
+                ? 'border-blue-500 bg-blue-500 text-white hover:bg-blue-600'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-100'
+            }`}
           >
             {page}
-          </PageNumber>
+          </button>
         ))}
 
-        <PaginationButton
+        <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
+          className={`p-1.5 border border-gray-200 rounded bg-white ${
+            currentPage === totalPages
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-700 cursor-pointer hover:bg-gray-100'
+          }`}
         >
           <ChevronRight size={16} />
-        </PaginationButton>
-      </PaginationControls>
-    </PaginationContainer>
+        </button>
+      </div>
+    </div>
   );
 };
-
-const PaginationContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  border-top: 1px solid #e5e7eb;
-`;
-
-const PageSizeSelector = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #6b7280;
-  font-size: 0.875rem;
-`;
-
-const Select = styled.select`
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  outline: none;
-  
-  &:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const PageInfo = styled.div`
-  color: #6b7280;
-  font-size: 0.875rem;
-`;
-
-const PaginationControls = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-`;
-
-const PaginationButton = styled.button<{ disabled?: boolean }>`
-  padding: 0.375rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  background: white;
-  color: ${props => props.disabled ? '#d1d5db' : '#374151'};
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-
-  &:hover:not(:disabled) {
-    background-color: #f3f4f6;
-  }
-`;
-
-const PageNumber = styled.button<{ $active?: boolean }>`
-  padding: 0.375rem 0.75rem;
-  border: 1px solid ${props => props.$active ? '#3b82f6' : '#e5e7eb'};
-  border-radius: 0.375rem;
-  background: ${props => props.$active ? '#3b82f6' : 'white'};
-  color: ${props => props.$active ? 'white' : '#374151'};
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    background-color: ${props => props.$active ? '#2563eb' : '#f3f4f6'};
-  }
-`;

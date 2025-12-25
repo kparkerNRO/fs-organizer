@@ -1,7 +1,8 @@
 import React from "react";
-import styled from "styled-components";
 import { CategoryDetailsProps } from "../types/types";
 import { FileIcon, FolderIcon } from "lucide-react";
+
+const detailsContainerClass = "p-6 bg-white rounded-lg shadow-sm w-full box-border overflow-x-hidden overflow-y-auto [.folder-structure-page_&]:flex-1 [.folder-structure-page_&]:flex [.folder-structure-page_&]:flex-col [.folder-structure-page_&]:min-h-0 [.folder-structure-page_&]:overflow-y-auto [.folder-structure-page_&]:w-[450px] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:rounded [&::-webkit-scrollbar-thumb]:bg-gray-400 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb:hover]:bg-gray-500";
 
 export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
   category,
@@ -11,356 +12,261 @@ export const CategoryDetails: React.FC<CategoryDetailsProps> = ({
   // If no item is selected, return the placeholder
   if (!category && !folder && !file) {
     return (
-      <DetailsContainer>
-        <DetailHeader>
-          <DetailTitle>Details</DetailTitle>
-        </DetailHeader>
-        <PlaceholderContainer>
-          <PlaceholderText>Select a folder or file to view details</PlaceholderText>
-        </PlaceholderContainer>
-      </DetailsContainer>
+      <div className={detailsContainerClass}>
+        <div className="flex items-center mb-5 pb-3 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900 m-0">Details</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1 min-h-[200px]">
+          <p className="text-gray-500 text-base">Select a folder or file to view details</p>
+        </div>
+      </div>
     );
   }
-  
+
   // Render file details if a file is selected
   if (file) {
     return (
-      <DetailsContainer>
-        <DetailHeader>
+      <div className={detailsContainerClass}>
+        <div className="flex items-center mb-5 pb-3 border-b border-gray-200">
           <FileIcon size={18} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
-          <DetailTitle>File Details</DetailTitle>
-        </DetailHeader>
-        
-        <DetailsGrid>
-          <FieldContainer>
-            <Label>File Name</Label>
-            <Input type="text" value={file.name || ""} readOnly />
-          </FieldContainer>
+          <h3 className="text-lg font-medium text-gray-900 m-0">File Details</h3>
+        </div>
 
-          <FieldContainer>
-            <Label>File Type</Label>
-            <Input type="text" value={file.fileType || ""} readOnly />
-          </FieldContainer>
-          
-          {file.size && (
-            <FieldContainer>
-              <Label>Size</Label>
-              <Input type="text" value={file.size} readOnly />
-            </FieldContainer>
-          )}
-        </DetailsGrid>
-
-        <FieldRow>
-          <Label>Original Path</Label>
-          <Input type="text" value={file.original_path || ""} readOnly />
-        </FieldRow>
-        
-        {file.categories && file.categories.length > 0 && (
-          <FieldRow>
-            <Label>Categories</Label>
-            <Input 
-              type="text" 
-              value={file.categories.join(", ")} 
-              readOnly 
+        <div className="grid grid-cols-2 gap-6 mb-6 [.folder-structure-page_&]:grid-cols-1">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">File Name</label>
+            <input
+              type="text"
+              value={file.name || ""}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
-          </FieldRow>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">File Type</label>
+            <input
+              type="text"
+              value={file.fileType || ""}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {file.size && (
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-gray-700">Size</label>
+              <input
+                type="text"
+                value={file.size}
+                readOnly
+                className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Original Path</label>
+          <input
+            type="text"
+            value={file.original_path || ""}
+            readOnly
+            className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+
+        {file.categories && file.categories.length > 0 && (
+          <div className="mt-4 flex flex-col gap-1 w-full">
+            <label className="text-sm font-medium text-gray-700">Categories</label>
+            <input
+              type="text"
+              value={file.categories.join(", ")}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
         )}
 
-        <FieldRow>
-          <Label>Confidence</Label>
-          <ConfidenceBar>
-            <ConfidenceFill style={{ width: `${file.confidence}%` }}>
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Confidence</label>
+          <div className="w-full h-10 bg-gray-300 rounded-lg overflow-hidden">
+            <div
+              style={{ width: `${file.confidence}%` }}
+              className="h-full bg-gray-500 rounded-lg transition-all duration-300 flex items-center justify-center text-white text-sm"
+            >
               {file.confidence}%
-            </ConfidenceFill>
-          </ConfidenceBar>
-        </FieldRow>
-      </DetailsContainer>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
+
   // Render folder details if a folder is selected
   if (folder != null) {
-    // Calculate content based on what's available
     const hasProcessedNames = folder.processed_names && folder.processed_names.length > 0;
-    
+
     return (
-      <DetailsContainer>
-        <DetailHeader>
+      <div className={detailsContainerClass}>
+        <div className="flex items-center mb-5 pb-3 border-b border-gray-200">
           <FolderIcon size={18} style={{ marginRight: '0.5rem', opacity: 0.7 }} />
-          <DetailTitle>Folder Details</DetailTitle>
-        </DetailHeader>
-        
-        <DetailsGrid>
-          <FieldContainer>
-            <Label>Category Name</Label>
-            <Input type="text" value={category?.name || ""} readOnly />
-          </FieldContainer>
+          <h3 className="text-lg font-medium text-gray-900 m-0">Folder Details</h3>
+        </div>
 
-          <FieldContainer>
-            <Label>Name:</Label>
-            <Input type="text" value={folder.name || ""} readOnly />
-          </FieldContainer>
+        <div className="grid grid-cols-2 gap-6 mb-6 [.folder-structure-page_&]:grid-cols-1">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Category Name</label>
+            <input
+              type="text"
+              value={category?.name || ""}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
 
-          <FieldContainer>
-            <Label>Classification</Label>
-            <SelectInput>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Name:</label>
+            <input
+              type="text"
+              value={folder.name || ""}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Classification</label>
+            <select
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
               <option value={folder.classification}>
                 {folder.classification}
               </option>
-            </SelectInput>
-          </FieldContainer>
-        </DetailsGrid>
+            </select>
+          </div>
+        </div>
 
-        <FieldRow>
-          <Label>Original Filename</Label>
-          <Input type="text" value={folder.original_filename || ""} readOnly />
-        </FieldRow>
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Original Filename</label>
+          <input
+            type="text"
+            value={folder.original_filename || ""}
+            readOnly
+            className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
 
-        <FieldRow>
-          <Label>Original Path</Label>
-          <Input type="text" value={folder.original_path || ""} readOnly />
-        </FieldRow>
-        
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Original Path</label>
+          <input
+            type="text"
+            value={folder.original_path || ""}
+            readOnly
+            className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+
         {hasProcessedNames && (
-          <FieldRow>
-            <Label>Categories</Label>
-            <Input 
-              type="text" 
-              value={folder.processed_names!.join(", ")} 
-              readOnly 
+          <div className="mt-4 flex flex-col gap-1 w-full">
+            <label className="text-sm font-medium text-gray-700">Categories</label>
+            <input
+              type="text"
+              value={folder.processed_names!.join(", ")}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
-          </FieldRow>
+          </div>
         )}
-        {!hasProcessedNames && <EmptySpace />}
+        {!hasProcessedNames && <div className="h-20 w-full" />}
 
-        <FieldRow>
-          <Label>Confidence</Label>
-          <ConfidenceBar>
-            <ConfidenceFill style={{ width: `${folder.confidence}%` }}>
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Confidence</label>
+          <div className="w-full h-10 bg-gray-300 rounded-lg overflow-hidden">
+            <div
+              style={{ width: `${folder.confidence}%` }}
+              className="h-full bg-gray-500 rounded-lg transition-all duration-300 flex items-center justify-center text-white text-sm"
+            >
               {folder.confidence}%
-            </ConfidenceFill>
-          </ConfidenceBar>
-        </FieldRow>
+            </div>
+          </div>
+        </div>
 
         {hasProcessedNames && (
-          <ProcessedNamesContainer>
-            <Label>Processed Names</Label>
-            <ProcessedNamesInput
+          <div className="mt-4">
+            <label className="text-sm font-medium text-gray-700">Processed Names</label>
+            <textarea
               value={folder.processed_names!.join("\n")}
               readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100 min-h-[100px] resize-y"
             />
-          </ProcessedNamesContainer>
+          </div>
         )}
-        {!hasProcessedNames && <EmptySpace />}
-      </DetailsContainer>
+        {!hasProcessedNames && <div className="h-20 w-full" />}
+      </div>
     );
   }
 
   if (category != null) {
-    // Render Category details
     return (
-      <DetailsContainer>
-        <DetailHeader>
-          <DetailTitle>Category Details</DetailTitle>
-        </DetailHeader>
-        
-        <DetailsGrid>
-          <FieldContainer>
-            <Label>Category Name</Label>
-            <Input type="text" value={category.name || ""} readOnly />
-          </FieldContainer>
+      <div className={detailsContainerClass}>
+        <div className="flex items-center mb-5 pb-3 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900 m-0">Category Details</h3>
+        </div>
 
-          <FieldContainer>
-            <Label>Classification</Label>
-            <SelectInput>
+        <div className="grid grid-cols-2 gap-6 mb-6 [.folder-structure-page_&]:grid-cols-1">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Category Name</label>
+            <input
+              type="text"
+              value={category.name || ""}
+              readOnly
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Classification</label>
+            <select
+              className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
               <option value={category.classification}>
                 {category.classification}
               </option>
-            </SelectInput>
-          </FieldContainer>
+            </select>
+          </div>
 
-          <FieldContainer>
-            <Label>Confidence</Label>
-            <ConfidenceBar>
-              <ConfidenceFill style={{ width: `${category.confidence}%` }}>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Confidence</label>
+            <div className="w-full h-10 bg-gray-300 rounded-lg overflow-hidden">
+              <div
+                style={{ width: `${category.confidence}%` }}
+                className="h-full bg-gray-500 rounded-lg transition-all duration-300 flex items-center justify-center text-white text-sm"
+              >
                 {category.confidence}%
-              </ConfidenceFill>
-            </ConfidenceBar>
-          </FieldContainer>
-        </DetailsGrid>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        <FieldRow>
-          <Label>Possible Classifications</Label>
-          <Input
+        <div className="mt-4 flex flex-col gap-1 w-full">
+          <label className="text-sm font-medium text-gray-700">Possible Classifications</label>
+          <input
             type="text"
             value={category.possibleClassifications?.join(", ") || ""}
             readOnly
+            className="w-full py-2 px-3 border border-gray-200 rounded-lg outline-none box-border focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
-        </FieldRow>
-      </DetailsContainer>
+        </div>
+      </div>
     );
   }
+
   if (!category && !folder) {
     return (
-      <DetailsContainer>
-        <PlaceholderText>Select a category to view details</PlaceholderText>
-      </DetailsContainer>
+      <div className={detailsContainerClass}>
+        <p className="text-gray-500 text-base">Select a category to view details</p>
+      </div>
     );
   }
 };
-
-const DetailsContainer = styled.div`
-  padding: 1.5rem;
-  background: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-  overflow-y: auto;
-  
-  .folder-structure-page & {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* Critical for proper flexbox behavior with scrolling */
-    overflow-y: auto;
-    width: 450px;
-  }
-  
-  /* Modern scrollbar styling */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 4px;
-  }
-  
-  &::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
-  }
-`;
-
-const DetailsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  margin-bottom: 1.5rem;
-  
-  .folder-structure-page & {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const FieldContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-`;
-const FieldRow = styled.div`
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  width: 100%;
-`;
-
-const Label = styled.label`
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-`;
-
-const Input = styled.input`
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  outline: none;
-  box-sizing: border-box;
-
-  &:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const SelectInput = styled.select`
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  outline: none;
-  background-color: white;
-
-  &:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const ProcessedNamesContainer = styled.div`
-  margin-top: 1rem;
-`;
-
-const ProcessedNamesInput = styled(Input)`
-  min-height: 100px;
-  resize: vertical;
-  width: 100%;
-  box-sizing: border-box;
-`;
-
-const ConfidenceBar = styled.div`
-  width: 100%;
-  height: 2.5rem;
-  background-color: #d1d5db;
-  border-radius: 0.5rem;
-  overflow: hidden;
-`;
-
-const ConfidenceFill = styled.div`
-  height: 100%;
-  background-color: #6b7280;
-  border-radius: 0.5rem;
-  transition: width 0.3s ease;
-`;
-
-const DetailHeader = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e5e7eb;
-`;
-
-const DetailTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 500;
-  color: #111827;
-  margin: 0;
-`;
-
-const PlaceholderContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  min-height: 200px;
-`;
-
-const EmptySpace = styled.div`
-  height: 80px;
-  width: 100%;
-`;
-
-const PlaceholderText = styled.p`
-  color: #6b7280;
-  font-size: 0.95rem;
-`;

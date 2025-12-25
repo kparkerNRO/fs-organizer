@@ -1,6 +1,5 @@
 // src/components/NavBar.tsx
 import React, { useState } from "react";
-import styled from "styled-components";
 import { Menu, X } from "lucide-react";
 
 export interface NavItem {
@@ -14,10 +13,10 @@ interface NavBarProps {
   onNavItemClick: (itemId: string) => void;
 }
 
-export const NavBar: React.FC<NavBarProps> = ({ 
-  items, 
-  activeItemId, 
-  onNavItemClick 
+export const NavBar: React.FC<NavBarProps> = ({
+  items,
+  activeItemId,
+  onNavItemClick
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -31,86 +30,34 @@ export const NavBar: React.FC<NavBarProps> = ({
   };
 
   return (
-    <NavContainer>
-      <NavHeader>
-        <MenuButton onClick={toggleMenu}>
+    <nav className="relative">
+      <div className="flex justify-between items-center p-4 px-6 bg-white border-b border-gray-200">
+        <button
+          onClick={toggleMenu}
+          className="bg-transparent border-none cursor-pointer flex items-center justify-center text-gray-600 hover:text-gray-800"
+        >
           {menuOpen ? <X size={24} /> : <Menu size={24} />}
-        </MenuButton>
-        <Logo>FS Organizer</Logo>
-      </NavHeader>
+        </button>
+        <div className="text-xl font-semibold text-gray-800">FS Organizer</div>
+      </div>
 
       {menuOpen && (
-        <NavMenu>
+        <div className="absolute top-full left-0 w-64 bg-white shadow-lg rounded-lg mt-2 ml-4 overflow-hidden z-50">
           {items.map((item) => (
-            <NavMenuItem
+            <div
               key={item.id}
-              $active={item.id === activeItemId}
               onClick={() => handleNavItemClick(item.id)}
+              className={`py-3 px-6 cursor-pointer ${
+                item.id === activeItemId
+                  ? "text-blue-600 bg-blue-50 font-semibold"
+                  : "text-gray-600 bg-transparent font-normal"
+              } hover:bg-gray-100`}
             >
               {item.label}
-            </NavMenuItem>
+            </div>
           ))}
-        </NavMenu>
+        </div>
       )}
-    </NavContainer>
+    </nav>
   );
 };
-
-const NavContainer = styled.nav`
-  position: relative;
-`;
-
-const NavHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-`;
-
-const Logo = styled.div`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-`;
-
-const MenuButton = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4b5563;
-  
-  &:hover {
-    color: #1f2937;
-  }
-`;
-
-const NavMenu = styled.div`
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 250px;
-  background-color: #ffffff;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  border-radius: 0.5rem;
-  margin-top: 0.5rem;
-  margin-left: 1rem;
-  overflow: hidden;
-  z-index: 50;
-`;
-
-const NavMenuItem = styled.div<{ $active: boolean }>`
-  padding: 0.75rem 1.5rem;
-  cursor: pointer;
-  color: ${(props) => (props.$active ? "#2563eb" : "#4b5563")};
-  background-color: ${(props) => (props.$active ? "#eff6ff" : "transparent")};
-  font-weight: ${(props) => (props.$active ? "600" : "400")};
-  
-  &:hover {
-    background-color: #f3f4f6;
-  }
-`;

@@ -1,6 +1,5 @@
 // CategoriesPage.tsx
 import React, { useState, useEffect } from "react";
-import styled from "styled-components";
 import { Folder, SortConfig } from "../types/types";
 import { CategoryTable } from "../components/CategoryTable";
 import { CategoryDetails } from "../components/CategoryDetails";
@@ -102,13 +101,13 @@ export const CategoriesPage: React.FC = () => {
   };
 
   return (
-    <PageContainer>
-      <Header>
-        <Title>Categories</Title>
+    <div className="bg-gray-100 p-8 min-h-[calc(100vh-57px)]">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-semibold text-gray-800">Categories</h1>
         <ResetButton onReset={() => resetToInitial(handleReset)} />
-      </Header>
+      </div>
 
-      <ContentContainer>
+      <div className="max-w-[1200px] mx-auto flex flex-col gap-8 overflow-hidden">
         <CategoryTable
           categories={categories}
           onSelectItem={setSelectedItem}
@@ -125,35 +124,7 @@ export const CategoriesPage: React.FC = () => {
           category={selectedItem?.category ?? undefined}
           folder={selectedItem?.folder ?? undefined}
         />
-      </ContentContainer>
-    </PageContainer>
+      </div>
+    </div>
   );
 };
-
-const PageContainer = styled.div`
-  background-color: #f3f4f6;
-  padding: 2rem;
-  min-height: calc(100vh - 57px); /* Account for navbar height */
-`;
-
-const ContentContainer = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  overflow: hidden;
-`;
-
-const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-`;
-
-const Title = styled.h1`
-  font-size: 2rem;
-  font-weight: 600;
-  color: #1f2937;
-`;

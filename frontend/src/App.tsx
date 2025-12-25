@@ -1,6 +1,5 @@
 // src/App.tsx
 import React, { useState } from "react";
-import styled from "styled-components";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { FolderStructurePage } from "./pages/FolderStructurePage";
 import { ImportWizardPage } from "./pages/ImportWizardPage";
@@ -21,13 +20,13 @@ function App() {
   };
 
   return (
-    <AppContainer>
+    <div className="min-h-screen flex flex-col">
       <NavBar
         items={navItems}
         activeItemId={activeView}
         onNavItemClick={handleNavItemClick}
       />
-      <MainContent>
+      <main className="flex-1">
         {activeView === "categories" ? (
           <CategoriesPage />
         ) : activeView === "folders" ? (
@@ -35,19 +34,9 @@ function App() {
         ) : (
           <ImportWizardPage />
         )}
-      </MainContent>
-    </AppContainer>
+      </main>
+    </div>
   );
 }
-
-const AppContainer = styled.div`
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-`;
-
-const MainContent = styled.main`
-  flex: 1;
-`;
 
 export default App;

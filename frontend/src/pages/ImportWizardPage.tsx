@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from "react";
-import styled from "styled-components";
 import { FolderV2 } from "../types/types";
 import {
   gatherFiles,
@@ -147,48 +146,148 @@ export const ImportWizardPage: React.FC = () => {
   };
 
   return (
-    <WizardContainer data-testid="wizard-container">
-      <WizardHeader>
+    <div
+      className="w-screen h-screen m-0 p-1 bg-slate-50 overflow-hidden flex flex-col box-border"
+      data-testid="wizard-container"
+    >
+      <div className="flex justify-between items-center mb-2 flex-shrink-0 h-12 relative min-w-0">
         <div style={{ width: "120px", flexShrink: 0 }} />{" "}
         {/* Spacer for centering */}
-        <Title>Import Wizard</Title>
-        <StepIndicator>
-          <StepItem
-            active={state.currentStep === 1}
-            completed={state.currentStep > 1}
-            clickable={1 <= state.currentStep}
+        <h1 className="text-2xl font-bold text-gray-800 m-0 pt-0 leading-tight flex-1 text-center min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+          Import Wizard
+        </h1>
+        <div className="flex gap-2 items-center flex-shrink-0">
+          <div
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 border border-transparent select-none ${
+              1 <= state.currentStep
+                ? "cursor-pointer opacity-100"
+                : "cursor-not-allowed opacity-60"
+            } ${
+              state.currentStep === 1
+                ? "bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.2)] border-blue-700"
+                : ""
+            } ${
+              state.currentStep > 1 && state.currentStep !== 1
+                ? "bg-emerald-500 text-white"
+                : ""
+            } ${
+              state.currentStep < 1 && state.currentStep !== 1
+                ? "bg-slate-200 text-slate-500"
+                : ""
+            } ${
+              1 <= state.currentStep &&
+              state.currentStep !== 1 &&
+              state.currentStep > 1
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-emerald-600"
+                : ""
+            } ${
+              1 <= state.currentStep &&
+              state.currentStep !== 1 &&
+              state.currentStep < 1
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-slate-300"
+                : ""
+            }`}
             onClick={() => goToStep(1)}
           >
             1. Import
-          </StepItem>
-          <StepItem
-            active={state.currentStep === 2}
-            completed={state.currentStep > 2}
-            clickable={2 <= state.currentStep}
+          </div>
+          <div
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 border border-transparent select-none ${
+              2 <= state.currentStep
+                ? "cursor-pointer opacity-100"
+                : "cursor-not-allowed opacity-60"
+            } ${
+              state.currentStep === 2
+                ? "bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.2)] border-blue-700"
+                : ""
+            } ${
+              state.currentStep > 2 && state.currentStep !== 2
+                ? "bg-emerald-500 text-white"
+                : ""
+            } ${
+              state.currentStep < 2 && state.currentStep !== 2
+                ? "bg-slate-200 text-slate-500"
+                : ""
+            } ${
+              2 <= state.currentStep &&
+              state.currentStep !== 2 &&
+              state.currentStep > 2
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-emerald-600"
+                : ""
+            } ${
+              2 <= state.currentStep &&
+              state.currentStep !== 2 &&
+              state.currentStep < 2
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-slate-300"
+                : ""
+            }`}
             onClick={() => goToStep(2)}
           >
             2. Group
-          </StepItem>
-          <StepItem
-            active={state.currentStep === 3}
-            completed={state.currentStep > 3}
-            clickable={3 <= state.currentStep}
+          </div>
+          <div
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 border border-transparent select-none ${
+              3 <= state.currentStep
+                ? "cursor-pointer opacity-100"
+                : "cursor-not-allowed opacity-60"
+            } ${
+              state.currentStep === 3
+                ? "bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.2)] border-blue-700"
+                : ""
+            } ${
+              state.currentStep > 3 && state.currentStep !== 3
+                ? "bg-emerald-500 text-white"
+                : ""
+            } ${
+              state.currentStep < 3 && state.currentStep !== 3
+                ? "bg-slate-200 text-slate-500"
+                : ""
+            } ${
+              3 <= state.currentStep &&
+              state.currentStep !== 3 &&
+              state.currentStep > 3
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-emerald-600"
+                : ""
+            } ${
+              3 <= state.currentStep &&
+              state.currentStep !== 3 &&
+              state.currentStep < 3
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-slate-300"
+                : ""
+            }`}
             onClick={() => goToStep(3)}
           >
             3. Organize
-          </StepItem>
-          <StepItem
-            active={state.currentStep === 4}
-            completed={false}
-            clickable={4 <= state.currentStep}
+          </div>
+          <div
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 border border-transparent select-none ${
+              4 <= state.currentStep
+                ? "cursor-pointer opacity-100"
+                : "cursor-not-allowed opacity-60"
+            } ${
+              state.currentStep === 4
+                ? "bg-blue-600 text-white shadow-[0_0_0_2px_rgba(37,99,235,0.2)] border-blue-700"
+                : ""
+            } ${
+              state.currentStep !== 4 ? "bg-slate-200 text-slate-500" : ""
+            } ${
+              4 <= state.currentStep && state.currentStep !== 4
+                ? "hover:-translate-y-0.5 hover:shadow-sm hover:bg-slate-300"
+                : ""
+            }`}
             onClick={() => goToStep(4)}
           >
             4. Review
-          </StepItem>
-        </StepIndicator>
-      </WizardHeader>
-      <WizardContent data-testid="wizard-content">{renderStep()}</WizardContent>
-    </WizardContainer>
+          </div>
+        </div>
+      </div>
+      <div
+        className="bg-white rounded-md p-3 shadow-sm relative flex-1 flex flex-col overflow-hidden min-h-0"
+        data-testid="wizard-content"
+      >
+        {renderStep()}
+      </div>
+    </div>
   );
 };
 
@@ -209,7 +308,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
         abortController.abort();
       }
     };
-  }, []);
+  }, [abortController]);
 
   const handleBrowseFolder = async () => {
     const result = await selectFolder();
@@ -293,9 +392,9 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
   };
 
   return (
-    <StepContainer>
-      <FolderSelectSection>
-        <FolderInput
+    <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+      <div className="flex gap-3 mb-4 items-stretch">
+        <input
           type="text"
           placeholder="Select folder or enter path..."
           value={state.sourcePath}
@@ -306,18 +405,22 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
               handleFolderSelect(state.sourcePath);
             }
           }}
+          className="flex-1 px-2 py-2 border border-gray-300 rounded-md text-sm font-inherit focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
         />
-        <BrowseButton onClick={handleBrowseFolder} disabled={state.isLoading}>
+        <button
+          onClick={handleBrowseFolder}
+          disabled={state.isLoading}
+          className="px-4 py-2 border-0 rounded-md cursor-pointer text-sm font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-500 text-white hover:bg-gray-600 disabled:hover:bg-gray-500"
+        >
           Browse
-        </BrowseButton>
-        <ProcessButton
+        </button>
+        <button
           onClick={
             state.isLoading
               ? handleCancelImport
               : () => handleFolderSelect(state.sourcePath)
           }
           disabled={!state.sourcePath.trim() && !state.isLoading}
-          $isCancel={state.isLoading}
           title={
             state.isLoading
               ? "Cancel folder processing"
@@ -325,12 +428,21 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
                 ? "Select a folder first"
                 : "Process selected folder"
           }
+          className={`px-4 py-2 border-0 rounded-md cursor-pointer text-sm font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-white ${
+            state.isLoading
+              ? "bg-red-500 hover:bg-red-600 disabled:hover:bg-red-500"
+              : "bg-blue-600 hover:bg-blue-700 disabled:hover:bg-blue-600"
+          }`}
         >
           {state.isLoading ? "Cancel" : "Process"}
-        </ProcessButton>
-      </FolderSelectSection>
+        </button>
+      </div>
 
-      <ContentContainer isLoading={state.isLoading}>
+      <div
+        className={`p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] ${
+          state.isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
+        }`}
+      >
         {state.originalStructure ? (
           <FolderBrowser
             folderTree={state.originalStructure}
@@ -351,29 +463,41 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
           </div>
         )}
         {state.isLoading && (
-          <LoadingOverlay>
-            <LoadingModal>
-              <LoadingSpinner />
-              <LoadingText>{state.loadingMessage}</LoadingText>
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-xl">
+            <div className="bg-white px-8 py-6 rounded-xl shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_10px_15px_-3px_rgba(0,0,0,0.2)] border border-slate-200 flex flex-col items-center gap-4 min-w-[280px] max-w-[350px] text-center">
+              <div className="w-8 h-8 border-[3px] border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+              <div className="text-gray-700 font-medium text-base">
+                {state.loadingMessage}
+              </div>
               {state.progress > 0 && (
-                <ProgressSection>
-                  <ProgressBar>
-                    <ProgressFill style={{ width: `${state.progress}%` }} />
-                  </ProgressBar>
-                  <ProgressText>{state.progress}% complete</ProgressText>
-                </ProgressSection>
+                <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] my-4 p-4 rounded-lg flex-none">
+                  <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 transition-[width] duration-300"
+                      style={{ width: `${state.progress}%` }}
+                    />
+                  </div>
+                  <div className="text-center mt-2 text-gray-500 font-medium">
+                    {state.progress}% complete
+                  </div>
+                </div>
               )}
-            </LoadingModal>
-          </LoadingOverlay>
+            </div>
+          </div>
         )}
-      </ContentContainer>
+      </div>
 
       {state.originalStructure && (
-        <ButtonRow>
-          <SuccessButton onClick={onNext}>Next</SuccessButton>
-        </ButtonRow>
+        <div className="flex gap-3 justify-end pt-3 pb-3 border-t border-slate-200 flex-wrap flex-shrink-0 min-h-[56px] items-center">
+          <button
+            onClick={onNext}
+            className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500 text-white hover:bg-emerald-600 disabled:hover:bg-emerald-500"
+          >
+            Next
+          </button>
+        </div>
       )}
-    </StepContainer>
+    </div>
   );
 };
 
@@ -392,7 +516,7 @@ const GroupStep: React.FC<StepProps> = ({
         abortController.abort();
       }
     };
-  }, []);
+  }, [abortController]);
 
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
@@ -450,12 +574,18 @@ const GroupStep: React.FC<StepProps> = ({
   ]);
 
   return (
-    <StepContainer>
-      <ComparisonView isLoading={state.isLoading}>
-        <Panel>
-          <SectionTitle>
-            <span>Original Structure</span>
-          </SectionTitle>
+    <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+      <div
+        className={`grid grid-cols-2 gap-3 relative transition-opacity duration-200 flex-1 min-h-0 ${
+          state.isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
+          <h4 className="font-bold m-0 text-slate-900 text-sm leading-tight relative text-center mb-2 before:content-[''] before:absolute before:top-1/2 before:left-0 before:w-[calc(50%-0.75rem)] before:h-[1px] before:bg-slate-100 before:opacity-60 after:content-[''] after:absolute after:top-1/2 after:right-0 after:w-[calc(50%-0.75rem)] after:h-[1px] after:bg-slate-100 after:opacity-60">
+            <span className="bg-[#fafbfc] px-2 relative z-[1] transition-colors duration-200">
+              Original Structure
+            </span>
+          </h4>
           {state.originalStructure ? (
             <FolderBrowser
               folderTree={state.originalStructure}
@@ -475,11 +605,13 @@ const GroupStep: React.FC<StepProps> = ({
               Original folder structure will appear here...
             </div>
           )}
-        </Panel>
-        <Panel>
-          <SectionTitle>
-            <span>Grouped Structure</span>
-          </SectionTitle>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
+          <h4 className="font-bold m-0 text-slate-900 text-sm leading-tight relative text-center mb-2 before:content-[''] before:absolute before:top-1/2 before:left-0 before:w-[calc(50%-0.75rem)] before:h-[1px] before:bg-slate-100 before:opacity-60 after:content-[''] after:absolute after:top-1/2 after:right-0 after:w-[calc(50%-0.75rem)] after:h-[1px] after:bg-slate-100 after:opacity-60">
+            <span className="bg-[#fafbfc] px-2 relative z-[1] transition-colors duration-200">
+              Grouped Structure
+            </span>
+          </h4>
           {state.groupedStructure ? (
             <FolderBrowser
               folderTree={state.groupedStructure}
@@ -499,20 +631,27 @@ const GroupStep: React.FC<StepProps> = ({
               Grouped structure will appear here after processing...
             </div>
           )}
-        </Panel>
-      </ComparisonView>
+        </div>
+      </div>
       {state.isLoading && (
-        <LoadingOverlay>
-          <LoadingModal>
-            <LoadingSpinner />
-            <LoadingText>{state.loadingMessage}</LoadingText>
-          </LoadingModal>
-        </LoadingOverlay>
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-xl">
+          <div className="bg-white px-8 py-6 rounded-xl shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_10px_15px_-3px_rgba(0,0,0,0.2)] border border-slate-200 flex flex-col items-center gap-4 min-w-[280px] max-w-[350px] text-center">
+            <div className="w-8 h-8 border-[3px] border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+            <div className="text-gray-700 font-medium text-base">
+              {state.loadingMessage}
+            </div>
+          </div>
+        </div>
       )}
 
-      <ButtonRow>
-        <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton
+      <div className="flex gap-3 justify-end pt-3 pb-3 border-t border-slate-200 flex-wrap flex-shrink-0 min-h-[56px] items-center">
+        <button
+          onClick={onPrev}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-500 text-white hover:bg-gray-600 disabled:hover:bg-gray-500"
+        >
+          Previous
+        </button>
+        <button
           onClick={async () => {
             if (state.groupedStructure) {
               try {
@@ -531,17 +670,19 @@ const GroupStep: React.FC<StepProps> = ({
             }
           }}
           disabled={state.isLoading || !state.groupedStructure}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-amber-500 text-white hover:bg-amber-600 disabled:hover:bg-amber-500"
         >
           Save
-        </WarningButton>
-        <SuccessButton
+        </button>
+        <button
           onClick={onNext}
           disabled={state.isLoading || !state.groupedStructure}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500 text-white hover:bg-emerald-600 disabled:hover:bg-emerald-500"
         >
           Next
-        </SuccessButton>
-      </ButtonRow>
-    </StepContainer>
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -551,7 +692,6 @@ const OrganizeStep: React.FC<StepProps> = ({
   onNext,
   onPrev,
 }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
 
@@ -561,7 +701,7 @@ const OrganizeStep: React.FC<StepProps> = ({
         abortController.abort();
       }
     };
-  }, []);
+  }, [abortController]);
 
   const handleFileSelect = (fileId: number | null) => {
     updateState({ selectedFileId: fileId });
@@ -619,12 +759,18 @@ const OrganizeStep: React.FC<StepProps> = ({
   ]);
 
   return (
-    <StepContainer>
-      <ComparisonView isLoading={state.isLoading}>
-        <Panel>
-          <SectionTitle>
-            <span>Grouped Structure</span>
-          </SectionTitle>
+    <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+      <div
+        className={`grid grid-cols-2 gap-3 relative transition-opacity duration-200 flex-1 min-h-0 ${
+          state.isLoading ? "opacity-50 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
+          <h4 className="font-bold m-0 text-slate-900 text-sm leading-tight relative text-center mb-2 before:content-[''] before:absolute before:top-1/2 before:left-0 before:w-[calc(50%-0.75rem)] before:h-[1px] before:bg-slate-100 before:opacity-60 after:content-[''] after:absolute after:top-1/2 after:right-0 after:w-[calc(50%-0.75rem)] after:h-[1px] after:bg-slate-100 after:opacity-60">
+            <span className="bg-[#fafbfc] px-2 relative z-[1] transition-colors duration-200">
+              Grouped Structure
+            </span>
+          </h4>
           {state.groupedStructure ? (
             <FolderBrowser
               folderTree={state.groupedStructure}
@@ -644,11 +790,13 @@ const OrganizeStep: React.FC<StepProps> = ({
               Grouped structure will appear here...
             </div>
           )}
-        </Panel>
-        <Panel>
-          <SectionTitle>
-            <span>Final Organization</span>
-          </SectionTitle>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
+          <h4 className="font-bold m-0 text-slate-900 text-sm leading-tight relative text-center mb-2 before:content-[''] before:absolute before:top-1/2 before:left-0 before:w-[calc(50%-0.75rem)] before:h-[1px] before:bg-slate-100 before:opacity-60 after:content-[''] after:absolute after:top-1/2 after:right-0 after:w-[calc(50%-0.75rem)] after:h-[1px] after:bg-slate-100 after:opacity-60">
+            <span className="bg-[#fafbfc] px-2 relative z-[1] transition-colors duration-200">
+              Final Organization
+            </span>
+          </h4>
           {state.organizedStructure ? (
             <FolderBrowser
               folderTree={state.organizedStructure}
@@ -668,20 +816,27 @@ const OrganizeStep: React.FC<StepProps> = ({
               Final organization will appear here after processing...
             </div>
           )}
-        </Panel>
-      </ComparisonView>
+        </div>
+      </div>
       {state.isLoading && (
-        <LoadingOverlay>
-          <LoadingModal>
-            <LoadingSpinner />
-            <LoadingText>{state.loadingMessage}</LoadingText>
-          </LoadingModal>
-        </LoadingOverlay>
+        <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10 rounded-xl">
+          <div className="bg-white px-8 py-6 rounded-xl shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_10px_15px_-3px_rgba(0,0,0,0.2)] border border-slate-200 flex flex-col items-center gap-4 min-w-[280px] max-w-[350px] text-center">
+            <div className="w-8 h-8 border-[3px] border-gray-200 border-t-blue-600 rounded-full animate-spin" />
+            <div className="text-gray-700 font-medium text-base">
+              {state.loadingMessage}
+            </div>
+          </div>
+        </div>
       )}
 
-      <ButtonRow>
-        <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
-        <WarningButton
+      <div className="flex gap-3 justify-end pt-3 pb-3 border-t border-slate-200 flex-wrap flex-shrink-0 min-h-[56px] items-center">
+        <button
+          onClick={onPrev}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-500 text-white hover:bg-gray-600 disabled:hover:bg-gray-500"
+        >
+          Previous
+        </button>
+        <button
           onClick={() => {
             updateState({
               hasTriggeredFolders: false,
@@ -690,17 +845,19 @@ const OrganizeStep: React.FC<StepProps> = ({
             });
           }}
           disabled={state.isLoading}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-amber-500 text-white hover:bg-amber-600 disabled:hover:bg-amber-500"
         >
           Re-run Organization
-        </WarningButton>
-        <SuccessButton
+        </button>
+        <button
           onClick={onNext}
           disabled={state.isLoading || !state.organizedStructure}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-emerald-500 text-white hover:bg-emerald-600 disabled:hover:bg-emerald-500"
         >
           Next
-        </SuccessButton>
-      </ButtonRow>
-    </StepContainer>
+        </button>
+      </div>
+    </div>
   );
 };
 
@@ -764,30 +921,40 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
   };
 
   return (
-    <StepContainer>
-      <ComparisonView>
-        <Panel>
-          <SectionTitle>
-            <span>Configuration Settings</span>
-          </SectionTitle>
-          <SettingGroup>
-            <SettingLabel>Target Folder:</SettingLabel>
-            <FolderSelectSection>
-              <FolderInput
+    <div className="flex-1 flex flex-col relative overflow-hidden min-h-0">
+      <div className="grid grid-cols-2 gap-3 relative transition-opacity duration-200 flex-1 min-h-0 opacity-100">
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
+          <h4 className="font-bold m-0 text-slate-900 text-sm leading-tight relative text-center mb-2 before:content-[''] before:absolute before:top-1/2 before:left-0 before:w-[calc(50%-0.75rem)] before:h-[1px] before:bg-slate-100 before:opacity-60 after:content-[''] after:absolute after:top-1/2 after:right-0 after:w-[calc(50%-0.75rem)] after:h-[1px] after:bg-slate-100 after:opacity-60">
+            <span className="bg-[#fafbfc] px-2 relative z-[1] transition-colors duration-200">
+              Configuration Settings
+            </span>
+          </h4>
+          <div className="mb-3">
+            <label className="block font-semibold mb-2 text-gray-800 text-base">
+              Target Folder:
+            </label>
+            <div className="flex gap-3 mb-4 items-stretch">
+              <input
                 type="text"
                 placeholder="Choose destination folder..."
                 value={state.targetPath}
                 onChange={(e) => updateState({ targetPath: e.target.value })}
+                className="flex-1 px-2 py-2 border border-gray-300 rounded-md text-sm font-inherit focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
               />
-              <BrowseButton onClick={handleBrowseTargetFolder}>
+              <button
+                onClick={handleBrowseTargetFolder}
+                className="px-4 py-2 border-0 rounded-md cursor-pointer text-sm font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-500 text-white hover:bg-gray-600 disabled:hover:bg-gray-500"
+              >
                 Browse
-              </BrowseButton>
-            </FolderSelectSection>
-          </SettingGroup>
+              </button>
+            </div>
+          </div>
 
-          <SettingGroup>
-            <SettingLabel>Duplicate Handling:</SettingLabel>
-            <Select
+          <div className="mb-3">
+            <label className="block font-semibold mb-2 text-gray-800 text-base">
+              Duplicate Handling:
+            </label>
+            <select
               value={state.duplicateHandling}
               onChange={(e) =>
                 updateState({
@@ -795,6 +962,7 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
                     .value as ImportWizardState["duplicateHandling"],
                 })
               }
+              className="w-full px-3 py-3 border border-gray-300 rounded-md text-base font-inherit bg-white focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
             >
               <option value="newest">Keep Newest</option>
               <option value="largest">Keep Largest</option>
@@ -802,10 +970,10 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
               <option value="both-if-different">
                 Keep Both if Not Identical
               </option>
-            </Select>
-          </SettingGroup>
-        </Panel>
-        <Panel>
+            </select>
+          </div>
+        </div>
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] bg-[#fafbfc] flex flex-col">
           {state.organizedStructure && (
             <FolderBrowser
               folderTree={state.organizedStructure}
@@ -815,460 +983,39 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
               showConfidence={false}
             />
           )}
-        </Panel>
-      </ComparisonView>
+        </div>
+      </div>
 
       {isApplying && (
-        <ProgressSection>
-          <ProgressBar>
-            <ProgressFill style={{ width: `${progress}%` }} />
-          </ProgressBar>
-          <ProgressText>Applying organization... {progress}%</ProgressText>
-        </ProgressSection>
+        <div className="p-2 border border-slate-200 rounded-md bg-gradient-to-b from-white to-slate-50 shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_2px_4px_-1px_rgba(0,0,0,0.1)] transition-all duration-200 relative overflow-y-auto flex-1 min-h-0 hover:border-slate-300 hover:shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_4px_12px_-2px_rgba(0,0,0,0.1)] my-4 p-4 rounded-lg flex-none">
+          <div className="w-full h-2 bg-gray-200 rounded overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 transition-[width] duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="text-center mt-2 text-gray-500 font-medium">
+            Applying organization... {progress}%
+          </div>
+        </div>
       )}
 
-      <ButtonRow>
-        <SecondaryButton onClick={onPrev} disabled={isApplying}>
+      <div className="flex gap-3 justify-end pt-3 pb-3 border-t border-slate-200 flex-wrap flex-shrink-0 min-h-[56px] items-center">
+        <button
+          onClick={onPrev}
+          disabled={isApplying}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-500 text-white hover:bg-gray-600 disabled:hover:bg-gray-500"
+        >
           Previous
-        </SecondaryButton>
-        <DangerButton
+        </button>
+        <button
           onClick={handleApply}
           disabled={isApplying || !state.targetPath}
+          className="px-8 py-3 text-base border-0 rounded-md cursor-pointer font-medium whitespace-nowrap transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700 disabled:hover:bg-red-600"
         >
           {isApplying ? "Applying..." : "Apply Organization"}
-        </DangerButton>
-      </ButtonRow>
-    </StepContainer>
+        </button>
+      </div>
+    </div>
   );
 };
-
-// Styled Components
-const WizardContainer = styled.div`
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0.25rem;
-  background-color: #f8fafc;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-`;
-
-const WizardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  flex-shrink: 0;
-  height: 48px;
-  position: relative;
-  min-width: 0;
-`;
-
-const Title = styled.h1`
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin: 0;
-  padding-top: 0;
-  line-height: 1.1;
-  flex: 1;
-  text-align: center;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const StepIndicator = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-shrink: 0;
-`;
-
-const StepItem = styled.div.withConfig({
-  shouldForwardProp: (prop) =>
-    !["active", "completed", "clickable"].includes(prop),
-})<{ active: boolean; completed: boolean; clickable: boolean }>`
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-  cursor: ${(props) =>
-    props.clickable
-      ? "pointer"
-      : props.clickable === false
-        ? "not-allowed"
-        : "default"};
-  user-select: none;
-  opacity: ${(props) => (props.clickable ? 1 : 0.6)};
-
-  // Background and text colors
-  ${(props) => {
-    if (props.active) {
-      return `
-        background-color: #2563eb;
-        color: white;
-        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-        border-color: #1d4ed8;
-      `;
-    } else if (props.completed) {
-      return `
-        background-color: #10b981;
-        color: white;
-      `;
-    } else {
-      return `
-        background-color: #e2e8f0;
-        color: #64748b;
-      `;
-    }
-  }}
-
-  // Hover effects for clickable items
-  ${(props) =>
-    props.clickable &&
-    !props.active &&
-    `
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-      background-color: ${props.completed ? "#059669" : "#cbd5e1"};
-    }
-  `}
-`;
-
-const WizardContent = styled.div`
-  background: white;
-  border-radius: 0.375rem;
-  padding: 0.75rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
-`;
-
-const StepContainer = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  min-height: 0;
-`;
-
-const FolderSelectSection = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  align-items: stretch;
-`;
-
-const FolderInput = styled.input`
-  flex: 1;
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-family: inherit;
-
-  &:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  }
-`;
-
-// Base button styles
-const BaseButton = styled.button`
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: background-color 0.2s ease;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const BrowseButton = styled(BaseButton)`
-  background-color: #6b7280;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #4b5563;
-  }
-`;
-
-const ProcessButton = styled(BaseButton).withConfig({
-  shouldForwardProp: (prop) => !["$isCancel"].includes(prop),
-})<{ $isCancel?: boolean }>`
-  background-color: ${(props) => (props.$isCancel ? "#ef4444" : "#2563eb")};
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: ${(props) => (props.$isCancel ? "#dc2626" : "#1d4ed8")};
-  }
-`;
-
-// Loading components
-const LoadingOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  border-radius: 0.75rem;
-`;
-
-const LoadingModal = styled.div`
-  background: white;
-  padding: 1.5rem 2rem;
-  border-radius: 0.75rem;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 10px 15px -3px rgba(0, 0, 0, 0.2);
-  border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  min-width: 280px;
-  max-width: 350px;
-  text-align: center;
-`;
-
-const LoadingSpinner = styled.div`
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e5e7eb;
-  border-top: 3px solid #2563eb;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-`;
-
-const LoadingText = styled.div`
-  color: #374151;
-  font-weight: 500;
-  font-size: 1rem;
-`;
-
-// Base container with loading state
-const BaseContainer = styled.div.withConfig({
-  shouldForwardProp: (prop) => !["isLoading"].includes(prop),
-})<{ isLoading?: boolean }>`
-  padding: 0.5rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.375rem;
-  background: linear-gradient(to bottom, #ffffff, #f8fafc);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.05),
-    0 2px 4px -1px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-  position: relative;
-  opacity: ${(props) => (props.isLoading ? 0.5 : 1)};
-  pointer-events: ${(props) => (props.isLoading ? "none" : "auto")};
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-
-  &:hover {
-    border-color: #cbd5e1;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.05),
-      0 4px 12px -2px rgba(0, 0, 0, 0.1);
-  }
-`;
-
-const ContentContainer = styled(BaseContainer)``;
-
-const ComparisonView = styled.div.withConfig({
-  shouldForwardProp: (prop) => !["isLoading"].includes(prop),
-})<{ isLoading?: boolean }>`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  position: relative;
-  opacity: ${(props) => (props.isLoading ? 0.5 : 1)};
-  pointer-events: ${(props) => (props.isLoading ? "none" : "auto")};
-  transition: opacity 0.2s ease;
-  flex: 1;
-  min-height: 0;
-`;
-
-const SectionTitle = styled.h4`
-  font-weight: 700;
-  margin: 0;
-  color: #0f172a;
-  font-size: 0.875rem;
-  line-height: 1.2;
-  position: relative;
-  text-align: center;
-  margin-bottom: 0.5rem;
-
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    width: calc(50% - 0.75rem);
-    height: 1px;
-    background-color: #f1f5f9;
-    opacity: 0.6;
-  }
-
-  &::before {
-    left: 0;
-  }
-
-  &::after {
-    right: 0;
-  }
-
-  span {
-    background: #fafbfc;
-    padding: 0 0.5rem;
-    position: relative;
-    z-index: 1;
-    transition: background-color 0.2s ease;
-  }
-`;
-
-const Panel = styled(BaseContainer)`
-  background: #fafbfc;
-  display: flex;
-  flex-direction: column;
-`;
-
-const ButtonRow = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  padding: 0.75rem 0;
-  border-top: 1px solid #e2e8f0;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  min-height: 56px;
-  align-items: center;
-`;
-
-// Large button base for wizard navigation
-const LargeButton = styled(BaseButton)`
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-`;
-
-const SuccessButton = styled(LargeButton)`
-  background-color: #10b981;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #059669;
-  }
-`;
-
-const SecondaryButton = styled(LargeButton)`
-  background-color: #6b7280;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #4b5563;
-  }
-`;
-
-const WarningButton = styled(LargeButton)`
-  background-color: #f59e0b;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #d97706;
-  }
-`;
-
-const DangerButton = styled(LargeButton)`
-  background-color: #dc2626;
-  color: white;
-
-  &:hover:not(:disabled) {
-    background-color: #b91c1c;
-  }
-`;
-
-const SettingGroup = styled.div`
-  margin-bottom: 0.75rem;
-`;
-
-const SettingLabel = styled.label`
-  display: block;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #1f2937;
-  font-size: 1rem;
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 1rem;
-  font-family: inherit;
-  background-color: white;
-
-  &:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  }
-`;
-
-// Remove FinalPreview - will use ContentContainer instead
-
-const ProgressSection = styled(BaseContainer)`
-  margin: 1rem 0;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  flex: none;
-`;
-
-// Progress components
-const ProgressBar = styled.div`
-  width: 100%;
-  height: 8px;
-  background-color: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-`;
-
-const ProgressFill = styled.div`
-  height: 100%;
-  background-color: #10b981;
-  transition: width 0.3s ease;
-`;
-
-const ProgressText = styled.div`
-  text-align: center;
-  margin-top: 0.5rem;
-  color: #6b7280;
-  font-weight: 500;
-`;

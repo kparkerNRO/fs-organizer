@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import styled from "styled-components";
 import {
   Folder,
   LegacyFolder,
@@ -386,104 +385,171 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     setActiveCategory(category);
   };
 
-  const renderCategory = (category: Folder, index: number) => (
-    <CategoryGroup
-      key={category.id}
-      $isDraggedOver={category.id === draggedOverCategoryId}
-      onDragOver={(e) => handleDragOver(e, category.id)}
-      onDragLeave={handleDragLeave}
-      onDrop={(e) => handleDrop(category, e)}
-    >
-      <TableRow
-        $isEven={index % 2 === 0}
-        $isSelected={category.id === activeCategory?.id}
-        onClick={() => handleCategorySelection(category)}
+  const renderCategory = (category: Folder, index: number) => {
+    const isDraggedOver = category.id === draggedOverCategoryId;
+    const isEven = index % 2 === 0;
+    const isCategorySelected = category.id === activeCategory?.id;
+
+    return (
+      <div
+        key={category.id}
+        className="relative flex flex-col gap-1 mb-0.5 last:mb-0"
+        data-category-id={category.id}
+        onDragOver={(e) => handleDragOver(e, category.id)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(category, e)}
       >
-        <RowCell>
-          {category.children && category.children.length > 0 ? (
-            <ExpandButton onClick={(e) => toggleExpand(category.id, e)}>
-              {expandedCategories.includes(category.id) ? (
-                <ChevronDown size={16} />
-              ) : (
-                <ChevronRight size={16} />
-              )}
-            </ExpandButton>
-          ) : (
-            <ExpandButton></ExpandButton>
-          )}
-          {category.name}
-        </RowCell>
-        <RowCell>{category.classification}</RowCell>
-        <RowCell>{category.count}</RowCell>
-        <RowCell>{category.possibleClassifications?.join(", ") || "-"}</RowCell>
-        <RowCell>{category.confidence * 100}%</RowCell>
-      </TableRow>
-      {expandedCategories.includes(category.id) &&
-        category.children?.map((folder) => (
-          <TableRow
-            key={folder.id}
-            $isEven={index % 2 === 0}
-            $isSelected={selectedFolders.some((f) => f.id === folder.id)}
-            $isChild
-            draggable
-            onClick={(e) => handleFolderSelection(folder, category, e)}
-            onContextMenu={(e) => handleContextMenu(e, folder, category)}
-            onDragStart={(e) => handleDragStart(folder, category, e)}
-          >
-            <RowCell>
-              <IndentSpace />
-              {folder.name}
-            </RowCell>
-            <RowCell>{folder.classification}</RowCell>
-            <RowCell>-</RowCell>
-            {/* <RowCell>{folder.original_filename}</RowCell> */}
-            <RowCell>{folder.processed_names?.join(", ")}</RowCell>
-            <RowCell>{folder.confidence}%</RowCell>
-          </TableRow>
-        ))}
-    </CategoryGroup>
-  );
+        {/* Drag overlay */}
+        {isDraggedOver && (
+          <div className="absolute inset-0 bg-blue-300 bg-opacity-20 border-2 border-dashed border-blue-600 rounded-md pointer-events-none" />
+        )}
+
+        {/* Category row */}
+        <div
+          className={`grid grid-cols-5 gap-4 px-3 py-2.5 rounded-md cursor-pointer ${
+            isCategorySelected
+              ? "bg-sky-200 border-2 border-blue-400"
+              : isEven
+              ? "bg-gray-100"
+              : "bg-blue-50"
+          } ${
+            isCategorySelected
+              ? "hover:bg-sky-100"
+              : isEven
+              ? "hover:bg-gray-200"
+              : "hover:bg-sky-100"
+          }`}
+          onClick={() => handleCategorySelection(category)}
+        >
+          <div className="flex items-center gap-2">
+            {category.children && category.children.length > 0 ? (
+              <span
+                className="mr-2 inline-flex items-center"
+                onClick={(e) => toggleExpand(category.id, e)}
+              >
+                {expandedCategories.includes(category.id) ? (
+                  <ChevronDown size={16} />
+                ) : (
+                  <ChevronRight size={16} />
+                )}
+              </span>
+            ) : (
+              <span className="mr-2 inline-flex items-center"></span>
+            )}
+            {category.name}
+          </div>
+          <div className="flex items-center gap-2">{category.classification}</div>
+          <div className="flex items-center gap-2">{category.count}</div>
+          <div className="flex items-center gap-2">
+            {category.possibleClassifications?.join(", ") || "-"}
+          </div>
+          <div className="flex items-center gap-2">{category.confidence * 100}%</div>
+        </div>
+
+        {/* Child folders */}
+        {expandedCategories.includes(category.id) &&
+          category.children?.map((folder) => {
+            const isFolderSelected = selectedFolders.some((f) => f.id === folder.id);
+
+            return (
+              <div
+                key={folder.id}
+                className={`grid grid-cols-5 gap-4 px-3 py-2.5 rounded-md cursor-pointer ml-6 ${
+                  isFolderSelected
+                    ? "bg-sky-200 border-2 border-blue-400"
+                    : isEven
+                    ? "bg-gray-100"
+                    : "bg-blue-50"
+                } ${
+                  isFolderSelected
+                    ? "hover:bg-sky-100"
+                    : isEven
+                    ? "hover:bg-gray-200"
+                    : "hover:bg-sky-100"
+                }`}
+                draggable
+                onClick={(e) => handleFolderSelection(folder, category, e)}
+                onContextMenu={(e) => handleContextMenu(e, folder, category)}
+                onDragStart={(e) => handleDragStart(folder, category, e)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-6" />
+                  {folder.name}
+                </div>
+                <div className="flex items-center gap-2">{folder.classification}</div>
+                <div className="flex items-center gap-2">-</div>
+                <div className="flex items-center gap-2">
+                  {folder.processed_names?.join(", ")}
+                </div>
+                <div className="flex items-center gap-2">{folder.confidence}%</div>
+              </div>
+            );
+          })}
+      </div>
+    );
+  };
 
   return (
-    <TableContainer>
-      <HeaderContainer>
-        <SearchInput placeholder="Search" />
-      </HeaderContainer>
+    <div className="p-6 bg-white rounded-lg shadow-sm w-full box-border overflow-x-auto">
+      <div className="flex justify-between items-center mb-8">
+        <input
+          className="px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          placeholder="Search"
+        />
+      </div>
 
-      <TableGrid>
-        <HeaderGrid>
-          <HeaderCell
-            $active={pageState.sortConfig.field === SORT_FIELD.NAME}
+      <div className="w-full">
+        <div className="grid grid-cols-5 gap-4 px-4 mb-2">
+          <div
+            className={`group flex items-center gap-2 p-3 font-medium cursor-pointer transition-all hover:bg-gray-100 hover:rounded-md ${
+              pageState.sortConfig.field === SORT_FIELD.NAME
+                ? "text-blue-600"
+                : "text-gray-600"
+            }`}
             onClick={() => handleHeaderClick(SORT_FIELD.NAME)}
           >
             Name <SortIcon field={SORT_FIELD.NAME} />
-          </HeaderCell>
-          <HeaderCell
-            $active={pageState.sortConfig.field === SORT_FIELD.CLASSIFICATION}
+          </div>
+          <div
+            className={`group flex items-center gap-2 p-3 font-medium cursor-pointer transition-all hover:bg-gray-100 hover:rounded-md ${
+              pageState.sortConfig.field === SORT_FIELD.CLASSIFICATION
+                ? "text-blue-600"
+                : "text-gray-600"
+            }`}
             onClick={() => handleHeaderClick(SORT_FIELD.CLASSIFICATION)}
           >
             Classification <SortIcon field={SORT_FIELD.CLASSIFICATION} />
-          </HeaderCell>
-          <HeaderCell
-            $active={pageState.sortConfig.field === SORT_FIELD.COUNT}
+          </div>
+          <div
+            className={`group flex items-center gap-2 p-3 font-medium cursor-pointer transition-all hover:bg-gray-100 hover:rounded-md ${
+              pageState.sortConfig.field === SORT_FIELD.COUNT
+                ? "text-blue-600"
+                : "text-gray-600"
+            }`}
             onClick={() => handleHeaderClick(SORT_FIELD.COUNT)}
           >
             Count <SortIcon field={SORT_FIELD.COUNT} />
-          </HeaderCell>
-          <HeaderCell>Possible classifications</HeaderCell>
-          <HeaderCell
-            $active={pageState.sortConfig.field === SORT_FIELD.CONFIDENCE}
+          </div>
+          <div className="flex items-center gap-2 p-3 font-medium text-gray-600">
+            Possible classifications
+          </div>
+          <div
+            className={`group flex items-center gap-2 p-3 font-medium cursor-pointer transition-all hover:bg-gray-100 hover:rounded-md ${
+              pageState.sortConfig.field === SORT_FIELD.CONFIDENCE
+                ? "text-blue-600"
+                : "text-gray-600"
+            }`}
             onClick={() => handleHeaderClick(SORT_FIELD.CONFIDENCE)}
           >
             Confidence
             <SortIcon field={SORT_FIELD.CONFIDENCE} />
-          </HeaderCell>
-        </HeaderGrid>
+          </div>
+        </div>
 
-        <RowsContainer>
+        <div className="flex flex-col gap-2">
           {categories.map((category, index) => renderCategory(category, index))}
-        </RowsContainer>
-      </TableGrid>
+        </div>
+      </div>
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
@@ -509,147 +575,6 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
           ]}
         />
       )}
-    </TableContainer>
+    </div>
   );
 };
-
-const ExpandButton = styled.span`
-  margin-right: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-`;
-
-const IndentSpace = styled.span`
-  display: inline-block;
-  width: 1.5rem;
-`;
-
-const TableContainer = styled.div`
-  padding: 1.5rem;
-  background: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: auto;
-`;
-
-const HeaderContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-`;
-
-
-const SearchInput = styled.input`
-  padding: 0.5rem 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.5rem;
-  outline: none;
-
-  &:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const TableGrid = styled.div`
-  width: 100%;
-`;
-
-const HeaderGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-  padding: 0 1rem;
-  margin-bottom: 0.5rem;
-`;
-
-const HeaderCell = styled.div<{
-  $active?: boolean;
-}>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  font-weight: 500;
-  color: ${(props) => (props.$active ? "#2563eb" : "#4b5563")};
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background-color: #f3f4f6;
-    border-radius: 0.375rem;
-  }
-
-  /* Sort icon container */
-  > div {
-    display: flex;
-    align-items: center;
-    transition: all 0.2s;
-  }
-`;
-
-const RowsContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`;
-
-const TableRow = styled.div<{
-  $isEven: boolean;
-  $isSelected: boolean;
-  $isChild?: boolean;
-}>`
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1rem;
-  padding: 0.6rem 0.75rem; // Reduced from 0.75rem 1rem
-  border-radius: 0.375rem; // Reduced from 0.5rem
-  cursor: pointer;
-  background-color: ${(props) =>
-    props.$isSelected ? "#e0f2fe" : props.$isEven ? "#f3f4f6" : "#eff6ff"};
-  border: ${(props) => (props.$isSelected ? "2px solid #60a5fa" : "none")};
-  margin-left: ${(props) => (props.$isChild ? "1.5rem" : "0")};
-
-  &:hover {
-    background-color: ${(props) =>
-      props.$isSelected ? "#dbeafe" : props.$isEven ? "#e5e7eb" : "#dbeafe"};
-  }
-`;
-
-const RowCell = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const CategoryGroup = styled.div<{ $isDraggedOver: boolean }>`
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem; // Reduced from 0.5rem
-  margin-bottom: 0.1rem; // Reduced from 0.5rem
-
-  ${(props) =>
-    props.$isDraggedOver &&
-    `
-    &::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(147, 197, 253, 0.2);
-      border: 2px dashed #2563eb;
-      border-radius: 0.375rem;
-      pointer-events: none;
-    }
-  `}
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;

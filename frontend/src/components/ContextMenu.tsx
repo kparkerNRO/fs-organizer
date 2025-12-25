@@ -1,5 +1,4 @@
 import React from 'react';
-import styled from 'styled-components';
 
 interface ContextMenuProps {
   x: number;
@@ -21,55 +20,26 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   return (
     <>
-      <Overlay onClick={onClose} />
-      <MenuContainer style={{ top: y, left: x }}>
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-[100]"
+      />
+      <div
+        style={{ top: y, left: x }}
+        className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[101] min-w-[160px]"
+      >
         {menu_items.map((item, index) => (
-          <MenuItem key={index} onClick={item.onClick}>
+          <div
+            key={index}
+            onClick={item.onClick}
+            className={`py-2 px-4 cursor-pointer hover:bg-gray-100 ${
+              index === 0 ? 'rounded-t-md' : ''
+            } ${index === menu_items.length - 1 ? 'rounded-b-md' : ''}`}
+          >
             {item.text}
-          </MenuItem>
+          </div>
         ))}
-      </MenuContainer>
+      </div>
     </>
   );
 };
-
-
-
-
-const Overlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-`;
-
-const MenuContainer = styled.div`
-  position: fixed;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.375rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  z-index: 101;
-  min-width: 160px;
-`;
-
-const MenuItem = styled.div`
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  
-  &:hover {
-    background-color: #f3f4f6;
-  }
-  
-  &:first-child {
-    border-top-left-radius: 0.375rem;
-    border-top-right-radius: 0.375rem;
-  }
-  
-  &:last-child {
-    border-bottom-left-radius: 0.375rem;
-    border-bottom-right-radius: 0.375rem;
-  }
-`;

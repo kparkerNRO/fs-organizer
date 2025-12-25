@@ -1,6 +1,5 @@
 // src/pages/FolderStructurePage.tsx
 import React, { useState, useEffect } from "react";
-import styled from "styled-components";
 import { fetchFolderStructureComparison } from "../api";
 import { FolderViewResponse } from "../types/types";
 import { Folder as FolderIcon } from "lucide-react";
@@ -134,41 +133,45 @@ export const FolderStructurePage: React.FC = () => {
   }, []);
 
   return (
-    <PageContainer>
-      <Header>
-        <Title>Folder Structure</Title>
+    <div
+      className="bg-gray-100 overflow-hidden flex flex-col w-screen box-border p-4"
+      style={{ height: "calc(100vh - 57px)" }}
+    >
+      <div className="flex justify-between items-center mb-4 shrink-0">
+        <h1 className="text-3xl font-semibold text-gray-800">
+          Folder Structure
+        </h1>
         <ResetButton onReset={handleReset} />
-      </Header>
+      </div>
 
-      <ContentContainer>
-        <div
-          style={{
-            paddingBottom: "0.5rem",
-            borderBottom: "1px solid #e5e7eb",
-            marginBottom: "0.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <FolderIcon
-              size={16}
-              style={{ marginRight: "0.5rem", opacity: 0.7 }}
-            />
-            <span style={{ fontWeight: 500 }}>Folders</span>
+      <div className="w-full bg-white rounded-lg shadow-sm p-6 box-border overflow-hidden flex flex-col flex-1 min-h-0">
+        <div className="pb-2 border-b border-gray-200 mb-2 flex items-center justify-between">
+          <div className="flex items-center">
+            <FolderIcon size={16} className="mr-2 opacity-70" />
+            <span className="font-medium">Folders</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <SyncToggleContainer>
-              <SyncToggleLabel>Sync scroll:</SyncToggleLabel>
-              <SyncToggle
-                $isEnabled={shouldSync}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">
+                Sync scroll:
+              </span>
+              <div
+                className={`w-8 h-[18px] rounded-[9px] cursor-pointer transition-colors duration-200 relative ${
+                  shouldSync
+                    ? "bg-blue-500 hover:bg-blue-600"
+                    : "bg-gray-300 hover:bg-gray-400"
+                }`}
                 onClick={() => setShouldSync(!shouldSync)}
               >
-                <SyncToggleThumb $isEnabled={shouldSync} />
-              </SyncToggle>
-            </SyncToggleContainer>
-            <InstructionsButton
+                <div
+                  className={`w-[14px] h-[14px] rounded-full bg-white absolute top-0.5 transition-all duration-200 shadow-sm ${
+                    shouldSync ? "left-4" : "left-0.5"
+                  }`}
+                />
+              </div>
+            </div>
+            <button
+              className="w-5 h-5 rounded-full bg-gray-200 border-none text-xs flex items-center justify-center cursor-pointer transition-all duration-150 ease-in-out hover:bg-gray-300"
               onClick={(e) => {
                 e.stopPropagation();
                 alert(
@@ -177,21 +180,12 @@ export const FolderStructurePage: React.FC = () => {
               }}
             >
               ?
-            </InstructionsButton>
+            </button>
           </div>
         </div>
-        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <span style={{ fontWeight: 500, marginBottom: "0.5rem" }}>
-              Original
-            </span>
+        <div className="flex flex-1 min-h-0">
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className="font-medium mb-2">Original</span>
             <FolderBrowser
               folderTree={folderComparison?.original || null}
               onSelectItem={setSelectedFileId}
@@ -199,15 +193,8 @@ export const FolderStructurePage: React.FC = () => {
               shouldSync={shouldSync}
             />
           </div>
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <span style={{ fontWeight: 500, marginBottom: "0.5rem" }}>New</span>
+          <div className="flex-1 min-w-0 flex flex-col">
+            <span className="font-medium mb-2">New</span>
             <FolderBrowser
               folderTree={folderComparison?.new || null}
               onSelectItem={setSelectedFileId}
@@ -217,103 +204,7 @@ export const FolderStructurePage: React.FC = () => {
             />
           </div>
         </div>
-      </ContentContainer>
-    </PageContainer>
+      </div>
+    </div>
   );
 };
-
-// Styled components
-const PageContainer = styled.div`
-  background-color: #f3f4f6;
-  height: calc(100vh - 57px); /* Account for navbar height */
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
-  box-sizing: border-box;
-  padding: 1rem;
-`;
-
-const ContentContainer = styled.div`
-  width: 100%;
-  background-color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  padding: 1.5rem;
-  box-sizing: border-box;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0; /* Critical for proper flexbox behavior with scrolling */
-`;
-
-const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  flex-shrink: 0;
-`;
-
-const Title = styled.h1`
-  font-size: 2rem;
-  font-weight: 600;
-  color: #1f2937;
-`;
-
-const InstructionsButton = styled.button`
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background-color: #e5e7eb;
-  border: none;
-  font-size: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background-color: #d1d5db;
-  }
-`;
-
-const SyncToggleContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const SyncToggleLabel = styled.span`
-  font-size: 0.75rem;
-  color: #6b7280;
-  font-weight: 500;
-`;
-
-const SyncToggle = styled.div<{ $isEnabled: boolean }>`
-  width: 32px;
-  height: 18px;
-  border-radius: 9px;
-  background-color: ${(props) => (props.$isEnabled ? "#3b82f6" : "#d1d5db")};
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  position: relative;
-
-  &:hover {
-    background-color: ${(props) => (props.$isEnabled ? "#2563eb" : "#9ca3af")};
-  }
-`;
-
-const SyncToggleThumb = styled.div<{ $isEnabled: boolean }>`
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background-color: white;
-  position: absolute;
-  top: 2px;
-  left: ${(props) => (props.$isEnabled ? "16px" : "2px")};
-  transition: left 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-`;
