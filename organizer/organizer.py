@@ -56,7 +56,6 @@ def gather(
     typer.echo(f"DB path: {db_path}")
 
     gather_folder_structure_and_store(base_path, db_path)
-    clean_file_name_post(Path(db_path))
 
     # Set up latest directory and file
     latest_dir = base_output / "latest"
