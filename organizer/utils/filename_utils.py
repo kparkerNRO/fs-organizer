@@ -1,14 +1,10 @@
 import re
 import logging
+from pathlib import Path
+from typing import Optional
 
 from utils.common import VIEW_TYPES
-from pathlib import Path
-from utils.config import (
-    CLEAN_EXCEPTIONS,
-    REPLACE_EXCEPTIONS,
-    CREATOR_REMOVES,
-    FILE_NAME_EXCEPTIONS,
-)
+from utils.config import Config, get_config
 
 PATH_EXTRAS = " -,()/"
 
@@ -101,15 +97,13 @@ def process_file_name(name, final_token, has_suffix, use_suffix=False):
 
 def clean_filename(
     base_name,
-    creator_removes=CREATOR_REMOVES,
-    file_name_exceptions=FILE_NAME_EXCEPTIONS,
-    replace_exceptions=REPLACE_EXCEPTIONS,
-    clean_exceptions=CLEAN_EXCEPTIONS,
+    config: Optional[Config] = None,
 ):
     """
     Handles a bunch of standardized cleanup for junk that ends up in folder names
     """
-    if base_name in clean_exceptions:
+    config = config or get_config()
+    if base_name in config.clean_exceptions:
         return base_name
 
     out_dir_name = base_name
@@ -126,14 +120,10 @@ def clean_filename(
             out_dir_name = base_name.replace("_", " ")
 
     # remove any creator-specific removals
-    for _, removes in creator_removes.items():
-        # if creator in str(source_dir) and removes != "":
-        if isinstance(removes, list):
-            for remove in removes:
+    for _, removes in config.creator_removes.items():
+        for remove in removes:
+            if remove:
                 out_dir_name = strip_part_from_base(out_dir_name, remove)
-        else:
-            if removes != "":
-                out_dir_name = strip_part_from_base(out_dir_name, removes)
 
     # remove "part" naming
     out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
@@ -145,12 +135,12 @@ def clean_filename(
     out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
 
     # remove special case exceptions
-    for exception, replace in file_name_exceptions.items():
+    for exception, replace in config.file_name_exceptions.items():
         if out_dir_name == exception:
             out_dir_name = replace
             break
 
-    for exception, replace in replace_exceptions.items():
+    for exception, replace in config.replace_exceptions.items():
         if exception in out_dir_name:
             out_dir_name = out_dir_name.replace(exception, replace)
 
@@ -171,35 +161,6 @@ def clean_filename(
     # clean up hyphens *only* if there is no whitespace in the name
     if " " not in out_dir_name:
         out_dir_name = out_dir_name.replace("-", " ")
-
-    # cleanup whitespace
-    out_dir_name = out_dir_name.replace("(", " ")
-    out_dir_name = re.sub("\s+", " ", out_dir_name)
-    out_dir_name = re.sub("--", " ", out_dir_name)
-    out_dir_name = re.sub("-\s+-", " ", out_dir_name)
-    out_dir_name = out_dir_name.strip(PATH_EXTRAS)
-
-    # cleanup number only entries
-    out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
-
-    if len(out_dir_name) == 1:
-        out_dir_name = ""
-
-    return out_dir_name
-
-
-def clean_path(base_name, full_path):
-    out_dir_name = base_name
-    source_dir = Path(full_path)
-    parts = source_dir.parts
-
-    if base_name == "Base":
-        return base_name
-
-    # process duplicate entries in the path
-    for part in parts:
-        if part in parts:
-            out_dir_name = strip_part_from_base(out_dir_name, part)
 
     # cleanup whitespace
     out_dir_name = out_dir_name.replace("(", " ")

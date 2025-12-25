@@ -542,7 +542,7 @@ def _find_component_combinations(
     """Find all ways to decompose a tag using available components"""
     # First check if this is a meaningful phrase that shouldn't be decomposed
     if is_meaningful_phrase(tag):
-        return []  
+        return []
 
     words = tag.split()
     tag_length = len(words)
@@ -1175,7 +1175,7 @@ def _comprehensive_decomposition_analysis(
     ngram_candidates, frequent_ngrams = extract_ngram_components(
         component_stats, MIN_COMPONENT_FREQUENCY
     )
-    
+
     for tag, decompositions in ngram_candidates.items():
         combined_candidates[tag] = {
             "decompositions": decompositions,
@@ -1509,7 +1509,7 @@ def create_decomposed_entries(
                 confidence=(
                     original_entry.confidence * best_candidate.overall_confidence
                 ),
-                processed=False, 
+                processed=False,
             )
             new_entries.append(new_entry)
             session.add(new_entry)

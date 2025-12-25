@@ -77,17 +77,6 @@ def gather(
 
 
 @app.command()
-def classify(db_path: str = typer.Argument(...)):
-    """
-    Classify folders in the given run_data.db
-    using known variant detection + structural heuristics.
-    """
-    typer.echo(f"Classifying folders in: {db_path}")
-    classify_folders(Path(db_path))
-    typer.echo("Classification complete.")
-
-
-@app.command()
 def group(db_path: str = typer.Argument(...)):
     """
     Classify folders in the given run_data.db

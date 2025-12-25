@@ -1,0 +1,44 @@
+creators:
+  CzePeku:
+    synonyms: []
+    tokens_to_remove:
+      - "$5 Rewards"
+      - "$10 Rewards"
+      - "$1 Rewards"
+  Limithron:
+    synonyms: []
+    tokens_to_remove:
+      - Admiral
+      - Captain
+  The Reclusive Cartographer:
+    synonyms: []
+    tokens_to_remove:
+      - _MC
+  Baileywiki:
+    synonyms: []
+    tokens_to_remove: []
+  Unknown:
+    synonyms: []
+    tokens_to_remove: []
+  Caeora:
+    synonyms: []
+    tokens_to_remove: []
+  DWW:
+    synonyms: []
+    tokens_to_remove: []
+  MAD Cartographer:
+    synonyms: []
+    tokens_to_remove: []
+  MikWewa:
+    synonyms: []
+    tokens_to_remove:
+      - "$5 Map Rewards"
+  Tom Cartos:
+    synonyms: []
+    tokens_to_remove:
+      - Tier 2+
+      - tomcartos
+  Borough Bound:
+    synonyms: []
+    tokens_to_remove:
+      - Chief Courier Rewards

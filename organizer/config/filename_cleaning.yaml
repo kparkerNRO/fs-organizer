@@ -1,0 +1,7 @@
+file_name_exceptions:
+  The Clean: Clean
+  The: ""
+replace_exceptions:
+  ItW: ""
+clean_exceptions:
+  - 5e

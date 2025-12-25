@@ -385,9 +385,6 @@ def run_group_task(task_id: str):
 
         update_task(task_id, message="Classifying folders", progress=0.2)
 
-        # Run classification first
-        # classify_folders(db_path_obj)
-
         # update_task(task_id, message="Grouping folders", progress=0.5)
 
         # Run grouping
@@ -400,7 +397,9 @@ def run_group_task(task_id: str):
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
         # Get folder structure if available
-        folder_structure = get_folder_structure_from_db(db_path, stage=StructureType.grouped)
+        folder_structure = get_folder_structure_from_db(
+            db_path, stage=StructureType.grouped
+        )
 
         result = {"message": "Grouping complete", "folder_structure": folder_structure}
 
