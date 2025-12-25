@@ -63,10 +63,10 @@ class CategoryResponse(BaseModel):
 
 
 class SortColumn(str, Enum):
-    name = "name"
-    count = "count"
-    confidence = "confidence"
-    id = "id"
+    NAME = "name"
+    COUNT = "count"
+    CONFIDENCE = "confidence"
+    ID = "id"
 
 
 class SortOrder(str, Enum):

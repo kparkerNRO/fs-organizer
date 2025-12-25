@@ -1,0 +1,20 @@
+{
+  "include": [
+    "."
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv"
+  ],
+  "reportAttributeAccessIssue": "warning",
+  "reportIncompatibleMethodOverride": "error",
+  "reportAssignmentType": "warning",
+  "reportArgumentType": "warning",
+  "reportOptionalSubscript": "warning",
+  "reportPossiblyUnboundVariable": "warning",
+  "reportGeneralTypeIssues": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportInvalidStringEscapeSequence": "error",
+  "pythonVersion": "3.9",
+  "typeCheckingMode": "basic"
+}

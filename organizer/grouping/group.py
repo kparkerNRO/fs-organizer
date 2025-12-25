@@ -63,7 +63,7 @@ def refine_groups(
     current_group_categories: list[GroupCategoryEntry],
     iteration_id,
     next_group_id=1,
-) -> list[GroupCategory]:
+) -> int:
     """
     After groupings have been calculated, evalute the groups to determine which represent
     "real" groupings (i.e. single unique name, or multiple names with a common prefix), and

@@ -126,7 +126,7 @@ def process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
     if not (is_single_group and is_only_remainders):
         return
 
-    main_group = max(group_to_counts, key=group_to_counts.get)
+    main_group = max(group_to_counts, key=group_to_counts.__getitem__)
     filenames_in_main = [entry.original_name for entry in group_to_entries[main_group]]
     for group, entries in group_to_entries.items():
         if group == main_group:

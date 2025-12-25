@@ -129,7 +129,7 @@ def main(
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
     logger.info(f"Processing database at: {db_path}")
-    get_folder_heirarchy(db_path)
+    get_folder_heirarchy(db_path, StructureType.organized)
 
 
 if __name__ == "__main__":

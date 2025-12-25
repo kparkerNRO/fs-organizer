@@ -17,8 +17,8 @@ def strip_part_from_base(base_name: str, part):
     folders (eg, avoids returning <path>//<name>)
     """
     output = base_name.replace(part, "")
-    output = re.sub("\s+", " ", output)
-    output = re.sub("\/\/", "/", output)
+    output = re.sub(r"\s+", " ", output)
+    output = re.sub(r"\/\/", "/", output)
     output = output.strip()
 
     return output
@@ -126,13 +126,13 @@ def clean_filename(
                 out_dir_name = strip_part_from_base(out_dir_name, remove)
 
     # remove "part" naming
-    out_dir_name = re.sub("\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
-    out_dir_name = re.sub("\s*Part\s*\d*", "", out_dir_name)
-    out_dir_name = re.sub("\/\s*\d+\s*", "", out_dir_name)
+    out_dir_name = re.sub(r"\s*Pt(\.)?\s*\d\s*", "", out_dir_name)
+    out_dir_name = re.sub(r"\s*Part\s*\d*", "", out_dir_name)
+    out_dir_name = re.sub(r"\/\s*\d+\s*", "", out_dir_name)
     out_dir_name = out_dir_name.strip(" ()")
 
     # remove file dimensions
-    out_dir_name = re.sub("(\[)?\d+x\d+(\])?", "", out_dir_name)
+    out_dir_name = re.sub(r"(\[)?\d+x\d+(\])?", "", out_dir_name)
 
     # remove special case exceptions
     for exception, replace in config.file_name_exceptions.items():
@@ -145,18 +145,18 @@ def clean_filename(
             out_dir_name = out_dir_name.replace(exception, replace)
 
     # remove numbers at the start and end of the name
-    out_dir_name = re.sub("^(♯|#?)\d{0,3}\s*", "", out_dir_name)
-    out_dir_name = re.sub("#?\d{0,2}\s*$", "", out_dir_name)
+    out_dir_name = re.sub(r"^(♯|#?)\d{0,3}\s*", "", out_dir_name)
+    out_dir_name = re.sub(r"#?\d{0,2}\s*$", "", out_dir_name)
 
     # remove "#<number> at the start of the name"
-    out_dir_name = re.sub("^#\d+\s*", "", out_dir_name)
+    out_dir_name = re.sub(r"^#\d+\s*", "", out_dir_name)
 
     # clean up directory sizes
     # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)
 
     # clean up special characters at the start and end
-    out_dir_name = re.sub("^\.\s*", "", out_dir_name)
-    out_dir_name = re.sub("\s*\.$", "", out_dir_name)
+    out_dir_name = re.sub(r"^\.\s*", "", out_dir_name)
+    out_dir_name = re.sub(r"\s*\.$", "", out_dir_name)
 
     # clean up hyphens *only* if there is no whitespace in the name
     if " " not in out_dir_name:
@@ -164,13 +164,13 @@ def clean_filename(
 
     # cleanup whitespace
     out_dir_name = out_dir_name.replace("(", " ")
-    out_dir_name = re.sub("\s+", " ", out_dir_name)
-    out_dir_name = re.sub("--", " ", out_dir_name)
-    out_dir_name = re.sub("-\s+-", " ", out_dir_name)
+    out_dir_name = re.sub(r"\s+", " ", out_dir_name)
+    out_dir_name = re.sub(r"--", " ", out_dir_name)
+    out_dir_name = re.sub(r"-\s+-", " ", out_dir_name)
     out_dir_name = out_dir_name.strip(PATH_EXTRAS)
 
     # cleanup number only entries
-    out_dir_name = re.sub("^\s*\d+\s*$", "", out_dir_name)
+    out_dir_name = re.sub(r"^\s*\d+\s*$", "", out_dir_name)
 
     if len(out_dir_name) == 1:
         out_dir_name = ""

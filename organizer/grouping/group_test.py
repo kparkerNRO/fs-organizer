@@ -55,7 +55,7 @@ def test_process_folders_to_groups(test_db):
     test_db.commit()
 
     # Run the function
-    process_folders_to_groups(test_db, 0, 0)
+    process_folders_to_groups(test_db, 0)
 
     # Verify results
     entries = test_db.query(GroupCategoryEntry).all()

@@ -32,7 +32,6 @@ from sqlalchemy.sql import func
 from fastapi.middleware.cors import CORSMiddleware
 
 from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
-from pipeline.classify import classify_folders
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
 from pipeline.folder_reconstruction import get_folder_heirarchy
@@ -115,7 +114,7 @@ def sort_folder_structure(folder_data: dict) -> dict:
 async def get_groups(
     page: int = 1,
     page_size: int = 10,
-    sort_column: SortColumn = SortColumn.name,
+    sort_column: SortColumn = SortColumn.NAME,
     sort_order: SortOrder = SortOrder.asc,
     db=Depends(get_db_session),
 ) -> CategoryResponse:
@@ -127,10 +126,10 @@ async def get_groups(
     offset = (page - 1) * page_size
 
     sort_column_to_attr = {
-        SortColumn.name: GroupCategory.name,
-        SortColumn.count: GroupCategory.count,
-        SortColumn.confidence: GroupCategory.group_confidence,
-        SortColumn.id: GroupCategory.id,
+        SortColumn.NAME: GroupCategory.name,
+        SortColumn.COUNT: GroupCategory.count,
+        SortColumn.CONFIDENCE: GroupCategory.group_confidence,
+        SortColumn.ID: GroupCategory.id,
     }
 
     sort_attr = sort_column_to_attr[sort_column]
