@@ -18,3 +18,17 @@ should_ignore:
   - .Trashes
   - .DocumentRevisions-V100
   - thumbs
+collab_markers:
+  - collab
+  - collabs
+  - collaboration
+  - collaborations
+  - collaborator
+  - collaborators
+  - with
+  - w
+  - feat
+  - featuring
+  - ft
+  - x
+  - "&"
