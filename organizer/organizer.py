@@ -1,16 +1,13 @@
 import typer
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
-import shutil
 from api.api import StructureType
-from data_models.database import setup_gather
 from pipeline.folder_reconstruction import (
     get_folder_heirarchy,
     recalculate_cleaned_paths_for_structure,
 )
-from pipeline.gather import gather_folder_structure_and_store
+from pipeline.gather import ingest_filesystem
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
 
@@ -36,44 +33,20 @@ def gather(
         readable=True,
         resolve_path=True,
     ),
-    output_dir: Path = typer.Argument(
-        ..., file_okay=False, dir_okay=True, writable=True, resolve_path=True
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
     """
-    1) Create a timestamped subfolder in output_dir,
-    2) Create a run_data.db,
-    3) Gather folder/file data,
-    4) Insert freq counts.
+    Scan filesystem and create immutable snapshot in index.db.
     """
-    base_output = output_dir
-    base_output.mkdir(parents=True, exist_ok=True)
-
-    timestamp_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    run_dir = base_output / timestamp_str
-    run_dir.mkdir()
-
-    db_path = run_dir / "run_data.db"
-    setup_gather(db_path)
     typer.echo(f"Gathering from: {base_path}")
-    typer.echo(f"DB path: {db_path}")
 
-    gather_folder_structure_and_store(base_path, db_path)
-
-    # Set up latest directory and file
-    latest_dir = base_output / "latest"
-    latest_db = latest_dir / "latest.db"
-
-    # Remove existing latest directory if it exists
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
-
-    # Create new latest directory
-    latest_dir.mkdir()
-
-    # Copy the current run's database to latest.db
-    shutil.copy2(db_path, latest_db)
-    typer.echo(f"Copied latest run to: {latest_db}")
+    snapshot_id = ingest_filesystem(base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
     typer.echo("Gather complete.")
 
 
@@ -120,21 +93,26 @@ def pipeline(
         readable=True,
         resolve_path=True,
     ),
-    output_dir: Path = typer.Argument(
-        ..., file_okay=False, dir_okay=True, writable=True, resolve_path=True
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
+    """
+    Run full pipeline: gather, group, and folders.
+
+    NOTE: Currently only gather is implemented with new storage.
+    Group and folders commands need to be migrated to work with snapshots.
+    """
     # Run gather
-    gather(base_path, output_dir)
+    snapshot_id = ingest_filesystem(base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
-    # Get the path to the latest db
-    latest_db = output_dir / "latest" / "latest.db"
-
-    # Run group
-    group(str(latest_db))
-
-    # Run folders
-    folders(str(latest_db))
+    # TODO: Update group and folders commands to work with snapshot_id
+    typer.echo("⚠ Pipeline incomplete: group and folders commands not yet migrated to new storage")
+    typer.echo(f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}")
 
 
 # FastAPI endpoints
