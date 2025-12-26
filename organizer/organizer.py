@@ -136,6 +136,10 @@ def pipeline(
 training_app = typer.Typer(help="Training data generation and management")
 app.add_typer(training_app, name="training")
 
+# Fine-tuning model commands (train, predict, etc.)
+from fine_tuning.cli import app as fine_tuning_app
+app.add_typer(fine_tuning_app, name="model")
+
 
 @training_app.command("select-data")
 def select_data(

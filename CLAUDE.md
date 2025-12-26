@@ -2,6 +2,12 @@
 
 Analyzes messy directory structures (particularly Patreon RPG assets) and reorganizes them into consistent hierarchies using a multi-stage pipeline.
 
+## Tools and conventions
+* Use typer for CLI tools
+* Use context managers for sqlalchemy sessions
+* Use pytest with fixtures and parameterized tests for test cases
+* Use `type | None` instead of `Optional[type]`, and prefer python primitives rather than importing from typing
+
 ## Architecture Overview
 
 ```

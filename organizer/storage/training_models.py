@@ -22,14 +22,19 @@ class TrainingBase(DeclarativeBase):
     pass
 
 
-class TrainingRun(TrainingBase):
-    """Training run for a classifier model.
+class ModelRun(TrainingBase):
+    """Model run for training or evaluation.
 
-    Each run represents one training session with specific hyperparameters.
-    Multiple runs can be created to experiment with different configurations.
+    Each run represents either:
+    - Training: Fine-tuning a model on data
+    - Evaluation: Running predictions to evaluate performance
+    - Baseline: Testing a baseline model without fine-tuning
+
+    Multiple runs can be created to experiment with different configurations
+    and track performance over time.
     """
 
-    __tablename__ = "training_run"
+    __tablename__ = "model_run"
 
     run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     started_at: Mapped[str] = mapped_column(String)
@@ -38,10 +43,21 @@ class TrainingRun(TrainingBase):
         String, default="running"
     )  # 'running' | 'completed' | 'failed' | 'cancelled'
 
-    # Model and training configuration
-    base_model_id: Mapped[Optional[str]]  # e.g., 'bert-base-uncased'
-    model_version: Mapped[Optional[str]]
-    hyperparameters_json: Mapped[Optional[str]]  # Learning rate, batch size, etc.
+    # Run type and model configuration
+    run_type: Mapped[str] = mapped_column(
+        String, default="evaluation"
+    )  # 'training' | 'evaluation' | 'baseline' | 'prediction'
+    base_model_id: Mapped[Optional[str]]  # e.g., 'setfit-baseline-v2'
+    model_version: Mapped[Optional[str]]  # Model path or version identifier
+    model_type: Mapped[Optional[str]]  # e.g., 'setfit', 'bert', 'gpt'
+    taxonomy: Mapped[Optional[str]]  # e.g., 'v1', 'v2', 'legacy'
+
+    # Training data tracking
+    training_data_source: Mapped[Optional[str]]  # Description of training data source
+    training_data_hash: Mapped[Optional[str]]  # Hash for reproducibility
+
+    # Configuration
+    hyperparameters_json: Mapped[Optional[str]]  # Learning rate, batch size, metrics, etc.
     config_hash: Mapped[Optional[str]]
 
     # Dataset info
@@ -132,7 +148,7 @@ class TrainingEpoch(TrainingBase):
     __tablename__ = "training_epoch"
 
     epoch_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("training_run.run_id"))
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
     epoch_number: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[Optional[str]]
 
@@ -156,7 +172,7 @@ class TrainingEpoch(TrainingBase):
     duration_seconds: Mapped[Optional[float]] = mapped_column(Float)
 
     # Relationship
-    run: Mapped["TrainingRun"] = relationship(back_populates="epochs")
+    run: Mapped["ModelRun"] = relationship(back_populates="epochs")
 
     __table_args__ = (
         Index("idx_training_epoch_run", "run_id"),
@@ -173,7 +189,7 @@ class ModelCheckpoint(TrainingBase):
     __tablename__ = "model_checkpoint"
 
     checkpoint_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("training_run.run_id"))
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
     epoch_number: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[str] = mapped_column(String)
 
@@ -194,7 +210,7 @@ class ModelCheckpoint(TrainingBase):
     notes: Mapped[Optional[str]]
 
     # Relationship
-    run: Mapped["TrainingRun"] = relationship(back_populates="checkpoints")
+    run: Mapped["ModelRun"] = relationship(back_populates="checkpoints")
 
     __table_args__ = (Index("idx_model_checkpoint_run", "run_id"),)
 
@@ -208,7 +224,7 @@ class SamplePrediction(TrainingBase):
     __tablename__ = "sample_prediction"
 
     prediction_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("training_run.run_id"))
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
     sample_id: Mapped[int]  # FK to training_sample (same database)
     epoch_number: Mapped[Optional[int]] = mapped_column(
         Integer
@@ -227,7 +243,7 @@ class SamplePrediction(TrainingBase):
     prediction_type: Mapped[Optional[str]]  # 'train' | 'validation' | 'test'
 
     # Relationship
-    run: Mapped["TrainingRun"] = relationship(back_populates="predictions")
+    run: Mapped["ModelRun"] = relationship(back_populates="predictions")
 
     __table_args__ = (
         Index("idx_sample_prediction_run", "run_id"),
