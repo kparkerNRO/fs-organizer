@@ -194,6 +194,7 @@ def get_index_session(self, read_only: bool = False):
 
 ### Day 4: StorageManager Class ✅ COMPLETE
 - [x] Create `organizer/storage/manager.py`
+- [x] Define enums for storage field values (NodeKind, FileSource, RunStatus)
 - [x] Define constants: `DATA_DIR`, `INDEX_DB`, `WORK_DB`
 - [x] **CRITICAL: Set up per-connection PRAGMA event listener**
   ```python

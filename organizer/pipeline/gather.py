@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import zipfile
 import logging
 from pathlib import Path
@@ -211,6 +212,35 @@ def calculate_structure(session: Session, root_dir: Path):
     )
 
 
+from storage.manager import StorageManager
+from storage.index_models import (
+    IndexBase,
+    Snapshot,
+    Node,
+    Meta as IndexMeta,
+    INDEX_SCHEMA_VERSION,
+)
+
+def ingest_filesystem(base_path: Path, storage_path: Path | None):
+    storage_manager = StorageManager(storage_path)
+
+    with (
+        storage_manager.get_index_session() as index_session,
+        storage_manager.get_work_session() as work_session,
+    ):
+        # set up the new ingest
+        new_snapshot = Snapshot(
+            created_at=datetime.now(timezone.utc),
+            root_path=base_path,
+            root_abs_path=base_path.absolute(),
+        )
+        index_session.add(new_snapshot)
+        index_session.flush()
+        snapshot_id = int(new_snapshot.snapshot_id)
+
+        
+
+
 def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
     """Gather folder structure and store in database using SQLAlchemy."""
     session = get_session(db_path)
@@ -263,10 +293,10 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                     continue
 
                 new_file = dbFile(
-                        file_name=file_path.name,
-                        file_path=str(file_path),
-                        depth=depth,
-                    )
+                    file_name=file_path.name,
+                    file_path=str(file_path),
+                    depth=depth,
+                )
                 session.add(new_file)
 
             session.commit()

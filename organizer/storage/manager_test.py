@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from storage.manager import StorageManager
+from storage.manager import StorageManager, NodeKind, FileSource, RunStatus
 from storage.index_models import (
     IndexBase,
     Snapshot,
@@ -29,17 +29,10 @@ from storage.work_models import (
 
 
 
-@pytest.fixture
-def storage_paths(tmp_path: Path) -> tuple[Path, Path]:
-    index_path = tmp_path / "index.db"
-    work_path = tmp_path / "work.db"
-    return index_path, work_path
-
 
 @pytest.fixture
-def storage_manager(storage_paths: tuple[Path, Path]) -> StorageManager:
-    index_path, work_path = storage_paths
-    return StorageManager(index_path=index_path, work_path=work_path)
+def storage_manager(tmp_path: Path) -> StorageManager:
+    return StorageManager(database_path=tmp_path)
 
 
 @pytest.fixture
@@ -70,12 +63,12 @@ def snapshot(index_session):
 def node(index_session, snapshot):
     new_node = Node(
         snapshot_id=snapshot.snapshot_id,
-        kind="file",
+        kind=NodeKind.FILE.value,
         name="test.txt",
         rel_path="test.txt",
         abs_path="/test/test.txt",
         depth=1,
-        file_source="filesystem",
+        file_source=FileSource.FILESYSTEM.value,
     )
     index_session.add(new_node)
     index_session.commit()
@@ -87,7 +80,7 @@ def run(work_session, snapshot):
     new_run = Run(
         snapshot_id=snapshot.snapshot_id,
         started_at="2024-01-01T00:00:00",
-        status="running",
+        status=RunStatus.RUNNING.value,
     )
     work_session.add(new_run)
     work_session.commit()
@@ -98,10 +91,11 @@ class TestStorageManager:
     """Test StorageManager initialization and database creation."""
 
     def test_create_databases(
-        self, storage_paths: tuple[Path, Path], storage_manager: StorageManager
+        self, tmp_path: Path, storage_manager: StorageManager
     ):
         """Test that databases are created with correct schema."""
-        index_path, work_path = storage_paths
+        index_path = tmp_path / "index.db"
+        work_path = tmp_path / "work.db"
 
         # Verify databases exist
         assert index_path.exists()
@@ -165,9 +159,8 @@ class TestSchemaVersioning:
             session.close()
 
             # Now try to initialize StorageManager - should fail
-            work_path = Path(tmpdir) / "work.db"
             with pytest.raises(RuntimeError, match="index.db schema version mismatch"):
-                StorageManager(index_path=index_path, work_path=work_path)
+                StorageManager(Path(tmpdir))
 
     def test_work_version_mismatch_raises_error(self):
         """Test that wrong work.db version raises RuntimeError."""
@@ -191,7 +184,7 @@ class TestSchemaVersioning:
             # Now try to initialize StorageManager - should fail
             index_path = Path(tmpdir) / "index.db"
             with pytest.raises(RuntimeError, match="work.db schema version mismatch"):
-                StorageManager(index_path=index_path, work_path=work_path)
+                StorageManager(Path(tmpdir))
 
 
 class TestReferentialIntegrity:
@@ -229,7 +222,7 @@ class TestReferentialIntegrity:
         run = Run(
             snapshot_id=snapshot.snapshot_id,
             started_at="2024-01-01T00:00:00",
-            status="running",
+            status=RunStatus.RUNNING.value,
         )
         work_session.add(run)
         work_session.commit()
@@ -242,7 +235,11 @@ class TestReferentialIntegrity:
     ):
         """Test _validate_snapshot_id_matches_run method."""
         # Create run with snapshot_id=1
-        run = Run(snapshot_id=1, started_at="2024-01-01T00:00:00", status="running")
+        run = Run(
+            snapshot_id=1,
+            started_at="2024-01-01T00:00:00",
+            status=RunStatus.RUNNING.value,
+        )
         work_session.add(run)
         work_session.commit()
 

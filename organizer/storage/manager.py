@@ -5,6 +5,8 @@ architecture: filesystem index (index.db) and intermediary work (work.db).
 Configuration data is managed separately via YAML files loaded in-memory
 (see organizer/utils/config.py).
 """
+from enum import Enum
+from dataclasses import dataclass
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,6 +16,8 @@ from datetime import datetime
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
+
+from utils.config import compute_reference_hash
 
 from storage.index_models import (
     IndexBase,
@@ -32,10 +36,11 @@ from storage.work_models import (
     WORK_SCHEMA_VERSION,
 )
 
+
 # Default paths
 DATA_DIR = Path(__file__).parent.parent / "data"
-INDEX_DB = DATA_DIR / "index" / "index.db"
-WORK_DB = DATA_DIR / "work" / "work.db"
+# INDEX_DB = DATA_DIR / "index.db"
+# WORK_DB = DATA_DIR /  "work.db"
 
 
 # CRITICAL: Set PRAGMAs per connection, not per engine
@@ -53,6 +58,39 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
     cursor.close()
 
 
+class NodeKind(str, Enum):
+    """Allowed values for Node.kind."""
+
+    FILE = "file"
+    DIR = "dir"
+
+
+class FileSource(str, Enum):
+    """Allowed values for Node.file_source."""
+
+    FILESYSTEM = "filesystem"
+    ZIP_FILE = "zip_file"
+    ZIP_CONTENT = "zip_content"
+
+
+class RunStatus(str, Enum):
+    """Allowed values for Run.status."""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+@dataclass(frozen=True)
+class IngestionJob:
+    """Context payload for an ingestion job."""
+
+    storage: "StorageManager"
+    snapshot_id: int
+    run_id: int
+
+
 class StorageManager:
     """Manager for index.db and work.db databases.
 
@@ -67,17 +105,17 @@ class StorageManager:
 
     def __init__(
         self,
-        index_path: Optional[Path] = None,
-        work_path: Optional[Path] = None,
+        database_path: Path | None,
     ):
         """Initialize storage manager.
 
         Args:
-            index_path: Path to index.db (defaults to data/index/index.db)
-            work_path: Path to work.db (defaults to data/work/work.db)
+            database_path: Path to output path where the databases live (defaults to data/)
         """
-        self.index_path = index_path or INDEX_DB
-        self.work_path = work_path or WORK_DB
+        if database_path is None:
+            database_path = DATA_DIR
+        self.index_path = database_path / "index.db"
+        self.work_path = database_path / "work.db"
 
         # Store engines for later use
         self.index_engine = None
@@ -151,7 +189,7 @@ class StorageManager:
     def _init_work_schema(self):
         """Initialize work.db schema and verify version.
 
-        CRITICAL: PRAGMAs are set via event listener (see module-level decorator)
+        PRAGMAs are set via event listener (see module-level decorator)
         to ensure they apply to ALL connections, not just the first one.
         """
         # Handle in-memory database path
@@ -345,6 +383,76 @@ class StorageManager:
                 # SQLAlchemy cascade deletes stages, group_iterations, etc.
                 session.delete(run)
                 session.commit()
+
+    def _finish_run(self, run_id: int, status: RunStatus) -> None:
+        """Mark a run as finished with a status and timestamp."""
+        finished_at = datetime.utcnow().isoformat()
+        with self.get_work_session() as session:
+            run = session.query(Run).filter_by(run_id=run_id).first()
+            if run:
+                run.status = status.value
+                run.finished_at = finished_at
+                session.commit()
+
+    @contextmanager
+    def ingestion_job(
+        self,
+        root_path: Path,
+        preprocess_version: Optional[str] = None,
+        preprocess_hash: Optional[str] = None,
+        pipeline_version: Optional[str] = None,
+        config_hash: Optional[str] = None,
+        model_id: Optional[str] = None,
+        notes: Optional[str] = None,
+        reference_hash: Optional[str] = None,
+    ) -> Iterator[IngestionJob]:
+        """Create a snapshot + run for a new ingestion job.
+
+        The ingestion code can use the returned StorageManager to add nodes,
+        update stages, or write work data while the job is running.
+        """
+        created_at = datetime.utcnow().isoformat()
+        root_path_value = Path(root_path)
+        reference_hash_value = reference_hash or compute_reference_hash()
+        config_hash_value = config_hash or reference_hash_value
+
+        with self.get_index_session() as index_session:
+            snapshot = Snapshot(
+                created_at=created_at,
+                root_path=str(root_path_value),
+                root_abs_path=str(root_path_value.resolve()),
+                preprocess_version=preprocess_version,
+                preprocess_hash=preprocess_hash,
+                reference_hash=reference_hash_value,
+                notes=notes,
+            )
+            index_session.add(snapshot)
+            index_session.commit()
+            snapshot_id = snapshot.snapshot_id
+
+        with self.get_work_session() as work_session:
+            run = Run(
+                snapshot_id=snapshot_id,
+                started_at=created_at,
+                status=RunStatus.RUNNING.value,
+                pipeline_version=pipeline_version,
+                config_hash=config_hash_value,
+                model_id=model_id,
+                notes=notes,
+            )
+            work_session.add(run)
+            work_session.commit()
+            run_id = run.run_id
+
+        job = IngestionJob(storage=self, snapshot_id=snapshot_id, run_id=run_id)
+
+        try:
+            yield job
+        except Exception:
+            self._finish_run(run_id, RunStatus.FAILED)
+            raise
+        else:
+            self._finish_run(run_id, RunStatus.COMPLETED)
 
     # Placeholder methods for modification prevention
 
