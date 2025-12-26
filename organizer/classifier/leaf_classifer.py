@@ -12,7 +12,9 @@ from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import train_test_split
 
 # Hard-negative (batch-hard) loss
-from sentence_transformers.losses import BatchHardSoftMarginTripletLoss  # mines hardest negs in-batch
+from sentence_transformers.losses import (
+    BatchHardSoftMarginTripletLoss,
+)  # mines hardest negs in-batch
 
 
 LABELS = [
@@ -178,7 +180,9 @@ def main():
     ap.add_argument("--test_size", type=float, default=0.2)
 
     # Training knobs
-    ap.add_argument("--batch_size", type=int, default=32)  # good default for triplet batches
+    ap.add_argument(
+        "--batch_size", type=int, default=32
+    )  # good default for triplet batches
     ap.add_argument("--num_epochs", type=int, default=6)
     ap.add_argument("--lr", type=float, default=2e-5)
 
@@ -200,7 +204,9 @@ def main():
 
     # Basic validation: batch_size multiple of samples_per_label for triplet batching
     if args.use_triplet_loss and (args.batch_size % args.samples_per_label != 0):
-        raise ValueError("When using triplet loss, batch_size must be a multiple of samples_per_label.")
+        raise ValueError(
+            "When using triplet loss, batch_size must be a multiple of samples_per_label."
+        )
 
     label2id: Dict[str, int] = {l: i for i, l in enumerate(LABELS)}
     id2label: Dict[int, str] = {i: l for l, i in label2id.items()}
@@ -308,7 +314,9 @@ def main():
     trainer.model.save_pretrained(args.output_dir)
     print(f"\nSaved to: {args.output_dir}")
     if extra_texts:
-        print(f"Hard-negative oversampling added {len(extra_texts)} extra training rows.")
+        print(
+            f"Hard-negative oversampling added {len(extra_texts)} extra training rows."
+        )
 
 
 if __name__ == "__main__":

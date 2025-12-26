@@ -13,6 +13,7 @@ from data_models.database import (
     setup_group,
     setup_folder_categories,
     GroupCategoryEntry,
+    GroupingIteration,
     Folder,
 )
 from grouping.tag_decomposition import decompose_compound_tags
@@ -34,6 +35,11 @@ def create_test_database():
 
 def create_test_entries(session: Session):
     """Create test GroupCategoryEntry records for decomposition testing"""
+    # Create iteration record
+    iteration = GroupingIteration(id=0, description="test iteration")
+    session.add(iteration)
+    session.commit()
+
     # Create some test folders
     folders = [
         Folder(id=1, folder_name="test1", folder_path="/test1"),
@@ -42,6 +48,7 @@ def create_test_entries(session: Session):
     ]
     for folder in folders:
         session.add(folder)
+    session.commit()
 
     # Create test entries with compound tags
     test_entries = [

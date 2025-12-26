@@ -39,7 +39,7 @@ from pipeline.folder_reconstruction import get_folder_heirarchy
 
 app = FastAPI()
 app.add_middleware(
-    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly  
+    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -462,7 +462,9 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
-        calculate_folder_structure(Path(db_path), structure_type=StructureType.organized)
+        calculate_folder_structure(
+            Path(db_path), structure_type=StructureType.organized
+        )
 
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(

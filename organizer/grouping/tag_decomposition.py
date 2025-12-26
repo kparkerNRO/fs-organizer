@@ -1542,8 +1542,14 @@ def decompose_compound_tags(session: Session) -> None:
 
     # Get the next iteration ID
     from grouping.group import get_next_iteration_id
+    from data_models.database import GroupingIteration
 
     iteration_id = get_next_iteration_id(session)
+
+    # Create the iteration record
+    iteration = GroupingIteration(id=iteration_id, description="Tag decomposition")
+    session.add(iteration)
+    session.commit()
 
     # Get entries from the previous iteration
     stmt = select(GroupCategoryEntry).where(
