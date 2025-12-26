@@ -46,7 +46,10 @@ CSV_COLUMNS = [
     "child_names_sample",
     "sibling_names_sample",
     "file_extensions",
-    "label",
+    "heuristic_label",  # Heuristic prediction
+    "heuristic_confidence",  # Confidence score
+    "heuristic_reason",  # Reasoning
+    "label",  # Manual label (to be filled)
 ]
 
 
@@ -265,6 +268,8 @@ def write_sample_csv(
     child_sample_size: int = 5,
     sibling_sample_size: int = 5,
     ext_sample_size: int = 10,
+    use_heuristic: bool = True,
+    heuristic_taxonomy: str = "v2",
 ) -> None:
     """Write training sample CSV with context columns.
 
@@ -276,6 +281,8 @@ def write_sample_csv(
         child_sample_size: Max child names to sample
         sibling_sample_size: Max sibling names to sample
         ext_sample_size: Max file extensions to sample
+        use_heuristic: Whether to include heuristic classifier predictions
+        heuristic_taxonomy: Taxonomy for heuristic classifier ('v1' or 'v2')
     """
     # Load all nodes for snapshot to build adjacency
     all_nodes = session.execute(
@@ -299,6 +306,19 @@ def write_sample_csv(
                 exts.add(child.ext.lstrip('.').lower())
             exts.update(collect_extensions(child.node_id))
         return exts
+
+    # Initialize heuristic classifier if requested
+    heuristic_classifier = None
+    if use_heuristic:
+        try:
+            from fine_tuning.heuristic_classifier import HeuristicClassifier
+            from utils.config import Config
+
+            config = Config()
+            heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
+        except Exception as e:
+            print(f"Warning: Could not initialize heuristic classifier: {e}")
+            use_heuristic = False
 
     # Write CSV
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -336,6 +356,24 @@ def write_sample_csv(
             # Get file extensions
             extensions = sorted(collect_extensions(node.node_id))[:ext_sample_size]
 
+            # Run heuristic classifier if enabled
+            heuristic_label = ''
+            heuristic_confidence = ''
+            heuristic_reason = ''
+
+            if heuristic_classifier:
+                result = heuristic_classifier.classify(
+                    name=node.name,
+                    depth=node.depth,
+                    parent_name=parent.name if parent else None,
+                    children_names=child_names,
+                    sibling_names=sibling_names,
+                    file_extensions=extensions
+                )
+                heuristic_label = result.label
+                heuristic_confidence = f"{result.confidence:.3f}"
+                heuristic_reason = result.reason
+
             # Write row
             writer.writerow({
                 'snapshot_id': snapshot_id,
@@ -349,6 +387,9 @@ def write_sample_csv(
                 'child_names_sample': json.dumps(child_names),
                 'sibling_names_sample': json.dumps(sibling_names),
                 'file_extensions': json.dumps(extensions),
+                'heuristic_label': heuristic_label,
+                'heuristic_confidence': heuristic_confidence,
+                'heuristic_reason': heuristic_reason,
                 'label': '',  # Empty for manual labeling
             })
 

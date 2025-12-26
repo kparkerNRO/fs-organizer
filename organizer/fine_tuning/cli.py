@@ -817,6 +817,16 @@ def generate_samples(
         "--diversity-factor",
         help="Balance between random and diverse sampling (0-1, higher=more diverse)",
     ),
+    use_heuristic: bool = typer.Option(
+        True,
+        "--use-heuristic/--no-heuristic",
+        help="Include heuristic classifier predictions in CSV output",
+    ),
+    heuristic_taxonomy: str = typer.Option(
+        "v2",
+        "--heuristic-taxonomy",
+        help="Taxonomy for heuristic classifier (v1 or v2)",
+    ),
 ):
     """Generate training samples CSV for manual labeling.
 
@@ -873,11 +883,15 @@ def generate_samples(
 
         # Write CSV
         typer.echo(f"Writing samples to {output_csv}...")
+        if use_heuristic:
+            typer.echo(f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})...")
         write_sample_csv(
             output_path=output_csv,
             nodes=samples,
             session=session,
             snapshot_id=snapshot_id,
+            use_heuristic=use_heuristic,
+            heuristic_taxonomy=heuristic_taxonomy,
         )
 
         typer.echo(f"✓ Saved samples to {output_csv}")
