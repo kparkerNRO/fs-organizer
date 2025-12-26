@@ -139,6 +139,7 @@ class Config:
     replace_exceptions: dict[str, str]
     clean_exceptions: set[str]
     should_ignore: set[str]
+    collab_markers: set[str]
     grouping_exceptions: tuple[str, ...]
     variants: dict[str, dict[str, Any]]
     known_variant_tokens: set[str]
@@ -146,6 +147,7 @@ class Config:
     variant_grouping_by_string: dict[str, str]
     variant_types: set[str]
     media_types: set[str]
+    format_types: set[str]
     relational_cache: dict[str, Any]
 
     def is_variant(self, value: str) -> bool:
@@ -173,6 +175,7 @@ def get_config() -> Config:
     replace_exceptions = filename_config.get("replace_exceptions", {})
     clean_exceptions = set(filename_config.get("clean_exceptions", []))
     should_ignore = set(filename_config.get("should_ignore", []))
+    collab_markers = set(filename_config.get("collab_markers", []))
 
     grouping_exceptions = tuple(grouping_config.get("grouping_exceptions", []))
 
@@ -180,8 +183,9 @@ def get_config() -> Config:
     variant_cache = _build_variant_cache(variants)
     creator_cache = _build_creator_remove_cache(creators)
 
-    variant_types = {name for name in variant_cache["types"].get("variant", set())}
-    media_types = {name for name in variant_cache["types"].get("media_type", set())}
+    variant_types = {name.lower() for name in variant_cache["types"].get("variant", set())}
+    media_types = {name.lower() for name in variant_cache["types"].get("media_type", set())}
+    format_types = {name.lower() for name in variant_cache["types"].get("media_format", set())}
 
     relational_cache = {
         "variant_tokens": variant_cache,
@@ -196,6 +200,7 @@ def get_config() -> Config:
         replace_exceptions=replace_exceptions,
         clean_exceptions=clean_exceptions,
         should_ignore=should_ignore,
+        collab_markers=collab_markers,
         grouping_exceptions=grouping_exceptions,
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],
@@ -203,6 +208,7 @@ def get_config() -> Config:
         variant_grouping_by_string=variant_cache["grouping_by_token"],
         variant_types=variant_types,
         media_types=media_types,
+        format_types=format_types,
         relational_cache=relational_cache,
     )
 
@@ -227,6 +233,7 @@ def get_minimal_config() -> Config:
         replace_exceptions={},
         clean_exceptions=set(),
         should_ignore=set(),
+        collab_markers=set(),
         grouping_exceptions=tuple(),
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],
@@ -234,6 +241,7 @@ def get_minimal_config() -> Config:
         variant_grouping_by_string=variant_cache["grouping_by_token"],
         variant_types=set(),
         media_types=set(),
+        format_types=set(),
         relational_cache=relational_cache,
     )
 

@@ -1,6 +1,6 @@
 import re
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from utils.common import VIEW_TYPES
 from utils.config import Config, get_config
@@ -8,6 +8,43 @@ from utils.config import Config, get_config
 PATH_EXTRAS = " -,()/"
 
 logger = logging.getLogger(__name__)
+
+
+def levenshtein_distance(s1: str, s2: str) -> int:
+    """Calculate the Levenshtein distance between two strings."""
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            # Cost of insertions, deletions, or substitutions
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def has_close_match(s: str, candidates: List[str], max_distance: int = 2) -> bool:
+    """
+    Check if string s has a Levenshtein distance <= max_distance with any string in candidates.
+
+    Args:
+        s: The string to check
+        candidates: List of candidate strings to compare against
+        max_distance: Maximum Levenshtein distance to consider a match (default: 2)
+
+    Returns:
+        True if any candidate has distance <= max_distance, False otherwise
+    """
+    return any(levenshtein_distance(s, candidate) <= max_distance for candidate in candidates)
 
 
 def strip_part_from_base(base_name: str, part):
@@ -149,9 +186,6 @@ def clean_filename(
 
     # remove "#<number> at the start of the name"
     out_dir_name = re.sub(r"^#\d+\s*", "", out_dir_name)
-
-    # clean up directory sizes
-    # out_dir_name = re.sub("#?\d{2}\s*", "", out_dir_name)
 
     # clean up special characters at the start and end
     out_dir_name = re.sub(r"^\.\s*", "", out_dir_name)
