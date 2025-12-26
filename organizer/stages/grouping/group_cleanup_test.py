@@ -1,5 +1,5 @@
 import pytest
-from grouping.group_cleanup import GroupEntry, unify_category_spelling
+from stages.grouping.group_cleanup import GroupEntry, unify_category_spelling
 
 
 @pytest.mark.parametrize(

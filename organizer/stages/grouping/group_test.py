@@ -17,12 +17,12 @@ from data_models.database import (
     setup_folder_categories,
     setup_group,
 )
-from grouping.group import (
+from stages.grouping.group import (
     process_folders_to_groups,
     refine_groups,
     group_folders,
 )
-from grouping.helpers import common_token_grouping
+from stages.grouping.helpers import common_token_grouping
 from utils.config import KNOWN_VARIANT_TOKENS, get_minimal_config
 
 

@@ -1541,7 +1541,7 @@ def decompose_compound_tags(session: Session) -> None:
     logger.info("Starting compound tag decomposition")
 
     # Get the next iteration ID
-    from grouping.group import get_next_iteration_id
+    from stages.grouping.group import get_next_iteration_id
     from data_models.database import GroupingIteration
 
     iteration_id = get_next_iteration_id(session)

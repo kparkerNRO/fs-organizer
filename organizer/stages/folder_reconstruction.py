@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session
 import typer
 from api.api import StructureType
-from pipeline.categorize import get_categories_for_path
+from stages.categorize import get_categories_for_path
 from data_models.database import FolderStructure
 from data_models.database import (
     Folder as dbFolder,

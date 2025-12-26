@@ -4,7 +4,7 @@ from typing import Dict, List
 from pathlib import Path
 
 from data_models.database import Folder
-from grouping.helpers import common_token_grouping
+from stages.grouping.helpers import common_token_grouping
 
 
 def get_folder_groups(session: Session) -> Dict[str, List[Folder]]:

@@ -2,7 +2,7 @@ import pytest
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from pipeline.gather import process_zip, ingest_filesystem
+from stages.gather import process_zip, ingest_filesystem
 from storage.index_models import IndexBase, Snapshot, Node, NodeFeatures
 from storage.manager import NodeKind, FileSource
 import zipfile

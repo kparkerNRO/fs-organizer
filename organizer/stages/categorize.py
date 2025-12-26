@@ -24,7 +24,7 @@ from data_models.database import (
 
 from sqlalchemy import select
 
-from grouping.group import GroupCategoryEntry
+from stages.grouping.group import GroupCategoryEntry
 from utils.folder_structure import insert_file_in_structure
 
 logger = logging.getLogger(__name__)

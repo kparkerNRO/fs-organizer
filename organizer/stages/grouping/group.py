@@ -11,9 +11,9 @@ from data_models.database import (
     Folder,
     GroupCategoryEntry,
 )
-from grouping.group_cleanup import refine_group
+from stages.grouping.group_cleanup import refine_group
 from logging import getLogger
-from grouping.nlp_grouping import (
+from stages.grouping.nlp_grouping import (
     cluster_with_custom_metric,
     prepare_records,
     compute_custom_distance_matrix,
@@ -421,7 +421,7 @@ def group_folders(
         pre_process_groups(session, config=config)
 
         # New tag decomposition stage
-        from grouping.tag_decomposition import decompose_compound_tags
+        from stages.grouping.tag_decomposition import decompose_compound_tags
 
         decompose_compound_tags(session)
 

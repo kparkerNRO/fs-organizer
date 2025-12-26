@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from unittest.mock import patch
 
-from pipeline.categorize import (
+from stages.categorize import (
     get_parent_folder,
     get_categories_for_path,
     calculate_folder_structure,
@@ -292,8 +292,8 @@ class TestGetCategoriesForPath:
 class TestCalculateCategories:
     """Test cases for calculate_categories function"""
 
-    @patch("pipeline.categorize.insert_file_in_structure")
-    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("stages.categorize.insert_file_in_structure")
+    @patch("stages.categorize.get_sessionmaker")
     def test_calculate_categories_basic(
         self,
         mock_get_sessionmaker,
@@ -327,8 +327,8 @@ class TestCalculateCategories:
         assert len(folder_structures) == 1
         assert folder_structures[0].structure_type == StructureType.organized
 
-    @patch("pipeline.categorize.insert_file_in_structure")
-    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("stages.categorize.insert_file_in_structure")
+    @patch("stages.categorize.get_sessionmaker")
     def test_calculate_categories_processes_all_files(
         self,
         mock_get_sessionmaker,
@@ -354,9 +354,9 @@ class TestCalculateCategories:
             assert hasattr(file, "new_path")
             assert hasattr(file, "groups")
 
-    @patch("pipeline.categorize.insert_file_in_structure")
-    @patch("pipeline.categorize.get_sessionmaker")
-    @patch("pipeline.categorize.get_categories_for_path")
+    @patch("stages.categorize.insert_file_in_structure")
+    @patch("stages.categorize.get_sessionmaker")
+    @patch("stages.categorize.get_categories_for_path")
     def test_calculate_categories_with_categories(
         self,
         mock_get_categories,
@@ -390,7 +390,7 @@ class TestCalculateCategories:
             assert file.new_path == "category1/category2"
             assert file.groups == ["category1", "category2"]
 
-    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("stages.categorize.get_sessionmaker")
     def test_calculate_categories_no_files(
         self, mock_get_sessionmaker, session, mock_sessionmaker
     ):
@@ -418,7 +418,7 @@ class TestCalculateCategories:
         files = session.query(File).all()
         assert len(files) == 0
 
-    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("stages.categorize.get_sessionmaker")
     def test_calculate_categories_empty_categories(
         self,
         mock_get_sessionmaker,
@@ -434,7 +434,7 @@ class TestCalculateCategories:
 
         # sample_group_entries already has entries with iteration_id=1
 
-        with patch("pipeline.categorize.get_categories_for_path", return_value=[]):
+        with patch("stages.categorize.get_categories_for_path", return_value=[]):
             calculate_folder_structure(db_path)
 
         # Check that empty categories result in empty new_path
@@ -461,7 +461,7 @@ class TestEdgeCases:
         result = get_categories_for_path(session, path, iteration_id=1)
         assert result == []
 
-    @patch("pipeline.categorize.get_sessionmaker")
+    @patch("stages.categorize.get_sessionmaker")
     def test_calculate_categories_no_iteration_id(
         self, mock_get_sessionmaker, session, mock_sessionmaker
     ):
