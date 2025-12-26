@@ -276,7 +276,7 @@ def setup_gather(db_path: Path):
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
-    reset_tables(db_path, [GroupCategoryEntry])
+    reset_tables(db_path, [GroupingIteration, GroupCategoryEntry])
 
 
 def setup_folder_categories(db_path: Path):

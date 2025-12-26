@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from data_models.database import (
     GroupCategory,
+    GroupingIteration,
     setup_folder_categories,
     setup_group,
     get_sessionmaker,
@@ -37,16 +38,24 @@ def get_next_iteration_id(session: Session):
     return result + 1
 
 
-def process_folders_to_groups(session, group_id: int):
+def process_folders_to_groups(session, group_id: int | None):
     """
     Process the folders to groups
     """
     iteration_id = get_next_iteration_id(session)
+
+    # Create the iteration record
+    iteration = GroupingIteration(
+        id=iteration_id, description=f"Initial folder processing"
+    )
+    session.add(iteration)
+    session.commit()
+
     folders = session.query(Folder).all()
     for folder in folders:
         group_entry = GroupCategoryEntry(
             folder_id=folder.id,
-            group_id=group_id,
+            group_id=group_id if group_id is not None else None,
             iteration_id=iteration_id,
             pre_processed_name=folder.folder_name,
             processed_name=folder.cleaned_name,
@@ -91,13 +100,15 @@ def refine_groups(
                 needs_review=False,
             )
 
+            # Add and flush the group_category first to satisfy foreign key constraints
+            session.add(group_category)
+            session.flush()
+
+            # Now update the entry with the group_id
             entry.group_id = current_group_id
             entry.processed_name = entry.pre_processed_name
             entry.processed = True
 
-            # group_categories.append(group_category)
-            session.add(group_category)
-            session.flush()
             current_group_id += 1
 
             continue
@@ -136,6 +147,12 @@ def refine_groups(
                 )
             }
             subcategory_to_entry = {subcategory: [] for subcategory in subcategories}
+
+            # Add group_category and subgroups first to satisfy foreign key constraints
+            session.add(group_category)
+            for subgroup in subgroups.values():
+                session.add(subgroup)
+            session.flush()
 
             # Find entries that match this refined group
             group_members = []
@@ -220,6 +237,12 @@ def pre_process_groups(session: Session, config: Config | None = None) -> None:
     """
     # Get last round's entries
     iteration_id = get_next_iteration_id(session)
+
+    # Create the iteration record
+    iteration = GroupingIteration(id=iteration_id, description="Pre-process groups")
+    session.add(iteration)
+    session.commit()
+
     stmt = select(GroupCategoryEntry).where(
         GroupCategoryEntry.iteration_id == iteration_id - 1
     )
@@ -272,6 +295,12 @@ def compact_groups(session: Session):
     Compact groups for each folder, making sure that folders don't have duplicate category entries
     """
     iteration_id = get_next_iteration_id(session)
+
+    # Create the iteration record
+    iteration = GroupingIteration(id=iteration_id, description="Compact groups")
+    session.add(iteration)
+    session.commit()
+
     folders = session.execute(select(Folder)).scalars().all()
     for folder in folders:
         groups = (
@@ -388,7 +417,7 @@ def group_folders(
     sessionmaker = get_sessionmaker(db_path)
     with sessionmaker() as session:
         config = config or get_config()
-        process_folders_to_groups(session, 0)
+        process_folders_to_groups(session, None)
         pre_process_groups(session, config=config)
 
         # New tag decomposition stage

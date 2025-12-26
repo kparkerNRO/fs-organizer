@@ -5,6 +5,7 @@ architecture: filesystem index (index.db) and intermediary work (work.db).
 Configuration data is managed separately via YAML files loaded in-memory
 (see organizer/utils/config.py).
 """
+
 from enum import Enum
 from dataclasses import dataclass
 
@@ -295,7 +296,10 @@ class StorageManager:
             True if snapshot exists, False otherwise
         """
         with self.get_index_session(read_only=True) as session:
-            return session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first() is not None
+            return (
+                session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
+                is not None
+            )
 
     def _validate_node_exists(self, node_id: int, snapshot_id: int) -> bool:
         """Check if node exists in index.db for given snapshot.
@@ -325,7 +329,10 @@ class StorageManager:
             True if runs exist that reference snapshot, False otherwise
         """
         with self.get_work_session() as session:
-            return session.query(Run).filter_by(snapshot_id=snapshot_id).first() is not None
+            return (
+                session.query(Run).filter_by(snapshot_id=snapshot_id).first()
+                is not None
+            )
 
     def _validate_snapshot_id_matches_run(self, snapshot_id: int, run_id: int) -> bool:
         """Validate that provided snapshot_id matches the run's snapshot_id.
@@ -366,9 +373,13 @@ class StorageManager:
 
         # Safe to delete
         with self.get_index_session() as session:
-            snapshot = session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
+            snapshot = (
+                session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
+            )
             if snapshot:
-                session.delete(snapshot)  # Cascades to nodes, node_features via SQLAlchemy
+                session.delete(
+                    snapshot
+                )  # Cascades to nodes, node_features via SQLAlchemy
                 session.commit()
 
     def delete_run(self, run_id: int):
@@ -462,7 +473,9 @@ class StorageManager:
         Raises:
             NotImplementedError: Always, as nodes are immutable
         """
-        raise NotImplementedError("Nodes are immutable. Create a new snapshot to capture changes.")
+        raise NotImplementedError(
+            "Nodes are immutable. Create a new snapshot to capture changes."
+        )
 
     def compute_node_features(self, snapshot_id: int):
         """NOT ALLOWED: Features must be computed during snapshot creation.

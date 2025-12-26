@@ -28,8 +28,6 @@ from storage.work_models import (
 )
 
 
-
-
 @pytest.fixture
 def storage_manager(tmp_path: Path) -> StorageManager:
     return StorageManager(database_path=tmp_path)
@@ -90,9 +88,7 @@ def run(work_session, snapshot):
 class TestStorageManager:
     """Test StorageManager initialization and database creation."""
 
-    def test_create_databases(
-        self, tmp_path: Path, storage_manager: StorageManager
-    ):
+    def test_create_databases(self, tmp_path: Path, storage_manager: StorageManager):
         """Test that databases are created with correct schema."""
         index_path = tmp_path / "index.db"
         work_path = tmp_path / "work.db"
@@ -190,9 +186,7 @@ class TestSchemaVersioning:
 class TestReferentialIntegrity:
     """Test referential integrity validation methods."""
 
-    def test_validate_snapshot_exists(
-        self, storage_manager: StorageManager, snapshot
-    ):
+    def test_validate_snapshot_exists(self, storage_manager: StorageManager, snapshot):
         """Test _validate_snapshot_exists method."""
         # Non-existent snapshot
         assert not storage_manager._validate_snapshot_exists(999)
@@ -200,7 +194,9 @@ class TestReferentialIntegrity:
         # Now it should exist
         assert storage_manager._validate_snapshot_exists(snapshot.snapshot_id)
 
-    def test_validate_node_exists(self, storage_manager: StorageManager, node, snapshot):
+    def test_validate_node_exists(
+        self, storage_manager: StorageManager, node, snapshot
+    ):
         """Test _validate_node_exists method."""
         # Should exist
         assert storage_manager._validate_node_exists(node.node_id, snapshot.snapshot_id)
@@ -276,9 +272,12 @@ class TestDeletion:
 
         # Verify it's gone
         with storage_manager.get_index_session() as session:
-            assert session.query(Snapshot).filter_by(
-                snapshot_id=snapshot.snapshot_id
-            ).first() is None
+            assert (
+                session.query(Snapshot)
+                .filter_by(snapshot_id=snapshot.snapshot_id)
+                .first()
+                is None
+            )
 
 
 class TestImmutability:

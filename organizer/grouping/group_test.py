@@ -10,6 +10,9 @@ from data_models.database import (
     Folder,
     GroupCategory,
     GroupCategoryEntry,
+    GroupingIteration,
+    setup_folder_categories,
+    setup_group,
 )
 from grouping.group import (
     process_folders_to_groups,
@@ -23,13 +26,25 @@ from grouping.helpers import common_token_grouping
 @pytest.fixture
 def test_db():
     """Create an in-memory SQLite database for testing."""
+    from sqlalchemy import event
+
     engine = create_engine("sqlite:///:memory:")
+
+    # Enable foreign key constraints
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     session = Session(engine)
 
     yield session
 
     session.close()
+    Base.metadata.drop_all(engine)
+    engine.dispose()
 
 
 def test_process_folders_to_groups(test_db):
@@ -48,8 +63,9 @@ def test_process_folders_to_groups(test_db):
     test_db.add_all(folders)
     test_db.commit()
 
-    # Run the function
-    process_folders_to_groups(test_db, 0)
+    # Run the function (it will create iteration 0)
+    # Pass None for group_id since we don't have a group yet
+    process_folders_to_groups(test_db, None)
 
     # Verify results
     entries = test_db.query(GroupCategoryEntry).all()
@@ -72,6 +88,12 @@ def test_process_folders_to_groups(test_db):
 
 # Test refine_groups with singleton clusters
 def test_refine_groups_singletons(test_db):
+    # Create iteration records
+    iteration0 = GroupingIteration(id=0, description="test iteration 0")
+    iteration1 = GroupingIteration(id=1, description="test iteration 1")
+    test_db.add_all([iteration0, iteration1])
+    test_db.commit()
+
     # Set up test folders
     folders = [
         Folder(
@@ -85,6 +107,7 @@ def test_refine_groups_singletons(test_db):
         ),
     ]
     test_db.add_all(folders)
+    test_db.commit()
 
     # Set up entries with different cluster IDs (singletons)
     entries = [
@@ -128,6 +151,12 @@ def test_refine_groups_singletons(test_db):
 
 # Test refine_groups with clustered items
 def test_refine_groups_clusters(test_db):
+    # Create iteration records
+    iteration0 = GroupingIteration(id=0, description="test iteration 0")
+    iteration1 = GroupingIteration(id=1, description="test iteration 1")
+    test_db.add_all([iteration0, iteration1])
+    test_db.commit()
+
     # Set up test folders
     folders = [
         Folder(
@@ -150,6 +179,7 @@ def test_refine_groups_clusters(test_db):
         ),
     ]
     test_db.add_all(folders)
+    test_db.commit()
 
     # Set up entries with same cluster ID for apple items
     entries = [

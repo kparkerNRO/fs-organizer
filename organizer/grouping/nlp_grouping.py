@@ -30,6 +30,7 @@ def compute_distance_to_shared_parent(A_path: Path, B_path: Path) -> int:
     """
     Compute the distance between two paths by counting how far each is from the shared parent.
     """
+
     def normalize_parts(path: Path) -> tuple[str, ...]:
         parts = [part for part in path.parts if part not in (".", "")]
         if parts and parts[0] == "/":

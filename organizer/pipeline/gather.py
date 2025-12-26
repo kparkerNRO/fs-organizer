@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from api.api import FolderV2, StructureType
 from data_models.database import (
     FolderStructure,
-    setup_folder_categories,
     get_session,
     Folder as dbFolder,
     File as dbFile,
@@ -17,6 +16,8 @@ from utils.config import get_config
 from utils.filename_utils import clean_filename
 import os
 from utils.folder_structure import insert_file_in_structure
+from storage.manager import StorageManager, NodeKind, FileSource
+from storage.index_models import Node, NodeFeatures
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +63,180 @@ def count_zip_children(entries: List[str], target_dir: str = "") -> Tuple[int, i
 
 def process_zip(
     zip_source,
+    base_path: Path,
+    parent_rel_path: Path,
+    parent_node_id: int | None,
+    zip_name: str,
+    session: Session,
+    snapshot_id: int,
+    zip_file_source: FileSource = FileSource.ZIP_FILE,
+    preserve_modules: bool = True,
+) -> None:
+    try:
+        with zipfile.ZipFile(zip_source, "r") as zf:
+            entries = zf.namelist()
+            zip_rel_path = (
+                parent_rel_path / zip_name if parent_rel_path else Path(zip_name)
+            )
+            zip_abs_path = base_path / zip_rel_path
+
+            # Shortcut if it's a Foundry module: i.e., if module.json exists at the root level
+            matching_foundry_module = [
+                entry
+                for entry in entries
+                if entry.lower().endswith("module.json") and entry.count("/") <= 2
+            ]
+            if preserve_modules and matching_foundry_module:
+                # HACK: this creates an artificial folder to tag foundry modules
+                folder_name = "Foundry Module " + zip_name
+                folder_rel_path = (
+                    parent_rel_path / folder_name
+                    if parent_rel_path
+                    else Path(folder_name)
+                )
+                folder_depth = len(folder_rel_path.parts)
+                folder_node = _create_node(
+                    session,
+                    snapshot_id=snapshot_id,
+                    kind=NodeKind.DIR,
+                    name=folder_name,
+                    rel_path=folder_rel_path,
+                    abs_path=base_path / folder_rel_path,
+                    depth=folder_depth,
+                    parent_node_id=parent_node_id,
+                    file_source=zip_file_source,
+                    num_folder_children=0,
+                    num_file_children=1,
+                )
+                _create_node(
+                    session,
+                    snapshot_id=snapshot_id,
+                    kind=NodeKind.FILE,
+                    name=zip_name,
+                    rel_path=folder_rel_path / zip_name,
+                    abs_path=base_path / folder_rel_path / zip_name,
+                    depth=folder_depth + 1,
+                    parent_node_id=folder_node.node_id,
+                    file_source=zip_file_source,
+                )
+                session.commit()
+                return
+
+            # Count children at the ZIP root level
+            root_folders, root_files = count_zip_children(entries)
+
+            zip_node = _create_node(
+                session,
+                snapshot_id=snapshot_id,
+                kind=NodeKind.FILE,
+                name=zip_name,
+                rel_path=zip_rel_path,
+                abs_path=zip_abs_path,
+                depth=len(zip_rel_path.parts),
+                parent_node_id=parent_node_id,
+                file_source=zip_file_source,
+                num_folder_children=root_folders,
+                num_file_children=root_files,
+            )
+            zip_dir_nodes: dict[Path, int] = {}
+
+            for entry in entries:
+                entry_path = Path(entry)
+                if any(should_ignore(part) for part in entry_path.parts):
+                    continue
+
+                # Process directory structure
+                current_rel_path = zip_rel_path
+                current_parent_id = zip_node.node_id
+                for part in entry_path.parts[:-1]:  # Exclude the file name itself
+                    new_rel_path = current_rel_path / part
+                    if new_rel_path in zip_dir_nodes:
+                        current_parent_id = zip_dir_nodes[new_rel_path]
+                    else:
+                        depth = len(new_rel_path.parts)
+
+                        # Count children at this directory level
+                        folder_children, file_children = count_zip_children(
+                            entries, str(new_rel_path.relative_to(zip_rel_path))
+                        )
+
+                        new_folder = _create_node(
+                            session,
+                            snapshot_id=snapshot_id,
+                            kind=NodeKind.DIR,
+                            name=part,
+                            rel_path=new_rel_path,
+                            abs_path=base_path / new_rel_path,
+                            depth=depth,
+                            parent_node_id=current_parent_id,
+                            file_source=FileSource.ZIP_CONTENT,
+                            num_folder_children=folder_children,
+                            num_file_children=file_children,
+                        )
+                        current_parent_id = new_folder.node_id
+                        zip_dir_nodes[new_rel_path] = new_folder.node_id
+
+                    current_rel_path = new_rel_path
+
+                # Process file
+                if not entry.endswith("/"):
+                    file_name = entry_path.name
+                    if file_name:
+                        file_rel_path = current_rel_path / file_name
+                        depth = len(file_rel_path.parts)
+
+                        if file_name.lower().endswith(".zip"):
+                            try:
+                                with zf.open(entry) as nested_content:
+                                    process_zip(
+                                        nested_content,
+                                        base_path,
+                                        current_rel_path,
+                                        current_parent_id,
+                                        file_name,
+                                        session,
+                                        snapshot_id,
+                                        FileSource.ZIP_CONTENT,
+                                    )
+                            except (zipfile.BadZipFile, Exception) as e:
+                                logger.error(
+                                    f"Error processing nested zip {entry}: {e}"
+                                )
+                        else:
+                            info = zf.getinfo(entry)
+                            mtime = datetime(
+                                *info.date_time, tzinfo=timezone.utc
+                            ).timestamp()
+                            _create_node(
+                                session,
+                                snapshot_id=snapshot_id,
+                                kind=NodeKind.FILE,
+                                name=file_name,
+                                rel_path=file_rel_path,
+                                abs_path=base_path / file_rel_path,
+                                depth=depth,
+                                parent_node_id=current_parent_id,
+                                file_source=FileSource.ZIP_CONTENT,
+                                size=info.file_size,
+                                mtime=mtime,
+                            )
+
+            session.commit()
+
+    except (NotImplementedError, zipfile.BadZipFile) as e:
+        logger.error(f"Error processing zip {zip_name}: {e}")
+        raise
+
+
+def _process_zip_legacy(
+    zip_source,
     parent_path: Path,
     zip_name: str,
     base_depth: int,
     session: Session,
     preserve_modules: bool = True,
 ) -> None:
+    """Legacy ZIP processing for run_data.db folders/files tables."""
     try:
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
@@ -163,7 +332,7 @@ def process_zip(
                         if file_name.lower().endswith(".zip"):
                             try:
                                 with zf.open(entry) as nested_content:
-                                    process_zip(
+                                    _process_zip_legacy(
                                         nested_content,
                                         current_path,
                                         file_name,
@@ -212,33 +381,167 @@ def calculate_structure(session: Session, root_dir: Path):
     )
 
 
-from storage.manager import StorageManager
-from storage.index_models import (
-    IndexBase,
-    Snapshot,
-    Node,
-    Meta as IndexMeta,
-    INDEX_SCHEMA_VERSION,
-)
+def _normalized_name(name: str) -> str:
+    if name.lower().endswith(".zip"):
+        return clean_filename(name[:-4])
+    return clean_filename(name)
+
+
+def _create_node(
+    session: Session,
+    *,
+    snapshot_id: int,
+    kind: NodeKind,
+    name: str,
+    rel_path: Path,
+    abs_path: Path,
+    depth: int,
+    parent_node_id: int | None,
+    file_source: FileSource,
+    num_folder_children: int = 0,
+    num_file_children: int = 0,
+    size: int | None = None,
+    mtime: float | None = None,
+    ctime: float | None = None,
+    inode: int | None = None,
+) -> Node:
+    node = Node(
+        snapshot_id=snapshot_id,
+        parent_node_id=parent_node_id,
+        kind=kind.value,
+        name=name,
+        rel_path=str(rel_path),
+        abs_path=str(abs_path),
+        ext=Path(name).suffix or None,
+        size=size,
+        mtime=mtime,
+        ctime=ctime,
+        inode=inode,
+        depth=depth,
+        file_source=file_source.value,
+        num_folder_children=num_folder_children,
+        num_file_children=num_file_children,
+    )
+    session.add(node)
+    session.flush()
+
+    features = NodeFeatures(
+        node_id=node.node_id,
+        normalized_name=_normalized_name(name),
+    )
+    session.add(features)
+    return node
+
 
 def ingest_filesystem(base_path: Path, storage_path: Path | None):
     storage_manager = StorageManager(storage_path)
+    base_path = base_path.resolve()
 
-    with (
-        storage_manager.get_index_session() as index_session,
-        storage_manager.get_work_session() as work_session,
-    ):
-        # set up the new ingest
-        new_snapshot = Snapshot(
-            created_at=datetime.now(timezone.utc),
-            root_path=base_path,
-            root_abs_path=base_path.absolute(),
-        )
-        index_session.add(new_snapshot)
-        index_session.flush()
-        snapshot_id = int(new_snapshot.snapshot_id)
+    with storage_manager.ingestion_job(root_path=base_path) as job:
+        snapshot_id = job.snapshot_id
+        with storage_manager.get_index_session() as index_session:
+            dir_nodes: dict[str, int] = {}
 
-        
+            for root, dirs, files in os.walk(base_path):
+                # Filter out ignored files and directories
+                dirs[:] = [d for d in dirs if not should_ignore(d)]
+                files = [f for f in files if not should_ignore(f)]
+
+                root_path = Path(root)
+
+                for d in dirs:
+                    folder_path = root_path / d
+                    rel_path = folder_path.relative_to(base_path)
+                    parent_rel_path = rel_path.parent
+                    parent_node_id = (
+                        dir_nodes.get(str(parent_rel_path))
+                        if parent_rel_path != Path(".")
+                        else None
+                    )
+                    depth = len(rel_path.parts)
+
+                    child_dirs = [
+                        child_dir
+                        for child_dir in os.listdir(folder_path)
+                        if (folder_path / child_dir).is_dir()
+                        and not should_ignore(child_dir)
+                    ]
+                    child_files = [
+                        child_file
+                        for child_file in os.listdir(folder_path)
+                        if (folder_path / child_file).is_file()
+                        and not should_ignore(child_file)
+                    ]
+
+                    stat = folder_path.stat()
+                    node = _create_node(
+                        index_session,
+                        snapshot_id=snapshot_id,
+                        kind=NodeKind.DIR,
+                        name=d,
+                        rel_path=rel_path,
+                        abs_path=folder_path,
+                        depth=depth,
+                        parent_node_id=parent_node_id,
+                        file_source=FileSource.FILESYSTEM,
+                        num_folder_children=len(child_dirs),
+                        num_file_children=len(child_files),
+                        size=stat.st_size,
+                        mtime=stat.st_mtime,
+                        ctime=stat.st_ctime,
+                        inode=stat.st_ino,
+                    )
+                    dir_nodes[str(rel_path)] = node.node_id
+
+                for f in files:
+                    file_path = root_path / f
+                    rel_path = file_path.relative_to(base_path)
+                    parent_rel_path = rel_path.parent
+                    parent_node_id = (
+                        dir_nodes.get(str(parent_rel_path))
+                        if parent_rel_path != Path(".")
+                        else None
+                    )
+                    depth = len(rel_path.parts)
+
+                    if f.lower().endswith(".zip"):
+                        try:
+                            process_zip(
+                                file_path,
+                                base_path,
+                                Path("")
+                                if parent_rel_path == Path(".")
+                                else parent_rel_path,
+                                parent_node_id,
+                                f,
+                                index_session,
+                                snapshot_id,
+                                FileSource.ZIP_FILE,
+                            )
+                        except zipfile.BadZipFile as e:
+                            logger.error(f"Error processing zip file {file_path}: {e}")
+                        continue
+
+                    stat = file_path.stat()
+                    _create_node(
+                        index_session,
+                        snapshot_id=snapshot_id,
+                        kind=NodeKind.FILE,
+                        name=f,
+                        rel_path=rel_path,
+                        abs_path=file_path,
+                        depth=depth,
+                        parent_node_id=parent_node_id,
+                        file_source=FileSource.FILESYSTEM,
+                        size=stat.st_size,
+                        mtime=stat.st_mtime,
+                        ctime=stat.st_ctime,
+                        inode=stat.st_ino,
+                    )
+
+            index_session.commit()
+
+    return snapshot_id
 
 
 def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
@@ -287,7 +590,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
 
                 if f.lower().endswith(".zip"):
                     try:
-                        process_zip(file_path, Path(root), f, depth, session)
+                        _process_zip_legacy(file_path, Path(root), f, depth, session)
                     except zipfile.BadZipFile as e:
                         logger.error(f"Error processing zip file {file_path}: {e}")
                     continue

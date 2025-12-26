@@ -1,5 +1,6 @@
 import pytest
 from pathlib import Path
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from data_models.database import (
     Folder,
     File,
     GroupCategoryEntry,
+    GroupingIteration,
     FolderStructure,
 )
 from api.api import StructureType
@@ -22,13 +24,38 @@ from api.api import StructureType
 @pytest.fixture
 def session():
     """Create an in-memory SQLite database for testing"""
+    from sqlalchemy import event
+
     engine = create_engine("sqlite:///:memory:")
+
+    # Enable foreign key constraints
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
     yield session
     session.close()
     Base.metadata.drop_all(engine)
+    engine.dispose()
+
+
+@pytest.fixture
+def mock_sessionmaker(session):
+    """Create a mock sessionmaker that returns a context manager"""
+
+    @contextmanager
+    def session_context():
+        yield session
+
+    def create_session():
+        return session_context()
+
+    return create_session
 
 
 @pytest.fixture
@@ -68,8 +95,9 @@ def sample_folders(session):
 
 
 @pytest.fixture
-def sample_files(session):
+def sample_files(session, sample_folders):
     """Create sample file data for testing"""
+    # Ensure folders are created first
     files = [
         File(
             id=1,
@@ -110,6 +138,11 @@ def sample_files(session):
 @pytest.fixture
 def sample_group_entries(session, sample_folders):
     """Create sample group category entries for testing"""
+    # Create iteration record first
+    iteration = GroupingIteration(id=1, description="test iteration")
+    session.add(iteration)
+    session.commit()
+
     entries = [
         GroupCategoryEntry(
             id=1,
@@ -266,21 +299,17 @@ class TestCalculateCategories:
         mock_get_sessionmaker,
         mock_insert,
         session,
+        mock_sessionmaker,
         sample_files,
         sample_group_entries,
     ):
         """Test basic calculate_categories functionality"""
         # Setup mocks
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
 
         db_path = Path("/test/database.db")
 
-        # Add max iteration_id query result
-        session.add(
-            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
-        )
-        session.commit()
-
+        # sample_group_entries already has entries with iteration_id=1
         calculate_folder_structure(db_path)
 
         # Verify sessionmaker was called
@@ -305,20 +334,16 @@ class TestCalculateCategories:
         mock_get_sessionmaker,
         mock_insert,
         session,
+        mock_sessionmaker,
         sample_files,
         sample_group_entries,
     ):
         """Test that all files are processed including zip files"""
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
 
         db_path = Path("/test/database.db")
 
-        # Add max iteration_id query result
-        session.add(
-            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
-        )
-        session.commit()
-
+        # sample_group_entries already has entries with iteration_id=1
         calculate_folder_structure(db_path)
 
         # Check that all files were processed and updated
@@ -338,12 +363,13 @@ class TestCalculateCategories:
         mock_get_sessionmaker,
         mock_insert,
         session,
+        mock_sessionmaker,
         sample_files,
         sample_group_entries,
     ):
         """Test calculate_categories with mock categories"""
         # Setup mocks
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
         # Mock GroupCategoryEntry objects
         mock_categories = [
             GroupCategoryEntry(processed_name="category1", confidence=0.8),
@@ -353,12 +379,7 @@ class TestCalculateCategories:
 
         db_path = Path("/test/database.db")
 
-        # Add max iteration_id query result
-        session.add(
-            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
-        )
-        session.commit()
-
+        # sample_group_entries already has entries with iteration_id=1
         calculate_folder_structure(db_path)
 
         # Check that categories were used to create new paths
@@ -370,13 +391,22 @@ class TestCalculateCategories:
             assert file.groups == ["category1", "category2"]
 
     @patch("pipeline.categorize.get_sessionmaker")
-    def test_calculate_categories_no_files(self, mock_get_sessionmaker, session):
+    def test_calculate_categories_no_files(
+        self, mock_get_sessionmaker, session, mock_sessionmaker
+    ):
         """Test calculate_categories with no files in database"""
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
 
         db_path = Path("/test/database.db")
 
-        # Add max iteration_id query result but no files
+        # Create required records
+        iteration = GroupingIteration(id=1, description="test iteration")
+        folder = Folder(
+            id=1, folder_name="test_folder", folder_path="/test/folder", depth=1
+        )
+        session.add_all([iteration, folder])
+        session.commit()
+
         session.add(
             GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
         )
@@ -390,18 +420,19 @@ class TestCalculateCategories:
 
     @patch("pipeline.categorize.get_sessionmaker")
     def test_calculate_categories_empty_categories(
-        self, mock_get_sessionmaker, session, sample_files, sample_group_entries
+        self,
+        mock_get_sessionmaker,
+        session,
+        mock_sessionmaker,
+        sample_files,
+        sample_group_entries,
     ):
         """Test calculate_categories when get_categories_for_path returns empty list"""
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
 
         db_path = Path("/test/database.db")
 
-        # Add max iteration_id query result
-        session.add(
-            GroupCategoryEntry(iteration_id=1, folder_id=1, processed_name="test")
-        )
-        session.commit()
+        # sample_group_entries already has entries with iteration_id=1
 
         with patch("pipeline.categorize.get_categories_for_path", return_value=[]):
             calculate_folder_structure(db_path)
@@ -431,9 +462,11 @@ class TestEdgeCases:
         assert result == []
 
     @patch("pipeline.categorize.get_sessionmaker")
-    def test_calculate_categories_no_iteration_id(self, mock_get_sessionmaker, session):
+    def test_calculate_categories_no_iteration_id(
+        self, mock_get_sessionmaker, session, mock_sessionmaker
+    ):
         """Test calculate_categories when no GroupCategoryEntry exists"""
-        mock_get_sessionmaker.return_value = lambda: session
+        mock_get_sessionmaker.return_value = mock_sessionmaker
 
         db_path = Path("/test/database.db")
 

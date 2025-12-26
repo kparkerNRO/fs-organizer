@@ -30,14 +30,18 @@ class Run(WorkBase):
     snapshot_id = Column(Integer, nullable=False)  # FK to index.db (cross-database)
     started_at = Column(String, nullable=False)
     finished_at = Column(String)
-    status = Column(String, default="running")  # 'running' | 'completed' | 'failed' | 'cancelled'
+    status = Column(
+        String, default="running"
+    )  # 'running' | 'completed' | 'failed' | 'cancelled'
     pipeline_version = Column(String)
     config_hash = Column(String)
     model_id = Column(String)
     notes = Column(String)
 
     # Relationships
-    stages = relationship("StageState", back_populates="run", cascade="all, delete-orphan")
+    stages = relationship(
+        "StageState", back_populates="run", cascade="all, delete-orphan"
+    )
     group_iterations = relationship(
         "GroupIteration", back_populates="run", cascade="all, delete-orphan"
     )
@@ -53,7 +57,9 @@ class StageState(WorkBase):
     __tablename__ = "stage_state"
 
     stage_name = Column(String, primary_key=True)
-    snapshot_id = Column(Integer, primary_key=True)  # Redundant with run.snapshot_id for query performance
+    snapshot_id = Column(
+        Integer, primary_key=True
+    )  # Redundant with run.snapshot_id for query performance
     run_id = Column(Integer, ForeignKey("run.run_id"), primary_key=True)
     completed_at = Column(String)
     input_fingerprint = Column(String)
@@ -77,14 +83,18 @@ class GroupIteration(WorkBase):
 
     iteration_id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(Integer, ForeignKey("run.run_id"), nullable=False)
-    snapshot_id = Column(Integer, nullable=False)  # Redundant with run.snapshot_id for queries
+    snapshot_id = Column(
+        Integer, nullable=False
+    )  # Redundant with run.snapshot_id for queries
     timestamp = Column(String)
     description = Column(String)
     parameters_json = Column(String)
 
     # Relationships
     run = relationship("Run", back_populates="group_iterations")
-    entries = relationship("GroupEntry", back_populates="iteration", cascade="all, delete-orphan")
+    entries = relationship(
+        "GroupEntry", back_populates="iteration", cascade="all, delete-orphan"
+    )
     categories = relationship(
         "GroupCategory", back_populates="iteration", cascade="all, delete-orphan"
     )
@@ -99,7 +109,9 @@ class GroupEntry(WorkBase):
     __tablename__ = "stg_group_entry"
 
     entry_id = Column(Integer, primary_key=True, autoincrement=True)
-    iteration_id = Column(Integer, ForeignKey("stg_group_iteration.iteration_id"), nullable=False)
+    iteration_id = Column(
+        Integer, ForeignKey("stg_group_iteration.iteration_id"), nullable=False
+    )
     node_id = Column(Integer, nullable=False)  # FK to index.db node
     cluster_id = Column(Integer)
     pre_processed_name = Column(String)
@@ -123,7 +135,9 @@ class GroupCategory(WorkBase):
     __tablename__ = "stg_group_category"
 
     group_id = Column(Integer, primary_key=True, autoincrement=True)
-    iteration_id = Column(Integer, ForeignKey("stg_group_iteration.iteration_id"), nullable=False)
+    iteration_id = Column(
+        Integer, ForeignKey("stg_group_iteration.iteration_id"), nullable=False
+    )
     name = Column(String, nullable=False)
     count = Column(Integer)
     group_confidence = Column(Float)
@@ -147,7 +161,9 @@ class Classification(WorkBase):
     classification_id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(Integer, ForeignKey("run.run_id"), nullable=False)
     node_id = Column(Integer, nullable=False)
-    classification = Column(String)  # 'variant' | 'collection' | 'subject' | 'uncertain'
+    classification = Column(
+        String
+    )  # 'variant' | 'collection' | 'subject' | 'uncertain'
     confidence = Column(Float)
     method = Column(String)  # 'structural' | 'llm' | 'manual'
 
@@ -165,7 +181,9 @@ class FolderStructure(WorkBase):
 
     structure_id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(Integer, ForeignKey("run.run_id"), nullable=False)
-    structure_type = Column(String, nullable=False)  # 'original' | 'organized' | 'grouped'
+    structure_type = Column(
+        String, nullable=False
+    )  # 'original' | 'organized' | 'grouped'
     structure_json = Column(String, nullable=False)
     created_at = Column(String)
 

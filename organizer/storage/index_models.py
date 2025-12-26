@@ -8,7 +8,16 @@ ingest_filesystem(), they MUST NOT be modified. All nodes and node_features
 are computed atomically during creation.
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, CheckConstraint, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    Boolean,
+    ForeignKey,
+    CheckConstraint,
+    Index,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 # Schema version (increment on breaking changes)
@@ -40,7 +49,9 @@ class Snapshot(IndexBase):
     notes = Column(String)
 
     # Relationships
-    nodes = relationship("Node", back_populates="snapshot", cascade="all, delete-orphan")
+    nodes = relationship(
+        "Node", back_populates="snapshot", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (Index("idx_snapshot_root", "root_abs_path"),)
 
@@ -86,7 +97,10 @@ class Node(IndexBase):
     snapshot = relationship("Snapshot", back_populates="nodes")
     parent = relationship("Node", remote_side=[node_id], backref="children")
     features = relationship(
-        "NodeFeatures", back_populates="node", uselist=False, cascade="all, delete-orphan"
+        "NodeFeatures",
+        back_populates="node",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
