@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional
 from wordfreq import zipf_frequency
-from grouping.helpers import (
+from stages.grouping.helpers import (
     common_token_grouping,
     has_number_difference,
     normalized_grouping,

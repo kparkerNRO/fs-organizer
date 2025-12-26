@@ -3,13 +3,13 @@ import logging
 import sys
 from pathlib import Path
 from api.api import StructureType
-from pipeline.folder_reconstruction import (
+from stages.folder_reconstruction import (
     get_folder_heirarchy,
     recalculate_cleaned_paths_for_structure,
 )
-from pipeline.gather import ingest_filesystem
-from grouping.group import group_folders
-from pipeline.categorize import calculate_folder_structure
+from stages.gather import ingest_filesystem
+from stages.grouping.group import group_folders
+from stages.categorize import calculate_folder_structure
 
 # Configure root logger to output to stdout
 logging.basicConfig(
@@ -111,8 +111,12 @@ def pipeline(
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
     # TODO: Update group and folders commands to work with snapshot_id
-    typer.echo("⚠ Pipeline incomplete: group and folders commands not yet migrated to new storage")
-    typer.echo(f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}")
+    typer.echo(
+        "⚠ Pipeline incomplete: group and folders commands not yet migrated to new storage"
+    )
+    typer.echo(
+        f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}"
+    )
 
 
 # FastAPI endpoints

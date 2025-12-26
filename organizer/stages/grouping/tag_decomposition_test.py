@@ -15,7 +15,7 @@ from data_models.database import (
     GroupingIteration,
     Folder,
 )
-from grouping.tag_decomposition import decompose_compound_tags
+from stages.grouping.tag_decomposition import decompose_compound_tags
 
 
 def create_test_database():
@@ -151,7 +151,7 @@ def test_full_decomposition_pipeline():
         decompose_compound_tags(session)
 
         # Check new iteration was created
-        from grouping.group import get_next_iteration_id
+        from stages.grouping.group import get_next_iteration_id
 
         new_iteration_id = get_next_iteration_id(session) - 1
 

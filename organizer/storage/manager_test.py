@@ -1,8 +1,4 @@
 """Unit tests for StorageManager.
-
-CRITICAL: All :memory: tests must use StaticPool to prevent separate DB issues.
-Without StaticPool, each connection gets a separate :memory: DB, causing
-schema/version checks and session reads to fail intermittently.
 """
 
 import tempfile
@@ -10,7 +6,6 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.pool import StaticPool
 
 from storage.manager import StorageManager, NodeKind, FileSource, RunStatus
 from storage.index_models import (
