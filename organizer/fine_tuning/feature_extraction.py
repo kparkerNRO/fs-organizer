@@ -40,7 +40,7 @@ def _processed_name(name: str) -> str:
 
 
 def has_any_token(token_list: List[str], cue_set: Set[str]) -> bool:
-    return any(has_close_match(t, token_list) in cue_set for t in token_list)
+    return any(has_close_match(t, list(cue_set)) for t in token_list)
 
 
 def extract_features(
