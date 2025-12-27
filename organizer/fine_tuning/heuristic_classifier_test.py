@@ -1,56 +1,34 @@
 """Tests for heuristic classifier."""
 
 import pytest
-from unittest.mock import MagicMock
 
 from fine_tuning.heuristic_classifier import (
     HeuristicClassifier,
     ClassificationResult,
-    normalize_text,
+)
+from fine_tuning.text_processing import (
+    normalize_string,
     text_similarity,
     has_close_text_match,
     has_pattern_match,
 )
-from utils.config import Config
+from utils.config import get_config
 
 
 @pytest.fixture
-def mock_config():
-    """Create a mock config for testing."""
-    config = MagicMock(spec=Config)
-
-    # Mock variants
-    config.variants = {
-        "winter": {"type": "variant", "grouping": "season", "synonyms": []},
-        "summer": {"type": "variant", "grouping": "season", "synonyms": []},
-        "VTT": {"type": "media_type", "grouping": "media", "synonyms": []},
-        "PDF": {"type": "media_format", "grouping": "media", "synonyms": ["PDFs"]},
-        "Gridded": {"type": "variant", "grouping": "layout", "synonyms": []},
-        "Gridless": {"type": "variant", "grouping": "layout", "synonyms": []},
-    }
-
-    # Mock creators
-    config.creators = {
-        "CzePeku": {"synonyms": [], "tokens_to_remove": []},
-        "Tom Cartos": {"synonyms": [], "tokens_to_remove": []},
-        "Limithron": {"synonyms": [], "tokens_to_remove": []},
-    }
-
-    # Mock collaboration markers
-    config.collab_markers = [
-        "collab", "collaboration", "with", "feat", "ft", "&"
-    ]
-
-    return config
+def test_config():
+    """Load actual config from YAML files."""
+    # Load the real config which reads from yaml files
+    return get_config()
 
 
 class TestTextUtilities:
     """Test text processing utilities."""
 
     def test_normalize_text(self):
-        assert normalize_text("Hello  World") == "hello world"
-        assert normalize_text("  UPPER  ") == "upper"
-        assert normalize_text("Multiple   Spaces") == "multiple spaces"
+        assert normalize_string("Hello  World") == "hello world"
+        assert normalize_string("  UPPER  ") == "upper"
+        assert normalize_string("Multiple   Spaces") == "multiple spaces"
 
     def test_text_similarity(self):
         # Identical strings
@@ -94,10 +72,20 @@ class TestTextUtilities:
         assert "maps" in matches
 
     def test_has_pattern_match_contains(self):
-        patterns = ["map", "token"]
+        # Test whole-word matching (not substring)
+        patterns = ["maps", "token"]
         has_match, matches = has_pattern_match("VTT Maps Pack", patterns)
         assert has_match
-        assert "map" in matches
+        assert "maps" in matches
+
+        # Test that partial word doesn't match
+        patterns = ["map", "pack"]
+        has_match, matches = has_pattern_match("VTT Maps Pack", patterns)
+        # "map" won't match "maps" (different words)
+        # but "pack" will match "Pack"
+        assert has_match
+        assert "pack" in matches
+        assert "map" not in matches
 
     def test_has_pattern_match_no_match(self):
         patterns = ["maps", "tokens"]
@@ -108,15 +96,15 @@ class TestTextUtilities:
 class TestHeuristicClassifier:
     """Test the heuristic classifier."""
 
-    def test_init(self, mock_config):
+    def test_init(self, test_config):
         """Test classifier initialization."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
-        assert classifier.config == mock_config
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
+        assert classifier.config == test_config
         assert classifier.taxonomy == "v2"
 
-    def test_variant_mapping_v2(self, mock_config):
+    def test_variant_mapping_v2(self, test_config):
         """Test variant mapping for v2 taxonomy."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Check variant types are mapped correctly
         assert classifier.variant_to_label_v2["winter"] == "theme_or_genre"
@@ -124,106 +112,116 @@ class TestHeuristicClassifier:
         assert classifier.variant_to_label_v2["PDF"] == "asset_type"
         assert classifier.variant_to_label_v2["PDFs"] == "asset_type"  # synonym
 
-    def test_variant_mapping_v1(self, mock_config):
+    def test_variant_mapping_v1(self, test_config):
         """Test variant mapping for v1 taxonomy."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v1")
+        classifier = HeuristicClassifier(test_config, taxonomy="v1")
 
         # Check variant types are mapped correctly
         assert classifier.variant_to_label_v1["winter"] == "descriptor"
         assert classifier.variant_to_label_v1["VTT"] == "media_bucket"
         assert classifier.variant_to_label_v1["PDF"] == "media_bucket"
 
-    def test_classify_variant_season(self, mock_config):
+    def test_classify_variant_season(self, test_config):
         """Test classification of season variants."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Winter")
         assert result.label == "theme_or_genre"
         assert result.confidence >= 0.85
         assert "variant" in result.reason.lower()
 
-    def test_classify_variant_media_type(self, mock_config):
+    def test_classify_variant_media_type(self, test_config):
         """Test classification of media type variants."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("VTT")
         assert result.label == "asset_type"
         assert result.confidence >= 0.85
 
-    def test_classify_known_creator(self, mock_config):
+    def test_classify_known_creator(self, test_config):
         """Test classification of known creators."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("CzePeku", depth=1)
         assert result.label == "creator_or_studio"
         assert result.confidence >= 0.8
 
-    def test_classify_creator_fuzzy_match(self, mock_config):
+    def test_classify_creator_fuzzy_match(self, test_config):
         """Test classification with fuzzy creator matching."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Should match "Tom Cartos" with high similarity
         result = classifier.classify("Tom Cartos Maps", depth=1)
         assert result.label == "creator_or_studio"
 
-    def test_classify_creator_with_collab(self, mock_config):
+    def test_classify_creator_with_collab(self, test_config):
         """Test classification with collaboration markers."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Collaboration with Tom Cartos", depth=2)
         assert result.label == "creator_or_studio"
         assert "collaboration" in result.reason.lower() or "collab" in result.matches
 
-    def test_classify_asset_type_maps(self, mock_config):
+    def test_classify_asset_type_maps(self, test_config):
         """Test classification of map folders."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Maps", file_extensions=["png", "jpg"])
         assert result.label == "asset_type"
         assert result.confidence >= 0.75
 
-    def test_classify_asset_type_tokens(self, mock_config):
+    def test_classify_asset_type_tokens(self, test_config):
         """Test classification of token folders."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Tokens")
         assert result.label == "asset_type"
 
-    def test_classify_theme_dungeon(self, mock_config):
+    def test_classify_theme_dungeon(self, test_config):
         """Test classification of theme folders."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Dungeon")
         assert result.label == "theme_or_genre"
         assert result.confidence >= 0.7
 
-    def test_classify_other_year(self, mock_config):
+    def test_classify_other_year(self, test_config):
         """Test classification of year folders."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("2023")
         assert result.label == "other"
         assert result.confidence >= 0.9
 
-    def test_classify_other_rewards(self, mock_config):
+    def test_classify_other_rewards(self, test_config):
         """Test classification of organizational folders."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Patreon Rewards")
+        # "Patreon Rewards" should be classified as "other" due to special case
+        # handling that prioritizes the combo of "patreon" + "rewards"
         assert result.label == "other"
         assert result.confidence >= 0.75
 
-    def test_classify_unknown(self, mock_config):
+    def test_classify_other_tier(self, test_config):
+        """Test classification of tier organizational folders."""
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
+
+        result = classifier.classify("Tier 3 Rewards")
+        assert result.label == "other"
+        assert result.confidence >= 0.75
+
+    def test_classify_unknown(self, test_config):
         """Test classification when no rules match."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("SomeRandomFolderName")
         assert result.label == "unknown"
         assert result.confidence < 0.5
 
-    def test_classify_v1_taxonomy(self, mock_config):
+    def test_classify_v1_taxonomy(self, test_config):
         """Test that v1 taxonomy returns correct labels."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v1")
+        classifier = HeuristicClassifier(test_config, taxonomy="v1")
 
         # Variant should map to descriptor
         result = classifier.classify("Winter")
@@ -237,9 +235,9 @@ class TestHeuristicClassifier:
         result = classifier.classify("CzePeku", depth=1)
         assert result.label == "person_or_group"
 
-    def test_classify_with_depth_context(self, mock_config):
+    def test_classify_with_depth_context(self, test_config):
         """Test that depth affects confidence."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Creator at depth 1 (high confidence)
         result_shallow = classifier.classify("CzePeku", depth=1)
@@ -250,9 +248,9 @@ class TestHeuristicClassifier:
         # Shallow should have higher confidence
         assert result_shallow.confidence >= result_deep.confidence
 
-    def test_classify_with_parent_context(self, mock_config):
+    def test_classify_with_parent_context(self, test_config):
         """Test that parent context affects classification."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Folder under "Collaborator Content" parent
         result = classifier.classify(
@@ -266,9 +264,9 @@ class TestHeuristicClassifier:
         # but the parent context should be considered
         assert result is not None
 
-    def test_classify_batch(self, mock_config):
+    def test_classify_batch(self, test_config):
         """Test batch classification."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         samples = [
             {"name": "Winter", "depth": 3},
@@ -285,9 +283,9 @@ class TestHeuristicClassifier:
         assert results[2].label == "asset_type"  # Maps
         assert results[3].label == "other"  # 2023
 
-    def test_confidence_ranges(self, mock_config):
+    def test_confidence_ranges(self, test_config):
         """Test that confidence scores are in valid range."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         test_cases = [
             "Winter",
@@ -301,17 +299,17 @@ class TestHeuristicClassifier:
             result = classifier.classify(name)
             assert 0.0 <= result.confidence <= 1.0
 
-    def test_reason_provided(self, mock_config):
+    def test_reason_provided(self, test_config):
         """Test that all results include a reason."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Winter")
         assert result.reason
         assert len(result.reason) > 0
 
-    def test_matches_provided(self, mock_config):
+    def test_matches_provided(self, test_config):
         """Test that matches are tracked."""
-        classifier = HeuristicClassifier(mock_config, taxonomy="v2")
+        classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Winter")
         assert isinstance(result.matches, list)

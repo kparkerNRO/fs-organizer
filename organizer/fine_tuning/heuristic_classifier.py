@@ -11,9 +11,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
+from fine_tuning.text_processing import (
+    has_close_text_match,
+    has_pattern_match,
+    normalize_string,
+)
 from utils.config import Config
 
 
@@ -36,6 +40,44 @@ LABELS_V2 = {
     "unknown",  # ambiguous
 }
 
+# Mapping from variant types (in variants.yaml) to taxonomy labels
+# Format: {variant_type: (v1_label, v2_label)}
+VARIANT_TYPE_TO_TAXONOMY = {
+    "variant": ("descriptor", "theme_or_genre"),
+    "media_type": ("media_bucket", "asset_type"),
+    "media_format": ("media_bucket", "asset_type"),
+}
+
+# Creator detection keywords (from proposal v2)
+CREATOR_KEYWORDS = {
+    "patreon", "studios", "studio", "co", "inc", "llc",
+    "cartographer", "maps", "publishing", "games"
+}
+
+# Asset type keywords (from proposal v2)
+ASSET_TYPE_KEYWORDS = {
+    "maps", "tokens", "token", "pack", "assets", "asset",
+    "battlemap", "battlemaps", "handouts", "handout",
+    "tiles", "tile", "music", "illustrations", "illustration",
+    "animated scenes", "key & design notes"
+}
+
+# Theme/genre keywords (from proposal v2)
+THEME_KEYWORDS = {
+    "dungeon", "dungeons", "forest", "sci-fi", "scifi",
+    "cyberpunk", "horror", "desert", "urban", "fantasy",
+    "medieval", "modern", "futuristic", "gothic", "steampunk"
+}
+
+# Organizational folder keywords
+OTHER_KEYWORDS = {
+    "rewards", "reward", "tier", "bonus", "content",
+    "instructions", "instruction", "guide", "notes", "note"
+}
+
+# Year pattern for organizational folders
+YEAR_PATTERN = re.compile(r'^(19|20)\d{2}$')
+
 
 @dataclass
 class ClassificationResult:
@@ -45,91 +87,6 @@ class ClassificationResult:
     confidence: float
     reason: str
     matches: List[str]  # What patterns/rules matched
-
-
-# Mapping from variant types (in variants.yaml) to taxonomy labels
-# Format: {variant_type: (v1_label, v2_label)}
-VARIANT_TYPE_TO_TAXONOMY = {
-    "variant": ("descriptor", "theme_or_genre"),
-    "media_type": ("media_bucket", "asset_type"),
-    "media_format": ("media_bucket", "asset_type"),
-}
-
-
-def normalize_text(text: str) -> str:
-    """Normalize text for comparison (lowercase, remove extra spaces)."""
-    return re.sub(r'\s+', ' ', text.lower().strip())
-
-
-def text_similarity(text1: str, text2: str) -> float:
-    """Calculate text similarity using SequenceMatcher.
-
-    Returns a value between 0 and 1, where 1 is identical.
-    """
-    return SequenceMatcher(None, normalize_text(text1), normalize_text(text2)).ratio()
-
-
-def has_close_text_match(target: str, candidates: List[str], threshold: float = 0.85) -> Tuple[bool, List[str]]:
-    """Check if target has a close text match in candidates.
-
-    Args:
-        target: Text to match
-        candidates: List of candidate strings
-        threshold: Similarity threshold (0-1)
-
-    Returns:
-        Tuple of (has_match, list_of_matches)
-    """
-    matches = []
-    normalized_target = normalize_text(target)
-
-    for candidate in candidates:
-        normalized_candidate = normalize_text(candidate)
-
-        # Exact match
-        if normalized_target == normalized_candidate:
-            matches.append(candidate)
-            continue
-
-        # Substring match
-        if normalized_target in normalized_candidate or normalized_candidate in normalized_target:
-            matches.append(candidate)
-            continue
-
-        # Fuzzy match
-        similarity = text_similarity(target, candidate)
-        if similarity >= threshold:
-            matches.append(candidate)
-
-    return len(matches) > 0, matches
-
-
-def has_pattern_match(text: str, patterns: List[str]) -> Tuple[bool, List[str]]:
-    """Check if text matches any of the given patterns (case-insensitive).
-
-    Args:
-        text: Text to check
-        patterns: List of patterns (can include wildcards)
-
-    Returns:
-        Tuple of (has_match, list_of_matching_patterns)
-    """
-    matches = []
-    normalized_text = normalize_text(text)
-
-    for pattern in patterns:
-        normalized_pattern = normalize_text(pattern)
-
-        # Exact match
-        if normalized_text == normalized_pattern:
-            matches.append(pattern)
-            continue
-
-        # Contains match (pattern in text)
-        if normalized_pattern in normalized_text:
-            matches.append(pattern)
-
-    return len(matches) > 0, matches
 
 
 class HeuristicClassifier:
@@ -147,9 +104,6 @@ class HeuristicClassifier:
 
         # Build lookup tables from config
         self._build_variant_mappings()
-        self._build_creator_patterns()
-        self._build_asset_type_patterns()
-        self._build_theme_patterns()
 
     def _build_variant_mappings(self):
         """Build mappings from config variants to taxonomy labels."""
@@ -169,48 +123,6 @@ class HeuristicClassifier:
                 for synonym in variant_info.get("synonyms", []):
                     self.variant_to_label_v1[synonym] = v1_label
                     self.variant_to_label_v2[synonym] = v2_label
-
-    def _build_creator_patterns(self):
-        """Build patterns for creator detection."""
-        # Known creators from config
-        self.known_creators = set(self.config.creators.keys())
-
-        # Patterns that suggest creator/studio
-        self.creator_keywords = {
-            "patreon", "studios", "studio", "co", "inc", "llc",
-            "cartographer", "maps", "publishing", "games"
-        }
-
-        # Collaboration markers
-        self.collab_markers = set(self.config.collab_markers)
-
-    def _build_asset_type_patterns(self):
-        """Build patterns for asset type detection."""
-        # From proposal v2
-        self.asset_type_keywords = {
-            "maps", "tokens", "token", "pack", "assets", "asset",
-            "battlemap", "battlemaps", "handouts", "handout",
-            "tiles", "tile", "music", "illustrations", "illustration",
-            "animated scenes", "key & design notes"
-        }
-
-    def _build_theme_patterns(self):
-        """Build patterns for theme/genre detection."""
-        # From proposal v2
-        self.theme_keywords = {
-            "dungeon", "dungeons", "forest", "sci-fi", "scifi",
-            "cyberpunk", "horror", "desert", "urban", "fantasy",
-            "medieval", "modern", "futuristic", "gothic", "steampunk"
-        }
-
-        # Year patterns for "other"
-        self.year_pattern = re.compile(r'^(19|20)\d{2}$')
-
-        # Other organizational keywords
-        self.other_keywords = {
-            "rewards", "reward", "tier", "bonus", "content",
-            "instructions", "instruction", "guide", "notes", "note"
-        }
 
     def classify(self, name: str, depth: int = 0, parent_name: Optional[str] = None,
                  children_names: Optional[List[str]] = None,
@@ -317,23 +229,25 @@ class HeuristicClassifier:
         matches = []
 
         # Check against known creators
-        has_match, creator_matches = has_close_text_match(name, list(self.known_creators), threshold=0.85)
+        known_creators = list(self.config.creators.keys())
+        has_match, creator_matches = has_close_text_match(name, known_creators, threshold=0.85)
         if has_match:
             matches.extend(creator_matches)
 
         # Check for creator keywords
-        has_keyword, keyword_matches = has_pattern_match(name, list(self.creator_keywords))
+        has_keyword, keyword_matches = has_pattern_match(name, list(CREATOR_KEYWORDS))
         if has_keyword:
             matches.extend(keyword_matches)
 
         # Check for collaboration markers
-        has_collab, collab_matches = has_pattern_match(name, list(self.collab_markers))
+        collab_markers = list(self.config.collab_markers)
+        has_collab, collab_matches = has_pattern_match(name, collab_markers)
         if has_collab:
             matches.append("collaboration marker")
 
         # Check if parent suggests creator context
         if parent_name:
-            parent_lower = normalize_text(parent_name)
+            parent_lower = normalize_string(parent_name)
             if "collaborat" in parent_lower or "creator" in parent_lower or "author" in parent_lower:
                 matches.append("creator context from parent")
 
@@ -356,7 +270,7 @@ class HeuristicClassifier:
 
     def _check_asset_types(self, name: str, file_extensions: List[str]) -> Optional[ClassificationResult]:
         """Check if folder represents an asset type."""
-        has_match, matches = has_pattern_match(name, list(self.asset_type_keywords))
+        has_match, matches = has_pattern_match(name, list(ASSET_TYPE_KEYWORDS))
 
         if has_match:
             # Check file extensions for additional confidence
@@ -376,7 +290,7 @@ class HeuristicClassifier:
 
     def _check_themes(self, name: str) -> Optional[ClassificationResult]:
         """Check if folder represents a theme/genre."""
-        has_match, matches = has_pattern_match(name, list(self.theme_keywords))
+        has_match, matches = has_pattern_match(name, list(THEME_KEYWORDS))
 
         if has_match:
             return ClassificationResult(
@@ -391,7 +305,7 @@ class HeuristicClassifier:
     def _check_other(self, name: str) -> Optional[ClassificationResult]:
         """Check if folder is in 'other' category."""
         # Check for year
-        if self.year_pattern.match(name.strip()):
+        if YEAR_PATTERN.match(name.strip()):
             return ClassificationResult(
                 label=self._get_label("other"),
                 confidence=0.95,
@@ -400,12 +314,12 @@ class HeuristicClassifier:
             )
 
         # Check for other organizational keywords
-        has_match, matches = has_pattern_match(name, list(self.other_keywords))
+        has_match, matches = has_pattern_match(name, list(OTHER_KEYWORDS))
 
         if has_match:
             # Special case: if contains both "patreon" and reward/tier keywords, higher confidence
             # This handles "Patreon Rewards", "Patreon Tier 1", etc.
-            normalized_name = normalize_text(name)
+            normalized_name = normalize_string(name)
             if "patreon" in normalized_name and any(kw in normalized_name for kw in ["reward", "tier", "bonus"]):
                 return ClassificationResult(
                     label=self._get_label("other"),

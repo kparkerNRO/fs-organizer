@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import csv
 import json
-import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
@@ -18,6 +17,7 @@ from typing import Any, Dict, List, Set, Tuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from fine_tuning.text_processing import char_trigrams, jaccard_similarity
 from storage.index_models import Node
 from storage.manager import NodeKind
 
@@ -51,40 +51,6 @@ CSV_COLUMNS = [
     "heuristic_reason",  # Reasoning
     "label",  # Manual label (to be filled)
 ]
-
-
-def char_trigrams(s: str) -> Set[str]:
-    """Generate character trigrams from a string.
-
-    Args:
-        s: Input string
-
-    Returns:
-        Set of character trigrams
-    """
-    s = re.sub(r"\s+", " ", s.strip())
-    if len(s) < 3:
-        return {s} if s else set()
-    return {s[i : i + 3] for i in range(len(s) - 2)}
-
-
-def jaccard_similarity(a: Set[str], b: Set[str]) -> float:
-    """Calculate Jaccard similarity between two sets.
-
-    Args:
-        a: First set
-        b: Second set
-
-    Returns:
-        Jaccard similarity (0-1)
-    """
-    if not a and not b:
-        return 1.0
-    if not a or not b:
-        return 0.0
-    inter = len(a & b)
-    union = len(a | b)
-    return inter / union if union else 0.0
 
 
 def select_training_samples(
