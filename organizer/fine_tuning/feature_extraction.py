@@ -9,28 +9,15 @@ from __future__ import annotations
 from utils.filename_utils import clean_filename, has_close_match
 
 import json
-import re
-import unicodedata
 from typing import Dict, List, Optional, Set
 from utils.config import Config
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from fine_tuning.text_processing import tokenize_string
 from storage.index_models import Node
 from storage.manager import NodeKind
 from storage.training_models import TrainingSample
-
-
-TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
-
-def normalize_string(s: str) -> str:
-    s = unicodedata.normalize("NFKC", s).lower().strip()
-    s = re.sub(r"\s+", " ", s)
-    return s
-
-
-def token_ready_strings(s: str) -> List[str]:
-    return TOKEN_RE.findall(normalize_string(s))
 
 
 def _processed_name(name: str) -> str:
@@ -138,8 +125,8 @@ def extract_features(
         sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[:sibling_cap]
 
         # cues from children/siblings
-        child_token_bag = [t for cn in child_names for t in token_ready_strings(cn)]
-        sibling_token_bag = [t for sn in sibling_names for t in token_ready_strings(sn)]
+        child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
+        sibling_token_bag = [t for sn in sibling_names for t in tokenize_string(sn)]
 
         child_has_media_type_cue = has_any_token(child_token_bag, config.media_types)
         child_has_variant_hint = has_any_token(child_token_bag, config.variant_types)
@@ -151,10 +138,10 @@ def extract_features(
 
         # collab cue from self or parent
         has_collab_cue = has_any_token(
-            token_ready_strings(n.name), config.collab_markers
+            tokenize_string(n.name), config.collab_markers
         ) or (
             parent is not None
-            and has_any_token(token_ready_strings(parent.name), config.collab_markers)
+            and has_any_token(tokenize_string(parent.name), config.collab_markers)
         )
 
         looks_like_format = config.is_media_type(n.name)
