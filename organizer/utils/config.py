@@ -183,9 +183,15 @@ def get_config() -> Config:
     variant_cache = _build_variant_cache(variants)
     creator_cache = _build_creator_remove_cache(creators)
 
-    variant_types = {name.lower() for name in variant_cache["types"].get("variant", set())}
-    media_types = {name.lower() for name in variant_cache["types"].get("media_type", set())}
-    format_types = {name.lower() for name in variant_cache["types"].get("media_format", set())}
+    variant_types = {
+        name.lower() for name in variant_cache["types"].get("variant", set())
+    }
+    media_types = {
+        name.lower() for name in variant_cache["types"].get("media_type", set())
+    }
+    format_types = {
+        name.lower() for name in variant_cache["types"].get("media_format", set())
+    }
 
     relational_cache = {
         "variant_tokens": variant_cache,

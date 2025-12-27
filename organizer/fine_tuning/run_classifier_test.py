@@ -129,11 +129,14 @@ class TestLoadSamples:
 class TestEvaluatePredictions:
     """Test evaluate_predictions function"""
 
-    @pytest.mark.parametrize("labels,expected_accuracy", [
-        (LABELS_LEGACY, 0.75),
-        (LABELS_V1, 0.75),
-        (LABELS_V2, 0.75),
-    ])
+    @pytest.mark.parametrize(
+        "labels,expected_accuracy",
+        [
+            (LABELS_LEGACY, 0.75),
+            (LABELS_V1, 0.75),
+            (LABELS_V2, 0.75),
+        ],
+    )
     def test_evaluate_predictions_basic(self, labels, expected_accuracy):
         """Test basic evaluation metrics"""
         y_true = ["primary_author", "subject", "variant", "other"]

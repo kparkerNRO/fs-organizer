@@ -52,13 +52,13 @@ def text_similarity(text1: str, text2: str) -> float:
     Returns:
         Similarity score between 0 and 1, where 1 is identical
     """
-    return SequenceMatcher(None, normalize_string(text1), normalize_string(text2)).ratio()
+    return SequenceMatcher(
+        None, normalize_string(text1), normalize_string(text2)
+    ).ratio()
 
 
 def has_close_text_match(
-    target: str,
-    candidates: List[str],
-    threshold: float = 0.85
+    target: str, candidates: List[str], threshold: float = 0.85
 ) -> Tuple[bool, List[str]]:
     """Check if target has a close text match in candidates.
 
@@ -84,7 +84,10 @@ def has_close_text_match(
             continue
 
         # Substring match
-        if normalized_target in normalized_candidate or normalized_candidate in normalized_target:
+        if (
+            normalized_target in normalized_candidate
+            or normalized_candidate in normalized_target
+        ):
             matches.append(candidate)
             continue
 
@@ -123,7 +126,7 @@ def has_pattern_match(text: str, patterns: List[str]) -> Tuple[bool, List[str]]:
 
         # Word boundary match - check if pattern appears as a complete word or phrase
         # For single-word patterns, check word set
-        if ' ' not in normalized_pattern:
+        if " " not in normalized_pattern:
             if normalized_pattern in words:
                 matches.append(pattern)
         # For multi-word patterns, use substring match

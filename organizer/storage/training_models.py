@@ -57,7 +57,9 @@ class ModelRun(TrainingBase):
     training_data_hash: Mapped[Optional[str]]  # Hash for reproducibility
 
     # Configuration
-    hyperparameters_json: Mapped[Optional[str]]  # Learning rate, batch size, metrics, etc.
+    hyperparameters_json: Mapped[
+        Optional[str]
+    ]  # Learning rate, batch size, metrics, etc.
     config_hash: Mapped[Optional[str]]
 
     # Dataset info
@@ -133,7 +135,9 @@ class TrainingSample(TrainingBase):
     __table_args__ = (
         Index("idx_training_sample_snapshot", "snapshot_id"),
         Index("idx_training_sample_node", "node_id"),
-        Index("idx_training_sample_snapshot_node", "snapshot_id", "node_id", unique=True),
+        Index(
+            "idx_training_sample_snapshot_node", "snapshot_id", "node_id", unique=True
+        ),
         Index("idx_training_sample_split", "split"),
         Index("idx_training_sample_label", "label"),
     )
@@ -164,7 +168,9 @@ class TrainingEpoch(TrainingBase):
     val_f1: Mapped[Optional[float]] = mapped_column(Float)
 
     # Per-class metrics (JSON)
-    class_metrics_json: Mapped[Optional[str]]  # {'variant': {'precision': 0.9, ...}, ...}
+    class_metrics_json: Mapped[
+        Optional[str]
+    ]  # {'variant': {'precision': 0.9, ...}, ...}
 
     # Training info
     learning_rate: Mapped[Optional[float]] = mapped_column(Float)

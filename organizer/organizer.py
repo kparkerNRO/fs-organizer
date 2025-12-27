@@ -138,6 +138,7 @@ app.add_typer(training_app, name="training")
 
 # Fine-tuning model commands (train, predict, etc.)
 from fine_tuning.cli import app as fine_tuning_app
+
 app.add_typer(fine_tuning_app, name="model")
 
 
@@ -151,13 +152,19 @@ def select_data(
         help="Storage directory (contains index.db). Defaults to data/",
     ),
     snapshot_id: int = typer.Option(
-        None, "--snapshot-id", help="Snapshot ID to sample from. Uses most recent if not specified."
+        None,
+        "--snapshot-id",
+        help="Snapshot ID to sample from. Uses most recent if not specified.",
     ),
     sample_size: int = typer.Option(
         200, "--sample-size", "-n", help="Target number of samples to select"
     ),
-    min_depth: int = typer.Option(1, "--min-depth", help="Minimum folder depth to sample"),
-    max_depth: int = typer.Option(10, "--max-depth", help="Maximum folder depth to sample"),
+    min_depth: int = typer.Option(
+        1, "--min-depth", help="Minimum folder depth to sample"
+    ),
+    max_depth: int = typer.Option(
+        10, "--max-depth", help="Maximum folder depth to sample"
+    ),
     diversity_factor: float = typer.Option(
         0.7,
         "--diversity",
@@ -186,22 +193,34 @@ def select_data(
     with storage.get_index_session(read_only=True) as session:
         if snapshot_id is None:
             # Get most recent snapshot
-            snapshot = session.execute(
-                sql_select(Snapshot).order_by(Snapshot.created_at.desc())
-            ).scalars().first()
+            snapshot = (
+                session.execute(
+                    sql_select(Snapshot).order_by(Snapshot.created_at.desc())
+                )
+                .scalars()
+                .first()
+            )
 
             if not snapshot:
                 typer.echo("❌ No snapshots found in index.db", err=True)
-                typer.echo("   Run 'gather' command first to create a snapshot", err=True)
+                typer.echo(
+                    "   Run 'gather' command first to create a snapshot", err=True
+                )
                 raise typer.Exit(1)
 
             snapshot_id = snapshot.snapshot_id
-            typer.echo(f"Using most recent snapshot: {snapshot_id} (created {snapshot.created_at})")
+            typer.echo(
+                f"Using most recent snapshot: {snapshot_id} (created {snapshot.created_at})"
+            )
         else:
             # Validate snapshot exists
-            snapshot = session.execute(
-                sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id)
-            ).scalars().first()
+            snapshot = (
+                session.execute(
+                    sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id)
+                )
+                .scalars()
+                .first()
+            )
 
             if not snapshot:
                 typer.echo(f"❌ Snapshot {snapshot_id} not found in index.db", err=True)
@@ -272,7 +291,9 @@ def apply_classifications(
         "-t",
         help="Path to training.db. Defaults to storage_path/training.db",
     ),
-    labeler: str = typer.Option("manual", "--labeler", help="Name of the labeler (e.g., 'manual', 'human-v1')"),
+    labeler: str = typer.Option(
+        "manual", "--labeler", help="Name of the labeler (e.g., 'manual', 'human-v1')"
+    ),
     split: str = typer.Option(
         None,
         "--split",
@@ -329,7 +350,7 @@ def apply_classifications(
         return
 
     # Validate split value
-    if split and split not in ('train', 'validation', 'test'):
+    if split and split not in ("train", "validation", "test"):
         typer.echo(
             f"❌ Invalid split value: '{split}'. Must be 'train', 'validation', or 'test'",
             err=True,
@@ -346,7 +367,7 @@ def apply_classifications(
     typer.echo(f"Using training database: {training_db_path}")
 
     # Get unique snapshot IDs from CSV
-    snapshot_ids = sorted(set(row['snapshot_id'] for row in rows))
+    snapshot_ids = sorted(set(row["snapshot_id"] for row in rows))
     typer.echo(f"Processing {len(snapshot_ids)} snapshot(s): {snapshot_ids}")
 
     # Extract features and apply labels
@@ -358,9 +379,13 @@ def apply_classifications(
 
             with storage.get_index_session(read_only=True) as index_session:
                 # Validate snapshot exists
-                snapshot = index_session.execute(
-                    sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id)
-                ).scalars().first()
+                snapshot = (
+                    index_session.execute(
+                        sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id)
+                    )
+                    .scalars()
+                    .first()
+                )
 
                 if not snapshot:
                     typer.echo(
@@ -387,10 +412,14 @@ def apply_classifications(
         labeled_count = 0
         for row in rows:
             # Find the sample
-            sample = training_session.query(TrainingSample).filter_by(
-                snapshot_id=row['snapshot_id'],
-                node_id=row['node_id'],
-            ).first()
+            sample = (
+                training_session.query(TrainingSample)
+                .filter_by(
+                    snapshot_id=row["snapshot_id"],
+                    node_id=row["node_id"],
+                )
+                .first()
+            )
 
             if not sample:
                 typer.echo(
@@ -401,7 +430,7 @@ def apply_classifications(
                 continue
 
             # Update label
-            sample.label = row['label']
+            sample.label = row["label"]
             sample.label_confidence = 1.0
             sample.labeler = labeler
             if split:

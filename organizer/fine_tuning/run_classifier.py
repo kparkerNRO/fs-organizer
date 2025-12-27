@@ -52,7 +52,12 @@ from fine_tuning.taxonomy import get_labels
 class SetFitClassifier:
     """Wrapper for SetFit model (fine-tuned or baseline)."""
 
-    def __init__(self, model_path: Optional[str] = None, taxonomy: str = "legacy", use_baseline: bool = False):
+    def __init__(
+        self,
+        model_path: Optional[str] = None,
+        taxonomy: str = "legacy",
+        use_baseline: bool = False,
+    ):
         """Initialize SetFit classifier.
 
         Args:
@@ -63,14 +68,14 @@ class SetFitClassifier:
         try:
             from setfit import SetFitModel
         except ImportError:
-            raise ImportError(
-                "SetFit not installed. Install with: pip install setfit"
-            )
+            raise ImportError("SetFit not installed. Install with: pip install setfit")
 
         if use_baseline:
             # Use baseline pre-trained sentence transformer
             print("Loading baseline model: sentence-transformers/all-MiniLM-L6-v2")
-            self.model = SetFitModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+            self.model = SetFitModel.from_pretrained(
+                "sentence-transformers/all-MiniLM-L6-v2"
+            )
         else:
             if not model_path:
                 raise ValueError("model_path required when use_baseline=False")
@@ -108,7 +113,9 @@ class SetFitClassifier:
             label_list = sorted(self.labels)
             all_probabilities = []
             for prob_row in probs:
-                prob_dict = {label: float(prob) for label, prob in zip(label_list, prob_row)}
+                prob_dict = {
+                    label: float(prob) for label, prob in zip(label_list, prob_row)
+                }
                 all_probabilities.append(prob_dict)
         except Exception:
             # Fallback if predict_proba not available
@@ -416,9 +423,7 @@ def main():
         # Initialize classifier
         if args.use_baseline:
             print(f"Initializing baseline SetFit model (taxonomy={args.taxonomy})...")
-            classifier = SetFitClassifier(
-                taxonomy=args.taxonomy, use_baseline=True
-            )
+            classifier = SetFitClassifier(taxonomy=args.taxonomy, use_baseline=True)
         else:
             print(f"Loading fine-tuned model from {args.model_path}...")
             classifier = SetFitClassifier(
@@ -497,7 +502,9 @@ def main():
 
         session.commit()
 
-        print(f"✓ Saved metrics to database (run_id={run.run_id}, type={run_type_label}, taxonomy={args.taxonomy})")
+        print(
+            f"✓ Saved metrics to database (run_id={run.run_id}, type={run_type_label}, taxonomy={args.taxonomy})"
+        )
         if metrics:
             print(f"  Accuracy: {metrics.get('accuracy', 0):.4f}")
             print(f"  Macro F1: {metrics.get('macro_f1', 0):.4f}")

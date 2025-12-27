@@ -107,7 +107,9 @@ VARIANT_TYPE_TO_TAXONOMY: Dict[str, tuple[str, str]] = {
 }
 
 
-def build_variant_mappings(variants: Dict[str, Dict[str, any]]) -> tuple[Dict[str, str], Dict[str, str]]:
+def build_variant_mappings(
+    variants: Dict[str, Dict[str, any]],
+) -> tuple[Dict[str, str], Dict[str, str]]:
     """Build mappings from config variants to taxonomy labels.
 
     Args:
@@ -140,6 +142,7 @@ def build_variant_mappings(variants: Dict[str, Dict[str, any]]) -> tuple[Dict[st
 # Utility Functions
 # =============================================================================
 
+
 def get_labels(taxonomy: str) -> Set[str]:
     """Get label set for a specific taxonomy.
 
@@ -159,7 +162,9 @@ def get_labels(taxonomy: str) -> Set[str]:
     elif taxonomy == "legacy":
         return LABELS_LEGACY
     else:
-        raise ValueError(f"Unknown taxonomy: {taxonomy}. Must be 'v1', 'v2', or 'legacy'")
+        raise ValueError(
+            f"Unknown taxonomy: {taxonomy}. Must be 'v1', 'v2', or 'legacy'"
+        )
 
 
 def convert_label(label: str, from_taxonomy: str, to_taxonomy: str) -> str:
@@ -254,7 +259,9 @@ def normalize_labels(labels: Set[str], target_taxonomy: str = "v2") -> Set[str]:
 
     # If we detected a source taxonomy, convert
     if source_taxonomy and source_taxonomy != target_taxonomy:
-        return {convert_label(label, source_taxonomy, target_taxonomy) for label in labels}
+        return {
+            convert_label(label, source_taxonomy, target_taxonomy) for label in labels
+        }
 
     # Otherwise, return as-is
     return labels

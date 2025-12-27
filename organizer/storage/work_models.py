@@ -162,7 +162,9 @@ class Classification(WorkBase):
     classification_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
     node_id: Mapped[int]
-    classification: Mapped[Optional[str]]  # 'variant' | 'collection' | 'subject' | 'uncertain'
+    classification: Mapped[
+        Optional[str]
+    ]  # 'variant' | 'collection' | 'subject' | 'uncertain'
     confidence: Mapped[Optional[float]] = mapped_column(Float)
     method: Mapped[Optional[str]]  # 'structural' | 'llm' | 'manual'
 
@@ -180,7 +182,9 @@ class FolderStructure(WorkBase):
 
     structure_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
-    structure_type: Mapped[str] = mapped_column(String)  # 'original' | 'organized' | 'grouped'
+    structure_type: Mapped[str] = mapped_column(
+        String
+    )  # 'original' | 'organized' | 'grouped'
     structure_json: Mapped[str] = mapped_column(String)
     created_at: Mapped[Optional[str]]
 

@@ -122,7 +122,9 @@ def extract_features(
         )
 
         child_names = sorted({processed_name_by_id[c] for c in child_ids})[:child_cap]
-        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[:sibling_cap]
+        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[
+            :sibling_cap
+        ]
 
         # cues from children/siblings
         child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
@@ -134,7 +136,9 @@ def extract_features(
             cn.strip(".").lower() in config.format_types for cn in child_names
         )
 
-        sibling_has_variant_hint = has_any_token(sibling_token_bag, config.variant_types)
+        sibling_has_variant_hint = has_any_token(
+            sibling_token_bag, config.variant_types
+        )
 
         # collab cue from self or parent
         has_collab_cue = has_any_token(

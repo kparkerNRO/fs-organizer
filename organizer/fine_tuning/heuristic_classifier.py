@@ -23,33 +23,74 @@ from utils.config import Config
 
 # Creator detection keywords (from proposal v2)
 CREATOR_KEYWORDS = {
-    "patreon", "studios", "studio", "co", "inc", "llc",
-    "cartographer", "maps", "publishing", "games"
+    "patreon",
+    "studios",
+    "studio",
+    "co",
+    "inc",
+    "llc",
+    "cartographer",
+    "maps",
+    "publishing",
+    "games",
 }
 
 # Asset type keywords (from proposal v2)
 ASSET_TYPE_KEYWORDS = {
-    "maps", "tokens", "token", "pack", "assets", "asset",
-    "battlemap", "battlemaps", "handouts", "handout",
-    "tiles", "tile", "music", "illustrations", "illustration",
-    "animated scenes", "key & design notes"
+    "maps",
+    "tokens",
+    "token",
+    "pack",
+    "assets",
+    "asset",
+    "battlemap",
+    "battlemaps",
+    "handouts",
+    "handout",
+    "tiles",
+    "tile",
+    "music",
+    "illustrations",
+    "illustration",
+    "animated scenes",
+    "key & design notes",
 }
 
 # Theme/genre keywords (from proposal v2)
 THEME_KEYWORDS = {
-    "dungeon", "dungeons", "forest", "sci-fi", "scifi",
-    "cyberpunk", "horror", "desert", "urban", "fantasy",
-    "medieval", "modern", "futuristic", "gothic", "steampunk"
+    "dungeon",
+    "dungeons",
+    "forest",
+    "sci-fi",
+    "scifi",
+    "cyberpunk",
+    "horror",
+    "desert",
+    "urban",
+    "fantasy",
+    "medieval",
+    "modern",
+    "futuristic",
+    "gothic",
+    "steampunk",
 }
 
 # Organizational folder keywords
 OTHER_KEYWORDS = {
-    "rewards", "reward", "tier", "bonus", "content",
-    "instructions", "instruction", "guide", "notes", "note"
+    "rewards",
+    "reward",
+    "tier",
+    "bonus",
+    "content",
+    "instructions",
+    "instruction",
+    "guide",
+    "notes",
+    "note",
 }
 
 # Year pattern for organizational folders
-YEAR_PATTERN = re.compile(r'^(19|20)\d{2}$')
+YEAR_PATTERN = re.compile(r"^(19|20)\d{2}$")
 
 
 @dataclass
@@ -76,12 +117,19 @@ class HeuristicClassifier:
         self.taxonomy = taxonomy
 
         # Build lookup tables from config
-        self.variant_to_label_v1, self.variant_to_label_v2 = build_variant_mappings(config.variants)
+        self.variant_to_label_v1, self.variant_to_label_v2 = build_variant_mappings(
+            config.variants
+        )
 
-    def classify(self, name: str, depth: int = 0, parent_name: Optional[str] = None,
-                 children_names: Optional[List[str]] = None,
-                 sibling_names: Optional[List[str]] = None,
-                 file_extensions: Optional[List[str]] = None) -> ClassificationResult:
+    def classify(
+        self,
+        name: str,
+        depth: int = 0,
+        parent_name: Optional[str] = None,
+        children_names: Optional[List[str]] = None,
+        sibling_names: Optional[List[str]] = None,
+        file_extensions: Optional[List[str]] = None,
+    ) -> ClassificationResult:
         """Classify a folder using heuristic rules.
 
         Args:
@@ -114,7 +162,9 @@ class HeuristicClassifier:
             results.append(result)
 
         # 3. Check for creators (high confidence at low depth)
-        result = self._check_creators(name, depth, parent_name, children_names, sibling_names)
+        result = self._check_creators(
+            name, depth, parent_name, children_names, sibling_names
+        )
         if result:
             results.append(result)
 
@@ -139,7 +189,7 @@ class HeuristicClassifier:
             label=self._get_label("unknown"),
             confidence=0.3,
             reason="No matching heuristic rules",
-            matches=[]
+            matches=[],
         )
 
     def _get_label(self, base_label: str) -> str:
@@ -159,7 +209,11 @@ class HeuristicClassifier:
 
     def _check_variants(self, name: str) -> Optional[ClassificationResult]:
         """Check if name matches known variants from config."""
-        variant_map = self.variant_to_label_v2 if self.taxonomy == "v2" else self.variant_to_label_v1
+        variant_map = (
+            self.variant_to_label_v2
+            if self.taxonomy == "v2"
+            else self.variant_to_label_v1
+        )
 
         # Get all variant names
         variant_names = list(variant_map.keys())
@@ -174,19 +228,27 @@ class HeuristicClassifier:
                 label=label,
                 confidence=0.9,  # High confidence for config-based matches
                 reason=f"Matched variant '{matches[0]}' from config",
-                matches=matches
+                matches=matches,
             )
 
         return None
 
-    def _check_creators(self, name: str, depth: int, parent_name: Optional[str],
-                       children_names: List[str], sibling_names: List[str]) -> Optional[ClassificationResult]:
+    def _check_creators(
+        self,
+        name: str,
+        depth: int,
+        parent_name: Optional[str],
+        children_names: List[str],
+        sibling_names: List[str],
+    ) -> Optional[ClassificationResult]:
         """Check if folder represents a creator/studio."""
         matches = []
 
         # Check against known creators
         known_creators = list(self.config.creators.keys())
-        has_match, creator_matches = has_close_text_match(name, known_creators, threshold=0.85)
+        has_match, creator_matches = has_close_text_match(
+            name, known_creators, threshold=0.85
+        )
         if has_match:
             matches.extend(creator_matches)
 
@@ -204,7 +266,11 @@ class HeuristicClassifier:
         # Check if parent suggests creator context
         if parent_name:
             parent_lower = normalize_string(parent_name)
-            if "collaborat" in parent_lower or "creator" in parent_lower or "author" in parent_lower:
+            if (
+                "collaborat" in parent_lower
+                or "creator" in parent_lower
+                or "author" in parent_lower
+            ):
                 matches.append("creator context from parent")
 
         if matches:
@@ -219,12 +285,14 @@ class HeuristicClassifier:
                 label=self._get_label("person_or_group"),
                 confidence=base_confidence,
                 reason=f"Creator indicators: {', '.join(matches[:3])}",
-                matches=matches
+                matches=matches,
             )
 
         return None
 
-    def _check_asset_types(self, name: str, file_extensions: List[str]) -> Optional[ClassificationResult]:
+    def _check_asset_types(
+        self, name: str, file_extensions: List[str]
+    ) -> Optional[ClassificationResult]:
         """Check if folder represents an asset type."""
         has_match, matches = has_pattern_match(name, list(ASSET_TYPE_KEYWORDS))
 
@@ -239,7 +307,7 @@ class HeuristicClassifier:
                 label=self._get_label("media_bucket"),
                 confidence=confidence,
                 reason=f"Matched asset type keywords: {', '.join(matches[:3])}",
-                matches=matches
+                matches=matches,
             )
 
         return None
@@ -253,7 +321,7 @@ class HeuristicClassifier:
                 label=self._get_label("descriptor"),
                 confidence=0.75,
                 reason=f"Matched theme keywords: {', '.join(matches[:3])}",
-                matches=matches
+                matches=matches,
             )
 
         return None
@@ -266,7 +334,7 @@ class HeuristicClassifier:
                 label=self._get_label("other"),
                 confidence=0.95,
                 reason="Year folder",
-                matches=[name]
+                matches=[name],
             )
 
         # Check for other organizational keywords
@@ -276,19 +344,21 @@ class HeuristicClassifier:
             # Special case: if contains both "patreon" and reward/tier keywords, higher confidence
             # This handles "Patreon Rewards", "Patreon Tier 1", etc.
             normalized_name = normalize_string(name)
-            if "patreon" in normalized_name and any(kw in normalized_name for kw in ["reward", "tier", "bonus"]):
+            if "patreon" in normalized_name and any(
+                kw in normalized_name for kw in ["reward", "tier", "bonus"]
+            ):
                 return ClassificationResult(
                     label=self._get_label("other"),
                     confidence=0.90,  # Higher confidence to beat creator check
                     reason=f"Patreon organizational folder: {', '.join(matches[:3])}",
-                    matches=matches
+                    matches=matches,
                 )
 
             return ClassificationResult(
                 label=self._get_label("other"),
                 confidence=0.8,
                 reason=f"Organizational keywords: {', '.join(matches[:3])}",
-                matches=matches
+                matches=matches,
             )
 
         return None
@@ -311,7 +381,7 @@ class HeuristicClassifier:
                 parent_name=sample.get("parent_name"),
                 children_names=sample.get("children_names"),
                 sibling_names=sample.get("sibling_names"),
-                file_extensions=sample.get("file_extensions")
+                file_extensions=sample.get("file_extensions"),
             )
             results.append(result)
 

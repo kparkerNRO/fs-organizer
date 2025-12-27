@@ -10,6 +10,33 @@ This module provides typer commands for all fine-tuning related operations:
 import typer
 from pathlib import Path
 from typing import Optional
+from organizer.fine_tuning.run_classifier import (
+    SetFitClassifier,
+    create_model_run,
+    evaluate_predictions,
+    load_samples,
+    save_predictions_to_db,
+)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
+from storage.index_models import Snapshot
+from collections import defaultdict
+from typing import Dict, List, Tuple
+import csv
+import re
+
+from datasets import Dataset
+from setfit import SetFitModel, SetFitTrainer
+from sklearn.metrics import classification_report, f1_score
+from sklearn.model_selection import train_test_split
+from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from organizer.fine_tuning.feature_extraction import extract_features as extract_fn
+from organizer.storage.training_manager import get_or_create_training_session
+from organizer.utils.config import get_config
 
 app = typer.Typer(
     name="fine_tuning",
@@ -30,16 +57,11 @@ def _get_highest_snapshot_id(index_db: Path) -> int:
     Raises:
         typer.Exit: If no snapshots found or database is empty
     """
-    from sqlalchemy import create_engine, func, select
-    from sqlalchemy.orm import Session
-    from storage.index_models import Snapshot
 
     engine = create_engine(f"sqlite:///{index_db}")
 
     with Session(engine) as session:
-        result = session.execute(
-            select(func.max(Snapshot.snapshot_id))
-        ).scalar()
+        result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
 
         if result is None:
             typer.echo(f"Error: No snapshots found in {index_db}", err=True)
@@ -143,16 +165,6 @@ def train(
             --num-epochs 8 \\
             --batch-size 32
     """
-    from collections import defaultdict
-    from typing import Dict, List, Tuple
-    import csv
-    import re
-
-    from datasets import Dataset
-    from setfit import SetFitModel, SetFitTrainer
-    from sklearn.metrics import classification_report, f1_score
-    from sklearn.model_selection import train_test_split
-    from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
 
     # Label definitions
     LABELS = [
@@ -405,9 +417,9 @@ def train(
     y_pred = trainer.model.predict(test_ds["text"])
     macro_f1 = f1_score(y_true, y_pred, average="macro")
 
-    typer.echo(f"\n{'='*80}")
+    typer.echo(f"\n{'=' * 80}")
     typer.echo(f"Macro F1-Score: {macro_f1:.4f}")
-    typer.echo(f"{'='*80}\n")
+    typer.echo(f"{'=' * 80}\n")
     typer.echo(
         classification_report(
             y_true,
@@ -513,17 +525,6 @@ def predict(
         typer.echo(f"Error: Invalid split '{split}'", err=True)
         raise typer.Exit(1)
 
-    # Import and run
-    from organizer.fine_tuning.run_classifier import (
-        SetFitClassifier,
-        create_model_run,
-        evaluate_predictions,
-        load_samples,
-        save_predictions_to_db,
-    )
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
-
     # Connect to database
     typer.echo(f"Loading samples from {training_db}...")
     engine = create_engine(f"sqlite:///{training_db}")
@@ -550,7 +551,9 @@ def predict(
 
         # Get true labels (if available)
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+        y_pred_labeled = [
+            pred for i, pred in enumerate(predictions) if samples[i].label
+        ]
 
         # Evaluate
         if y_true and y_pred_labeled:
@@ -614,7 +617,9 @@ def predict(
 
         session.commit()
 
-        typer.echo(f"✓ Saved metrics to database (run_id={run.run_id}, type={run_type_label}, taxonomy={taxonomy})")
+        typer.echo(
+            f"✓ Saved metrics to database (run_id={run.run_id}, type={run_type_label}, taxonomy={taxonomy})"
+        )
         if metrics:
             typer.echo(f"  Accuracy: {metrics.get('accuracy', 0):.4f}")
             typer.echo(f"  Macro F1: {metrics.get('macro_f1', 0):.4f}")
@@ -720,11 +725,6 @@ def extract_features(
             --training-db outputs/training.db \\
             --snapshot-id 1
     """
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
-    from organizer.fine_tuning.feature_extraction import extract_features as extract_fn
-    from organizer.storage.training_manager import get_or_create_training_session
-    from organizer.utils.config import get_config
 
     # Get highest snapshot_id if not provided
     if snapshot_id is None:
@@ -884,7 +884,9 @@ def generate_samples(
         # Write CSV
         typer.echo(f"Writing samples to {output_csv}...")
         if use_heuristic:
-            typer.echo(f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})...")
+            typer.echo(
+                f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})..."
+            )
         write_sample_csv(
             output_path=output_csv,
             nodes=samples,

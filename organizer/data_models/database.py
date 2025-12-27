@@ -10,7 +10,13 @@ from sqlalchemy import (
     inspect,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship, Mapped, mapped_column
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    sessionmaker,
+    relationship,
+    Mapped,
+    mapped_column,
+)
 import json
 from datetime import datetime
 
@@ -169,7 +175,9 @@ class GroupCategory(Base):
     name: Mapped[Optional[str]] = mapped_column(String, index=True)
     count: Mapped[Optional[int]]
     group_confidence: Mapped[Optional[float]] = mapped_column(Float)
-    iteration_id: Mapped[Optional[int]] = mapped_column(ForeignKey("grouping_iterations.id"), index=True)
+    iteration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grouping_iterations.id"), index=True
+    )
     needs_review: Mapped[bool] = mapped_column(default=False)
     reviewed: Mapped[bool] = mapped_column(default=False)
 
@@ -191,8 +199,12 @@ class GroupCategoryEntry(Base):
     partial_category_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("partial_name_categories.id"), index=True
     )
-    group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("group_categories.id"), index=True)
-    iteration_id: Mapped[Optional[int]] = mapped_column(ForeignKey("grouping_iterations.id"), index=True)
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("group_categories.id"), index=True
+    )
+    iteration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grouping_iterations.id"), index=True
+    )
     cluster_id: Mapped[Optional[int]]
     processed_name: Mapped[Optional[str]]
     pre_processed_name: Mapped[Optional[str]]

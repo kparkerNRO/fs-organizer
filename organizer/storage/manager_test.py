@@ -1,5 +1,4 @@
-"""Unit tests for StorageManager.
-"""
+"""Unit tests for StorageManager."""
 
 import tempfile
 from pathlib import Path

@@ -177,8 +177,7 @@ class TestHeuristicClassifier:
 
         # Folder under "Collaborator Content" parent
         result = classifier.classify(
-            "Mystery Folder",
-            parent_name="Collaborator Content"
+            "Mystery Folder", parent_name="Collaborator Content"
         )
 
         # Should be classified as creator due to parent context

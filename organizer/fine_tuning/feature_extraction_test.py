@@ -214,8 +214,16 @@ def sample_nodes(index_session):
     )
 
     nodes = [
-        root, collection1, collection2, high_res, low_res,
-        file1, file2, file3, zip_node, zip_content
+        root,
+        collection1,
+        collection2,
+        high_res,
+        low_res,
+        file1,
+        file2,
+        file3,
+        zip_node,
+        zip_content,
     ]
 
     index_session.add_all(nodes)
@@ -227,16 +235,19 @@ def sample_nodes(index_session):
 class TestNormalizeString:
     """Test normalize_string function"""
 
-    @pytest.mark.parametrize("input_str,expected", [
-        ("Hello World", "hello world"),
-        ("  Multiple   Spaces  ", "multiple spaces"),
-        ("UPPERCASE", "uppercase"),
-        ("Mixed-Case_String", "mixed-case_string"),
-        ("Tab\tSeparated", "tab separated"),
-        ("Newline\nSeparated", "newline separated"),
-        ("Unicode: café", "unicode: café"),
-        ("", ""),
-    ])
+    @pytest.mark.parametrize(
+        "input_str,expected",
+        [
+            ("Hello World", "hello world"),
+            ("  Multiple   Spaces  ", "multiple spaces"),
+            ("UPPERCASE", "uppercase"),
+            ("Mixed-Case_String", "mixed-case_string"),
+            ("Tab\tSeparated", "tab separated"),
+            ("Newline\nSeparated", "newline separated"),
+            ("Unicode: café", "unicode: café"),
+            ("", ""),
+        ],
+    )
     def test_normalize_string(self, input_str, expected):
         """Test string normalization"""
         assert normalize_string(input_str) == expected
@@ -245,15 +256,18 @@ class TestNormalizeString:
 class TestTokenReadyStrings:
     """Test token_ready_strings function"""
 
-    @pytest.mark.parametrize("input_str,expected_tokens", [
-        ("hello world", ["hello", "world"]),
-        ("test-file_name.png", ["test", "file", "name", "png"]),
-        ("123-numbers-456", ["123", "numbers", "456"]),
-        ("Special!@#$%Characters", ["special", "characters"]),
-        ("CamelCaseString", ["camelcasestring"]),
-        ("multiple   spaces", ["multiple", "spaces"]),
-        ("", []),
-    ])
+    @pytest.mark.parametrize(
+        "input_str,expected_tokens",
+        [
+            ("hello world", ["hello", "world"]),
+            ("test-file_name.png", ["test", "file", "name", "png"]),
+            ("123-numbers-456", ["123", "numbers", "456"]),
+            ("Special!@#$%Characters", ["special", "characters"]),
+            ("CamelCaseString", ["camelcasestring"]),
+            ("multiple   spaces", ["multiple", "spaces"]),
+            ("", []),
+        ],
+    )
     def test_token_ready_strings(self, input_str, expected_tokens):
         """Test token extraction"""
         tokens = token_ready_strings(input_str)
@@ -381,7 +395,9 @@ class TestExtractFeatures:
 
         sibling_names = json.loads(high_res_sample.sibling_names_topk_json)
         # Sibling names are normalized via _processed_name
-        assert any("low" in name.lower() and "res" in name.lower() for name in sibling_names)
+        assert any(
+            "low" in name.lower() and "res" in name.lower() for name in sibling_names
+        )
 
     def test_descendant_extensions(
         self, index_session, training_session, sample_nodes, test_config
@@ -495,9 +511,7 @@ class TestExtractFeatures:
         samples = training_session.query(TrainingSample).all()
         assert len(samples) == len(sample_nodes)
 
-    def test_child_cap(
-        self, index_session, training_session, test_config
-    ):
+    def test_child_cap(self, index_session, training_session, test_config):
         """Test that child_cap limits number of children stored"""
         # Create snapshot first
         snapshot = Snapshot(
@@ -559,9 +573,7 @@ class TestExtractFeatures:
         child_names = json.loads(parent_sample.child_names_topk_json)
         assert len(child_names) <= 10
 
-    def test_empty_snapshot(
-        self, index_session, training_session, test_config
-    ):
+    def test_empty_snapshot(self, index_session, training_session, test_config):
         """Test extraction with non-existent snapshot"""
         num_created = extract_features(
             index_session,

@@ -73,13 +73,17 @@ def select_training_samples(
         List of selected Node objects
     """
     # Query folders in depth range
-    nodes = session.execute(
-        select(Node)
-        .where(Node.snapshot_id == snapshot_id)
-        .where(Node.kind == NodeKind.DIR.value)
-        .where(Node.depth >= min_depth)
-        .where(Node.depth <= max_depth)
-    ).scalars().all()
+    nodes = (
+        session.execute(
+            select(Node)
+            .where(Node.snapshot_id == snapshot_id)
+            .where(Node.kind == NodeKind.DIR.value)
+            .where(Node.depth >= min_depth)
+            .where(Node.depth <= max_depth)
+        )
+        .scalars()
+        .all()
+    )
 
     if not nodes:
         return []
@@ -106,7 +110,9 @@ def select_training_samples(
         # Scale down proportionally
         scale_factor = sample_size / total_allocated
         for depth in samples_per_depth:
-            samples_per_depth[depth] = max(1, int(samples_per_depth[depth] * scale_factor))
+            samples_per_depth[depth] = max(
+                1, int(samples_per_depth[depth] * scale_factor)
+            )
 
     # Sample from each depth with diversity clustering
     selected: List[Node] = []
@@ -243,9 +249,11 @@ def write_sample_csv(
         heuristic_taxonomy: Taxonomy for heuristic classifier ('v1' or 'v2')
     """
     # Load all nodes for snapshot to build adjacency
-    all_nodes = session.execute(
-        select(Node).where(Node.snapshot_id == snapshot_id)
-    ).scalars().all()
+    all_nodes = (
+        session.execute(select(Node).where(Node.snapshot_id == snapshot_id))
+        .scalars()
+        .all()
+    )
 
     # Build node lookup and parent->children map
     nodes_by_id: Dict[int, Node] = {n.node_id: n for n in all_nodes}
@@ -261,7 +269,7 @@ def write_sample_csv(
         exts = set()
         for child in children_by_parent.get(node_id, []):
             if child.kind == NodeKind.FILE.value and child.ext:
-                exts.add(child.ext.lstrip('.').lower())
+                exts.add(child.ext.lstrip(".").lower())
             exts.update(collect_extensions(child.node_id))
         return exts
 
@@ -273,7 +281,9 @@ def write_sample_csv(
             from utils.config import Config
 
             config = Config()
-            heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
+            heuristic_classifier = HeuristicClassifier(
+                config, taxonomy=heuristic_taxonomy
+            )
         except Exception as e:
             print(f"Warning: Could not initialize heuristic classifier: {e}")
             use_heuristic = False
@@ -281,13 +291,15 @@ def write_sample_csv(
     # Write CSV
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open('w', newline='', encoding='utf-8') as f:
+    with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         writer.writeheader()
 
         for node in nodes:
             # Get parent and grandparent
-            parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+            parent = (
+                nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+            )
             grandparent = (
                 nodes_by_id.get(parent.parent_node_id)
                 if parent and parent.parent_node_id
@@ -296,7 +308,8 @@ def write_sample_csv(
 
             # Get children (folders only)
             children = [
-                c for c in children_by_parent.get(node.node_id, [])
+                c
+                for c in children_by_parent.get(node.node_id, [])
                 if c.kind == NodeKind.DIR.value
             ]
             child_names = sorted({c.name for c in children})[:child_sample_size]
@@ -304,7 +317,8 @@ def write_sample_csv(
             # Get siblings (folders only)
             if parent:
                 siblings = [
-                    c for c in children_by_parent.get(parent.node_id, [])
+                    c
+                    for c in children_by_parent.get(parent.node_id, [])
                     if c.kind == NodeKind.DIR.value and c.node_id != node.node_id
                 ]
                 sibling_names = sorted({s.name for s in siblings})[:sibling_sample_size]
@@ -315,9 +329,9 @@ def write_sample_csv(
             extensions = sorted(collect_extensions(node.node_id))[:ext_sample_size]
 
             # Run heuristic classifier if enabled
-            heuristic_label = ''
-            heuristic_confidence = ''
-            heuristic_reason = ''
+            heuristic_label = ""
+            heuristic_confidence = ""
+            heuristic_reason = ""
 
             if heuristic_classifier:
                 result = heuristic_classifier.classify(
@@ -326,30 +340,32 @@ def write_sample_csv(
                     parent_name=parent.name if parent else None,
                     children_names=child_names,
                     sibling_names=sibling_names,
-                    file_extensions=extensions
+                    file_extensions=extensions,
                 )
                 heuristic_label = result.label
                 heuristic_confidence = f"{result.confidence:.3f}"
                 heuristic_reason = result.reason
 
             # Write row
-            writer.writerow({
-                'snapshot_id': snapshot_id,
-                'node_id': node.node_id,
-                'name': node.name,
-                'rel_path': node.rel_path,
-                'depth': node.depth,
-                'parent_name': parent.name if parent else '',
-                'grandparent_name': grandparent.name if grandparent else '',
-                'num_children': len(children),
-                'child_names_sample': json.dumps(child_names),
-                'sibling_names_sample': json.dumps(sibling_names),
-                'file_extensions': json.dumps(extensions),
-                'heuristic_label': heuristic_label,
-                'heuristic_confidence': heuristic_confidence,
-                'heuristic_reason': heuristic_reason,
-                'label': '',  # Empty for manual labeling
-            })
+            writer.writerow(
+                {
+                    "snapshot_id": snapshot_id,
+                    "node_id": node.node_id,
+                    "name": node.name,
+                    "rel_path": node.rel_path,
+                    "depth": node.depth,
+                    "parent_name": parent.name if parent else "",
+                    "grandparent_name": grandparent.name if grandparent else "",
+                    "num_children": len(children),
+                    "child_names_sample": json.dumps(child_names),
+                    "sibling_names_sample": json.dumps(sibling_names),
+                    "file_extensions": json.dumps(extensions),
+                    "heuristic_label": heuristic_label,
+                    "heuristic_confidence": heuristic_confidence,
+                    "heuristic_reason": heuristic_reason,
+                    "label": "",  # Empty for manual labeling
+                }
+            )
 
 
 def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
@@ -366,7 +382,7 @@ def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
     """
     rows: List[Dict[str, Any]] = []
 
-    with csv_path.open('r', newline='', encoding='utf-8') as f:
+    with csv_path.open("r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
 
         # Validate columns
@@ -380,30 +396,32 @@ def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
         for i, row in enumerate(reader, start=2):  # Line 2 is first data row
             try:
                 # Parse numeric fields
-                snapshot_id = int(row['snapshot_id'])
-                node_id = int(row['node_id'])
-                depth = int(row['depth'])
-                num_children = int(row['num_children'])
+                snapshot_id = int(row["snapshot_id"])
+                node_id = int(row["node_id"])
+                depth = int(row["depth"])
+                num_children = int(row["num_children"])
 
                 # Parse JSON fields
-                child_names = json.loads(row['child_names_sample'])
-                sibling_names = json.loads(row['sibling_names_sample'])
-                extensions = json.loads(row['file_extensions'])
+                child_names = json.loads(row["child_names_sample"])
+                sibling_names = json.loads(row["sibling_names_sample"])
+                extensions = json.loads(row["file_extensions"])
 
-                rows.append({
-                    'snapshot_id': snapshot_id,
-                    'node_id': node_id,
-                    'name': row['name'],
-                    'rel_path': row['rel_path'],
-                    'depth': depth,
-                    'parent_name': row['parent_name'],
-                    'grandparent_name': row['grandparent_name'],
-                    'num_children': num_children,
-                    'child_names_sample': child_names,
-                    'sibling_names_sample': sibling_names,
-                    'file_extensions': extensions,
-                    'label': row['label'].strip(),
-                })
+                rows.append(
+                    {
+                        "snapshot_id": snapshot_id,
+                        "node_id": node_id,
+                        "name": row["name"],
+                        "rel_path": row["rel_path"],
+                        "depth": depth,
+                        "parent_name": row["parent_name"],
+                        "grandparent_name": row["grandparent_name"],
+                        "num_children": num_children,
+                        "child_names_sample": child_names,
+                        "sibling_names_sample": sibling_names,
+                        "file_extensions": extensions,
+                        "label": row["label"].strip(),
+                    }
+                )
             except (ValueError, json.JSONDecodeError, KeyError) as e:
                 raise ValueError(f"Error parsing CSV row {i}: {e}")
 
@@ -419,13 +437,15 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
     Raises:
         ValueError: If any rows are missing labels
     """
-    unlabeled = [i + 2 for i, row in enumerate(rows) if not row['label']]
+    unlabeled = [i + 2 for i, row in enumerate(rows) if not row["label"]]
 
     if unlabeled:
         if len(unlabeled) <= 10:
-            rows_str = ', '.join(map(str, unlabeled))
+            rows_str = ", ".join(map(str, unlabeled))
         else:
-            rows_str = ', '.join(map(str, unlabeled[:10])) + f', ... ({len(unlabeled)} total)'
+            rows_str = (
+                ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
+            )
 
         raise ValueError(
             f"Found {len(unlabeled)} rows with missing labels.\n"
@@ -446,7 +466,7 @@ def validate_label_values(rows: List[Dict[str, Any]]) -> None:
     invalid_labels = defaultdict(list)
 
     for i, row in enumerate(rows, start=2):
-        label = row['label']
+        label = row["label"]
         if label and label not in VALID_LABELS:
             invalid_labels[label].append(i)
 
@@ -454,10 +474,12 @@ def validate_label_values(rows: List[Dict[str, Any]]) -> None:
         error_msg = [f"Found invalid labels in CSV:"]
         for label, row_nums in sorted(invalid_labels.items()):
             if len(row_nums) <= 5:
-                rows_str = ', '.join(map(str, row_nums))
+                rows_str = ", ".join(map(str, row_nums))
             else:
-                rows_str = ', '.join(map(str, row_nums[:5])) + f', ... ({len(row_nums)} total)'
+                rows_str = (
+                    ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
+                )
             error_msg.append(f"  '{label}': rows {rows_str}")
 
         error_msg.append(f"\nValid labels are: {', '.join(sorted(VALID_LABELS))}")
-        raise ValueError('\n'.join(error_msg))
+        raise ValueError("\n".join(error_msg))

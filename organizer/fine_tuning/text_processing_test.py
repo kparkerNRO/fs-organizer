@@ -213,4 +213,4 @@ class TestJaccardSimilarity:
         # Intersection: {hello, world} = 2
         # Union: {hello, world, foo} = 3
         # Similarity: 2/3
-        assert abs(jaccard_similarity(a, b) - 2/3) < 0.001
+        assert abs(jaccard_similarity(a, b) - 2 / 3) < 0.001

@@ -44,7 +44,9 @@ def has_close_match(s: str, candidates: List[str], max_distance: int = 2) -> boo
     Returns:
         True if any candidate has distance <= max_distance, False otherwise
     """
-    return any(levenshtein_distance(s, candidate) <= max_distance for candidate in candidates)
+    return any(
+        levenshtein_distance(s, candidate) <= max_distance for candidate in candidates
+    )
 
 
 def strip_part_from_base(base_name: str, part):
