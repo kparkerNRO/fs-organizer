@@ -1,0 +1,48 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - 'organizer/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.9
+
+      - name: Install dependencies
+        run: |
+          cd organizer
+          uv sync
+
+      - name: Run tests
+        run: |
+          cd organizer
+          uv run pytest
+
+      - name: Check code formatting
+        run: |
+          cd organizer
+          uv run ruff format --check .
+
+      - name: Run linter
+        run: |
+          cd organizer
+          uv run ruff check .
+
+      - name: Run type checker
+        run: |
+          cd organizer
+          uv run pyright
