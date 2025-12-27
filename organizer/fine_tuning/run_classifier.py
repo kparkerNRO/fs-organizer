@@ -46,37 +46,7 @@ from storage.training_models import (
     ModelRun,
     TrainingSample,
 )
-
-# Label taxonomies from the proposals
-LABELS_V1 = {
-    "person_or_group",  # creator
-    "content",  # place/category
-    "media_bucket",  # media type
-    "descriptor",  # variant/modifier
-    "other",  # organizational
-    "unknown",  # ambiguous
-}
-
-LABELS_V2 = {
-    "creator_or_studio",  # formerly person_or_group
-    "content_subject",  # formerly content
-    "theme_or_genre",  # formerly descriptor
-    "asset_type",  # formerly media_bucket
-    "other",  # organizational
-    "unknown",  # ambiguous
-}
-
-# Legacy labels from existing code
-LABELS_LEGACY = {
-    "primary_author",
-    "secondary_author",
-    "collection",
-    "subject",
-    "media_format",
-    "media_type",
-    "variant",
-    "other",
-}
+from fine_tuning.taxonomy import get_labels
 
 
 class SetFitClassifier:
@@ -109,12 +79,8 @@ class SetFitClassifier:
         self.taxonomy = taxonomy
         self.use_baseline = use_baseline
 
-        if taxonomy == "v1":
-            self.labels = LABELS_V1
-        elif taxonomy == "v2":
-            self.labels = LABELS_V2
-        else:
-            self.labels = LABELS_LEGACY
+        # Get label set for taxonomy
+        self.labels = get_labels(taxonomy)
 
     def predict(
         self, samples: List[TrainingSample]
