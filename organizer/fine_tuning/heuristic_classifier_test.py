@@ -6,12 +6,6 @@ from fine_tuning.heuristic_classifier import (
     HeuristicClassifier,
     ClassificationResult,
 )
-from fine_tuning.text_processing import (
-    normalize_string,
-    text_similarity,
-    has_close_text_match,
-    has_pattern_match,
-)
 from utils.config import get_config
 
 
@@ -20,77 +14,6 @@ def test_config():
     """Load actual config from YAML files."""
     # Load the real config which reads from yaml files
     return get_config()
-
-
-class TestTextUtilities:
-    """Test text processing utilities."""
-
-    def test_normalize_text(self):
-        assert normalize_string("Hello  World") == "hello world"
-        assert normalize_string("  UPPER  ") == "upper"
-        assert normalize_string("Multiple   Spaces") == "multiple spaces"
-
-    def test_text_similarity(self):
-        # Identical strings
-        assert text_similarity("hello", "hello") == 1.0
-
-        # Very similar strings
-        similarity = text_similarity("winter", "Winter")
-        assert similarity == 1.0  # Case doesn't matter after normalization
-
-        # Different strings
-        similarity = text_similarity("hello", "world")
-        assert similarity < 0.5
-
-    def test_has_close_text_match_exact(self):
-        candidates = ["winter", "summer", "spring"]
-        has_match, matches = has_close_text_match("Winter", candidates)
-        assert has_match
-        assert "winter" in matches
-
-    def test_has_close_text_match_substring(self):
-        candidates = ["VTT Maps", "Print Maps"]
-        has_match, matches = has_close_text_match("VTT", candidates)
-        assert has_match
-        assert "VTT Maps" in matches
-
-    def test_has_close_text_match_fuzzy(self):
-        candidates = ["Gridded", "Grid"]
-        has_match, matches = has_close_text_match("Gridded", candidates, threshold=0.8)
-        assert has_match
-
-    def test_has_close_text_match_no_match(self):
-        candidates = ["winter", "summer"]
-        has_match, matches = has_close_text_match("xyz", candidates)
-        assert not has_match
-        assert len(matches) == 0
-
-    def test_has_pattern_match_exact(self):
-        patterns = ["maps", "tokens", "assets"]
-        has_match, matches = has_pattern_match("Maps", patterns)
-        assert has_match
-        assert "maps" in matches
-
-    def test_has_pattern_match_contains(self):
-        # Test whole-word matching (not substring)
-        patterns = ["maps", "token"]
-        has_match, matches = has_pattern_match("VTT Maps Pack", patterns)
-        assert has_match
-        assert "maps" in matches
-
-        # Test that partial word doesn't match
-        patterns = ["map", "pack"]
-        has_match, matches = has_pattern_match("VTT Maps Pack", patterns)
-        # "map" won't match "maps" (different words)
-        # but "pack" will match "Pack"
-        assert has_match
-        assert "pack" in matches
-        assert "map" not in matches
-
-    def test_has_pattern_match_no_match(self):
-        patterns = ["maps", "tokens"]
-        has_match, matches = has_pattern_match("xyz", patterns)
-        assert not has_match
 
 
 class TestHeuristicClassifier:

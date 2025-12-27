@@ -13,22 +13,13 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from fine_tuning.taxonomy import get_labels, convert_label
+from fine_tuning.taxonomy import get_labels, convert_label, build_variant_mappings
 from fine_tuning.text_processing import (
     has_close_text_match,
     has_pattern_match,
     normalize_string,
 )
 from utils.config import Config
-
-
-# Mapping from variant types (in variants.yaml) to taxonomy labels
-# Format: {variant_type: (v1_label, v2_label)}
-VARIANT_TYPE_TO_TAXONOMY = {
-    "variant": ("descriptor", "theme_or_genre"),
-    "media_type": ("media_bucket", "asset_type"),
-    "media_format": ("media_bucket", "asset_type"),
-}
 
 # Creator detection keywords (from proposal v2)
 CREATOR_KEYWORDS = {
@@ -85,26 +76,7 @@ class HeuristicClassifier:
         self.taxonomy = taxonomy
 
         # Build lookup tables from config
-        self._build_variant_mappings()
-
-    def _build_variant_mappings(self):
-        """Build mappings from config variants to taxonomy labels."""
-        self.variant_to_label_v1: Dict[str, str] = {}
-        self.variant_to_label_v2: Dict[str, str] = {}
-
-        # Map each variant name to its label based on type
-        for variant_name, variant_info in self.config.variants.items():
-            variant_type = variant_info.get("type", "variant")
-
-            if variant_type in VARIANT_TYPE_TO_TAXONOMY:
-                v1_label, v2_label = VARIANT_TYPE_TO_TAXONOMY[variant_type]
-                self.variant_to_label_v1[variant_name] = v1_label
-                self.variant_to_label_v2[variant_name] = v2_label
-
-                # Also map synonyms
-                for synonym in variant_info.get("synonyms", []):
-                    self.variant_to_label_v1[synonym] = v1_label
-                    self.variant_to_label_v2[synonym] = v2_label
+        self.variant_to_label_v1, self.variant_to_label_v2 = build_variant_mappings(config.variants)
 
     def classify(self, name: str, depth: int = 0, parent_name: Optional[str] = None,
                  children_names: Optional[List[str]] = None,

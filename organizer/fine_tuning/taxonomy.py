@@ -95,6 +95,48 @@ LEGACY_TO_V1: Dict[str, str] = {
 }
 
 # =============================================================================
+# Variant Type to Taxonomy Mapping
+# =============================================================================
+
+# Mapping from variant types (in variants.yaml) to taxonomy labels
+# Format: {variant_type: (v1_label, v2_label)}
+VARIANT_TYPE_TO_TAXONOMY: Dict[str, tuple[str, str]] = {
+    "variant": ("descriptor", "theme_or_genre"),
+    "media_type": ("media_bucket", "asset_type"),
+    "media_format": ("media_bucket", "asset_type"),
+}
+
+
+def build_variant_mappings(variants: Dict[str, Dict[str, any]]) -> tuple[Dict[str, str], Dict[str, str]]:
+    """Build mappings from config variants to taxonomy labels.
+
+    Args:
+        variants: Variant definitions from config (e.g., config.variants)
+
+    Returns:
+        Tuple of (variant_to_label_v1, variant_to_label_v2) mappings
+    """
+    variant_to_label_v1: Dict[str, str] = {}
+    variant_to_label_v2: Dict[str, str] = {}
+
+    # Map each variant name to its label based on type
+    for variant_name, variant_info in variants.items():
+        variant_type = variant_info.get("type", "variant")
+
+        if variant_type in VARIANT_TYPE_TO_TAXONOMY:
+            v1_label, v2_label = VARIANT_TYPE_TO_TAXONOMY[variant_type]
+            variant_to_label_v1[variant_name] = v1_label
+            variant_to_label_v2[variant_name] = v2_label
+
+            # Also map synonyms
+            for synonym in variant_info.get("synonyms", []):
+                variant_to_label_v1[synonym] = v1_label
+                variant_to_label_v2[synonym] = v2_label
+
+    return variant_to_label_v1, variant_to_label_v2
+
+
+# =============================================================================
 # Utility Functions
 # =============================================================================
 

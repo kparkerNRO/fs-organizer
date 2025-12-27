@@ -10,10 +10,12 @@ from fine_tuning.taxonomy import (
     V2_TO_V1,
     LEGACY_TO_V2,
     LEGACY_TO_V1,
+    VARIANT_TYPE_TO_TAXONOMY,
     get_labels,
     convert_label,
     is_valid_label,
     normalize_labels,
+    build_variant_mappings,
 )
 
 
@@ -217,3 +219,88 @@ class TestNormalizeLabels:
         result = normalize_labels(mixed_labels, "v2")
         # Since it doesn't match any taxonomy perfectly, return as-is
         assert result == mixed_labels
+
+
+class TestVariantTypeMapping:
+    """Test variant type to taxonomy mapping."""
+
+    def test_variant_type_to_taxonomy_defined(self):
+        """Ensure all common variant types have mappings."""
+        assert "variant" in VARIANT_TYPE_TO_TAXONOMY
+        assert "media_type" in VARIANT_TYPE_TO_TAXONOMY
+        assert "media_format" in VARIANT_TYPE_TO_TAXONOMY
+
+    def test_variant_type_mappings_complete(self):
+        """Each variant type should map to both v1 and v2."""
+        for variant_type, (v1_label, v2_label) in VARIANT_TYPE_TO_TAXONOMY.items():
+            assert v1_label in LABELS_V1
+            assert v2_label in LABELS_V2
+
+    def test_build_variant_mappings_basic(self):
+        """Test building variant mappings from config."""
+        variants = {
+            "winter": {"type": "variant", "synonyms": []},
+            "VTT": {"type": "media_type", "synonyms": []},
+            "PDF": {"type": "media_format", "synonyms": ["PDFs"]},
+        }
+
+        v1_map, v2_map = build_variant_mappings(variants)
+
+        # Check v1 mappings
+        assert v1_map["winter"] == "descriptor"
+        assert v1_map["VTT"] == "media_bucket"
+        assert v1_map["PDF"] == "media_bucket"
+
+        # Check v2 mappings
+        assert v2_map["winter"] == "theme_or_genre"
+        assert v2_map["VTT"] == "asset_type"
+        assert v2_map["PDF"] == "asset_type"
+
+    def test_build_variant_mappings_synonyms(self):
+        """Test that synonyms are also mapped."""
+        variants = {
+            "PDF": {"type": "media_format", "synonyms": ["PDFs", "pdf"]},
+        }
+
+        v1_map, v2_map = build_variant_mappings(variants)
+
+        # Main name
+        assert v1_map["PDF"] == "media_bucket"
+        assert v2_map["PDF"] == "asset_type"
+
+        # Synonyms
+        assert v1_map["PDFs"] == "media_bucket"
+        assert v1_map["pdf"] == "media_bucket"
+        assert v2_map["PDFs"] == "asset_type"
+        assert v2_map["pdf"] == "asset_type"
+
+    def test_build_variant_mappings_default_type(self):
+        """Test that variants without explicit type default to 'variant'."""
+        variants = {
+            "winter": {"synonyms": []},  # No type specified
+        }
+
+        v1_map, v2_map = build_variant_mappings(variants)
+
+        # Should default to variant type
+        assert v1_map["winter"] == "descriptor"
+        assert v2_map["winter"] == "theme_or_genre"
+
+    def test_build_variant_mappings_unknown_type(self):
+        """Test that unknown types are ignored."""
+        variants = {
+            "unknown_thing": {"type": "unknown_type", "synonyms": []},
+        }
+
+        v1_map, v2_map = build_variant_mappings(variants)
+
+        # Should not be in the mapping
+        assert "unknown_thing" not in v1_map
+        assert "unknown_thing" not in v2_map
+
+    def test_build_variant_mappings_empty(self):
+        """Test with empty variants dict."""
+        variants = {}
+        v1_map, v2_map = build_variant_mappings(variants)
+        assert v1_map == {}
+        assert v2_map == {}
