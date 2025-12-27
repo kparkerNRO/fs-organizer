@@ -15,7 +15,7 @@ from data_models.database import (
     GroupCategoryEntry,
     get_sessionmaker,
 )
-from utils.filename_utils import clean_filename
+from utils.filename_processing import clean_filename
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +126,7 @@ def _resolve_cleaned_name(folder: dbFolder) -> str:
     if folder.cleaned_name:
         return str(folder.cleaned_name)
     base_name = str(folder.folder_name)
-    if base_name.endswith(".zip"):
-        base_name = base_name[:-4]
+
     return clean_filename(base_name)
 
 

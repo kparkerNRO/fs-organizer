@@ -1,17 +1,19 @@
 """Tests for run_classifier.py"""
 
 import json
-from datetime import datetime
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from fine_tuning.run_classifier import (
+from fine_tuning.taxonomy import (
     LABELS_LEGACY,
     LABELS_V1,
     LABELS_V2,
+)
+
+from fine_tuning.run_classifier import (
+
     create_model_run,
     evaluate_predictions,
     load_samples,

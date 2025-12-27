@@ -1,6 +1,6 @@
-import re
 import logging
-from typing import List, Optional
+import re
+from typing import Optional
 
 from utils.common import VIEW_TYPES
 from utils.config import Config, get_config
@@ -8,45 +8,6 @@ from utils.config import Config, get_config
 PATH_EXTRAS = " -,()/"
 
 logger = logging.getLogger(__name__)
-
-
-def levenshtein_distance(s1: str, s2: str) -> int:
-    """Calculate the Levenshtein distance between two strings."""
-    if len(s1) < len(s2):
-        return levenshtein_distance(s2, s1)
-
-    if len(s2) == 0:
-        return len(s1)
-
-    previous_row = range(len(s2) + 1)
-    for i, c1 in enumerate(s1):
-        current_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            # Cost of insertions, deletions, or substitutions
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-
-    return previous_row[-1]
-
-
-def has_close_match(s: str, candidates: List[str], max_distance: int = 2) -> bool:
-    """
-    Check if string s has a Levenshtein distance <= max_distance with any string in candidates.
-
-    Args:
-        s: The string to check
-        candidates: List of candidate strings to compare against
-        max_distance: Maximum Levenshtein distance to consider a match (default: 2)
-
-    Returns:
-        True if any candidate has distance <= max_distance, False otherwise
-    """
-    return any(
-        levenshtein_distance(s, candidate) <= max_distance for candidate in candidates
-    )
 
 
 def strip_part_from_base(base_name: str, part):
@@ -80,27 +41,6 @@ def get_max_common_string(tokens, name_to_comp):
     return shared_tokens
 
 
-def get_max_common_words(tokens, name_to_comp):
-    base_token = tokens[0]
-    working_token = [base_token]
-    lower_tokens = [token.lower() for token in tokens]
-
-    lower_name = name_to_comp.lower()
-    lower_comp_tokens = lower_name.split(" ")
-
-    # greedily add tokens until they stop matching
-    for i in range(1, len(tokens) + 1):
-        test_tokens = lower_tokens[0:i]
-        lower_comp_test_tokens = lower_comp_tokens[0:i]
-        if lower_comp_test_tokens == test_tokens:
-            working_token = lower_tokens[0:i]
-        else:
-            break
-
-    shared_tokens = " ".join(tokens[: len(working_token)])
-    return shared_tokens
-
-
 def split_view_type(base_name, view_types=VIEW_TYPES):
     """
     Trims out standard view type suffixes from a filename, ensuring
@@ -118,22 +58,7 @@ def split_view_type(base_name, view_types=VIEW_TYPES):
     return f_name, f_suffix
 
 
-def process_file_name(name, final_token, has_suffix, use_suffix=False):
-    """
-    Generate the new file name after cleaning off extra tokens.
-    If there is no new file name, return "base"
-    """
-    next_name = strip_part_from_base(name, final_token)
-    next_name = next_name.strip(PATH_EXTRAS)
-    if next_name == "":
-        # if we _dont_ want to take the suffix into account
-        if not (has_suffix and use_suffix):
-            next_name = "Base"
-
-    return next_name
-
-
-def clean_filename(
+def _clean_filename(
     base_name,
     config: Optional[Config] = None,
 ):
@@ -211,3 +136,12 @@ def clean_filename(
         out_dir_name = ""
 
     return out_dir_name
+
+
+def clean_filename(
+    name: str,
+    config: Optional[Config] = None,
+) -> str:
+    if name.lower().endswith(".zip"):
+        return _clean_filename(name[:-4], config)
+    return _clean_filename(name, config)

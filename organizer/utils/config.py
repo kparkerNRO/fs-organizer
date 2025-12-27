@@ -139,7 +139,6 @@ class Config:
     replace_exceptions: dict[str, str]
     clean_exceptions: set[str]
     should_ignore: set[str]
-    collab_markers: set[str]
     grouping_exceptions: tuple[str, ...]
     variants: dict[str, dict[str, Any]]
     known_variant_tokens: set[str]
@@ -175,7 +174,6 @@ def get_config() -> Config:
     replace_exceptions = filename_config.get("replace_exceptions", {})
     clean_exceptions = set(filename_config.get("clean_exceptions", []))
     should_ignore = set(filename_config.get("should_ignore", []))
-    collab_markers = set(filename_config.get("collab_markers", []))
 
     grouping_exceptions = tuple(grouping_config.get("grouping_exceptions", []))
 
@@ -206,7 +204,6 @@ def get_config() -> Config:
         replace_exceptions=replace_exceptions,
         clean_exceptions=clean_exceptions,
         should_ignore=should_ignore,
-        collab_markers=collab_markers,
         grouping_exceptions=grouping_exceptions,
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],
@@ -239,7 +236,6 @@ def get_minimal_config() -> Config:
         replace_exceptions={},
         clean_exceptions=set(),
         should_ignore=set(),
-        collab_markers=set(),
         grouping_exceptions=tuple(),
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],

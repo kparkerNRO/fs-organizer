@@ -13,7 +13,7 @@ from data_models.database import (
     File as dbFile,
 )
 from utils.config import get_config
-from utils.filename_utils import clean_filename
+from utils.filename_processing import clean_filename
 import os
 from utils.folder_structure import insert_file_in_structure
 from storage.manager import StorageManager, NodeKind, FileSource
@@ -380,13 +380,6 @@ def calculate_structure(session: Session, root_dir: Path):
         )
     )
 
-
-def _normalized_name(name: str) -> str:
-    if name.lower().endswith(".zip"):
-        return clean_filename(name[:-4])
-    return clean_filename(name)
-
-
 def _create_node(
     session: Session,
     *,
@@ -427,7 +420,7 @@ def _create_node(
 
     features = NodeFeatures(
         node_id=node.node_id,
-        normalized_name=_normalized_name(name),
+        normalized_name=clean_filename(name),
     )
     session.add(features)
     return node
@@ -611,12 +604,7 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
         folders = session.query(dbFolder).all()
 
         for folder in folders:
-            if folder.folder_name.endswith(".zip"):
-                cleaned_name = clean_filename(folder.folder_name[:-4])
-            else:
-                cleaned_name = clean_filename(folder.folder_name)
-
-            # Update the cleaned name
+            cleaned_name = clean_filename(folder.folder_name)
             folder.cleaned_name = cleaned_name
 
         session.commit()

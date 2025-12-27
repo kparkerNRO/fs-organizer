@@ -5,30 +5,18 @@ Based on the discussion here: https://chatgpt.com/share/694e0924-de18-8007-bedc-
 
 """
 
-from __future__ import annotations
-from utils.filename_utils import clean_filename, has_close_match
-
 import json
 from typing import Dict, List, Optional, Set
-from utils.config import Config
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from fine_tuning.text_processing import tokenize_string
 from storage.index_models import Node
 from storage.manager import NodeKind
 from storage.training_models import TrainingSample
-
-
-def _processed_name(name: str) -> str:
-    if name.lower().endswith(".zip"):
-        return clean_filename(name[:-4])
-    return clean_filename(name)
-
-
-def has_any_token(token_list: List[str], cue_set: Set[str]) -> bool:
-    return any(has_close_match(t, list(cue_set)) for t in token_list)
-
+from utils.config import Config
+from utils.filename_processing import _processed_name
+from utils.text_processing import has_matching_token, normalize_string, tokenize_string
+from fine_tuning.heuristic_classifier import COLLAB_MARKERS
 
 def extract_features(
     index_session: Session,
@@ -62,12 +50,12 @@ def extract_features(
         - ZIP content nodes already have parent_node_id pointing at that 'zip_file' node
     """
 
-    # 1) Load nodes for snapshot
-    rows = index_session.execute(
-        select(Node).where(Node.snapshot_id == snapshot_id)
-    ).scalars()
+    # Load nodes 
+    rows = index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
 
-    # 2) Index nodes + build parent->children adjacency
+    # TODO: compute frequencies of words
+
+    # Index nodes + build parent->children adjacency
     nodes_by_id: Dict[int, Node] = {}
     processed_name_by_id: dict[int, str] = {}
     children_by_parent: Dict[Optional[int], List[int]] = {}
@@ -77,7 +65,7 @@ def extract_features(
         processed_name_by_id[r.node_id] = _processed_name(r.name)
         children_by_parent.setdefault(r.parent_node_id, []).append(r.node_id)
 
-    # 3) Precompute descendant file extensions per node (DP over depths)
+    # Precompute descendant file extensions per node (DP over depths)
     depth_groups: Dict[int, List[int]] = {}
     max_depth = 0
     for node_id, n in nodes_by_id.items():
@@ -104,6 +92,10 @@ def extract_features(
     total_saved = 0
 
     for nid, n in nodes_by_id.items():
+        # Only process dirs for now
+        if n.kind != NodeKind.DIR:
+            continue
+
         name_norm = processed_name_by_id[nid]
         parent_id = n.parent_node_id
         parent = nodes_by_id.get(parent_id) if parent_id is not None else None
@@ -122,30 +114,23 @@ def extract_features(
         )
 
         child_names = sorted({processed_name_by_id[c] for c in child_ids})[:child_cap]
-        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[
-            :sibling_cap
-        ]
+        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[:sibling_cap]
 
         # cues from children/siblings
         child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
         sibling_token_bag = [t for sn in sibling_names for t in tokenize_string(sn)]
 
-        child_has_media_type_cue = has_any_token(child_token_bag, config.media_types)
-        child_has_variant_hint = has_any_token(child_token_bag, config.variant_types)
+        child_has_media_type_cue = has_matching_token(child_token_bag, config.media_types)
+        child_has_variant_hint = has_matching_token(child_token_bag, config.variant_types)
         child_has_format_cue = any(
             cn.strip(".").lower() in config.format_types for cn in child_names
         )
 
-        sibling_has_variant_hint = has_any_token(
-            sibling_token_bag, config.variant_types
-        )
+        sibling_has_variant_hint = has_matching_token(sibling_token_bag, config.variant_types)
 
         # collab cue from self or parent
-        has_collab_cue = has_any_token(
-            tokenize_string(n.name), config.collab_markers
-        ) or (
-            parent is not None
-            and has_any_token(tokenize_string(parent.name), config.collab_markers)
+        has_collab_cue = has_matching_token(tokenize_string(n.name), COLLAB_MARKERS) or (
+            parent is not None and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
         )
 
         looks_like_format = config.is_media_type(n.name)
@@ -166,7 +151,6 @@ def extract_features(
             ]
         )
 
-        # Create TrainingSample directly
         sample = TrainingSample(
             snapshot_id=n.snapshot_id,
             node_id=n.node_id,

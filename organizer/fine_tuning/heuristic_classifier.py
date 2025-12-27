@@ -11,15 +11,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from fine_tuning.taxonomy import get_labels, convert_label, build_variant_mappings
-from fine_tuning.text_processing import (
-    has_close_text_match,
-    has_pattern_match,
+from utils.config import Config
+from utils.text_processing import (
+    get_close_text_matches,
+    get_matching_patterns,
     normalize_string,
 )
-from utils.config import Config
+
+from fine_tuning.taxonomy import VARIANT_TYPE_TO_TAXONOMY, convert_label
 
 # Creator detection keywords (from proposal v2)
 CREATOR_KEYWORDS = {
@@ -92,6 +93,23 @@ OTHER_KEYWORDS = {
 # Year pattern for organizational folders
 YEAR_PATTERN = re.compile(r"^(19|20)\d{2}$")
 
+# Collaboration markers
+COLLAB_MARKERS = {
+    "collab",
+    "collabs",
+    "collaboration",
+    "collaborations",
+    "collaborator",
+    "collaborators",
+    "with",
+    "w",
+    "feat",
+    "featuring",
+    "ft",
+    "x",
+    "&",
+}
+
 
 @dataclass
 class ClassificationResult:
@@ -100,7 +118,7 @@ class ClassificationResult:
     label: str
     confidence: float
     reason: str
-    matches: List[str]  # What patterns/rules matched
+    matches: List[str]
 
 
 class HeuristicClassifier:
@@ -115,11 +133,6 @@ class HeuristicClassifier:
         """
         self.config = config
         self.taxonomy = taxonomy
-
-        # Build lookup tables from config
-        self.variant_to_label_v1, self.variant_to_label_v2 = build_variant_mappings(
-            config.variants
-        )
 
     def classify(
         self,
@@ -162,9 +175,7 @@ class HeuristicClassifier:
             results.append(result)
 
         # 3. Check for creators (high confidence at low depth)
-        result = self._check_creators(
-            name, depth, parent_name, children_names, sibling_names
-        )
+        result = self._check_creators(name, depth, parent_name, children_names, sibling_names)
         if result:
             results.append(result)
 
@@ -209,19 +220,29 @@ class HeuristicClassifier:
 
     def _check_variants(self, name: str) -> Optional[ClassificationResult]:
         """Check if name matches known variants from config."""
-        variant_map = (
-            self.variant_to_label_v2
-            if self.taxonomy == "v2"
-            else self.variant_to_label_v1
-        )
+        # Build variant-to-label mapping using taxonomy
+        variant_map: Dict[str, str] = {}
+        taxonomy_index = 0 if self.taxonomy == "v1" else 1
+
+        for variant_name, variant_info in self.config.variants.items():
+            variant_type = variant_info.get("type", "variant")
+
+            if variant_type in VARIANT_TYPE_TO_TAXONOMY:
+                # Get the label from taxonomy mapping (v1 or v2 based on index)
+                label = VARIANT_TYPE_TO_TAXONOMY[variant_type][taxonomy_index]
+                variant_map[variant_name] = label
+
+                # Also map synonyms
+                for synonym in variant_info.get("synonyms", []):
+                    variant_map[synonym] = label
 
         # Get all variant names
         variant_names = list(variant_map.keys())
 
         # Check for close text match
-        has_match, matches = has_close_text_match(name, variant_names, threshold=0.85)
+        matches = get_close_text_matches(name, variant_names, threshold=0.85)
 
-        if has_match and matches:
+        if matches:
             # Use the first match to get the label
             label = variant_map[matches[0]]
             return ClassificationResult(
@@ -246,21 +267,18 @@ class HeuristicClassifier:
 
         # Check against known creators
         known_creators = list(self.config.creators.keys())
-        has_match, creator_matches = has_close_text_match(
-            name, known_creators, threshold=0.85
-        )
-        if has_match:
+        creator_matches = get_close_text_matches(name, known_creators, threshold=0.85)
+        if creator_matches:
             matches.extend(creator_matches)
 
         # Check for creator keywords
-        has_keyword, keyword_matches = has_pattern_match(name, list(CREATOR_KEYWORDS))
-        if has_keyword:
+        keyword_matches = get_matching_patterns(name, list(CREATOR_KEYWORDS))
+        if keyword_matches:
             matches.extend(keyword_matches)
 
         # Check for collaboration markers
-        collab_markers = list(self.config.collab_markers)
-        has_collab, collab_matches = has_pattern_match(name, collab_markers)
-        if has_collab:
+        collab_matches = get_matching_patterns(name, list(COLLAB_MARKERS))
+        if collab_matches:
             matches.append("collaboration marker")
 
         # Check if parent suggests creator context
@@ -294,9 +312,9 @@ class HeuristicClassifier:
         self, name: str, file_extensions: List[str]
     ) -> Optional[ClassificationResult]:
         """Check if folder represents an asset type."""
-        has_match, matches = has_pattern_match(name, list(ASSET_TYPE_KEYWORDS))
+        matches = get_matching_patterns(name, list(ASSET_TYPE_KEYWORDS))
 
-        if has_match:
+        if matches:
             # Check file extensions for additional confidence
             confidence = 0.8
             if file_extensions:
@@ -314,9 +332,9 @@ class HeuristicClassifier:
 
     def _check_themes(self, name: str) -> Optional[ClassificationResult]:
         """Check if folder represents a theme/genre."""
-        has_match, matches = has_pattern_match(name, list(THEME_KEYWORDS))
+        matches = get_matching_patterns(name, list(THEME_KEYWORDS))
 
-        if has_match:
+        if matches:
             return ClassificationResult(
                 label=self._get_label("descriptor"),
                 confidence=0.75,
@@ -338,9 +356,9 @@ class HeuristicClassifier:
             )
 
         # Check for other organizational keywords
-        has_match, matches = has_pattern_match(name, list(OTHER_KEYWORDS))
+        matches = get_matching_patterns(name, list(OTHER_KEYWORDS))
 
-        if has_match:
+        if matches:
             # Special case: if contains both "patreon" and reward/tier keywords, higher confidence
             # This handles "Patreon Rewards", "Patreon Tier 1", etc.
             normalized_name = normalize_string(name)

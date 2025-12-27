@@ -19,7 +19,7 @@ from stages.grouping.nlp_grouping import (
     compute_custom_distance_matrix,
 )
 from utils.config import Config, get_config
-from utils.filename_utils import clean_filename, split_view_type
+from utils.filename_processing import clean_filename, split_view_type
 
 from pathlib import Path
 from sqlalchemy import func, select

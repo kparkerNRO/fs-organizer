@@ -7,36 +7,36 @@ This module provides typer commands for all fine-tuning related operations:
 - Managing datasets
 """
 
-import typer
+import csv
+import re
+from collections import defaultdict
 from pathlib import Path
-from typing import Optional
-from organizer.fine_tuning.run_classifier import (
+from typing import Dict, List, Optional, Tuple
+
+import typer
+from datasets import Dataset
+from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
+from setfit import SetFitModel, SetFitTrainer
+from sklearn.metrics import classification_report, f1_score
+from sklearn.model_selection import train_test_split
+from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
+from storage.index_models import Snapshot
+from storage.training_manager import get_or_create_training_session
+from utils.config import get_config
+
+from fine_tuning.feature_extraction import extract_features as extract_fn
+from fine_tuning.run_classifier import (
     SetFitClassifier,
     create_model_run,
     evaluate_predictions,
     load_samples,
     save_predictions_to_db,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, func, select
-from sqlalchemy.orm import Session
-from storage.index_models import Snapshot
-from collections import defaultdict
-from typing import Dict, List, Tuple
-import csv
-import re
-
-from datasets import Dataset
-from setfit import SetFitModel, SetFitTrainer
-from sklearn.metrics import classification_report, f1_score
-from sklearn.model_selection import train_test_split
-from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from organizer.fine_tuning.feature_extraction import extract_features as extract_fn
-from organizer.storage.training_manager import get_or_create_training_session
-from organizer.utils.config import get_config
+from fine_tuning.sampling import (
+    select_training_samples,
+    write_sample_csv,
+)
 
 app = typer.Typer(
     name="fine_tuning",
@@ -551,16 +551,12 @@ def predict(
 
         # Get true labels (if available)
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [
-            pred for i, pred in enumerate(predictions) if samples[i].label
-        ]
+        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
 
         # Evaluate
         if y_true and y_pred_labeled:
             typer.echo(f"\nEvaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(
-                y_true, y_pred_labeled, classifier.labels, verbose=True
-            )
+            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
         else:
             typer.echo("\nNo labeled samples found. Skipping evaluation.")
             metrics = {}
@@ -843,12 +839,6 @@ def generate_samples(
             --snapshot-id 1 \\
             --sample-size 1000
     """
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
-    from organizer.fine_tuning.training_utils import (
-        select_training_samples,
-        write_sample_csv,
-    )
 
     typer.echo(f"Connecting to database: {index_db}")
     engine = create_engine(f"sqlite:///{index_db}")
@@ -860,9 +850,7 @@ def generate_samples(
         typer.echo(f"Using snapshot_id: {snapshot_id}")
 
     with Session(engine) as session:
-        typer.echo(
-            f"Selecting {sample_size} diverse samples from snapshot {snapshot_id}..."
-        )
+        typer.echo(f"Selecting {sample_size} diverse samples from snapshot {snapshot_id}...")
         typer.echo(f"  Depth range: {min_depth}-{max_depth}")
         typer.echo(f"  Diversity factor: {diversity_factor}")
 
@@ -884,9 +872,7 @@ def generate_samples(
         # Write CSV
         typer.echo(f"Writing samples to {output_csv}...")
         if use_heuristic:
-            typer.echo(
-                f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})..."
-            )
+            typer.echo(f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})...")
         write_sample_csv(
             output_path=output_csv,
             nodes=samples,

@@ -12,15 +12,15 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-from fine_tuning.text_processing import char_trigrams, jaccard_similarity
-from fine_tuning.taxonomy import LABELS_LEGACY
 from storage.index_models import Node
 from storage.manager import NodeKind
+from utils.text_processing import char_trigrams, jaccard_similarity
+
+from fine_tuning.taxonomy import LABELS_LEGACY
 
 # Valid labels for leaf folder classification (legacy taxonomy)
 VALID_LABELS = LABELS_LEGACY
@@ -110,9 +110,7 @@ def select_training_samples(
         # Scale down proportionally
         scale_factor = sample_size / total_allocated
         for depth in samples_per_depth:
-            samples_per_depth[depth] = max(
-                1, int(samples_per_depth[depth] * scale_factor)
-            )
+            samples_per_depth[depth] = max(1, int(samples_per_depth[depth] * scale_factor))
 
     # Sample from each depth with diversity clustering
     selected: List[Node] = []
@@ -193,7 +191,7 @@ def _sample_from_clusters(
         return []
 
     # Sort clusters by size (descending)
-    sorted_clusters = sorted(clusters, key=len, reverse=True)
+    sorted_clusters: List[Node] = sorted(clusters, key=len, reverse=True)
 
     # Calculate max samples per cluster
     max_per_cluster = max(1, int(3 * (1 - diversity_factor) + 1))
@@ -249,11 +247,7 @@ def write_sample_csv(
         heuristic_taxonomy: Taxonomy for heuristic classifier ('v1' or 'v2')
     """
     # Load all nodes for snapshot to build adjacency
-    all_nodes = (
-        session.execute(select(Node).where(Node.snapshot_id == snapshot_id))
-        .scalars()
-        .all()
-    )
+    all_nodes = session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars().all()
 
     # Build node lookup and parent->children map
     nodes_by_id: Dict[int, Node] = {n.node_id: n for n in all_nodes}
@@ -277,13 +271,12 @@ def write_sample_csv(
     heuristic_classifier = None
     if use_heuristic:
         try:
-            from fine_tuning.heuristic_classifier import HeuristicClassifier
             from utils.config import Config
 
+            from fine_tuning.heuristic_classifier import HeuristicClassifier
+
             config = Config()
-            heuristic_classifier = HeuristicClassifier(
-                config, taxonomy=heuristic_taxonomy
-            )
+            heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
         except Exception as e:
             print(f"Warning: Could not initialize heuristic classifier: {e}")
             use_heuristic = False
@@ -297,20 +290,14 @@ def write_sample_csv(
 
         for node in nodes:
             # Get parent and grandparent
-            parent = (
-                nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
-            )
+            parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
             grandparent = (
-                nodes_by_id.get(parent.parent_node_id)
-                if parent and parent.parent_node_id
-                else None
+                nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id else None
             )
 
             # Get children (folders only)
             children = [
-                c
-                for c in children_by_parent.get(node.node_id, [])
-                if c.kind == NodeKind.DIR.value
+                c for c in children_by_parent.get(node.node_id, []) if c.kind == NodeKind.DIR.value
             ]
             child_names = sorted({c.name for c in children})[:child_sample_size]
 
@@ -443,9 +430,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         if len(unlabeled) <= 10:
             rows_str = ", ".join(map(str, unlabeled))
         else:
-            rows_str = (
-                ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
-            )
+            rows_str = ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
 
         raise ValueError(
             f"Found {len(unlabeled)} rows with missing labels.\n"
@@ -476,9 +461,7 @@ def validate_label_values(rows: List[Dict[str, Any]]) -> None:
             if len(row_nums) <= 5:
                 rows_str = ", ".join(map(str, row_nums))
             else:
-                rows_str = (
-                    ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
-                )
+                rows_str = ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
             error_msg.append(f"  '{label}': rows {rows_str}")
 
         error_msg.append(f"\nValid labels are: {', '.join(sorted(VALID_LABELS))}")

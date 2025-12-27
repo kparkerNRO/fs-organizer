@@ -10,7 +10,7 @@ from stages.folder_reconstruction import (
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
-from fine_tuning.training_utils import (
+from fine_tuning.sampling import (
     select_training_samples,
     write_sample_csv,
     read_classification_csv,

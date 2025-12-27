@@ -29,20 +29,40 @@ class TestHeuristicClassifier:
         """Test variant mapping for v2 taxonomy."""
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
-        # Check variant types are mapped correctly
-        assert classifier.variant_to_label_v2["winter"] == "theme_or_genre"
-        assert classifier.variant_to_label_v2["VTT"] == "asset_type"
-        assert classifier.variant_to_label_v2["PDF"] == "asset_type"
-        assert classifier.variant_to_label_v2["PDFs"] == "asset_type"  # synonym
+        # Check variant types are mapped correctly via classification
+        winter_result = classifier._check_variants("winter")
+        assert winter_result is not None
+        assert winter_result.label == "theme_or_genre"
+
+        vtt_result = classifier._check_variants("VTT")
+        assert vtt_result is not None
+        assert vtt_result.label == "asset_type"
+
+        pdf_result = classifier._check_variants("PDF")
+        assert pdf_result is not None
+        assert pdf_result.label == "asset_type"
+
+        # Test synonym
+        pdfs_result = classifier._check_variants("PDFs")
+        assert pdfs_result is not None
+        assert pdfs_result.label == "asset_type"
 
     def test_variant_mapping_v1(self, test_config):
         """Test variant mapping for v1 taxonomy."""
         classifier = HeuristicClassifier(test_config, taxonomy="v1")
 
-        # Check variant types are mapped correctly
-        assert classifier.variant_to_label_v1["winter"] == "descriptor"
-        assert classifier.variant_to_label_v1["VTT"] == "media_bucket"
-        assert classifier.variant_to_label_v1["PDF"] == "media_bucket"
+        # Check variant types are mapped correctly via classification
+        winter_result = classifier._check_variants("winter")
+        assert winter_result is not None
+        assert winter_result.label == "descriptor"
+
+        vtt_result = classifier._check_variants("VTT")
+        assert vtt_result is not None
+        assert vtt_result.label == "media_bucket"
+
+        pdf_result = classifier._check_variants("PDF")
+        assert pdf_result is not None
+        assert pdf_result.label == "media_bucket"
 
     def test_classify_variant_season(self, test_config):
         """Test classification of season variants."""
