@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
+from fine_tuning.taxonomy import get_labels, convert_label
 from fine_tuning.text_processing import (
     has_close_text_match,
     has_pattern_match,
@@ -20,25 +21,6 @@ from fine_tuning.text_processing import (
 )
 from utils.config import Config
 
-
-# Label taxonomies from the proposals
-LABELS_V1 = {
-    "person_or_group",  # creator
-    "content",  # place/category
-    "media_bucket",  # media type
-    "descriptor",  # variant/modifier
-    "other",  # organizational
-    "unknown",  # ambiguous
-}
-
-LABELS_V2 = {
-    "creator_or_studio",  # formerly person_or_group
-    "content_subject",  # formerly content
-    "theme_or_genre",  # formerly descriptor
-    "asset_type",  # formerly media_bucket
-    "other",  # organizational
-    "unknown",  # ambiguous
-}
 
 # Mapping from variant types (in variants.yaml) to taxonomy labels
 # Format: {variant_type: (v1_label, v2_label)}
@@ -189,17 +171,19 @@ class HeuristicClassifier:
         )
 
     def _get_label(self, base_label: str) -> str:
-        """Get the label for the current taxonomy."""
-        # Map v1 labels to v2 if needed
-        if self.taxonomy == "v2":
-            label_map = {
-                "person_or_group": "creator_or_studio",
-                "content": "content_subject",
-                "media_bucket": "asset_type",
-                "descriptor": "theme_or_genre",
-            }
-            return label_map.get(base_label, base_label)
-        return base_label
+        """Get the label for the current taxonomy.
+
+        Args:
+            base_label: Base label in V1 taxonomy
+
+        Returns:
+            Label converted to current taxonomy
+        """
+        if self.taxonomy == "v1":
+            return base_label
+        else:
+            # Convert from v1 to target taxonomy
+            return convert_label(base_label, "v1", self.taxonomy)
 
     def _check_variants(self, name: str) -> Optional[ClassificationResult]:
         """Check if name matches known variants from config."""

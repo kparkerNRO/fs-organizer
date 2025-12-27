@@ -18,20 +18,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from fine_tuning.text_processing import char_trigrams, jaccard_similarity
+from fine_tuning.taxonomy import LABELS_LEGACY
 from storage.index_models import Node
 from storage.manager import NodeKind
 
-# Valid labels for leaf folder classification
-VALID_LABELS = {
-    "primary_author",
-    "secondary_author",
-    "collection",
-    "subject",
-    "media_format",
-    "media_type",
-    "variant",
-    "other",
-}
+# Valid labels for leaf folder classification (legacy taxonomy)
+VALID_LABELS = LABELS_LEGACY
 
 # CSV column schema for training samples
 CSV_COLUMNS = [
