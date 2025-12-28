@@ -25,8 +25,6 @@ interface FolderBrowserProps {
   treeType: TREE_TYPE;
 }
 
-const TREE_STATE_KEY = "treeState";
-
 interface TreeState {
   tree: FolderV2;
   expandedFolders: Set<string>;
@@ -35,10 +33,10 @@ interface TreeState {
 }
 
 class FolderBrowserErrorBoundary extends React.Component<
-  React.PropsWithChildren<{}>,
+  React.PropsWithChildren<Record<string, never>>,
   { hasError: boolean }
 > {
-  constructor(props: React.PropsWithChildren<{}>) {
+  constructor(props: React.PropsWithChildren<Record<string, never>>) {
     super(props);
     this.state = { hasError: false };
   }
@@ -134,35 +132,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       });
     }
   }, [folderTreeHook.modifiedTree, propFolderTree]);
-
-  // Helper function to get all folder paths in the order they appear in the tree
-  const getAllFolderPathsInOrder = (
-    tree: FolderV2,
-    parentPath: string = ""
-  ): string[] => {
-    if (!tree) return [];
-
-    const paths: string[] = [];
-    const currentPath = buildNodePath(parentPath, tree.name);
-
-    // Add current folder path (skip root)
-    if (currentPath !== "root") {
-      paths.push(currentPath);
-    }
-
-    // Recursively add children folder paths
-    if (tree.children) {
-      for (const child of tree.children) {
-        if (!isFileNode(child)) {
-          paths.push(
-            ...getAllFolderPathsInOrder(child as FolderV2, currentPath)
-          );
-        }
-      }
-    }
-
-    return paths;
-  };
 
   // Helper function to get folders at the same level as the given folder path
   const getFoldersAtSameLevel = (

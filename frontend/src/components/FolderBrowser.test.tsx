@@ -74,41 +74,7 @@ global.DragEvent = class DragEvent extends Event {
       getData: vi.fn().mockReturnValue(""),
     };
   }
-} as any;
-
-// Helper function to expand folders by clicking on chevron icons
-const expandFolder = async (folderName: string) => {
-  const folderElement = screen
-    .getByText(folderName)
-    .closest("[data-folder-path]");
-  if (folderElement) {
-    const chevron = folderElement.querySelector("svg");
-    if (chevron) {
-      fireEvent.click(chevron);
-      await waitFor(() => {
-        // Wait for expansion to complete
-      });
-    }
-  }
-};
-
-// Helper function to wait for elements to appear after expansion
-const waitForExpansion = async () => {
-  await waitFor(
-    () => {
-      // Small delay to allow state updates
-    },
-    { timeout: 100 }
-  );
-};
-
-// Helper function to expand multiple folders in sequence
-const expandFolders = async (folderNames: string[]) => {
-  for (const folderName of folderNames) {
-    await expandFolder(folderName);
-    await waitForExpansion();
-  }
-};
+} as unknown as typeof DragEvent;
 
 describe("FolderBrowser", () => {
   beforeEach(() => {

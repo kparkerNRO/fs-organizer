@@ -40,7 +40,7 @@ def generate_api_folder_structure_file(
     file_path = Path(file)
 
     for parent in file_path.parents:
-        groups = (
+        _ = (
             session.execute(
                 select(GroupCategoryEntry)
                 .join(dbFolder, GroupCategoryEntry.folder_id == dbFolder.id)

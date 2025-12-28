@@ -1,4 +1,3 @@
-from collections import defaultdict
 import os
 import tempfile
 from pathlib import Path
@@ -6,15 +5,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from data_models.classify import ClassificationType
 from data_models.database import (
     Base,
     Folder,
-    PartialNameCategory,
     GroupCategory,
     GroupCategoryEntry,
-    setup_folder_categories,
-    setup_group,
 )
 from grouping.group import (
     process_folders_to_groups,
@@ -22,7 +17,6 @@ from grouping.group import (
     group_folders,
 )
 from grouping.helpers import common_token_grouping
-from utils.config import KNOWN_VARIANT_TOKENS
 
 
 # Helper function to create an in-memory DB for testing

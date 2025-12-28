@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { FolderV2, File } from "../types/types";
+import { FolderV2 } from "../types/types";
 import {
   FolderTreeNode,
   FolderTreePath,
@@ -10,7 +10,6 @@ import {
   moveNode,
   findNodeByPath,
   findParentByPath,
-  isFileNode,
   flattenFolders,
   invertFolder,
   deleteFolders,
@@ -78,24 +77,6 @@ export interface FolderTreeActions {
 }
 
 export type UseFolderTreeReturn = FolderTreeState & FolderTreeActions;
-
-// Helper function to get file path in tree
-const getFilePathInTree = (
-  tree: FolderV2 | File,
-  fileId: number,
-  path: string[] = []
-): string[] | null => {
-  if (isFileNode(tree) && tree.id === fileId) {
-    return path;
-  }
-  if (!isFileNode(tree) && tree.children) {
-    for (const child of tree.children) {
-      const childPath = getFilePathInTree(child, fileId, [...path, tree.name]);
-      if (childPath) return childPath;
-    }
-  }
-  return null;
-};
 
 export const useFolderTree = (): UseFolderTreeReturn => {
   // State management

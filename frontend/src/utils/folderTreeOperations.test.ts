@@ -21,7 +21,6 @@ import {
   mockFolder1,
   pathTestCases,
   nameValidationTestCases,
-  expectedPaths,
 } from "../test/folderTreeTestData";
 
 describe("folderTreeOperations", () => {
@@ -335,7 +334,7 @@ describe("folderTreeOperations", () => {
         name: "level0",
         path: "/level0",
         confidence: 1.0,
-        children: [] as any[],
+        children: [] as (FolderV2 | File)[],
       };
       let current = deepTree;
 
