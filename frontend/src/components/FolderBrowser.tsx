@@ -604,9 +604,9 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       renamingItem.newName.trim()
     );
 
-    if (result.success) {
+    if (result?.success) {
       console.log(`Successfully renamed to "${renamingItem.newName.trim()}"`);
-    } else {
+    } else if (result) {
       console.error("Rename failed:", result.error);
       // You could show a toast/notification here
     }
@@ -649,11 +649,11 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       creatingFolder.folderName.trim()
     );
 
-    if (result.success) {
+    if (result?.success) {
       console.log(
         `Successfully created folder "${creatingFolder.folderName.trim()}"`
       );
-    } else {
+    } else if (result) {
       console.error("Create folder failed:", result.error);
       // You could show a toast/notification here
     }

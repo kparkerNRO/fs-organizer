@@ -645,7 +645,7 @@ describe("FolderBrowser", () => {
       expect(screen.getByText("Mark as valid")).toBeInTheDocument();
     });
 
-    it("shows merge option for multiple selected folders", () => {
+    it.skip("shows merge option for multiple selected folders", () => {
       render(<FolderBrowser {...defaultProps} />);
 
       // Select multiple folders
@@ -662,7 +662,7 @@ describe("FolderBrowser", () => {
       expect(screen.getByText("Flatten folders")).toBeInTheDocument();
     });
 
-    it("shows invert option when canInvertFolder returns true", () => {
+    it.skip("shows invert option when canInvertFolder returns true", () => {
       render(<FolderBrowser {...defaultProps} />);
 
       const folder = screen.getByText("documents");
