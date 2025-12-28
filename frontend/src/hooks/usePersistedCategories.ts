@@ -8,7 +8,9 @@ export const usePersistedCategories = (initialCategories: Folder[]) => {
   const [categories, setCategories] = useState<Folder[]>(() => {
     try {
       const savedCategories = localStorage.getItem(STORAGE_KEY);
-      const result = savedCategories ? JSON.parse(savedCategories) : initialCategories;
+      const result = savedCategories
+        ? JSON.parse(savedCategories)
+        : initialCategories;
       console.log("result", result);
       return result;
     } catch (error) {
@@ -17,7 +19,7 @@ export const usePersistedCategories = (initialCategories: Folder[]) => {
     }
   });
 
-  // 
+  //
 
   // Save to localStorage whenever categories change
   useEffect(() => {

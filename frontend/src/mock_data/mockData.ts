@@ -2,7 +2,6 @@
 
 import { Folder, FolderV2 } from "../types/types";
 
-
 export const mockCategoryData: Folder[] = [
   {
     name: "Dragon Lair",
@@ -64,18 +63,20 @@ export const mockOriginalFolderStructure: FolderV2 = {
                       name: "map1.png",
                       confidence: 100,
                       possibleClassifications: ["Wizard Tower", "Green"],
-                      originalPath: "/original/path/to/wizard_tower_green_map1.png",
-                      newPath: "/gaming/maps/wizard-tower/green/map1.png"
+                      originalPath:
+                        "/original/path/to/wizard_tower_green_map1.png",
+                      newPath: "/gaming/maps/wizard-tower/green/map1.png",
                     },
                     {
                       id: 2,
                       name: "map2.jpg",
                       confidence: 100,
                       possibleClassifications: ["Wizard Tower", "Green"],
-                      originalPath: "/original/path/to/green_wizard_tower_map2.jpg",
-                      newPath: "/gaming/maps/wizard-tower/green/map2.jpg"
-                    }
-                  ]
+                      originalPath:
+                        "/original/path/to/green_wizard_tower_map2.jpg",
+                      newPath: "/gaming/maps/wizard-tower/green/map2.jpg",
+                    },
+                  ],
                 },
                 {
                   name: "Blue_old",
@@ -87,12 +88,13 @@ export const mockOriginalFolderStructure: FolderV2 = {
                       name: "blueprint.pdf",
                       confidence: 100,
                       possibleClassifications: ["Wizard Tower", "Blueprint"],
-                      originalPath: "/original/path/to/blue_tower_blueprint.pdf",
-                      newPath: "/gaming/maps/wizard-tower/blue/blueprint.pdf"
-                    }
-                  ]
-                }
-              ]
+                      originalPath:
+                        "/original/path/to/blue_tower_blueprint.pdf",
+                      newPath: "/gaming/maps/wizard-tower/blue/blueprint.pdf",
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: "Dragon Lair_old",
@@ -105,7 +107,7 @@ export const mockOriginalFolderStructure: FolderV2 = {
                   confidence: 100,
                   possibleClassifications: ["Dragon Lair", "Entrance"],
                   originalPath: "/original/path/to/dragon_lair_entrance.png",
-                  newPath: "/gaming/maps/dragon-lair/entrance.png"
+                  newPath: "/gaming/maps/dragon-lair/entrance.png",
                 },
                 {
                   id: 5,
@@ -113,11 +115,11 @@ export const mockOriginalFolderStructure: FolderV2 = {
                   confidence: 100,
                   possibleClassifications: ["Dragon Lair", "Treasure"],
                   originalPath: "/original/path/to/dragon_treasure_room.png",
-                  newPath: "/gaming/maps/dragon-lair/treasure-room.png"
-                }
-              ]
-            }
-          ]
+                  newPath: "/gaming/maps/dragon-lair/treasure-room.png",
+                },
+              ],
+            },
+          ],
         },
         {
           name: "Assets_old",
@@ -135,7 +137,7 @@ export const mockOriginalFolderStructure: FolderV2 = {
                   confidence: 100,
                   possibleClassifications: ["Character", "Wizard"],
                   originalPath: "/original/path/to/wizard_character.fbx",
-                  newPath: "/gaming/assets/characters/wizard.fbx"
+                  newPath: "/gaming/assets/characters/wizard.fbx",
                 },
                 {
                   id: 7,
@@ -143,9 +145,9 @@ export const mockOriginalFolderStructure: FolderV2 = {
                   confidence: 100,
                   possibleClassifications: ["Character", "Dragon"],
                   originalPath: "/original/path/to/red_dragon_model.fbx",
-                  newPath: "/gaming/assets/characters/dragon.fbx"
-                }
-              ]
+                  newPath: "/gaming/assets/characters/dragon.fbx",
+                },
+              ],
             },
             {
               name: "Props_old",
@@ -158,13 +160,13 @@ export const mockOriginalFolderStructure: FolderV2 = {
                   confidence: 100,
                   possibleClassifications: ["Prop", "Treasure"],
                   originalPath: "/original/path/to/gold_treasure_chest.obj",
-                  newPath: "/gaming/assets/props/treasure-chest.obj"
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                  newPath: "/gaming/assets/props/treasure-chest.obj",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     },
     {
       name: "Music_old",
@@ -182,9 +184,9 @@ export const mockOriginalFolderStructure: FolderV2 = {
               confidence: 100,
               possibleClassifications: ["Classical", "Beethoven"],
               originalPath: "/original/path/to/beethoven_symphony_no9.mp3",
-              newPath: "/music/classical/beethoven.mp3"
-            }
-          ]
+              newPath: "/music/classical/beethoven.mp3",
+            },
+          ],
         },
         {
           name: "Jazz_old",
@@ -197,7 +199,7 @@ export const mockOriginalFolderStructure: FolderV2 = {
               confidence: 100,
               possibleClassifications: ["Jazz", "Miles Davis"],
               originalPath: "/original/path/to/miles_davis_kind_of_blue.mp3",
-              newPath: "/music/jazz/miles-davis.mp3"
+              newPath: "/music/jazz/miles-davis.mp3",
             },
             {
               id: 11,
@@ -205,13 +207,13 @@ export const mockOriginalFolderStructure: FolderV2 = {
               confidence: 100,
               possibleClassifications: ["Jazz", "John Coltrane"],
               originalPath: "/original/path/to/coltrane_a_love_supreme.mp3",
-              newPath: "/music/jazz/coltrane.mp3"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+              newPath: "/music/jazz/coltrane.mp3",
+            },
+          ],
+        },
+      ],
+    },
+  ],
 };
 
 export const mockFolderStructure: FolderV2 = {
@@ -244,18 +246,20 @@ export const mockFolderStructure: FolderV2 = {
                       name: "map1.png",
                       confidence: 92,
                       possibleClassifications: ["Wizard Tower", "Green"],
-                      originalPath: "/original/path/to/wizard_tower_green_map1.png",
-                      newPath: "/gaming/maps/wizard-tower/green/map1.png"
+                      originalPath:
+                        "/original/path/to/wizard_tower_green_map1.png",
+                      newPath: "/gaming/maps/wizard-tower/green/map1.png",
                     },
                     {
                       id: 2,
                       name: "map2.jpg",
                       confidence: 85,
                       possibleClassifications: ["Wizard Tower", "Green"],
-                      originalPath: "/original/path/to/green_wizard_tower_map2.jpg",
-                      newPath: "/gaming/maps/wizard-tower/green/map2.jpg"
-                    }
-                  ]
+                      originalPath:
+                        "/original/path/to/green_wizard_tower_map2.jpg",
+                      newPath: "/gaming/maps/wizard-tower/green/map2.jpg",
+                    },
+                  ],
                 },
                 {
                   name: "Blue_new",
@@ -267,12 +271,13 @@ export const mockFolderStructure: FolderV2 = {
                       name: "blueprint.pdf",
                       confidence: 78,
                       possibleClassifications: ["Wizard Tower", "Blueprint"],
-                      originalPath: "/original/path/to/blue_tower_blueprint.pdf",
-                      newPath: "/gaming/maps/wizard-tower/blue/blueprint.pdf"
-                    }
-                  ]
-                }
-              ]
+                      originalPath:
+                        "/original/path/to/blue_tower_blueprint.pdf",
+                      newPath: "/gaming/maps/wizard-tower/blue/blueprint.pdf",
+                    },
+                  ],
+                },
+              ],
             },
             {
               name: "Dragon Lair_new",
@@ -285,7 +290,7 @@ export const mockFolderStructure: FolderV2 = {
                   confidence: 95,
                   possibleClassifications: ["Dragon Lair", "Entrance"],
                   originalPath: "/original/path/to/dragon_lair_entrance.png",
-                  newPath: "/gaming/maps/dragon-lair/entrance.png"
+                  newPath: "/gaming/maps/dragon-lair/entrance.png",
                 },
                 {
                   id: 5,
@@ -293,11 +298,11 @@ export const mockFolderStructure: FolderV2 = {
                   confidence: 89,
                   possibleClassifications: ["Dragon Lair", "Treasure"],
                   originalPath: "/original/path/to/dragon_treasure_room.png",
-                  newPath: "/gaming/maps/dragon-lair/treasure-room.png"
-                }
-              ]
-            }
-          ]
+                  newPath: "/gaming/maps/dragon-lair/treasure-room.png",
+                },
+              ],
+            },
+          ],
         },
         {
           name: "Assets_new",
@@ -315,7 +320,7 @@ export const mockFolderStructure: FolderV2 = {
                   confidence: 91,
                   possibleClassifications: ["Character", "Wizard"],
                   originalPath: "/original/path/to/wizard_character.fbx",
-                  newPath: "/gaming/assets/characters/wizard.fbx"
+                  newPath: "/gaming/assets/characters/wizard.fbx",
                 },
                 {
                   id: 7,
@@ -323,9 +328,9 @@ export const mockFolderStructure: FolderV2 = {
                   confidence: 94,
                   possibleClassifications: ["Character", "Dragon"],
                   originalPath: "/original/path/to/red_dragon_model.fbx",
-                  newPath: "/gaming/assets/characters/dragon.fbx"
-                }
-              ]
+                  newPath: "/gaming/assets/characters/dragon.fbx",
+                },
+              ],
             },
             {
               name: "Props_new",
@@ -338,13 +343,13 @@ export const mockFolderStructure: FolderV2 = {
                   confidence: 87,
                   possibleClassifications: ["Prop", "Treasure"],
                   originalPath: "/original/path/to/gold_treasure_chest.obj",
-                  newPath: "/gaming/assets/props/treasure-chest.obj"
-                }
-              ]
-            }
-          ]
-        }
-      ]
+                  newPath: "/gaming/assets/props/treasure-chest.obj",
+                },
+              ],
+            },
+          ],
+        },
+      ],
     },
     {
       name: "Music_new",
@@ -362,9 +367,9 @@ export const mockFolderStructure: FolderV2 = {
               confidence: 96,
               possibleClassifications: ["Classical", "Beethoven"],
               originalPath: "/original/path/to/beethoven_symphony_no9.mp3",
-              newPath: "/music/classical/beethoven.mp3"
-            }
-          ]
+              newPath: "/music/classical/beethoven.mp3",
+            },
+          ],
         },
         {
           name: "Jazz_new",
@@ -377,7 +382,7 @@ export const mockFolderStructure: FolderV2 = {
               confidence: 93,
               possibleClassifications: ["Jazz", "Miles Davis"],
               originalPath: "/original/path/to/miles_davis_kind_of_blue.mp3",
-              newPath: "/music/jazz/miles-davis.mp3"
+              newPath: "/music/jazz/miles-davis.mp3",
             },
             {
               id: 11,
@@ -385,11 +390,11 @@ export const mockFolderStructure: FolderV2 = {
               confidence: 88,
               possibleClassifications: ["Jazz", "John Coltrane"],
               originalPath: "/original/path/to/coltrane_a_love_supreme.mp3",
-              newPath: "/music/jazz/coltrane.mp3"
-            }
-          ]
-        }
-      ]
-    }
-  ]
+              newPath: "/music/jazz/coltrane.mp3",
+            },
+          ],
+        },
+      ],
+    },
+  ],
 };

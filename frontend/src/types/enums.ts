@@ -1,7 +1,7 @@
 export enum SORT_ORDER {
   ASC = "asc",
   DESC = "desc",
-  NONE = "none"
+  NONE = "none",
 }
 
 export enum SORT_FIELD {
@@ -11,9 +11,8 @@ export enum SORT_FIELD {
   CONFIDENCE = "confidence",
 }
 
-
 export enum TREE_TYPE {
   LOADED = "loaded",
   ORGANIZED = "organized",
-  CATEGORIZED = "categorized"
+  CATEGORIZED = "categorized",
 }

@@ -1,14 +1,12 @@
-import React from 'react';
-import styled from 'styled-components';
+import React from "react";
+import styled from "styled-components";
 
 interface ResetButtonProps {
   onReset: () => void;
 }
 
 export const ResetButton: React.FC<ResetButtonProps> = ({ onReset }) => (
-  <Button onClick={onReset}>
-    Reset to Initial Data
-  </Button>
+  <Button onClick={onReset}>Reset to Initial Data</Button>
 );
 
 const Button = styled.button`

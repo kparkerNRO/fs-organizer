@@ -10,11 +10,11 @@ import { NavBar, NavItem } from "./components/NavBar";
 const navItems: NavItem[] = [
   { id: "categories", label: "Categorize" },
   { id: "folders", label: "Folder Structure" },
-  { id: "import", label: "Import Wizard" }
+  { id: "import", label: "Import Wizard" },
 ];
 
 function App() {
-  const [activeView, setActiveView] = useState<string>('import');
+  const [activeView, setActiveView] = useState<string>("import");
 
   const handleNavItemClick = (itemId: string) => {
     setActiveView(itemId);

@@ -53,14 +53,14 @@ describe("folderTreeOperations", () => {
       // Find deeply nested folder
       const imagesNode = findNodeByPath(
         mockRootFolder,
-        "root/documents/images"
+        "root/documents/images",
       );
       expect(imagesNode?.name).toBe("images");
 
       // Find file
       const fileNode = findNodeByPath(
         mockRootFolder,
-        "root/documents/document1.pdf"
+        "root/documents/document1.pdf",
       );
       expect(fileNode?.name).toBe("document1.pdf");
       expect(isFileNode(fileNode!)).toBe(true);
@@ -70,7 +70,7 @@ describe("folderTreeOperations", () => {
       expect(findNodeByPath(mockRootFolder, "nonexistent")).toBeNull();
       expect(findNodeByPath(mockRootFolder, "root/nonexistent")).toBeNull();
       expect(
-        findNodeByPath(mockRootFolder, "root/documents/nonexistent.txt")
+        findNodeByPath(mockRootFolder, "root/documents/nonexistent.txt"),
       ).toBeNull();
     });
   });
@@ -86,7 +86,7 @@ describe("folderTreeOperations", () => {
       // Find parent of nested folder
       const { parent: docParent, parentPath: docParentPath } = findParentByPath(
         mockRootFolder,
-        "root/documents/images"
+        "root/documents/images",
       );
       expect(docParent?.name).toBe("documents");
       expect(docParentPath).toBe("root/documents");
@@ -105,7 +105,7 @@ describe("folderTreeOperations", () => {
 
       const { parent: nonExistentParent } = findParentByPath(
         mockRootFolder,
-        "nonexistent"
+        "nonexistent",
       );
       expect(nonExistentParent).toBeNull();
     });
@@ -150,7 +150,7 @@ describe("folderTreeOperations", () => {
       const result = renameNode(
         simpleTestTree,
         "simple/file2.txt",
-        "renamed_file.txt"
+        "renamed_file.txt",
       );
 
       expect(result.success).toBe(true);
@@ -163,7 +163,7 @@ describe("folderTreeOperations", () => {
       // Check that the file was actually renamed
       const renamedFile = findNodeByPath(
         result.newTree!,
-        "simple/renamed_file.txt"
+        "simple/renamed_file.txt",
       );
       expect(renamedFile?.name).toBe("renamed_file.txt");
 
@@ -176,7 +176,7 @@ describe("folderTreeOperations", () => {
       const result = renameNode(
         simpleTestTree,
         "simple/folder1",
-        "renamed_folder"
+        "renamed_folder",
       );
 
       expect(result.success).toBe(true);
@@ -189,7 +189,7 @@ describe("folderTreeOperations", () => {
       // Check that the folder was actually renamed
       const renamedFolder = findNodeByPath(
         result.newTree!,
-        "simple/renamed_folder"
+        "simple/renamed_folder",
       );
       expect(renamedFolder?.name).toBe("renamed_folder");
     });
@@ -205,12 +205,12 @@ describe("folderTreeOperations", () => {
       const result = renameNode(
         simpleTestTree,
         "simple/nonexistent.txt",
-        "new_name.txt"
+        "new_name.txt",
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toBe(
-        "Node not found at path: simple/nonexistent.txt"
+        "Node not found at path: simple/nonexistent.txt",
       );
     });
 
@@ -218,13 +218,13 @@ describe("folderTreeOperations", () => {
       const result = renameNode(
         simpleTestTree,
         "simple/file2.txt",
-        "  trimmed_name.txt  "
+        "  trimmed_name.txt  ",
       );
 
       expect(result.success).toBe(true);
       const renamedFile = findNodeByPath(
         result.newTree!,
-        "simple/trimmed_name.txt"
+        "simple/trimmed_name.txt",
       );
       expect(renamedFile?.name).toBe("trimmed_name.txt");
     });
@@ -241,7 +241,7 @@ describe("folderTreeOperations", () => {
     it("should return empty array for leaf folders", () => {
       const descendants = getDescendantPaths(
         mockRootFolder,
-        "root/documents/images"
+        "root/documents/images",
       );
       expect(descendants).toEqual(["root/documents/images/image.jpg"]);
     });
@@ -257,7 +257,7 @@ describe("folderTreeOperations", () => {
       expect(isAncestorPath("root", "root/documents")).toBe(true);
       expect(isAncestorPath("root", "root/documents/file.txt")).toBe(true);
       expect(isAncestorPath("root/documents", "root/documents/file.txt")).toBe(
-        true
+        true,
       );
       expect(isAncestorPath("root", "root")).toBe(true); // Same path
     });
@@ -266,7 +266,7 @@ describe("folderTreeOperations", () => {
       expect(isAncestorPath("root/documents", "root")).toBe(false);
       expect(isAncestorPath("root/documents", "root/code")).toBe(false);
       expect(
-        isAncestorPath("root/documents/images", "root/documents/file.txt")
+        isAncestorPath("root/documents/images", "root/documents/file.txt"),
       ).toBe(false);
     });
   });
@@ -362,7 +362,7 @@ describe("folderTreeOperations", () => {
       // Should find the deeply nested file
       const deepFile = findNodeByPath(
         deepTree,
-        "level0/level1/level2/level3/level4/level5/level6/level7/level8/level9/level10/deep_file.txt"
+        "level0/level1/level2/level3/level4/level5/level6/level7/level8/level9/level10/deep_file.txt",
       );
       expect(deepFile?.name).toBe("deep_file.txt");
     });
@@ -394,7 +394,7 @@ describe("folderTreeOperations", () => {
       ]);
       expect(result2.success).toBe(false);
       expect(result2.error).toBe(
-        "Folder not found at path: root/documents/document1.pdf"
+        "Folder not found at path: root/documents/document1.pdf",
       );
     });
 
@@ -440,7 +440,7 @@ describe("folderTreeOperations", () => {
       const result2 = flattenFolders(
         deepTree,
         ["root/level1", "root/level1/level2", "root/level1/level2/level3"],
-        "flattened_levels"
+        "flattened_levels",
       );
       expect(result2.success).toBe(true);
     });
@@ -478,12 +478,12 @@ describe("folderTreeOperations", () => {
       const result = flattenFolders(
         siblingTree,
         ["root/parent", "root/parent/child1", "root/parent/child2"],
-        "flattened"
+        "flattened",
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain(
-        "Cannot have sibling folders in selection"
+        "Cannot have sibling folders in selection",
       );
       expect(result.error).toContain("child1");
       expect(result.error).toContain("child2");
@@ -515,13 +515,13 @@ describe("folderTreeOperations", () => {
       const result = flattenFolders(
         branchedTree,
         ["root/branch1", "root/branch2"],
-        "flattened"
+        "flattened",
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("is not a descendant of");
       expect(result.error).toContain(
-        "Folders must form a single hierarchy chain"
+        "Folders must form a single hierarchy chain",
       );
     });
 
@@ -529,7 +529,7 @@ describe("folderTreeOperations", () => {
       // Provide paths in reverse order
       const result = flattenFolders(
         mockRootFolder,
-        ["root/documents/images", "root/documents"] // reversed order
+        ["root/documents/images", "root/documents"], // reversed order
       );
 
       expect(result.success).toBe(true);
@@ -577,12 +577,12 @@ describe("folderTreeOperations", () => {
       const result = flattenFolders(
         complexTree,
         ["root/level1", "root/level1/level2a", "root/level1/level2b"],
-        "flattened"
+        "flattened",
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain(
-        "Cannot have sibling folders in selection"
+        "Cannot have sibling folders in selection",
       );
     });
 
@@ -591,7 +591,7 @@ describe("folderTreeOperations", () => {
       const result = flattenFolders(
         mockRootFolder,
         ["root", "root/documents"],
-        "flattened_root"
+        "flattened_root",
       );
 
       expect(result.success).toBe(false);
@@ -663,7 +663,7 @@ describe("folderTreeOperations", () => {
       ]);
       expect(result.canFlatten).toBe(false);
       expect(result.reason).toContain(
-        "Cannot have sibling folders in selection"
+        "Cannot have sibling folders in selection",
       );
     });
   });
@@ -725,7 +725,7 @@ describe("folderTreeOperations", () => {
       // Find the flattened folder (should be named 'photos summer' since it's a 2-level flatten)
       const flattenedFolder = findNodeByPath(
         result.newTree!,
-        "root/photos summer"
+        "root/photos summer",
       );
       expect(flattenedFolder).toBeDefined();
       expect(flattenedFolder!.name).toBe("photos summer");
@@ -742,7 +742,7 @@ describe("folderTreeOperations", () => {
 
         // Check that no nested folders remain
         const folders = flattenedFolder!.children.filter(
-          (child) => !isFileNode(child)
+          (child) => !isFileNode(child),
         );
         expect(folders).toHaveLength(0);
       }
@@ -795,7 +795,7 @@ describe("folderTreeOperations", () => {
 
       const flattenedFolder = findNodeByPath(
         result.newTree!,
-        "root/media videos"
+        "root/media videos",
       );
       if (!isFileNode(flattenedFolder!) && flattenedFolder!.children) {
         const files = flattenedFolder!.children.filter(isFileNode);
@@ -890,12 +890,12 @@ describe("folderTreeOperations", () => {
 
       const flattenedFolder = findNodeByPath(
         result.newTree!,
-        "root/media videos"
+        "root/media videos",
       );
       if (!isFileNode(flattenedFolder!) && flattenedFolder!.children) {
         expect(flattenedFolder!.children).toHaveLength(4);
         const files = flattenedFolder!.children.filter(isFileNode);
-        console.log(files)
+        console.log(files);
         expect(files).toHaveLength(3);
 
         const fileNames = files.map((f) => f.name);
@@ -974,7 +974,7 @@ describe("folderTreeOperations", () => {
 
       const flattenedFolder = findNodeByPath(
         result.newTree!,
-        "root/project src components"
+        "root/project src components",
       );
       if (!isFileNode(flattenedFolder!) && flattenedFolder!.children) {
         console.log(flattenedFolder);
@@ -991,7 +991,7 @@ describe("folderTreeOperations", () => {
 
         // Ensure no nested folders remain
         const folders = flattenedFolder!.children.filter(
-          (child) => !isFileNode(child)
+          (child) => !isFileNode(child),
         );
         console.log("");
         console.log(folders);

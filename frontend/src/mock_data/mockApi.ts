@@ -1,13 +1,16 @@
 // src/mockApi.ts
 
-import {  mockCategoryData, mockFolderStructure, mockOriginalFolderStructure } from "./mockData";
+import {
+  mockCategoryData,
+  mockFolderStructure,
+  mockOriginalFolderStructure,
+} from "./mockData";
 import { FetchCategoriesParams, FetchCategoriesResponse } from "../api";
 import { FolderV2, FolderViewResponse } from "../types/types";
 
-
 export const fetchMockCategoryData = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _params: FetchCategoriesParams
+  _params: FetchCategoriesParams,
 ): Promise<FetchCategoriesResponse> => {
   const mockData = {
     data: mockCategoryData,
@@ -27,19 +30,24 @@ export const fetchMockFolderStructure = (): Promise<FolderV2> => {
   });
 };
 
-export const fetchMockFolderStructureComparison = (): Promise<FolderViewResponse> => {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({
-      original: mockOriginalFolderStructure,
-      new: mockFolderStructure
-    }), 500); // Simulate API delay
-  });
-};
+export const fetchMockFolderStructureComparison =
+  (): Promise<FolderViewResponse> => {
+    return new Promise((resolve) => {
+      setTimeout(
+        () =>
+          resolve({
+            original: mockOriginalFolderStructure,
+            new: mockFolderStructure,
+          }),
+        500,
+      ); // Simulate API delay
+    });
+  };
 
 // Import Wizard Mock APIs
 export const importFolder = (sourcePath: string): Promise<FolderV2> => {
   const mockImportedStructure: FolderV2 = {
-    name: sourcePath.split('/').pop() || "Imported Folder",
+    name: sourcePath.split("/").pop() || "Imported Folder",
     count: 156,
     confidence: 0.85,
     children: [
@@ -52,15 +60,15 @@ export const importFolder = (sourcePath: string): Promise<FolderV2> => {
             name: "IMG_001.jpg",
             count: 1,
             confidence: 0.95,
-            children: []
+            children: [],
           },
           {
-            name: "IMG_002.jpg", 
+            name: "IMG_002.jpg",
             count: 1,
             confidence: 0.95,
-            children: []
-          }
-        ]
+            children: [],
+          },
+        ],
       },
       {
         name: "Documents",
@@ -71,17 +79,17 @@ export const importFolder = (sourcePath: string): Promise<FolderV2> => {
             name: "Report.pdf",
             count: 1,
             confidence: 0.9,
-            children: []
-          }
-        ]
+            children: [],
+          },
+        ],
       },
       {
         name: "Videos",
         count: 12,
         confidence: 0.95,
-        children: []
-      }
-    ]
+        children: [],
+      },
+    ],
   };
 
   return new Promise((resolve) => {
@@ -89,7 +97,9 @@ export const importFolder = (sourcePath: string): Promise<FolderV2> => {
   });
 };
 
-export const groupFolders = (originalStructure: FolderV2): Promise<FolderV2> => {
+export const groupFolders = (
+  originalStructure: FolderV2,
+): Promise<FolderV2> => {
   const mockGroupedStructure: FolderV2 = {
     name: "Grouped Structure",
     count: originalStructure.count,
@@ -104,23 +114,23 @@ export const groupFolders = (originalStructure: FolderV2): Promise<FolderV2> => 
             name: "Photos (45 items)",
             count: 45,
             confidence: 0.9,
-            children: []
+            children: [],
           },
           {
             name: "Videos (12 items)",
             count: 12,
             confidence: 0.95,
-            children: []
-          }
-        ]
+            children: [],
+          },
+        ],
       },
       {
         name: "Documents",
         count: 23,
         confidence: 0.8,
-        children: []
-      }
-    ]
+        children: [],
+      },
+    ],
   };
 
   return new Promise((resolve) => {
@@ -128,7 +138,9 @@ export const groupFolders = (originalStructure: FolderV2): Promise<FolderV2> => 
   });
 };
 
-export const organizeFolders = (groupedStructure: FolderV2): Promise<FolderV2> => {
+export const organizeFolders = (
+  groupedStructure: FolderV2,
+): Promise<FolderV2> => {
   const mockOrganizedStructure: FolderV2 = {
     name: "Organized Structure",
     count: groupedStructure.count,
@@ -143,23 +155,23 @@ export const organizeFolders = (groupedStructure: FolderV2): Promise<FolderV2> =
             name: "01_Photos",
             count: 45,
             confidence: 0.9,
-            children: []
+            children: [],
           },
           {
             name: "02_Videos",
             count: 12,
             confidence: 0.95,
-            children: []
-          }
-        ]
+            children: [],
+          },
+        ],
       },
       {
         name: "02_Documents",
         count: 23,
         confidence: 0.88,
-        children: []
-      }
-    ]
+        children: [],
+      },
+    ],
   };
 
   return new Promise((resolve) => {
@@ -171,12 +183,16 @@ export const applyOrganization = (
   organizedStructure: FolderV2,
   targetPath: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  duplicateHandling: string
+  duplicateHandling: string,
 ): Promise<{ success: boolean; message: string }> => {
   return new Promise((resolve) => {
-    setTimeout(() => resolve({
-      success: true,
-      message: `Successfully organized ${organizedStructure.count} items to ${targetPath}`
-    }), 3000);
+    setTimeout(
+      () =>
+        resolve({
+          success: true,
+          message: `Successfully organized ${organizedStructure.count} items to ${targetPath}`,
+        }),
+      3000,
+    );
   });
 };

@@ -21,9 +21,12 @@ export const usePersistedFolderPageState = () => {
         return JSON.parse(savedState);
       }
     } catch (error) {
-      console.error("Error loading folder page state from localStorage:", error);
+      console.error(
+        "Error loading folder page state from localStorage:",
+        error,
+      );
     }
-    
+
     // Default state
     return {
       expandedOriginal: ["root"],
@@ -31,26 +34,27 @@ export const usePersistedFolderPageState = () => {
       selectedFileId: null,
       highlightedPaths: {
         original: [],
-        new: []
-      }
+        new: [],
+      },
     };
   };
 
   const initialState = getInitialState();
 
   // State hooks
-  const [expandedFoldersOriginal, setExpandedFoldersOriginal] = useState<Set<string>>(
-    new Set(initialState.expandedOriginal)
-  );
+  const [expandedFoldersOriginal, setExpandedFoldersOriginal] = useState<
+    Set<string>
+  >(new Set(initialState.expandedOriginal));
   const [expandedFoldersNew, setExpandedFoldersNew] = useState<Set<string>>(
-    new Set(initialState.expandedNew)
+    new Set(initialState.expandedNew),
   );
   const [selectedFileId, setSelectedFileId] = useState<string | null>(
-    initialState.selectedFileId
+    initialState.selectedFileId,
   );
-  const [highlightedPaths, setHighlightedPaths] = useState<{original: string[], new: string[]}>(
-    initialState.highlightedPaths || {original: [], new: []}
-  );
+  const [highlightedPaths, setHighlightedPaths] = useState<{
+    original: string[];
+    new: string[];
+  }>(initialState.highlightedPaths || { original: [], new: [] });
 
   // Save to localStorage whenever any state changes
   useEffect(() => {
@@ -59,20 +63,25 @@ export const usePersistedFolderPageState = () => {
         expandedOriginal: Array.from(expandedFoldersOriginal),
         expandedNew: Array.from(expandedFoldersNew),
         selectedFileId,
-        highlightedPaths
+        highlightedPaths,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     } catch (error) {
       console.error("Error saving folder page state to localStorage:", error);
     }
-  }, [expandedFoldersOriginal, expandedFoldersNew, selectedFileId, highlightedPaths]);
+  }, [
+    expandedFoldersOriginal,
+    expandedFoldersNew,
+    selectedFileId,
+    highlightedPaths,
+  ]);
 
   // Function to reset to initial state
   const resetPageState = () => {
     setExpandedFoldersOriginal(new Set(["root"]));
     setExpandedFoldersNew(new Set(["root"]));
     setSelectedFileId(null);
-    setHighlightedPaths({original: [], new: []});
+    setHighlightedPaths({ original: [], new: [] });
   };
 
   return {

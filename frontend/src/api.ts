@@ -34,7 +34,7 @@ const isMockMode = false;
 export const gatherFiles = async (
   basePath: string,
   onProgress?: (progress: number) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<TaskInfo> => {
   // Start the gather task
   const response = await fetch(`${env.apiUrl}/api/gather`, {
@@ -56,13 +56,13 @@ export const gatherFiles = async (
   return await pollTaskToCompletion(
     taskResponse.task_id,
     onProgress,
-    abortSignal
+    abortSignal,
   );
 };
 
 export const groupFolders = async (
   onProgress?: (progress: number) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<TaskInfo> => {
   // Start the group task
   const response = await fetch(`${env.apiUrl}/api/group`, {
@@ -83,13 +83,13 @@ export const groupFolders = async (
   return await pollTaskToCompletion(
     taskResponse.task_id,
     onProgress,
-    abortSignal
+    abortSignal,
   );
 };
 
 export const generateFolders = async (
   onProgress?: (progress: number) => void,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
 ): Promise<TaskInfo> => {
   // Start the folders task
   const response = await fetch(`${env.apiUrl}/api/folders`, {
@@ -110,7 +110,7 @@ export const generateFolders = async (
   return await pollTaskToCompletion(
     taskResponse.task_id,
     onProgress,
-    abortSignal
+    abortSignal,
   );
 };
 
@@ -177,7 +177,7 @@ export const pollTaskToCompletion = async (
   taskId: string,
   onProgress?: (progress: number) => void,
   abortSignal?: AbortSignal,
-  pollInterval: number = 1000
+  pollInterval: number = 1000,
 ): Promise<TaskInfo> => {
   return new Promise((resolve, reject) => {
     const poll = async () => {
@@ -215,7 +215,7 @@ export const pollTaskToCompletion = async (
 };
 
 export const fetchCategories = async (
-  params: FetchCategoriesParams
+  params: FetchCategoriesParams,
 ): Promise<FetchCategoriesResponse> => {
   if (isMockMode) {
     return await fetchMockCategoryData(params);
@@ -226,7 +226,7 @@ export const fetchCategories = async (
       `page=${params.page}&` +
       `pageSize=${params.page_size}` +
       `${params.sortField ? `&sort_column=${params.sortField}` : ""}` +
-      `${params.sortOrder ? `&sort_order=${params.sortOrder}` : ""}`
+      `${params.sortOrder ? `&sort_order=${params.sortOrder}` : ""}`,
   );
   const data = await response.json();
   console.log(data);

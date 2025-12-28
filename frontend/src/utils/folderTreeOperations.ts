@@ -39,7 +39,7 @@ export const buildNodePath = (parentPath: string, nodeName: string): string => {
 export const getFilePathInTree = (
   tree: FolderV2 | File,
   fileId: number,
-  path: string[] = []
+  path: string[] = [],
 ): string[] | null => {
   if (isFileNode(tree) && tree.id === fileId) {
     return path;
@@ -57,7 +57,7 @@ export const getFilePathInTree = (
 export const findNodeByPath = (
   tree: FolderV2,
   targetPath: FolderTreePath,
-  currentPath: string = ""
+  currentPath: string = "",
 ): FolderTreeNode | null => {
   const nodePath = buildNodePath(currentPath, tree.name);
 
@@ -86,7 +86,7 @@ export const findNodeByPath = (
 export const findParentByPath = (
   tree: FolderV2,
   targetPath: FolderTreePath,
-  currentPath: string = ""
+  currentPath: string = "",
 ): { parent: FolderV2 | null; parentPath: string } => {
   const nodePath = buildNodePath(currentPath, tree.name);
 
@@ -121,7 +121,7 @@ export const cloneTreeNode = (node: FolderTreeNode): FolderTreeNode => {
 
 // Check if a name is valid for files/folders
 export const validateNodeName = (
-  name: string
+  name: string,
 ): { valid: boolean; error?: string } => {
   if (!name.trim()) {
     return { valid: false, error: "Name cannot be empty" };
@@ -142,7 +142,7 @@ export const validateNodeName = (
 export const renameNode = (
   tree: FolderV2,
   targetPath: FolderTreePath,
-  newName: string
+  newName: string,
 ): FolderTreeOperationResult => {
   const nameValidation = validateNodeName(newName);
   if (!nameValidation.valid) {
@@ -185,7 +185,7 @@ export const renameNode = (
 export const getDescendantPaths = (
   tree: FolderV2,
   targetPath: FolderTreePath,
-  currentPath: string = ""
+  currentPath: string = "",
 ): FolderTreePath[] => {
   const nodePath = buildNodePath(currentPath, tree.name);
   const paths: FolderTreePath[] = [];
@@ -215,7 +215,7 @@ export const getDescendantPaths = (
 // Check if path1 is ancestor of path2
 export const isAncestorPath = (
   ancestorPath: string,
-  descendantPath: string
+  descendantPath: string,
 ): boolean => {
   return (
     descendantPath.startsWith(ancestorPath + "/") ||
@@ -226,7 +226,7 @@ export const isAncestorPath = (
 // Check if the selected folders can be flattened
 export const canFlattenFolders = (
   tree: FolderV2,
-  sourcePaths: FolderTreePath[]
+  sourcePaths: FolderTreePath[],
 ): { canFlatten: boolean; reason?: string } => {
   if (sourcePaths.length < 2) {
     return {
@@ -313,7 +313,7 @@ export const pathNamesToRootPath = (pathNames: string[]): string[] => {
 };
 
 export const generateFlattenedName = (
-  sortedPaths: FolderTreePath[]
+  sortedPaths: FolderTreePath[],
 ): string => {
   // Helper function to generate target name from selected folders
   // Extract the base folder name from each path
@@ -330,7 +330,7 @@ export const generateFlattenedName = (
 
 export const flattenFolders = (
   tree: FolderV2,
-  sourcePaths: FolderTreePath[]
+  sourcePaths: FolderTreePath[],
 ): FolderTreeOperationResult => {
   // Use the helper function to validate if folders can be flattened
   const canFlatten = canFlattenFolders(tree, sourcePaths);
@@ -528,7 +528,7 @@ export const sortFolderChildren = (folder: FolderV2): void => {
 // Helper function to recursively merge a node into a target folder
 const mergeNodeIntoFolder = (
   targetFolder: FolderV2,
-  nodeToMerge: FolderTreeNode
+  nodeToMerge: FolderTreeNode,
 ): void => {
   if (!targetFolder.children) {
     targetFolder.children = [];
@@ -542,7 +542,7 @@ const mergeNodeIntoFolder = (
 
   // It's a folder - check if a folder with the same name already exists
   const existingFolder = targetFolder.children.find(
-    (child) => !isFileNode(child) && child.name === nodeToMerge.name
+    (child) => !isFileNode(child) && child.name === nodeToMerge.name,
   ) as FolderV2 | undefined;
 
   if (existingFolder) {
@@ -563,7 +563,7 @@ const mergeNodeIntoFolder = (
 export const moveNode = (
   tree: FolderV2,
   sourcePath: FolderTreePath,
-  targetPath: FolderTreePath
+  targetPath: FolderTreePath,
 ): FolderTreeOperationResult => {
   // Clone the tree to avoid mutation
   const newTree = cloneTreeNode(tree) as FolderV2;
@@ -601,7 +601,7 @@ export const moveNode = (
   }
 
   const sourceIndex = sourceParent.children.findIndex(
-    (child) => child === sourceNode
+    (child) => child === sourceNode,
   );
   if (sourceIndex === -1) {
     return {
@@ -619,7 +619,7 @@ export const moveNode = (
 
   // Check for name conflicts and handle them
   const existingChild = targetFolder.children.find(
-    (child) => child.name === sourceNode.name
+    (child) => child.name === sourceNode.name,
   );
   if (existingChild) {
     if (isFileNode(sourceNode) && isFileNode(existingChild)) {
@@ -683,7 +683,7 @@ export const moveNode = (
 
 export const mergeFolders = (
   tree: FolderV2,
-  sourcePaths: FolderTreePath[]
+  sourcePaths: FolderTreePath[],
 ): FolderTreeOperationResult => {
   const newTree = cloneTreeNode(tree) as FolderV2;
 
@@ -768,7 +768,7 @@ export const mergeFolders = (
 // Helper function to check if folder can be inverted with children
 export const canInvertFolder = (
   tree: FolderV2,
-  targetPath: FolderTreePath
+  targetPath: FolderTreePath,
 ): { canInvert: boolean; reason?: string } => {
   const folder = findNodeByPath(tree, targetPath);
 
@@ -803,7 +803,7 @@ export const canInvertFolder = (
 // Invert folder with children operation
 export const invertFolder = (
   tree: FolderV2,
-  targetPath: FolderTreePath
+  targetPath: FolderTreePath,
 ): FolderTreeOperationResult => {
   // Validate that the folder can be inverted
   const canInvert = canInvertFolder(tree, targetPath);
@@ -826,12 +826,12 @@ export const invertFolder = (
 
   // Get all child folders (we already validated there are no files)
   const childFolders = targetFolder.children!.filter(
-    (child) => !isFileNode(child)
+    (child) => !isFileNode(child),
   ) as FolderV2[];
 
   // Remove the target folder from its parent
   const targetIndex = targetParent.children!.findIndex(
-    (child) => child === targetFolder
+    (child) => child === targetFolder,
   );
   targetParent.children!.splice(targetIndex, 1);
 
@@ -842,7 +842,7 @@ export const invertFolder = (
 
     // Check if a folder with the same name already exists in the parent
     const existingFolder = targetParent.children!.find(
-      (child) => !isFileNode(child) && child.name === childClone.name
+      (child) => !isFileNode(child) && child.name === childClone.name,
     ) as FolderV2 | undefined;
 
     if (existingFolder) {
@@ -900,7 +900,7 @@ export const invertFolder = (
 
 export const deleteFolders = (
   tree: FolderV2,
-  targetPaths: FolderTreePath[]
+  targetPaths: FolderTreePath[],
 ): FolderTreeOperationResult => {
   const newTree = cloneTreeNode(tree) as FolderV2;
 
@@ -911,7 +911,7 @@ export const deleteFolders = (
     }
     const baseName = path.split("/").slice(-1)[0];
     parent.children = parent.children.filter(
-      (child) => child.name !== baseName
+      (child) => child.name !== baseName,
     );
   }
 
@@ -925,7 +925,7 @@ export const deleteFolders = (
 export const createFolder = (
   tree: FolderV2,
   parentPath: FolderTreePath,
-  folderName: string
+  folderName: string,
 ): FolderTreeOperationResult => {
   const newTree = cloneTreeNode(tree) as FolderV2;
 
@@ -943,7 +943,7 @@ export const createFolder = (
 
   // Check if a folder with the same name already exists
   const existingChild = parentFolder.children?.find(
-    (child) => child.name === folderName
+    (child) => child.name === folderName,
   );
 
   if (existingChild) {

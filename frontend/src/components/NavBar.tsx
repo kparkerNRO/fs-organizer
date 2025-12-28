@@ -14,10 +14,10 @@ interface NavBarProps {
   onNavItemClick: (itemId: string) => void;
 }
 
-export const NavBar: React.FC<NavBarProps> = ({ 
-  items, 
-  activeItemId, 
-  onNavItemClick 
+export const NavBar: React.FC<NavBarProps> = ({
+  items,
+  activeItemId,
+  onNavItemClick,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -83,7 +83,7 @@ const MenuButton = styled.button`
   align-items: center;
   justify-content: center;
   color: #4b5563;
-  
+
   &:hover {
     color: #1f2937;
   }
@@ -95,7 +95,9 @@ const NavMenu = styled.div`
   left: 0;
   width: 250px;
   background-color: #ffffff;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border-radius: 0.5rem;
   margin-top: 0.5rem;
   margin-left: 1rem;
@@ -109,7 +111,7 @@ const NavMenuItem = styled.div<{ $active: boolean }>`
   color: ${(props) => (props.$active ? "#2563eb" : "#4b5563")};
   background-color: ${(props) => (props.$active ? "#eff6ff" : "transparent")};
   font-weight: ${(props) => (props.$active ? "600" : "400")};
-  
+
   &:hover {
     background-color: #f3f4f6;
   }

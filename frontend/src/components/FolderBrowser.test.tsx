@@ -106,7 +106,7 @@ describe("FolderBrowser", () => {
       render(<FolderBrowser {...defaultProps} folderTree={null} />);
 
       expect(
-        screen.getByText("Failed to load folder structure")
+        screen.getByText("Failed to load folder structure"),
       ).toBeInTheDocument();
     });
 
@@ -161,7 +161,7 @@ describe("FolderBrowser", () => {
     it("prevents folder row click when chevron is clicked", () => {
       const onSelectFolder = vi.fn();
       render(
-        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
       );
 
       const documentsFolder = screen
@@ -183,7 +183,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           onSelectItem={onSelectItem}
-        />
+        />,
       );
 
       // Expand folder first
@@ -203,7 +203,7 @@ describe("FolderBrowser", () => {
     it("selects folder when clicked", () => {
       const onSelectFolder = vi.fn();
       render(
-        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
       );
 
       const folder = screen.getByText("documents");
@@ -219,7 +219,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           onSelectFolder={onSelectFolder}
-        />
+        />,
       );
 
       // First select folder
@@ -229,7 +229,7 @@ describe("FolderBrowser", () => {
 
       // Expand folder and select file
       const chevron = within(folder.closest("[data-folder-path]")!).getByRole(
-        "button"
+        "button",
       );
       fireEvent.click(chevron);
       const file = screen.getByText("file1.txt");
@@ -245,7 +245,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           onSelectItem={onSelectItem}
-        />
+        />,
       );
 
       // First expand and select file
@@ -270,7 +270,7 @@ describe("FolderBrowser", () => {
     it("adds folder to selection with Ctrl+click", () => {
       const onSelectFolder = vi.fn();
       render(
-        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
       );
 
       // Select first folder
@@ -287,7 +287,7 @@ describe("FolderBrowser", () => {
     it("removes folder from selection with Ctrl+click on already selected folder", () => {
       const onSelectFolder = vi.fn();
       render(
-        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
       );
 
       // Select folder
@@ -303,7 +303,7 @@ describe("FolderBrowser", () => {
     it("works with Cmd+click (Mac)", () => {
       const onSelectFolder = vi.fn();
       render(
-        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+        <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
       );
 
       const documentsFolder = screen.getByText("documents");
@@ -319,7 +319,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           onSelectItem={onSelectItem}
-        />
+        />,
       );
 
       // Expand folder
@@ -374,7 +374,7 @@ describe("FolderBrowser", () => {
             {...defaultProps}
             folderTree={testTree}
             onSelectFolder={onSelectFolder}
-          />
+          />,
         );
 
         // Select first folder
@@ -391,7 +391,7 @@ describe("FolderBrowser", () => {
       it("selects only current folder if no previous selection for Shift+click", async () => {
         const onSelectFolder = vi.fn();
         render(
-          <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+          <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
         );
 
         // Wait for the root folder to be expanded and documents to be visible
@@ -408,7 +408,7 @@ describe("FolderBrowser", () => {
       it("selects only current folder if previous selection is at different level", async () => {
         const onSelectFolder = vi.fn();
         render(
-          <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />
+          <FolderBrowser {...defaultProps} onSelectFolder={onSelectFolder} />,
         );
 
         // Wait for the root folder to be expanded and documents to be visible
@@ -447,7 +447,7 @@ describe("FolderBrowser", () => {
             {...defaultProps}
             onSelectItem={onSelectItem}
             onSelectFolder={onSelectFolder}
-          />
+          />,
         );
 
         // Select folder
@@ -484,7 +484,7 @@ describe("FolderBrowser", () => {
         // Verify input is gone
         await waitFor(() => {
           expect(
-            screen.queryByDisplayValue("documents")
+            screen.queryByDisplayValue("documents"),
           ).not.toBeInTheDocument();
         });
       });
@@ -494,7 +494,7 @@ describe("FolderBrowser", () => {
   describe("Synchronization with External State", () => {
     it("updates selection when externalSelectedFile changes", () => {
       const { rerender } = render(
-        <FolderBrowser {...defaultProps} folderTree={simpleTestTree} />
+        <FolderBrowser {...defaultProps} folderTree={simpleTestTree} />,
       );
 
       // Change external selection
@@ -503,7 +503,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           externalSelectedFile={10}
-        />
+        />,
       );
 
       // Should sync with the hook
@@ -512,7 +512,7 @@ describe("FolderBrowser", () => {
 
     it("expands parent folders when external file is selected", () => {
       const { rerender } = render(
-        <FolderBrowser {...defaultProps} folderTree={simpleTestTree} />
+        <FolderBrowser {...defaultProps} folderTree={simpleTestTree} />,
       );
 
       // Change external selection
@@ -521,7 +521,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           externalSelectedFile={10}
-        />
+        />,
       );
 
       // Should expand folders to show the selected file
@@ -534,7 +534,7 @@ describe("FolderBrowser", () => {
           {...defaultProps}
           folderTree={simpleTestTree}
           shouldSync={false}
-        />
+        />,
       );
 
       // Change external selection
@@ -544,7 +544,7 @@ describe("FolderBrowser", () => {
           folderTree={simpleTestTree}
           externalSelectedFile={10}
           shouldSync={false}
-        />
+        />,
       );
 
       // Should still call setTreeData but not scroll
@@ -602,7 +602,7 @@ describe("FolderBrowser", () => {
       };
 
       render(
-        <FolderBrowser {...defaultProps} folderTree={lowConfidenceTree} />
+        <FolderBrowser {...defaultProps} folderTree={lowConfidenceTree} />,
       );
 
       const folder = screen.getByText("uncertain");
@@ -647,7 +647,7 @@ describe("FolderBrowser", () => {
       fireEvent.click(copyOption);
 
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        "/root/documents"
+        "/root/documents",
       );
     });
   });
@@ -671,7 +671,7 @@ describe("FolderBrowser", () => {
       expect(mockDataTransfer.effectAllowed).toBe("move");
       expect(mockDataTransfer.setData).toHaveBeenCalledWith(
         "text/plain",
-        "root/documents"
+        "root/documents",
       );
     });
 
@@ -721,7 +721,7 @@ describe("FolderBrowser", () => {
 
       expect(mockUseFolderTree.moveItem).toHaveBeenCalledWith(
         "root/documents",
-        "root/code"
+        "root/code",
       );
     });
 
@@ -780,7 +780,7 @@ describe("FolderBrowser", () => {
 
       expect(mockUseFolderTree.renameItem).toHaveBeenCalledWith(
         "root/documents",
-        "new-name"
+        "new-name",
       );
     });
 
@@ -849,7 +849,7 @@ describe("FolderBrowser", () => {
 
       expect(mockUseFolderTree.createFolder).toHaveBeenCalledWith(
         "root/documents",
-        "created-folder"
+        "created-folder",
       );
     });
 
@@ -867,7 +867,7 @@ describe("FolderBrowser", () => {
 
       await waitFor(() => {
         expect(
-          screen.queryByDisplayValue("New Folder")
+          screen.queryByDisplayValue("New Folder"),
         ).not.toBeInTheDocument();
       });
       expect(mockUseFolderTree.createFolder).not.toHaveBeenCalled();
@@ -901,7 +901,7 @@ describe("FolderBrowser", () => {
       };
 
       render(
-        <FolderBrowser {...defaultProps} folderTree={treeWithLowConfidence} />
+        <FolderBrowser {...defaultProps} folderTree={treeWithLowConfidence} />,
       );
 
       const parentFolder = screen.getByText("parent").closest("span");

@@ -20,9 +20,10 @@ export const selectFolder = async (): Promise<FolderSelectionResult> => {
  * Extended version for backward compatibility
  * In Electron, this behaves the same as selectFolder since we get full paths
  */
-export const selectFolderWithContents = async (): Promise<FolderSelectionResult> => {
-  return await selectFolder();
-};
+export const selectFolderWithContents =
+  async (): Promise<FolderSelectionResult> => {
+    return await selectFolder();
+  };
 
 // Type declarations for Electron API
 declare global {
