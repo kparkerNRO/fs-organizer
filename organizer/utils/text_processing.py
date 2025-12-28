@@ -91,7 +91,7 @@ def get_close_text_matches(
 ) -> list[str]:
     """Check if target has a close text match in candidates.
 
-    Matches using exact match, substring match, or fuzzy similarity.
+    Matches using exact match, or fuzzy similarity.
 
     Args:
         target: Text to match
@@ -109,6 +109,10 @@ def get_close_text_matches(
 
         # Exact match
         if normalized_target == normalized_candidate:
+            matches.append(candidate)
+            continue
+
+        if normalized_target in normalized_candidate:
             matches.append(candidate)
             continue
 

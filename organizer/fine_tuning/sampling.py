@@ -19,17 +19,14 @@ from sqlalchemy.orm import Session
 from storage.index_models import Node
 from storage.manager import NodeKind
 from utils.text_processing import char_trigrams, jaccard_similarity
+from utils.config import get_config
+from fine_tuning.heuristic_classifier import HeuristicClassifier
 
-from fine_tuning.taxonomy import LABELS_LEGACY
-
-# Valid labels for leaf folder classification (legacy taxonomy)
-VALID_LABELS = LABELS_LEGACY
 
 # CSV column schema for training samples
 CSV_COLUMNS = [
     "snapshot_id",
     "node_id",
-    "name",
     "rel_path",
     "depth",
     "parent_name",
@@ -38,6 +35,7 @@ CSV_COLUMNS = [
     "child_names_sample",
     "sibling_names_sample",
     "file_extensions",
+    "name",
     "heuristic_label",  # Heuristic prediction
     "heuristic_confidence",  # Confidence score
     "heuristic_reason",  # Reasoning
@@ -271,11 +269,8 @@ def write_sample_csv(
     heuristic_classifier = None
     if use_heuristic:
         try:
-            from utils.config import Config
 
-            from fine_tuning.heuristic_classifier import HeuristicClassifier
-
-            config = Config()
+            config = get_config()
             heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
         except Exception as e:
             print(f"Warning: Could not initialize heuristic classifier: {e}")
@@ -338,7 +333,6 @@ def write_sample_csv(
                 {
                     "snapshot_id": snapshot_id,
                     "node_id": node.node_id,
-                    "name": node.name,
                     "rel_path": node.rel_path,
                     "depth": node.depth,
                     "parent_name": parent.name if parent else "",
@@ -347,6 +341,7 @@ def write_sample_csv(
                     "child_names_sample": json.dumps(child_names),
                     "sibling_names_sample": json.dumps(sibling_names),
                     "file_extensions": json.dumps(extensions),
+                    "name": node.name,
                     "heuristic_label": heuristic_label,
                     "heuristic_confidence": heuristic_confidence,
                     "heuristic_reason": heuristic_reason,
@@ -439,7 +434,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         )
 
 
-def validate_label_values(rows: List[Dict[str, Any]]) -> None:
+def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
     """Validate that all labels are valid.
 
     Args:
@@ -452,7 +447,7 @@ def validate_label_values(rows: List[Dict[str, Any]]) -> None:
 
     for i, row in enumerate(rows, start=2):
         label = row["label"]
-        if label and label not in VALID_LABELS:
+        if label and label not in valid_labels:
             invalid_labels[label].append(i)
 
     if invalid_labels:

@@ -14,7 +14,7 @@ from storage.index_models import Node
 from storage.manager import NodeKind
 from storage.training_models import TrainingSample
 from utils.config import Config
-from utils.filename_processing import _processed_name
+from utils.filename_processing import clean_filename
 from utils.text_processing import has_matching_token, normalize_string, tokenize_string
 from fine_tuning.heuristic_classifier import COLLAB_MARKERS
 
@@ -62,7 +62,7 @@ def extract_features(
 
     for r in rows:
         nodes_by_id[r.node_id] = r
-        processed_name_by_id[r.node_id] = _processed_name(r.name)
+        processed_name_by_id[r.node_id] = clean_filename(r.name)
         children_by_parent.setdefault(r.parent_node_id, []).append(r.node_id)
 
     # Precompute descendant file extensions per node (DP over depths)

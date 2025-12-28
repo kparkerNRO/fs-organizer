@@ -19,7 +19,7 @@ Our design is guided by the constraints of a small, evolving dataset and the nee
 - **V2 Taxonomy as Output Schema**: The pipeline classifies folders into one of six clear, distinct categories defined in the "V2 Taxonomy." This schema is designed to be more intuitive and useful for organizing RPG assets. The classes are:
     - `creator_or_studio`
     - `content_subject`
-    - `theme_or_genre`
+    - `descriptor`
     - `asset_type`
     - `other`
     - `unknown`
@@ -33,7 +33,7 @@ The first stage is a rule-based heuristic classifier that provides initial predi
 - **Classification Rules with Examples**:
     - **Variant Matching**: Matches folder names against a predefined list of variants.
         - *Source*: `variants.yaml`
-        - *Example*: A folder named "Winter" or "Gridless" is mapped to `theme_or_genre`. A folder named "VTT" is mapped to `asset_type`.
+        - *Example*: A folder named "Winter" or "Gridless" is mapped to `descriptor`. A folder named "VTT" is mapped to `asset_type`.
         - *Confidence*: High (0.90)
 
     - **Creator Detection**: Identifies creators using keywords, known names, and folder structure.
@@ -48,7 +48,7 @@ The first stage is a rule-based heuristic classifier that provides initial predi
 
     - **Theme Detection**: Matches common genre or setting keywords.
         - *Keywords*: `dungeon`, `forest`, `sci-fi`, `cyberpunk`, `horror`, `desert`.
-        - *Example*: A folder named "Dungeon" is classified as `theme_or_genre`.
+        - *Example*: A folder named "Dungeon" is classified as `descriptor`.
         - *Confidence*: Medium (0.75).
 
     - **Organizational Folders**: Detects administrative or meta-folders.

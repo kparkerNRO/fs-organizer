@@ -5,25 +5,23 @@ import json
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-
-from fine_tuning.taxonomy import (
-    LABELS_LEGACY,
-    LABELS_V1,
-    LABELS_V2,
+from storage.training_models import (
+    ModelRun,
+    SamplePrediction,
+    TrainingBase,
+    TrainingSample,
 )
 
 from fine_tuning.run_classifier import (
-
     create_model_run,
     evaluate_predictions,
     load_samples,
     save_predictions_to_db,
 )
-from storage.training_models import (
-    TrainingBase,
-    ModelRun,
-    SamplePrediction,
-    TrainingSample,
+from fine_tuning.taxonomy import (
+    LABELS_LEGACY,
+    LABELS_V1,
+    LABELS_V2,
 )
 
 
@@ -352,7 +350,7 @@ class TestLabelTaxonomies:
         """Verify V2 label taxonomy"""
         assert "creator_or_studio" in LABELS_V2
         assert "content_subject" in LABELS_V2
-        assert "theme_or_genre" in LABELS_V2
+        assert "descriptor" in LABELS_V2
         assert "asset_type" in LABELS_V2
         assert "other" in LABELS_V2
         assert "unknown" in LABELS_V2

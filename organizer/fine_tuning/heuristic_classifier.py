@@ -48,32 +48,27 @@ ASSET_TYPE_KEYWORDS = {
     "battlemaps",
     "handouts",
     "handout",
-    "tiles",
-    "tile",
     "music",
     "illustrations",
     "illustration",
     "animated scenes",
     "key & design notes",
+    "guide",
 }
 
-# Theme/genre keywords (from proposal v2)
+# Additional variant types
 THEME_KEYWORDS = {
-    "dungeon",
-    "dungeons",
-    "forest",
-    "sci-fi",
-    "scifi",
-    "cyberpunk",
-    "horror",
-    "desert",
-    "urban",
-    "fantasy",
-    "medieval",
-    "modern",
-    "futuristic",
-    "gothic",
-    "steampunk",
+    "base",
+    "ruins",
+    "background",
+    "fog",
+    "looping",
+    "open",
+    "close",
+    "unlit",
+    "simple",
+    "Portrait",
+    "Fullbody"
 }
 
 # Organizational folder keywords
@@ -179,12 +174,12 @@ class HeuristicClassifier:
         if result:
             results.append(result)
 
-        # 4. Check for asset types (medium confidence)
+        # 4. Check for asset/media types (medium confidence)
         result = self._check_asset_types(name, file_extensions)
         if result:
             results.append(result)
 
-        # 5. Check for themes (medium confidence)
+        # 5. Check for themes/variants (medium confidence)
         result = self._check_themes(name)
         if result:
             results.append(result)
@@ -313,7 +308,9 @@ class HeuristicClassifier:
     ) -> Optional[ClassificationResult]:
         """Check if folder represents an asset type."""
         matches = get_matching_patterns(name, list(ASSET_TYPE_KEYWORDS))
-
+        matches.extend(get_matching_patterns(name, self.config.media_types))
+        matches.extend(get_matching_patterns(name, self.config.format_types))
+        
         if matches:
             # Check file extensions for additional confidence
             confidence = 0.8

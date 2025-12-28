@@ -3,19 +3,19 @@
 import pytest
 
 from fine_tuning.taxonomy import (
+    LABELS_LEGACY,
     LABELS_V1,
     LABELS_V2,
-    LABELS_LEGACY,
+    LEGACY_TO_V1,
+    LEGACY_TO_V2,
     V1_TO_V2,
     V2_TO_V1,
-    LEGACY_TO_V2,
-    LEGACY_TO_V1,
     VARIANT_TYPE_TO_TAXONOMY,
-    get_labels,
+    build_variant_mappings,
     convert_label,
+    get_labels,
     is_valid_label,
     normalize_labels,
-    build_variant_mappings,
 )
 
 
@@ -36,7 +36,7 @@ class TestLabelSets:
         assert "creator_or_studio" in LABELS_V2
         assert "content_subject" in LABELS_V2
         assert "asset_type" in LABELS_V2
-        assert "theme_or_genre" in LABELS_V2
+        assert "descriptor" in LABELS_V2
         assert "other" in LABELS_V2
         assert "unknown" in LABELS_V2
 
@@ -110,7 +110,7 @@ class TestConvertLabel:
         assert convert_label("person_or_group", "v1", "v2") == "creator_or_studio"
         assert convert_label("content", "v1", "v2") == "content_subject"
         assert convert_label("media_bucket", "v1", "v2") == "asset_type"
-        assert convert_label("descriptor", "v1", "v2") == "theme_or_genre"
+        assert convert_label("descriptor", "v1", "v2") == "descriptor"
         assert convert_label("other", "v1", "v2") == "other"
         assert convert_label("unknown", "v1", "v2") == "unknown"
 
@@ -118,7 +118,7 @@ class TestConvertLabel:
         assert convert_label("creator_or_studio", "v2", "v1") == "person_or_group"
         assert convert_label("content_subject", "v2", "v1") == "content"
         assert convert_label("asset_type", "v2", "v1") == "media_bucket"
-        assert convert_label("theme_or_genre", "v2", "v1") == "descriptor"
+        assert convert_label("descriptor", "v2", "v1") == "descriptor"
         assert convert_label("other", "v2", "v1") == "other"
         assert convert_label("unknown", "v2", "v1") == "unknown"
 
@@ -129,7 +129,7 @@ class TestConvertLabel:
         assert convert_label("subject", "legacy", "v2") == "content_subject"
         assert convert_label("media_format", "legacy", "v2") == "asset_type"
         assert convert_label("media_type", "legacy", "v2") == "asset_type"
-        assert convert_label("variant", "legacy", "v2") == "theme_or_genre"
+        assert convert_label("variant", "legacy", "v2") == "descriptor"
         assert convert_label("other", "legacy", "v2") == "other"
 
     def test_convert_legacy_to_v1(self):
@@ -252,7 +252,7 @@ class TestVariantTypeMapping:
         assert v1_map["PDF"] == "media_bucket"
 
         # Check v2 mappings
-        assert v2_map["winter"] == "theme_or_genre"
+        assert v2_map["winter"] == "descriptor"
         assert v2_map["VTT"] == "asset_type"
         assert v2_map["PDF"] == "asset_type"
 
@@ -284,7 +284,7 @@ class TestVariantTypeMapping:
 
         # Should default to variant type
         assert v1_map["winter"] == "descriptor"
-        assert v2_map["winter"] == "theme_or_genre"
+        assert v2_map["winter"] == "descriptor"
 
     def test_build_variant_mappings_unknown_type(self):
         """Test that unknown types are ignored."""

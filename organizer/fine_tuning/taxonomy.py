@@ -28,7 +28,7 @@ LABELS_V2 = {
     "creator_or_studio",  # Creator, publisher, or studio (formerly person_or_group)
     "content_subject",  # Specific subject matter or location (formerly content)
     "asset_type",  # Type of media/asset (formerly media_bucket)
-    "theme_or_genre",  # Theme, setting, genre, or variant (formerly descriptor)
+    "descriptor",  # Theme, setting, genre, or variant (formerly descriptor)
     "other",  # Organizational/administrative folders
     "unknown",  # Cannot be confidently classified
 }
@@ -55,7 +55,7 @@ V1_TO_V2: Dict[str, str] = {
     "person_or_group": "creator_or_studio",
     "content": "content_subject",
     "media_bucket": "asset_type",
-    "descriptor": "theme_or_genre",
+    "descriptor": "descriptor",
     "other": "other",
     "unknown": "unknown",
 }
@@ -65,7 +65,7 @@ V2_TO_V1: Dict[str, str] = {
     "creator_or_studio": "person_or_group",
     "content_subject": "content",
     "asset_type": "media_bucket",
-    "theme_or_genre": "descriptor",
+    "descriptor": "descriptor",
     "other": "other",
     "unknown": "unknown",
 }
@@ -78,7 +78,7 @@ LEGACY_TO_V2: Dict[str, str] = {
     "subject": "content_subject",
     "media_format": "asset_type",
     "media_type": "asset_type",
-    "variant": "theme_or_genre",
+    "variant": "descriptor",
     "other": "other",
 }
 
@@ -101,7 +101,7 @@ LEGACY_TO_V1: Dict[str, str] = {
 # Mapping from variant types (in variants.yaml) to taxonomy labels
 # Format: {variant_type: (v1_label, v2_label)}
 VARIANT_TYPE_TO_TAXONOMY: Dict[str, tuple[str, str]] = {
-    "variant": ("descriptor", "theme_or_genre"),
+    "variant": ("descriptor", "descriptor"),
     "media_type": ("media_bucket", "asset_type"),
     "media_format": ("media_bucket", "asset_type"),
 }
@@ -162,9 +162,7 @@ def get_labels(taxonomy: str) -> Set[str]:
     elif taxonomy == "legacy":
         return LABELS_LEGACY
     else:
-        raise ValueError(
-            f"Unknown taxonomy: {taxonomy}. Must be 'v1', 'v2', or 'legacy'"
-        )
+        raise ValueError(f"Unknown taxonomy: {taxonomy}. Must be 'v1', 'v2', or 'legacy'")
 
 
 def convert_label(label: str, from_taxonomy: str, to_taxonomy: str) -> str:
@@ -259,9 +257,7 @@ def normalize_labels(labels: Set[str], target_taxonomy: str = "v2") -> Set[str]:
 
     # If we detected a source taxonomy, convert
     if source_taxonomy and source_taxonomy != target_taxonomy:
-        return {
-            convert_label(label, source_taxonomy, target_taxonomy) for label in labels
-        }
+        return {convert_label(label, source_taxonomy, target_taxonomy) for label in labels}
 
     # Otherwise, return as-is
     return labels

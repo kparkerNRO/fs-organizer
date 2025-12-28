@@ -25,7 +25,7 @@ The heuristic classifier is a rule-based classifier that provides initial label 
 ### V2 Taxonomy (Recommended)
 - `creator_or_studio` - Creator, publisher, or studio
 - `content_subject` - Specific subject matter or location
-- `theme_or_genre` - Theme, setting, or genre
+- `descriptor` - Theme, setting, or genre
 - `asset_type` - Type of asset (maps, tokens, etc.)
 - `other` - Organizational folders
 - `unknown` - Cannot be classified
@@ -36,7 +36,7 @@ The classifier automatically maps variant types from `variants.yaml` to taxonomy
 
 | Variant Type | V1 Label | V2 Label |
 |--------------|----------|----------|
-| `variant` | `descriptor` | `theme_or_genre` |
+| `variant` | `descriptor` | `descriptor` |
 | `media_type` | `media_bucket` | `asset_type` |
 | `media_format` | `media_bucket` | `asset_type` |
 
@@ -44,7 +44,7 @@ The classifier automatically maps variant types from `variants.yaml` to taxonomy
 
 - **Seasons** (type: variant)
   - `winter`, `summer`, `spring`, `fall`, `autumn`
-  - → V1: `descriptor`, V2: `theme_or_genre`
+  - → V1: `descriptor`, V2: `descriptor`
 
 - **Media Types** (type: media_type)
   - `VTT`, `Print`, `Music`, `Tiles`, `Animated Scenes`
@@ -56,7 +56,7 @@ The classifier automatically maps variant types from `variants.yaml` to taxonomy
 
 - **Layout Variants** (type: variant)
   - `Gridded`, `Gridless`, `No Grid`, `Transparent`, `Interior`, `Exterior`
-  - → V1: `descriptor`, V2: `theme_or_genre`
+  - → V1: `descriptor`, V2: `descriptor`
 
 ## Classification Rules
 
@@ -64,7 +64,7 @@ The classifier automatically maps variant types from `variants.yaml` to taxonomy
 Matches folder names against known variants from `variants.yaml` using fuzzy text matching.
 
 **Example:**
-- Folder: "Winter" → `theme_or_genre` (v2)
+- Folder: "Winter" → `descriptor` (v2)
 - Folder: "VTT" → `asset_type` (v2)
 
 ### 2. Creator Detection (Confidence: 0.85-0.95)
@@ -92,7 +92,7 @@ Matches theme/genre keywords:
 - dungeon, forest, sci-fi, cyberpunk, horror, desert, urban, fantasy, medieval, etc.
 
 **Example:**
-- Folder: "Dungeon" → `theme_or_genre`
+- Folder: "Dungeon" → `descriptor`
 
 ### 5. Organizational Folders (Confidence: 0.80-0.95)
 Detects organizational folders:
@@ -177,7 +177,7 @@ When heuristic predictions are enabled, the CSV includes:
 **Example row:**
 ```csv
 name,depth,heuristic_label,heuristic_confidence,heuristic_reason,label
-Winter,3,theme_or_genre,0.900,"Matched variant 'winter' from config",
+Winter,3,descriptor,0.900,"Matched variant 'winter' from config",
 ```
 
 ## Confidence Score Interpretation

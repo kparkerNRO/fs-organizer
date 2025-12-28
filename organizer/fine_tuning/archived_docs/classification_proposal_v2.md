@@ -17,7 +17,7 @@ This section has been significantly revised to resolve contradictions identified
 - **`content_subject`**: **(Formerly `content`)** This class identifies the specific subject matter or named location of an asset. It answers the question, "What is this a map/token of?"
   - **Example**: `Abyssal Falls`, `The Sunken City`, `Forest Camp`
 
-- **`theme_or_genre`**: **(Formerly `descriptor`)** This class captures the setting, genre, or general theme of an asset. It's broader than `content_subject` and provides useful filtering context.
+- **`descriptor`**: **(Formerly `descriptor`)** This class captures the setting, genre, or general theme of an asset. It's broader than `content_subject` and provides useful filtering context.
   - **Example**: `Dungeon`, `Cyberpunk`, `Horror`, `Desert`
 
 - **`asset_type`**: **(Formerly `media_bucket`)** This class describes the *type* of asset in the folder, clarifying its intended use. This is more intuitive than "media bucket" and less ambiguous than using file extensions.
@@ -41,8 +41,8 @@ The original baseline was too simplistic. The new baseline will be a rule-based 
   - If folder name matches a known creator list -> `creator_or_studio`
 - **`asset_type` Rules**:
   - If folder name contains `maps`, `tokens`, `pack`, `assets`, `battlemap` -> `asset_type`
-- **`theme_or_genre` Rules**:
-  - If folder name contains `dungeon`, `forest`, `sci-fi`, `cyberpunk`, `horror` -> `theme_or_genre`
+- **`descriptor` Rules**:
+  - If folder name contains `dungeon`, `forest`, `sci-fi`, `cyberpunk`, `horror` -> `descriptor`
 - **`other` Rules**:
   - If folder name is a year (e.g., `2023`, `2024`) -> `other`
   - If folder name contains `rewards`, `tier` -> `other`

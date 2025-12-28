@@ -12,10 +12,10 @@ The primary goal is to take a chaotic directory structure and assign a meaningfu
 First, create a snapshot of your filesystem. This scans your target directory and stores its structure in a database.
 
 ```bash
-uv run python organizer.py gather /path/to/your/assets --storage outputs/run
+uv run python organizer.py gather /path/to/your/assets --storage data
 ```
 
-This creates a database at `outputs/run/index.db`.
+This creates a database at `data/index.db`.
 
 #### Step 2: Extract Features (1-5 min)
 
@@ -23,9 +23,8 @@ Next, process the snapshot to extract features (like folder depth, parent names,
 
 ```bash
 uv run python organizer.py model extract-features \
-  --index-db outputs/run/index.db \
-  --training-db outputs/training.db \
-  --snapshot-id 1
+  --index-db data/index.db \
+  --training-db data/training.db
 ```
 This creates a new database `outputs/training.db` populated with feature vectors for all your folders.
 
@@ -35,9 +34,8 @@ Generate a small, diverse set of samples for manual labeling. 200 is enough for 
 
 ```bash
 uv run python organizer.py model generate-samples \
-  --index-db outputs/run/index.db \
-  --output-csv baseline_eval.csv \
-  --snapshot-id 1 \
+  --index-db data/index.db \
+  --output-csv outputs/baseline_eval.csv \
   --sample-size 200
 ```
 
@@ -48,7 +46,7 @@ Open `baseline_eval.csv` in a spreadsheet editor. Your job is to fill in the `la
 Once you've labeled the samples, import them back into the training database:
 
 ```bash
-uv run python organizer.py training apply-classifications baseline_eval.csv --storage outputs/run
+uv run python organizer.py model apply-classifications outputs/baseline_eval.csv --storage data
 ```
 
 #### Step 5: Evaluate Baseline Model (1 min)
@@ -57,7 +55,7 @@ Now, run the pre-trained baseline model against your labeled samples to see how 
 
 ```bash
 uv run python organizer.py model predict \
-  --training-db outputs/training.db \
+  --training-db data/training.db \
   --use-baseline \
   --labeled-only \
   --output-file baseline_results.csv
@@ -77,7 +75,7 @@ Generate a larger set of samples for labeling. 800-1200 samples is a good target
 
 ```bash
 uv run python organizer.py model generate-samples \
-  --index-db outputs/run/index.db \
+  --index-db data/index.db \
   --output-csv training_samples.csv \
   --snapshot-id 1 \
   --sample-size 1000
@@ -124,7 +122,7 @@ This is the canonical set of labels used for classification.
 *   `content_subject`: The specific subject matter of the asset. Answers "What is this a map/token of?"
     *   *Example*: `The Sunken City`, `Forest Camp`, `Dragon's Lair`
 
-*   `theme_or_genre`: A broader category describing the setting, genre, or general theme.
+*   `descriptor`: A broader category describing the setting, genre, or general theme.
     *   *Example*: `Dungeon`, `Cyberpunk`, `Horror`, `Desert`
 
 *   `asset_type`: The type of asset and its intended use.

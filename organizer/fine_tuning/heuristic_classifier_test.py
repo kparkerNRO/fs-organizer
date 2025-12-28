@@ -1,12 +1,12 @@
 """Tests for heuristic classifier."""
 
 import pytest
+from utils.config import get_config
 
 from fine_tuning.heuristic_classifier import (
-    HeuristicClassifier,
     ClassificationResult,
+    HeuristicClassifier,
 )
-from utils.config import get_config
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ class TestHeuristicClassifier:
         # Check variant types are mapped correctly via classification
         winter_result = classifier._check_variants("winter")
         assert winter_result is not None
-        assert winter_result.label == "theme_or_genre"
+        assert winter_result.label == "descriptor"
 
         vtt_result = classifier._check_variants("VTT")
         assert vtt_result is not None
@@ -69,7 +69,7 @@ class TestHeuristicClassifier:
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Winter")
-        assert result.label == "theme_or_genre"
+        assert result.label == "descriptor"
         assert result.confidence >= 0.85
         assert "variant" in result.reason.lower()
 
@@ -125,7 +125,7 @@ class TestHeuristicClassifier:
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         result = classifier.classify("Dungeon")
-        assert result.label == "theme_or_genre"
+        assert result.label == "descriptor"
         assert result.confidence >= 0.7
 
     def test_classify_other_year(self, test_config):
@@ -196,9 +196,7 @@ class TestHeuristicClassifier:
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Folder under "Collaborator Content" parent
-        result = classifier.classify(
-            "Mystery Folder", parent_name="Collaborator Content"
-        )
+        result = classifier.classify("Mystery Folder", parent_name="Collaborator Content")
 
         # Should be classified as creator due to parent context
         # (if it matches other heuristics or has high confidence from parent)
@@ -220,7 +218,7 @@ class TestHeuristicClassifier:
         results = classifier.classify_batch(samples)
 
         assert len(results) == 4
-        assert results[0].label == "theme_or_genre"  # Winter
+        assert results[0].label == "descriptor"  # Winter
         assert results[1].label == "creator_or_studio"  # CzePeku
         assert results[2].label == "asset_type"  # Maps
         assert results[3].label == "other"  # 2023
