@@ -28,6 +28,47 @@ def should_ignore(name: str) -> bool:
     return name in config.should_ignore or name.startswith("._")
 
 
+def is_valid_zip(file_path: Path) -> tuple[bool, str | None]:
+    """
+    Check if a file is actually a valid ZIP archive.
+    Returns (is_valid, error_message).
+    """
+    try:
+        with open(file_path, "rb") as f:
+            magic = f.read(16)
+
+        # ZIP files start with PK
+        if magic[:2] == b"PK":
+            return True, None
+
+        # Check for common fake zip file types
+        if magic.startswith(b"<!DOCTYPE") or magic.startswith(b"<html"):
+            # Read a bit more to identify the type
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read(2000)
+                    if "Dropbox" in content and "File Deleted" in content:
+                        return False, "HTML file (Dropbox deleted/expired link)"
+                    elif "Dropbox" in content:
+                        return False, "HTML file (Dropbox error page)"
+                    elif "MyAirBridge" in content or "myairbridge" in content:
+                        return False, "HTML file (MyAirBridge download page)"
+                    else:
+                        return False, "HTML file"
+            except Exception:
+                return False, "HTML file"
+
+        # Empty file
+        if len(magic) == 0 or file_path.stat().st_size == 0:
+            return False, "Empty file (0 bytes)"
+
+        # Unknown format
+        return False, f"Not a ZIP file (starts with {magic[:4].hex()})"
+
+    except Exception as e:
+        return False, f"Error reading file: {e}"
+
+
 def count_zip_children(entries: List[str], target_dir: str = "") -> Tuple[int, int]:
     """
     Count direct children in a zip file at a specific directory level
@@ -380,6 +421,7 @@ def calculate_structure(session: Session, root_dir: Path):
         )
     )
 
+
 def _create_node(
     session: Session,
     *,
@@ -498,6 +540,12 @@ def ingest_filesystem(base_path: Path, storage_path: Path | None):
                     depth = len(rel_path.parts)
 
                     if f.lower().endswith(".zip"):
+                        # Validate that it's actually a ZIP file before processing
+                        is_valid, error_msg = is_valid_zip(file_path)
+                        if not is_valid:
+                            logger.warning(f"Skipping {file_path}: {error_msg}")
+                            continue
+
                         try:
                             process_zip(
                                 file_path,
@@ -582,6 +630,12 @@ def gather_folder_structure_and_store(base_path: Path, db_path: Path) -> None:
                 depth = len(file_path.parts) - len(base_path.parts)
 
                 if f.lower().endswith(".zip"):
+                    # Validate that it's actually a ZIP file before processing
+                    is_valid, error_msg = is_valid_zip(file_path)
+                    if not is_valid:
+                        logger.warning(f"Skipping {file_path}: {error_msg}")
+                        continue
+
                     try:
                         _process_zip_legacy(file_path, Path(root), f, depth, session)
                     except zipfile.BadZipFile as e:
