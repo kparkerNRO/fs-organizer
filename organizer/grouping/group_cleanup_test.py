@@ -2,7 +2,9 @@ import pytest
 from grouping.group_cleanup import GroupEntry, unify_category_spelling
 
 
-@pytest.mark.skip(reason="Pre-existing test failure - TypeError: 'GroupEntry' object is not iterable")
+@pytest.mark.skip(
+    reason="Pre-existing test failure - TypeError: 'GroupEntry' object is not iterable"
+)
 @pytest.mark.parametrize(
     "input_entries,expected_entries",
     [
