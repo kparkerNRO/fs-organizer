@@ -8,7 +8,6 @@ This module provides typer commands for all fine-tuning related operations:
 """
 
 import csv
-import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -34,6 +33,7 @@ from fine_tuning.run_classifier import (
     ZeroShotClassifier,
     create_model_run,
     evaluate_predictions,
+    get_newest_label_run_id,
     load_samples,
     save_predictions_to_db,
 )
@@ -44,6 +44,8 @@ from fine_tuning.sampling import (
     validate_label_values,
     write_sample_csv,
 )
+from fine_tuning.taxonomy import get_labels
+from utils.text_processing import char_trigrams, jaccard_similarity
 
 app = typer.Typer(
     name="fine_tuning",
@@ -79,13 +81,25 @@ def _get_highest_snapshot_id(index_db: Path) -> int:
 
 @app.command()
 def train(
-    data: Path = typer.Option(
+    training_db: Path = typer.Option(
         ...,
-        "--data",
+        "--training-db",
         "-d",
-        help="CSV file with headers: path,label",
+        help="Path to training.db database",
         exists=True,
         dir_okay=False,
+    ),
+    label_run_id: int | None = typer.Option(
+        None,
+        "--label-run-id",
+        "-l",
+        help="Label run ID to use for training labels (defaults to newest)",
+    ),
+    taxonomy: str = typer.Option(
+        "legacy",
+        "--taxonomy",
+        "-t",
+        help="Label taxonomy to use: v1, v2, or legacy",
     ),
     output_dir: Path = typer.Option(
         "./leaf_classifier_setfit",
@@ -158,7 +172,7 @@ def train(
         help="Disable triplet loss (use default SetFit loss)",
     ),
 ):
-    """Train a SetFit classifier on labeled folder data.
+    """Train a SetFit classifier on labeled folder data from the database.
 
     This command trains a SetFit model using:
     - Hard negative mining via character trigram similarity
@@ -166,24 +180,28 @@ def train(
     - Stratified train/test split
 
     Example:
-        uv run python -m organizer.fine_tuning.cli train \\
-            --data training_samples.csv \\
+        uv run python organizer/organizer.py model train \\
+            --training-db outputs/training.db \\
+            --taxonomy v2 \\
             --output-dir ./models/classifier_v1 \\
             --num-epochs 8 \\
             --batch-size 32
+
+        # Use specific label run with legacy taxonomy
+        uv run python organizer/organizer.py model train \\
+            --training-db outputs/training.db \\
+            --label-run-id 3 \\
+            --taxonomy legacy \\
+            --output-dir ./models/classifier_v1
     """
 
-    # Label definitions
-    LABELS = [
-        "primary_author",
-        "secondary_author",
-        "collection",
-        "subject",
-        "media_format",
-        "media_type",
-        "variant",
-        "other",
-    ]
+    # Validate taxonomy and get labels
+    if taxonomy not in ["v1", "v2", "legacy"]:
+        typer.echo(f"Error: Invalid taxonomy '{taxonomy}'", err=True)
+        typer.echo("Valid taxonomies: v1, v2, legacy")
+        raise typer.Exit(1)
+
+    LABELS = sorted(get_labels(taxonomy))
 
     # Validation
     if not no_triplet_loss and (batch_size % samples_per_label != 0):
@@ -194,61 +212,7 @@ def train(
         )
         raise typer.Exit(1)
 
-    # Helper functions
-    _SPLIT_RE = re.compile(r"[\\/._\- ]+")
-    _CAMEL_RE_1 = re.compile(r"([a-z0-9])([A-Z])")
-    _CAMEL_RE_2 = re.compile(r"([A-Z]+)([A-Z][a-z])")
-
-    def _tokenize_segment(seg: str) -> List[str]:
-        seg = seg.strip()
-        if not seg:
-            return []
-        seg = _CAMEL_RE_2.sub(r"\1 \2", seg)
-        seg = _CAMEL_RE_1.sub(r"\1 \2", seg)
-        toks = [t for t in _SPLIT_RE.split(seg) if t]
-        return [t.lower() for t in toks]
-
-    def split_path_parts(path: str) -> List[str]:
-        p = path.strip().replace("\\", "/")
-        return [s for s in p.split("/") if s.strip()]
-
-    def path_to_leaf_example(path: str) -> Tuple[str, str]:
-        parts = split_path_parts(path)
-        if not parts:
-            return "depth:0 parents: (root) || leaf: (empty)", ""
-
-        leaf = parts[-1]
-        parents = parts[:-1]
-
-        parent_toks: List[str] = []
-        for seg in parents:
-            parent_toks.extend(_tokenize_segment(seg))
-
-        leaf_toks = _tokenize_segment(leaf)
-
-        depth_tok = f"depth:{len(parts)}"
-        parents_text = " ".join(parent_toks) if parent_toks else "(root)"
-        leaf_text = " ".join(leaf_toks) if leaf_toks else "(empty)"
-
-        text = f"{depth_tok} parents: {parents_text} || leaf: {leaf_text}"
-        leaf_key = " ".join(leaf_toks)
-        return text, leaf_key
-
-    def char_trigrams(s: str) -> set:
-        s = re.sub(r"\s+", " ", s.strip())
-        if len(s) < 3:
-            return {s} if s else set()
-        return {s[i : i + 3] for i in range(len(s) - 2)}
-
-    def jaccard(a: set, b: set) -> float:
-        if not a and not b:
-            return 1.0
-        if not a or not b:
-            return 0.0
-        inter = len(a & b)
-        union = len(a | b)
-        return inter / union if union else 0.0
-
+    # Helper function for hard negative mining
     def augment_with_hard_negatives(
         train_texts: List[str],
         train_leaf_keys: List[str],
@@ -279,7 +243,7 @@ def train(
                 if y2 == y:
                     continue
                 for j in idxs:
-                    sim = jaccard(tri[i], tri[j])
+                    sim = jaccard_similarity(tri[i], tri[j])
                     if sim >= min_sim:
                         scored.append((sim, j))
 
@@ -298,48 +262,57 @@ def train(
 
         return extra_texts, extra_labels
 
-    # Read CSV
-    typer.echo(f"Reading training data from {data}...")
-    rows: List[Tuple[str, str]] = []
-    with open(data, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        if "path" not in reader.fieldnames or "label" not in reader.fieldnames:
-            typer.echo("Error: CSV must have headers: path,label", err=True)
+    # Connect to database and load samples
+    typer.echo(f"Loading training data from {training_db}...")
+    engine = create_engine(f"sqlite:///{training_db}")
+
+    with Session(engine) as session:
+        # Get newest label run if not specified
+        effective_label_run_id = label_run_id
+        if effective_label_run_id is None:
+            effective_label_run_id = get_newest_label_run_id(session)
+            if effective_label_run_id is None:
+                typer.echo("Error: No label runs found in database", err=True)
+                raise typer.Exit(1)
+            typer.echo(f"Using newest label run: {effective_label_run_id}")
+        else:
+            typer.echo(f"Using specified label run: {effective_label_run_id}")
+
+        # Load labeled samples only
+        samples = load_samples(
+            session, split=None, labeled_only=True, label_run_id=effective_label_run_id
+        )
+
+        if not samples:
+            typer.echo("Error: No labeled training samples found in database", err=True)
             raise typer.Exit(1)
 
-        for r in reader:
-            p = (r.get("path") or "").strip()
-            y = (r.get("label") or "").strip()
-            if p and y:
-                rows.append((p, y))
+        typer.echo(f"Loaded {len(samples)} labeled training samples")
 
-    if not rows:
-        typer.echo("Error: No training rows found in CSV", err=True)
-        raise typer.Exit(1)
+        # Validate labels
+        label2id: Dict[str, int] = {l: i for i, l in enumerate(LABELS)}
+        id2label: Dict[int, str] = {i: l for l, i in label2id.items()}
 
-    typer.echo(f"Loaded {len(rows)} training samples")
+        unknown = {s.label for s in samples if s.label and s.label not in label2id}
+        if unknown:
+            typer.echo(f"Error: Unknown labels found: {sorted(unknown)}", err=True)
+            typer.echo(f"Valid labels: {', '.join(LABELS)}")
+            raise typer.Exit(1)
 
-    # Validate labels
-    label2id: Dict[str, int] = {l: i for i, l in enumerate(LABELS)}
-    id2label: Dict[int, str] = {i: l for l, i in label2id.items()}
+        # Extract features from samples
+        typer.echo("Preparing training data...")
+        texts: List[str] = []
+        leaf_keys: List[str] = []
+        labels: List[int] = []
 
-    unknown = {y for _, y in rows if y not in label2id}
-    if unknown:
-        typer.echo(f"Error: Unknown labels found: {sorted(unknown)}", err=True)
-        typer.echo(f"Valid labels: {', '.join(LABELS)}")
-        raise typer.Exit(1)
-
-    # Convert to features
-    typer.echo("Extracting features...")
-    texts: List[str] = []
-    leaf_keys: List[str] = []
-    labels: List[int] = []
-
-    for p, y in rows:
-        t, lk = path_to_leaf_example(p)
-        texts.append(t)
-        leaf_keys.append(lk)
-        labels.append(label2id[y])
+        for sample in samples:
+            # Skip samples without labels (should not happen with labeled_only=True)
+            if not sample.label:
+                continue
+            texts.append(sample.text)
+            # Use normalized name as leaf key for hard negative mining
+            leaf_keys.append(sample.name_norm)
+            labels.append(label2id[sample.label])
 
     # Split
     typer.echo(f"Splitting data (test_size={test_size})...")
@@ -765,20 +738,20 @@ def zero_shot(
 
     Example:
         # Run zero-shot classifier on test set
-        uv run python organizer/organizer.py model zero-shot \\
-            --training-db outputs/training.db \\
-            --split test \\
-            --labeled-only \\
+        uv run python organizer/organizer.py model zero-shot \
+            --training-db data/training.db \
+            --split test \
+            --labeled-only \
             --save-predictions
 
         # Run on all samples with v2 taxonomy
-        uv run python organizer/organizer.py model zero-shot \\
-            --training-db outputs/training.db \\
+        uv run python organizer/organizer.py model zero-shot \
+            --training-db data/training.db \
             --taxonomy v2
 
         # Use specific label run
-        uv run python organizer/organizer.py model zero-shot \\
-            --training-db outputs/training.db \\
+        uv run python organizer/organizer.py model zero-shot \
+            --training-db data/training.db \
             --label-run-id 3
     """
     # Validation
@@ -1388,11 +1361,17 @@ def apply_classifications(
     training_session = get_or_create_training_session(training_db_path)
 
     try:
+        # Track label_run_id for each snapshot
+        label_run_by_snapshot: dict[int, int] = {}
+
         for snapshot_id in snapshot_ids:
             # Create label run
             label_run = LabelRun(snapshot_id=snapshot_id, label_source="manual")
             training_session.add(label_run)
             training_session.flush()
+
+            # Track the label_run_id for this snapshot
+            label_run_by_snapshot[snapshot_id] = label_run.id
 
             typer.echo(f"\nProcessing snapshot {snapshot_id}...")
 
@@ -1430,11 +1409,20 @@ def apply_classifications(
 
         labeled_count = 0
         for row in rows:
-            # Find the sample
+            # Get the label_run_id for this snapshot
+            label_run_id = label_run_by_snapshot.get(row["snapshot_id"])
+            if label_run_id is None:
+                typer.echo(
+                    f"⚠ Warning: No label run found for snapshot {row['snapshot_id']}",
+                    err=True,
+                )
+                continue
+
+            # Find the sample for this label run
             sample = (
                 training_session.query(TrainingSample)
                 .filter_by(
-                    snapshot_id=row["snapshot_id"],
+                    label_run_id=label_run_id,
                     node_id=row["node_id"],
                 )
                 .first()

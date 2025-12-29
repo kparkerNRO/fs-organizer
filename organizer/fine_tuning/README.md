@@ -78,7 +78,7 @@ uv run python organizer.py model generate-samples \
   --index-db data/index.db \
   --output-csv training_samples.csv \
   --snapshot-id 1 \
-  --sample-size 1000
+  --sample-size 1200
 ```
 
 ### Step 2: Label Your Data
@@ -87,15 +87,39 @@ This is the most time-consuming part. Open `training_samples.csv` and, just like
 
 ### Step 3: Train the Fine-Tuned Model
 
-Once your data is labeled, point the training command at your CSV file. This process can take 5-15 minutes.
+Once your data is labeled, train your model using the training database. This process can take 5-15 minutes.
 
 ```bash
 uv run python organizer.py model train \
-  --data training_samples.csv \
+  --training-db data/training.db \
+  --taxonomy legacy \
   --output-dir ./models/my_classifier \
   --num-epochs 8
 ```
-The command will automatically split your data, train the model, run an evaluation, and save the final model to the specified directory.
+
+**Taxonomy Options:**
+- `legacy`: Original labels (primary_author, secondary_author, collection, subject, media_format, media_type, variant, other)
+- `v1`: Simplified labels (person_or_group, content, media_bucket, descriptor, other, unknown)
+- `v2`: Refined labels (creator_or_studio, content_subject, asset_type, descriptor, other, unknown)
+
+If you have multiple label runs, you can specify which one to use:
+
+```bash
+uv run python organizer.py model train \
+  --training-db outputs/training.db \
+  --label-run-id 3 \
+  --taxonomy v2 \
+  --output-dir ./models/my_classifier \
+  --num-epochs 8
+```
+
+The command will automatically:
+- Use the newest label run (unless you specify `--label-run-id`)
+- Load labeled samples from the database
+- Use the specified taxonomy for label validation
+- Split your data into train/test sets
+- Train the model with hard negative mining
+- Run evaluation and save the final model to the specified directory
 
 ### Step 4: Apply Your New Model
 

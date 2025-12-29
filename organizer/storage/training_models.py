@@ -90,7 +90,7 @@ class TrainingSample(TrainingBase):
         Index("idx_training_sample_snapshot", "snapshot_id"),
         Index("idx_training_sample_node", "node_id"),
         Index(
-            "idx_training_sample_snapshot_node", "snapshot_id", "node_id", unique=True
+            "idx_training_sample_label_run_node", "label_run_id", "node_id", unique=True
         ),
         Index("idx_training_sample_split", "split"),
         Index("idx_training_sample_label", "label"),

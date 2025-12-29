@@ -93,21 +93,21 @@ class ZeroShotClassifier:
         """
         if taxonomy == "v1":
             return {
-                "person_or_group": "creator publisher studio author artist cartographer person group organization company",
-                "content": "location subject matter place setting scene environment theme topic content area",
-                "media_bucket": "media type file format asset type maps tokens music images videos audio handouts",
-                "descriptor": "variant style modifier season weather time lighting effect version alternate",
-                "other": "organizational administrative folder rewards tiers bonus instructions guide notes",
-                "unknown": "unclear ambiguous uncertain unclassifiable miscellaneous",
+                "person_or_group": "creator publisher studio artist cartographer author person group organization company collaboration presents by patreon team",
+                "content": "location place setting scene environment world region city town village dungeon tavern temple shop castle building encounter battleground proper noun",
+                "media_bucket": "asset pack tokens maps music illustrations portraits items cards stat blocks handouts paper minis tiles backgrounds adventure module media",
+                "descriptor": "variant version style theme genre setting gridded gridless vtt print day night seasonal weather interior exterior furnished unfurnished clean phased empty looping",
+                "other": "organizational administrative bonus rewards tiers instructions guide readme license archive polls wip work in progress",
+                "unknown": "unclear ambiguous uncertain unclassifiable miscellaneous general uncategorized",
             }
         elif taxonomy == "v2":
             return {
-                "creator_or_studio": "creator publisher studio author artist cartographer person group organization company",
-                "content_subject": "location subject matter place setting scene environment theme topic content specific area castle tavern forest",
-                "asset_type": "media type file format asset category maps tokens music images videos audio handouts illustrations",
-                "descriptor": "variant style modifier season weather time lighting day night gridded effect version alternate",
-                "other": "organizational administrative folder rewards tiers bonus instructions guide notes year month",
-                "unknown": "unclear ambiguous uncertain unclassifiable miscellaneous",
+                "creator_or_studio": "creator publisher studio artist cartographer author collaboration presents by patreon team",
+                "content_subject": "location place setting scene environment world region city town village dungeon tavern temple shop castle building encounter battleground proper noun",
+                "asset_type": "asset pack tokens maps music illustrations portraits items cards stat blocks handouts paper minis tiles backgrounds adventure module media",
+                "descriptor": "variant version style theme genre setting gridded gridless vtt print day night seasonal weather interior exterior furnished unfurnished clean phased empty looping",
+                "other": "organizational administrative bonus rewards tiers instructions guide readme license archive polls wip work in progress",
+                "unknown": "unclear ambiguous uncertain unclassifiable miscellaneous general uncategorized",
             }
         else:  # legacy
             return {
