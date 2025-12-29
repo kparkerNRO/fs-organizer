@@ -24,15 +24,12 @@ from storage.index_models import (
     IndexBase,
     Snapshot,
     Node,
-    NodeFeatures,
     Meta as IndexMeta,
     INDEX_SCHEMA_VERSION,
 )
 from storage.work_models import (
     WorkBase,
     Run,
-    StageState,
-    GroupIteration,
     Meta as WorkMeta,
     WORK_SCHEMA_VERSION,
 )

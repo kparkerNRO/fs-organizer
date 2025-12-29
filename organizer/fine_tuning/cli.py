@@ -7,7 +7,6 @@ This module provides typer commands for all fine-tuning related operations:
 - Managing datasets
 """
 
-import csv
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -15,7 +14,6 @@ from typing import Dict, List, Optional, Tuple
 
 import typer
 from datasets import Dataset
-from sentence_transformers.losses import BatchHardSoftMarginTripletLoss
 from setfit import SetFitModel, SetFitTrainer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import train_test_split
@@ -46,7 +44,7 @@ from fine_tuning.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from fine_tuning.taxonomy import convert_label, get_labels, is_valid_label
+from fine_tuning.taxonomy import get_labels
 
 app = typer.Typer(
     name="fine_tuning",
@@ -282,8 +280,8 @@ def train(
         typer.echo(f"Loaded {len(samples)} labeled training samples")
 
         # Validate labels
-        label2id: Dict[str, int] = {l: i for i, l in enumerate(LABELS)}
-        id2label: Dict[int, str] = {i: l for l, i in label2id.items()}
+        label2id: Dict[str, int] = {label: i for i, label in enumerate(LABELS)}
+        id2label: Dict[int, str] = {i: label for label, i in label2id.items()}
 
         unknown = {s.label for s in samples if s.label and s.label not in label2id}
         if unknown:

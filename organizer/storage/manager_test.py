@@ -172,7 +172,6 @@ class TestSchemaVersioning:
             session.close()
 
             # Now try to initialize StorageManager - should fail
-            index_path = Path(tmpdir) / "index.db"
             with pytest.raises(RuntimeError, match="work.db schema version mismatch"):
                 StorageManager(Path(tmpdir))
 

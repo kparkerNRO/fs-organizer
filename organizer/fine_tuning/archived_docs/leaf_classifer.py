@@ -208,8 +208,8 @@ def main():
             "When using triplet loss, batch_size must be a multiple of samples_per_label."
         )
 
-    label2id: Dict[str, int] = {l: i for i, l in enumerate(LABELS)}
-    id2label: Dict[int, str] = {i: l for l, i in label2id.items()}
+    label2id: Dict[str, int] = {label: i for i, label in enumerate(LABELS)}
+    id2label: Dict[int, str] = {i: label for label, i in label2id.items()}
 
     rows = read_csv_rows(args.data)
     if not rows:

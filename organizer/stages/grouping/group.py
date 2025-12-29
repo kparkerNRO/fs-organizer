@@ -13,11 +13,6 @@ from data_models.database import (
 )
 from stages.grouping.group_cleanup import refine_group
 from logging import getLogger
-from stages.grouping.nlp_grouping import (
-    cluster_with_custom_metric,
-    prepare_records,
-    compute_custom_distance_matrix,
-)
 from utils.config import Config, get_config
 from utils.filename_processing import clean_filename, split_view_type
 
@@ -46,7 +41,7 @@ def process_folders_to_groups(session, group_id: int | None):
 
     # Create the iteration record
     iteration = GroupingIteration(
-        id=iteration_id, description=f"Initial folder processing"
+        id=iteration_id, description="Initial folder processing"
     )
     session.add(iteration)
     session.commit()
