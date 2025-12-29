@@ -9,6 +9,7 @@ This module provides typer commands for all fine-tuning related operations:
 
 import csv
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -26,6 +27,7 @@ from storage.manager import StorageManager
 from storage.training_manager import get_or_create_training_session
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
+from utils.text_processing import char_trigrams, jaccard_similarity
 
 from fine_tuning.feature_extraction import extract_features as extract_fn
 from fine_tuning.run_classifier import (
@@ -44,8 +46,7 @@ from fine_tuning.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from fine_tuning.taxonomy import get_labels, convert_label, is_valid_label
-from utils.text_processing import char_trigrams, jaccard_similarity
+from fine_tuning.taxonomy import convert_label, get_labels, is_valid_label
 
 app = typer.Typer(
     name="fine_tuning",
@@ -366,7 +367,9 @@ def train(
     )
 
     if not no_triplet_loss:
-        typer.echo("Note: Custom triplet loss not supported in this SetFit version, using default loss")
+        typer.echo(
+            "Note: Custom triplet loss not supported in this SetFit version, using default loss"
+        )
 
     trainer = SetFitTrainer(**trainer_kwargs)
 
@@ -753,8 +756,6 @@ def zero_shot(
         # Get newest label run if not specified
         effective_label_run_id = label_run_id
         if effective_label_run_id is None:
-            from fine_tuning.run_classifier import get_newest_label_run_id
-
             effective_label_run_id = get_newest_label_run_id(session)
             if effective_label_run_id is None:
                 typer.echo("Error: No label runs found in database", err=True)
@@ -794,7 +795,6 @@ def zero_shot(
 
         # Save metrics to database
         typer.echo("\nSaving metrics to database...")
-        from datetime import datetime
 
         config = {
             "use_zero_shot": True,
@@ -835,7 +835,9 @@ def zero_shot(
         metrics_summary = ""
         if metrics:
             metrics_summary = f", Accuracy: {metrics.get('accuracy', 0):.4f}, Macro-F1: {metrics.get('macro_f1', 0):.4f}, Weighted-F1: {metrics.get('weighted_f1', 0):.4f}"
-        run.notes = f"Run type: zero-shot, Taxonomy: {taxonomy}, Split: {split or 'all'}{metrics_summary}"
+        run.notes = (
+            f"Run type: zero-shot, Taxonomy: {taxonomy}, Split: {split or 'all'}{metrics_summary}"
+        )
 
         session.commit()
 
