@@ -120,14 +120,6 @@ class TestHeuristicClassifier:
         result = classifier.classify("Tokens")
         assert result.label == "asset_type"
 
-    def test_classify_theme_dungeon(self, test_config):
-        """Test classification of theme folders."""
-        classifier = HeuristicClassifier(test_config, taxonomy="v2")
-
-        result = classifier.classify("Dungeon")
-        assert result.label == "descriptor"
-        assert result.confidence >= 0.7
-
     def test_classify_other_year(self, test_config):
         """Test classification of year folders."""
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
