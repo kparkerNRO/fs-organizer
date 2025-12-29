@@ -72,12 +72,8 @@ variants:
     type: media_type
     grouping: media
   PDF:
-    synonyms: []
-    type: media_type
-    grouping: media
-  PDFs:
-    synonyms: []
-    type: media_type
+    synonyms: ["PDFs"]
+    type: media_format
     grouping: media
   Print:
     synonyms: []
@@ -85,19 +81,15 @@ variants:
     grouping: media
   Jpeg:
     synonyms: []
-    type: media_type
+    type: media_format
     grouping: media
   PNGS:
-    synonyms: []
-    type: media_type
-    grouping: media
-  PNG:
-    synonyms: []
-    type: media_type
+    synonyms: ["PNG"]
+    type: media_format
     grouping: media
   WEBP:
     synonyms: []
-    type: media_type
+    type: media_format
     grouping: media
   Gridded:
     synonyms: []
@@ -135,10 +127,6 @@ variants:
     synonyms: []
     type: media_type
     grouping: media
-  Variants:
-    synonyms: []
-    type: variant
-    grouping: other
   Key & Design Notes:
     synonyms: []
     type: media_type

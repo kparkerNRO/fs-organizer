@@ -1,25 +1,28 @@
 from pathlib import Path
-from typing import List, Any
+from typing import List, Any, Optional
 from sqlalchemy import (
     TypeDecorator,
     create_engine,
-    Column,
-    Integer,
     String,
     Float,
     ForeignKey,
-    Boolean,
     DateTime,
     inspect,
     text,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    sessionmaker,
+    relationship,
+    Mapped,
+    mapped_column,
+)
 import json
 from datetime import datetime
 
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 class JsonList(TypeDecorator):
@@ -61,31 +64,24 @@ class Folder(Base):
 
     __tablename__ = "folders"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    folder_name = Column(String, nullable=False, index=True)
-    folder_path = Column(String, nullable=False, index=True)
-    parent_path = Column(String, index=True)
-    depth = Column(Integer)
-    cleaned_name = Column(String)
-    categories = Column(JsonList)
-    subject = Column(String)
-    variants = Column(JsonList)
-    classification = Column(String)
-    file_source = Column(String)
-    num_folder_children = Column(Integer, default=0)
-    num_file_children = Column(Integer, default=0)
-    cleaned_path = Column(String)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    folder_name: Mapped[str] = mapped_column(String, index=True)
+    folder_path: Mapped[str] = mapped_column(String, index=True)
+    parent_path: Mapped[Optional[str]] = mapped_column(String, index=True)
+    depth: Mapped[Optional[int]]
+    cleaned_name: Mapped[Optional[str]]
+    categories: Mapped[Optional[List]] = mapped_column(JsonList, default=[])
+    subject: Mapped[Optional[str]]
+    variants: Mapped[Optional[List]] = mapped_column(JsonList, default=[])
+    classification: Mapped[Optional[str]] = mapped_column(default="UNKNOWN")
+    file_source: Mapped[Optional[str]]
+    num_folder_children: Mapped[int] = mapped_column(default=0)
+    num_file_children: Mapped[int] = mapped_column(default=0)
+    cleaned_path: Mapped[Optional[str]]
 
     # # Relationships
-    # partial_categories = relationship("PartialNameCategory", back_populates="folder")
-    # group_entries = relationship("GroupCategoryEntry", back_populates="folder")
-
-    def __init__(self, **kwargs):
-        # Set default values for collections
-        kwargs["variants"] = kwargs.get("variants", [])
-        kwargs["classification"] = kwargs.get("classification", "UNKNOWN")
-        kwargs["categories"] = kwargs.get("categories", [])
-        super(Folder, self).__init__(**kwargs)
+    # partial_categories: Mapped[List["PartialNameCategory"]] = relationship(back_populates="folder")
+    # group_entries: Mapped[List["GroupCategoryEntry"]] = relationship(back_populates="folder")
 
     def __repr__(self):
         return f"Folder(id={self.id}, name={self.folder_name})"
@@ -96,19 +92,19 @@ class File(Base):
 
     __tablename__ = "files"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    file_name = Column(String, nullable=False, index=True)
-    file_path = Column(String, nullable=False, index=True)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
-    depth = Column(Integer)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    file_name: Mapped[str] = mapped_column(String, index=True)
+    file_path: Mapped[str] = mapped_column(String, index=True)
+    folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("folders.id"))
+    depth: Mapped[Optional[int]]
 
-    parent_folder_id = Column(Integer, ForeignKey("folders.id"), nullable=True)
-    groups = Column(JsonList)
-    original_path = Column(String, nullable=True)
-    new_path = Column(String, nullable=True)
+    parent_folder_id: Mapped[Optional[int]] = mapped_column(ForeignKey("folders.id"))
+    groups: Mapped[Optional[List]] = mapped_column(JsonList)
+    original_path: Mapped[Optional[str]]
+    new_path: Mapped[Optional[str]]
 
     # Relationship
-    # folder = relationship("Folder")
+    # folder: Mapped[Optional["Folder"]] = relationship()
 
     def __repr__(self):
         return f"File(id={self.id}, name={self.file_name})"
@@ -123,9 +119,9 @@ class FolderStructure(Base):
     """
 
     __tablename__ = "folder_structure"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    structure_type = Column(String, nullable=False)
-    structure = Column(JsonDict, nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    structure_type: Mapped[str] = mapped_column(String)
+    structure: Mapped[dict] = mapped_column(JsonDict)
 
 
 class PartialNameCategory(Base):
@@ -137,17 +133,17 @@ class PartialNameCategory(Base):
 
     __tablename__ = "partial_name_categories"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, index=True)
-    original_name = Column(String)
-    classification = Column(String)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False, index=True)
-    hidden = Column(Boolean, default=False)
-    confidence = Column(Float, default=1.0)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[Optional[str]] = mapped_column(String, index=True)
+    original_name: Mapped[Optional[str]]
+    classification: Mapped[Optional[str]]
+    folder_id: Mapped[int] = mapped_column(ForeignKey("folders.id"), index=True)
+    hidden: Mapped[bool] = mapped_column(default=False)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
 
     # Relationships
-    # folder = relationship("Folder", back_populates="partial_categories")
-    # group_entries = relationship("GroupCategoryEntry", back_populates="partial_category")
+    # folder: Mapped["Folder"] = relationship(back_populates="partial_categories")
+    # group_entries: Mapped[List["GroupCategoryEntry"]] = relationship(back_populates="partial_category")
 
     def __repr__(self):
         return f"PartialNameCategory(id={self.id}, name={self.name})"
@@ -158,13 +154,13 @@ class GroupingIteration(Base):
 
     __tablename__ = "grouping_iterations"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    description = Column(String)
-    parameters = Column(JsonDict)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    description: Mapped[Optional[str]]
+    parameters: Mapped[Optional[dict]] = mapped_column(JsonDict)
 
     # Relationships
-    # groups = relationship("GroupCategory", back_populates="iteration")
+    # groups: Mapped[List["GroupCategory"]] = relationship(back_populates="iteration")
 
     def __repr__(self):
         return f"GroupingIteration(id={self.id}, timestamp={self.timestamp})"
@@ -175,17 +171,19 @@ class GroupCategory(Base):
 
     __tablename__ = "group_categories"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, index=True)
-    count = Column(Integer)
-    group_confidence = Column(Float)
-    iteration_id = Column(Integer, ForeignKey("grouping_iterations.id"), index=True)
-    needs_review = Column(Boolean, default=False)
-    reviewed = Column(Boolean, default=False)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[Optional[str]] = mapped_column(String, index=True)
+    count: Mapped[Optional[int]]
+    group_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    iteration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grouping_iterations.id"), index=True
+    )
+    needs_review: Mapped[bool] = mapped_column(default=False)
+    reviewed: Mapped[bool] = mapped_column(default=False)
 
     # Relationships
-    # iteration = relationship("GroupingIteration", back_populates="groups")
-    # entries = relationship("GroupCategoryEntry", back_populates="group")
+    # iteration: Mapped[Optional["GroupingIteration"]] = relationship(back_populates="groups")
+    # entries: Mapped[List["GroupCategoryEntry"]] = relationship(back_populates="group")
 
     def __repr__(self):
         return f"GroupCategory(id={self.id}, name={self.name})"
@@ -196,25 +194,29 @@ class GroupCategoryEntry(Base):
 
     __tablename__ = "group_category_entries"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    folder_id = Column(Integer, ForeignKey("folders.id"), nullable=False, index=True)
-    partial_category_id = Column(
-        Integer, ForeignKey("partial_name_categories.id"), index=True
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    folder_id: Mapped[int] = mapped_column(ForeignKey("folders.id"), index=True)
+    partial_category_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("partial_name_categories.id"), index=True
     )
-    group_id = Column(Integer, ForeignKey("group_categories.id"), index=True)
-    iteration_id = Column(Integer, ForeignKey("grouping_iterations.id"), index=True)
-    cluster_id = Column(Integer)
-    processed_name = Column(String)
-    pre_processed_name = Column(String)
-    derived_names = Column(JsonList)
-    path = Column(String, nullable=True)
-    confidence = Column(Float, default=0)
-    processed = Column(Boolean, default=False)
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("group_categories.id"), index=True
+    )
+    iteration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("grouping_iterations.id"), index=True
+    )
+    cluster_id: Mapped[Optional[int]]
+    processed_name: Mapped[Optional[str]]
+    pre_processed_name: Mapped[Optional[str]]
+    derived_names: Mapped[Optional[List]] = mapped_column(JsonList)
+    path: Mapped[Optional[str]]
+    confidence: Mapped[float] = mapped_column(Float, default=0)
+    processed: Mapped[bool] = mapped_column(default=False)
 
     # Relationships
-    # folder = relationship("Folder", back_populates="group_entries")
-    # partial_category = relationship("PartialNameCategory", back_populates="group_entries")
-    # group = relationship("GroupCategory", back_populates="entries")
+    # folder: Mapped["Folder"] = relationship(back_populates="group_entries")
+    # partial_category: Mapped[Optional["PartialNameCategory"]] = relationship(back_populates="group_entries")
+    # group: Mapped[Optional["GroupCategory"]] = relationship(back_populates="entries")
 
     def __repr__(self):
         return f"GroupCategoryEntry(id={self.id}, original={self.pre_processed_name}, processed={self.processed_name})"
@@ -276,7 +278,7 @@ def setup_gather(db_path: Path):
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
-    reset_tables(db_path, [GroupCategoryEntry])
+    reset_tables(db_path, [GroupingIteration, GroupCategoryEntry])
 
 
 def setup_folder_categories(db_path: Path):

@@ -14,7 +14,7 @@ Features
         Cateegorization feature
             [x] Identify category "types" - grouping, variant, media type, etc
             [x] De-duplicate and spelling correct categories
-            [] generate folder heirarchies based on categories
+            [x] generate folder heirarchies based on categories
             [x] Flag possible matches for manual review/low confidence
 
     Frontend

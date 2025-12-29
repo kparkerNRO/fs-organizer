@@ -29,9 +29,10 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import func
 from fastapi.middleware.cors import CORSMiddleware
 
-from pipeline.gather import gather_folder_structure_and_store
-from grouping.group import group_folders
-from pipeline.categorize import calculate_folder_structure
+from stages.gather import gather_folder_structure_and_store
+from stages.grouping.group import group_folders
+from stages.categorize import calculate_folder_structure
+from stages.folder_reconstruction import get_folder_heirarchy
 
 app = FastAPI()
 app.add_middleware(

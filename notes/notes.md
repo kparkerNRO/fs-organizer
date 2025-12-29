@@ -20,3 +20,13 @@ Stages and data structures
                 path-component
                     path name
          
+# Classification
+Possible classifications for folder paths:
+* primary author
+* secondary author
+* collection- representing a grouping of similar places or locations
+* subject - representing a specific area eg: desert castle, or "fortune teller"
+* media format - vtt, jpg, etc
+* media type - audio, map, tokens, music, tiles, adventure
+* variant - day, night, snow, sand, etc
+* other - "collaboration", ???
