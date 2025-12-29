@@ -90,47 +90,80 @@ class IngestionJob:
 
 
 class StorageManager:
-    """Manager for index.db and work.db databases.
+    """Manager for index.db, work.db, and training.db databases.
 
-    This class provides the main interface for creating snapshots, managing runs,
-    and querying data across both databases.
+    This class is the single source of truth for all database configuration and
+    provides session management for up to three SQLite databases:
+
+    - index.db: Immutable filesystem snapshots (always initialized)
+    - work.db: Pipeline processing state (initialized by default, disable with initialize_work=False)
+    - training.db: ML training samples and model runs (opt-in with initialize_training=True)
+
+    Usage:
+        # For pipeline operations (index + work)
+        manager = StorageManager(path)
+
+        # For fine-tuning operations (index + training)
+        manager = StorageManager(path, initialize_work=False, initialize_training=True)
+
+        # For read-only operations (index only)
+        manager = StorageManager(path, initialize_work=False)
 
     IMPORTANT:
     - Snapshots in index.db are immutable after creation
     - Cross-database references (snapshot_id, node_id) are validated at application level
     - Schema versions are checked on initialization
+    - Session methods will raise RuntimeError if the database was not initialized
     """
 
     def __init__(
         self,
         database_path: Path | None,
+        initialize_work: bool = True,
+        initialize_training: bool = False,
     ):
         """Initialize storage manager.
 
         Args:
             database_path: Path to output path where the databases live (defaults to data/)
+            initialize_work: Whether to initialize work.db (default: True)
+            initialize_training: Whether to initialize training.db (default: False)
         """
         if database_path is None:
             database_path = DATA_DIR
         self.index_path = database_path / "index.db"
         self.work_path = database_path / "work.db"
+        self.training_path = database_path / "training.db"
+
+        # Store initialization flags
+        self._initialize_work = initialize_work
+        self._initialize_training = initialize_training
 
         # Store engines for later use
         self.index_engine = None
         self.work_engine = None
+        self.training_engine = None
 
         # Ensure databases exist and schemas are initialized
         self._ensure_databases()
 
     def _ensure_databases(self):
-        """Ensure database files exist and schemas are initialized."""
+        """Ensure database files exist and schemas are initialized based on flags."""
         # Create parent directories
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        self.work_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Initialize schemas
+        # Always initialize index database
         self._init_index_schema()
-        self._init_work_schema()
+
+        # Conditionally initialize work database
+        if self._initialize_work:
+            self.work_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_work_schema()
+
+        # Conditionally initialize training database
+        if self._initialize_training:
+            self.training_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_training_schema()
 
     def _init_index_schema(self):
         """Initialize index.db schema and verify version.
@@ -236,6 +269,62 @@ class StorageManager:
         finally:
             session.close()
 
+    def _init_training_schema(self):
+        """Initialize training.db schema and verify version.
+
+        PRAGMAs are set via event listener (see module-level decorator)
+        to ensure they apply to ALL connections, not just the first one.
+        """
+        from storage.training_models import TrainingBase
+
+        # Handle in-memory database path
+        if str(self.training_path) == ":memory:":
+            db_url = "sqlite:///:memory:"
+        else:
+            db_url = f"sqlite:///{self.training_path}"
+
+        self.training_engine = create_engine(db_url)
+
+        # Create tables if needed
+        TrainingBase.metadata.create_all(self.training_engine)
+
+        # Check/set schema version
+        self._verify_training_schema_version(self.training_engine)
+
+    def _verify_training_schema_version(self, engine):
+        """Verify training.db schema version matches code version.
+
+        Args:
+            engine: SQLAlchemy engine for training.db
+
+        Raises:
+            RuntimeError: If schema version mismatch detected
+        """
+        from storage.training_models import Meta, TRAINING_SCHEMA_VERSION
+
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        try:
+            # Get stored version
+            meta = session.query(Meta).filter_by(key="schema_version").first()
+
+            if meta is None:
+                # New database, set version
+                meta = Meta(key="schema_version", value=TRAINING_SCHEMA_VERSION)
+                session.add(meta)
+                session.commit()
+            else:
+                # Existing database, check version
+                if meta.value != TRAINING_SCHEMA_VERSION:
+                    raise RuntimeError(
+                        f"training.db schema version mismatch: "
+                        f"database is v{meta.value}, code expects v{TRAINING_SCHEMA_VERSION}. "
+                        f"Delete {self.training_path} to recreate (WARNING: loses all training data)."
+                    )
+        finally:
+            session.close()
+
     @contextmanager
     def get_index_session(self, read_only: bool = False) -> Iterator[Session]:
         """Get SQLAlchemy session for index.db.
@@ -273,7 +362,16 @@ class StorageManager:
 
         Returns:
             Context manager yielding a SQLAlchemy session
+
+        Raises:
+            RuntimeError: If work database was not initialized
         """
+        if not self._initialize_work or self.work_engine is None:
+            raise RuntimeError(
+                "Work database not initialized. "
+                "Create StorageManager with initialize_work=True"
+            )
+
         Session = sessionmaker(bind=self.work_engine)
         session = Session()
         try:
@@ -484,3 +582,44 @@ class StorageManager:
             "Node features are computed during ingest_filesystem(). "
             "This method should not be called externally."
         )
+
+    # Training database support
+
+    def get_training_db_path(self) -> Path:
+        """Get path to training.db database.
+
+        Returns:
+            Path to training.db file
+
+        Raises:
+            RuntimeError: If training database was not initialized
+        """
+        if not self._initialize_training:
+            raise RuntimeError(
+                "Training database not initialized. "
+                "Create StorageManager with initialize_training=True"
+            )
+        return self.training_path
+
+    @contextmanager
+    def get_training_session(self) -> Iterator[Session]:
+        """Get SQLAlchemy session for training.db.
+
+        Returns:
+            Context manager yielding a SQLAlchemy session
+
+        Raises:
+            RuntimeError: If training database was not initialized
+        """
+        if not self._initialize_training or self.training_engine is None:
+            raise RuntimeError(
+                "Training database not initialized. "
+                "Create StorageManager with initialize_training=True"
+            )
+
+        Session = sessionmaker(bind=self.training_engine)
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()

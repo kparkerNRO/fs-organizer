@@ -420,7 +420,7 @@ def train(
 ) -> None:
     """Train a SetFit classifier using settings from a config file."""
     settings = _load_settings(FullTrainingSettings, config_path)
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
     train_ds, test_ds, id2label = _prepare_training_data(settings, manager)
 
     typer.echo(f"Initializing model: {settings.model}")
@@ -472,7 +472,7 @@ def predict(
 ) -> None:
     """Run classifier predictions using settings from a config file."""
     settings = _load_settings(FullPredictSettings, config_path)
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
 
     if not settings.use_baseline and not settings.model_path:
         typer.echo(
@@ -509,7 +509,7 @@ def zero_shot(
 ) -> None:
     """Run zero-shot classification using settings from a config file."""
     settings = _load_settings(FullZeroShotSettings, config_path)
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
     typer.echo(f"Initializing zero-shot classifier (taxonomy={settings.taxonomy})...")
     classifier = ZeroShotClassifier(taxonomy=settings.taxonomy)
     _predict_and_evaluate(settings, classifier, manager)
@@ -530,7 +530,7 @@ def extract_features(
 ) -> None:
     """Extract features from index.db and populate training.db."""
     settings = _load_settings(FeatureExtractionSettings, config_path)
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
 
     snapshot_id = settings.snapshot_id
     if snapshot_id is None:
@@ -581,7 +581,7 @@ def generate_samples(
 ) -> None:
     """Generate training samples CSV for manual labeling."""
     settings = _load_settings(GenerateSamplesSettings, config_path)
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
 
     snapshot_id = settings.snapshot_id
     if snapshot_id is None:
@@ -707,7 +707,7 @@ def apply_classifications(
         typer.echo("✓ Validation complete (--validate-only mode)")
         return
 
-    manager = StorageManager(settings.storage_path)
+    manager = StorageManager(settings.storage_path, initialize_training=True)
     try:
         with manager.get_training_session() as training_session:
             snapshot_ids = sorted(list(set(row["snapshot_id"] for row in rows)))

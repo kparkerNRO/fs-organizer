@@ -44,7 +44,7 @@ class TrainSettings(BaseModel):
         description="Batch size for training (must be multiple of samples_per_label)",
     )
     num_epochs: int = Field(
-        6,
+        4,
         description="Number of training epochs",
     )
     learning_rate: float = Field(
