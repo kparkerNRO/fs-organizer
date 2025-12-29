@@ -7,7 +7,7 @@ consistency across the codebase.
 
 from __future__ import annotations
 
-from typing import Dict, Set
+from typing import Dict, Set, Any
 
 # =============================================================================
 # Taxonomy Definitions
@@ -108,7 +108,7 @@ VARIANT_TYPE_TO_TAXONOMY: Dict[str, tuple[str, str]] = {
 
 
 def build_variant_mappings(
-    variants: Dict[str, Dict[str, any]],
+    variants: Dict[str, Dict[str, Any]],
 ) -> tuple[Dict[str, str], Dict[str, str]]:
     """Build mappings from config variants to taxonomy labels.
 

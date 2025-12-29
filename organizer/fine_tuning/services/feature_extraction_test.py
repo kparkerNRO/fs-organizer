@@ -11,7 +11,7 @@ from storage.training_models import TrainingBase, TrainingSample, LabelRun
 from utils.config import Config
 from utils.text_processing import has_matching_token
 
-from fine_tuning.feature_extraction import (
+from fine_tuning.services.feature_extraction import (
     extract_features,
 )
 

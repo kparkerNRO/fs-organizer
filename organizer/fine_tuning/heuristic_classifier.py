@@ -128,6 +128,22 @@ class HeuristicClassifier:
         """
         self.config = config
         self.taxonomy = taxonomy
+        self._variant_map = self._build_variant_map()
+        self._variant_names = list(self._variant_map.keys())
+
+    def _build_variant_map(self) -> Dict[str, str]:
+        """Build a map from variant names to taxonomy labels."""
+        variant_map: Dict[str, str] = {}
+        taxonomy_index = 0 if self.taxonomy == "v1" else 1
+
+        for variant_name, variant_info in self.config.variants.items():
+            variant_type = variant_info.get("type", "variant")
+            if variant_type in VARIANT_TYPE_TO_TAXONOMY:
+                label = VARIANT_TYPE_TO_TAXONOMY[variant_type][taxonomy_index]
+                variant_map[variant_name] = label
+                for synonym in variant_info.get("synonyms", []):
+                    variant_map[synonym] = label
+        return variant_map
 
     def classify(
         self,
@@ -164,7 +180,6 @@ class HeuristicClassifier:
             results.append(result)
 
         # 2. Check for "other" category first (some have very high confidence like years)
-        # This needs to be before creator check to avoid "Patreon Rewards" being classified as creator
         result = self._check_other(name)
         if result:
             results.append(result)
@@ -188,7 +203,6 @@ class HeuristicClassifier:
 
         # Return highest confidence result, or unknown
         if results:
-            # Sort by confidence (descending)
             results.sort(key=lambda r: r.confidence, reverse=True)
             return results[0]
 
@@ -201,54 +215,20 @@ class HeuristicClassifier:
         )
 
     def _get_label(self, base_label: str) -> str:
-        """Get the label for the current taxonomy.
-
-        Args:
-            base_label: Base label in V1 taxonomy
-
-        Returns:
-            Label converted to current taxonomy
-        """
-        if self.taxonomy == "v1":
-            return base_label
-        else:
-            # Convert from v1 to target taxonomy
-            return convert_label(base_label, "v1", self.taxonomy)
+        """Get the label for the current taxonomy."""
+        return convert_label(base_label, "v1", self.taxonomy)
 
     def _check_variants(self, name: str) -> Optional[ClassificationResult]:
         """Check if name matches known variants from config."""
-        # Build variant-to-label mapping using taxonomy
-        variant_map: Dict[str, str] = {}
-        taxonomy_index = 0 if self.taxonomy == "v1" else 1
-
-        for variant_name, variant_info in self.config.variants.items():
-            variant_type = variant_info.get("type", "variant")
-
-            if variant_type in VARIANT_TYPE_TO_TAXONOMY:
-                # Get the label from taxonomy mapping (v1 or v2 based on index)
-                label = VARIANT_TYPE_TO_TAXONOMY[variant_type][taxonomy_index]
-                variant_map[variant_name] = label
-
-                # Also map synonyms
-                for synonym in variant_info.get("synonyms", []):
-                    variant_map[synonym] = label
-
-        # Get all variant names
-        variant_names = list(variant_map.keys())
-
-        # Check for close text match
-        matches = get_close_text_matches(name, variant_names, threshold=0.85)
-
+        matches = get_close_text_matches(name, self._variant_names, threshold=0.85)
         if matches:
-            # Use the first match to get the label
-            label = variant_map[matches[0]]
+            label = self._variant_map[matches[0]]
             return ClassificationResult(
                 label=label,
-                confidence=0.9,  # High confidence for config-based matches
+                confidence=0.9,
                 reason=f"Matched variant '{matches[0]}' from config",
                 matches=matches,
             )
-
         return None
 
     def _check_creators(
