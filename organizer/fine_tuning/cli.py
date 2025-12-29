@@ -967,7 +967,7 @@ def select_data(
             --max-depth 6 \\
             seed_samples.csv
     """
-    typer.echo(f"Selecting training samples from snapshot...")
+    typer.echo("Selecting training samples from snapshot...")
 
     # Initialize storage manager
     storage = StorageManager(storage_path)
@@ -1188,7 +1188,7 @@ def apply_classifications(
                 typer.echo(f"  ✓ Created {num_samples} training samples")
 
         # Apply labels from CSV
-        typer.echo(f"\nApplying labels from CSV...")
+        typer.echo("\nApplying labels from CSV...")
 
         labeled_count = 0
         for row in rows:

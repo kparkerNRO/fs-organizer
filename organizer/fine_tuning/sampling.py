@@ -451,7 +451,7 @@ def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
             invalid_labels[label].append(i)
 
     if invalid_labels:
-        error_msg = [f"Found invalid labels in CSV:"]
+        error_msg = ["Found invalid labels in CSV:"]
         for label, row_nums in sorted(invalid_labels.items()):
             if len(row_nums) <= 5:
                 rows_str = ", ".join(map(str, row_nums))
@@ -459,5 +459,5 @@ def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
                 rows_str = ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
             error_msg.append(f"  '{label}': rows {rows_str}")
 
-        error_msg.append(f"\nValid labels are: {', '.join(sorted(VALID_LABELS))}")
+        error_msg.append(f"\nValid labels are: {', '.join(sorted(valid_labels))}")
         raise ValueError("\n".join(error_msg))

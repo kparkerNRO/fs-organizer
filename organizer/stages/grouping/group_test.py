@@ -11,8 +11,6 @@ from data_models.database import (
     GroupCategory,
     GroupCategoryEntry,
     GroupingIteration,
-    setup_folder_categories,
-    setup_group,
 )
 from stages.grouping.group import (
     process_folders_to_groups,
@@ -20,7 +18,7 @@ from stages.grouping.group import (
     group_folders,
 )
 from stages.grouping.helpers import common_token_grouping
-from utils.config import KNOWN_VARIANT_TOKENS, get_minimal_config
+from utils.config import get_minimal_config
 
 
 # Helper function to create an in-memory DB for testing

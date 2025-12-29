@@ -13,7 +13,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import (
     DeclarativeBase,
     sessionmaker,
-    relationship,
     Mapped,
     mapped_column,
 )
