@@ -12,15 +12,16 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from fine_tuning.heuristic_classifier import HeuristicClassifier
 from storage.index_models import Node
 from storage.manager import NodeKind
-from utils.text_processing import char_trigrams, jaccard_similarity
 from utils.config import get_config
-from fine_tuning.heuristic_classifier import HeuristicClassifier
+from utils.text_processing import char_trigrams, jaccard_similarity
 
 
 # CSV column schema for training samples
@@ -43,6 +44,44 @@ CSV_COLUMNS = [
 ]
 
 
+def _build_node_maps(
+    nodes: list[Node],
+) -> tuple[dict[int, Node], dict[int, list[Node]]]:
+    nodes_by_id: dict[int, Node] = {node.node_id: node for node in nodes}
+    children_by_parent: dict[int, list[Node]] = defaultdict(list)
+
+    for node in nodes:
+        if node.parent_node_id is not None:
+            children_by_parent[node.parent_node_id].append(node)
+
+    return nodes_by_id, children_by_parent
+
+
+def _compute_descendant_extensions(
+    nodes_by_id: dict[int, Node],
+    children_by_parent: dict[int, list[Node]],
+) -> dict[int, set[str]]:
+    depth_groups: dict[int, list[int]] = defaultdict(list)
+    max_depth = 0
+
+    for node_id, node in nodes_by_id.items():
+        depth_groups[int(node.depth)].append(node_id)
+        max_depth = max(max_depth, int(node.depth))
+
+    descendant_exts: dict[int, set[str]] = {node_id: set() for node_id in nodes_by_id}
+
+    for depth in range(max_depth, -1, -1):
+        for node_id in depth_groups.get(depth, []):
+            node = nodes_by_id[node_id]
+            if node.kind == NodeKind.FILE.value and node.ext:
+                descendant_exts[node_id].add(node.ext.lstrip(".").lower())
+
+            for child in children_by_parent.get(node_id, []):
+                descendant_exts[node_id].update(descendant_exts[child.node_id])
+
+    return descendant_exts
+
+
 def select_training_samples(
     session: Session,
     snapshot_id: int,
@@ -50,7 +89,7 @@ def select_training_samples(
     min_depth: int,
     max_depth: int,
     diversity_factor: float,
-) -> List[Node]:
+) -> list[Node]:
     """Select diverse training samples from a snapshot using stratified sampling.
 
     Strategy:
@@ -87,13 +126,13 @@ def select_training_samples(
         return []
 
     # Group by depth
-    by_depth: Dict[int, List[Node]] = defaultdict(list)
+    by_depth: dict[int, list[Node]] = defaultdict(list)
     for node in nodes:
         by_depth[node.depth].append(node)
 
     # Calculate samples per depth proportionally
     total_nodes = len(nodes)
-    samples_per_depth: Dict[int, int] = {}
+    samples_per_depth: dict[int, int] = {}
     min_per_depth = 10  # Minimum samples per depth if available
 
     for depth, depth_nodes in by_depth.items():
@@ -113,7 +152,7 @@ def select_training_samples(
             )
 
     # Sample from each depth with diversity clustering
-    selected: List[Node] = []
+    selected: list[Node] = []
 
     for depth, num_samples in samples_per_depth.items():
         depth_nodes = by_depth[depth]
@@ -131,7 +170,7 @@ def select_training_samples(
     return selected[:sample_size]
 
 
-def _cluster_by_similarity(nodes: List[Node], threshold: float) -> List[List[Node]]:
+def _cluster_by_similarity(nodes: list[Node], threshold: float) -> list[list[Node]]:
     """Cluster nodes by name similarity using character trigrams.
 
     Args:
@@ -147,7 +186,7 @@ def _cluster_by_similarity(nodes: List[Node], threshold: float) -> List[List[Nod
     # Precompute trigrams
     trigrams = [char_trigrams(node.name.lower()) for node in nodes]
 
-    clusters: List[List[int]] = []  # indices into nodes list
+    clusters: list[list[int]] = []  # indices into nodes list
     assigned = set()
 
     for i, node in enumerate(nodes):
@@ -175,8 +214,8 @@ def _cluster_by_similarity(nodes: List[Node], threshold: float) -> List[List[Nod
 
 
 def _sample_from_clusters(
-    clusters: List[List[Node]], num_samples: int, diversity_factor: float
-) -> List[Node]:
+    clusters: list[list[Node]], num_samples: int, diversity_factor: float
+) -> list[Node]:
     """Sample nodes from clusters to maximize diversity.
 
     Args:
@@ -191,12 +230,12 @@ def _sample_from_clusters(
         return []
 
     # Sort clusters by size (descending)
-    sorted_clusters: List[Node] = sorted(clusters, key=len, reverse=True)
+    sorted_clusters: list[list[Node]] = sorted(clusters, key=len, reverse=True)
 
     # Calculate max samples per cluster
     max_per_cluster = max(1, int(3 * (1 - diversity_factor) + 1))
 
-    selected: List[Node] = []
+    selected: list[Node] = []
     cluster_idx = 0
 
     while len(selected) < num_samples and cluster_idx < len(sorted_clusters):
@@ -224,7 +263,7 @@ def _sample_from_clusters(
 
 def write_sample_csv(
     output_path: Path,
-    nodes: List[Node],
+    nodes: list[Node],
     session: Session,
     snapshot_id: int,
     child_sample_size: int = 5,
@@ -253,23 +292,8 @@ def write_sample_csv(
         .all()
     )
 
-    # Build node lookup and parent->children map
-    nodes_by_id: Dict[int, Node] = {n.node_id: n for n in all_nodes}
-    children_by_parent: Dict[int, List[Node]] = defaultdict(list)
-
-    for node in all_nodes:
-        if node.parent_node_id is not None:
-            children_by_parent[node.parent_node_id].append(node)
-
-    # Collect file extensions recursively
-    def collect_extensions(node_id: int) -> Set[str]:
-        """Recursively collect file extensions from descendants."""
-        exts = set()
-        for child in children_by_parent.get(node_id, []):
-            if child.kind == NodeKind.FILE.value and child.ext:
-                exts.add(child.ext.lstrip(".").lower())
-            exts.update(collect_extensions(child.node_id))
-        return exts
+    nodes_by_id, children_by_parent = _build_node_maps(all_nodes)
+    descendant_exts = _compute_descendant_extensions(nodes_by_id, children_by_parent)
 
     # Initialize heuristic classifier if requested
     heuristic_classifier = None
@@ -321,7 +345,7 @@ def write_sample_csv(
                 sibling_names = []
 
             # Get file extensions
-            extensions = sorted(collect_extensions(node.node_id))[:ext_sample_size]
+            extensions = sorted(descendant_exts.get(node.node_id, set()))[:ext_sample_size]
 
             # Run heuristic classifier if enabled
             heuristic_label = ""
@@ -363,7 +387,7 @@ def write_sample_csv(
             )
 
 
-def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
+def read_classification_csv(csv_path: Path) -> list[dict[str, Any]]:
     """Read and parse classification CSV file.
 
     Args:
@@ -375,7 +399,7 @@ def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
     Raises:
         ValueError: If CSV format is invalid
     """
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
 
     with csv_path.open("r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -423,7 +447,7 @@ def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
-def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
+def validate_all_labels_present(rows: list[dict[str, Any]]) -> None:
     """Validate that all rows have non-empty labels.
 
     Args:
@@ -449,7 +473,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         )
 
 
-def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
+def validate_label_values(rows: list[dict[str, Any]], valid_labels) -> None:
     """Validate that all labels are valid.
 
     Args:

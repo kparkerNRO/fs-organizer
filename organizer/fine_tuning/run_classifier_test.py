@@ -12,13 +12,13 @@ from storage.training_models import (
     TrainingSample,
 )
 
-from fine_tuning.run_classifier import (
+from fine_tuning.prediction_db import (
     create_model_run,
-    evaluate_predictions,
     get_newest_label_run_id,
     load_samples,
     save_predictions_to_db,
 )
+from fine_tuning.run_classifier import evaluate_predictions
 from fine_tuning.taxonomy import (
     LABELS_LEGACY,
     LABELS_V1,
