@@ -1,7 +1,7 @@
-"""Storage manager for index.db and work.db databases.
+"""Storage manager for index.db, work.db, and training.db databases.
 
-This module provides the main interface for interacting with the two-database
-architecture: filesystem index (index.db) and intermediary work (work.db).
+This module provides the main interface for interacting with the databases:
+filesystem index (index.db), intermediary work (work.db), and training (training.db).
 Configuration data is managed separately via YAML files loaded in-memory
 (see organizer/utils/config.py).
 """
@@ -90,7 +90,7 @@ class IngestionJob:
 
 
 class StorageManager:
-    """Manager for index.db and work.db databases.
+    """Manager for index.db, work.db, and training.db databases.
 
     This class provides the main interface for creating snapshots, managing runs,
     and querying data across both databases.
@@ -104,6 +104,13 @@ class StorageManager:
     def __init__(
         self,
         database_path: Path | None,
+        *,
+        index_path: Path | None = None,
+        work_path: Path | None = None,
+        training_path: Path | None = None,
+        enable_index: bool = True,
+        enable_work: bool = True,
+        enable_training: bool = True,
     ):
         """Initialize storage manager.
 
@@ -112,12 +119,21 @@ class StorageManager:
         """
         if database_path is None:
             database_path = DATA_DIR
-        self.index_path = database_path / "index.db"
-        self.work_path = database_path / "work.db"
+
+        self._index_enabled = enable_index
+        self._work_enabled = enable_work
+        self._training_enabled = enable_training
+
+        self.index_path = index_path or (database_path / "index.db" if enable_index else None)
+        self.work_path = work_path or (database_path / "work.db" if enable_work else None)
+        self.training_path = training_path or (
+            database_path / "training.db" if enable_training else None
+        )
 
         # Store engines for later use
         self.index_engine = None
         self.work_engine = None
+        self.training_engine = None
 
         # Ensure databases exist and schemas are initialized
         self._ensure_databases()
@@ -125,12 +141,13 @@ class StorageManager:
     def _ensure_databases(self):
         """Ensure database files exist and schemas are initialized."""
         # Create parent directories
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        self.work_path.parent.mkdir(parents=True, exist_ok=True)
+        if self._index_enabled and self.index_path:
+            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_index_schema()
 
-        # Initialize schemas
-        self._init_index_schema()
-        self._init_work_schema()
+        if self._work_enabled and self.work_path:
+            self.work_path.parent.mkdir(parents=True, exist_ok=True)
+            self._init_work_schema()
 
     def _init_index_schema(self):
         """Initialize index.db schema and verify version.
@@ -236,6 +253,48 @@ class StorageManager:
         finally:
             session.close()
 
+    def ensure_training_db(self) -> None:
+        """Ensure training.db exists and has expected schema version."""
+        if not self._training_enabled or not self.training_path:
+            raise RuntimeError("Training database is disabled for this storage manager.")
+
+        if self.training_engine is None:
+            self._init_training_schema()
+
+    def _init_training_schema(self) -> None:
+        """Initialize training.db schema and verify version."""
+        from storage.training_models import TRAINING_SCHEMA_VERSION, Meta, TrainingBase
+
+        if str(self.training_path) == ":memory:":
+            db_url = "sqlite:///:memory:"
+        else:
+            self.training_path.parent.mkdir(parents=True, exist_ok=True)
+            db_url = f"sqlite:///{self.training_path}"
+
+        self.training_engine = create_engine(db_url)
+        TrainingBase.metadata.create_all(self.training_engine)
+        self._verify_training_schema_version(self.training_engine, TRAINING_SCHEMA_VERSION, Meta)
+
+    @staticmethod
+    def _verify_training_schema_version(engine, expected_version, meta_model) -> None:
+        from sqlalchemy.orm import Session
+
+        session = Session(engine)
+        try:
+            meta = session.query(meta_model).filter_by(key="schema_version").first()
+            if meta is None:
+                meta = meta_model(key="schema_version", value=expected_version)
+                session.add(meta)
+                session.commit()
+            elif meta.value != expected_version:
+                raise RuntimeError(
+                    "training.db schema version mismatch: "
+                    f"database is v{meta.value}, code expects v{expected_version}. "
+                    "Delete the training.db file to recreate."
+                )
+        finally:
+            session.close()
+
     @contextmanager
     def get_index_session(self, read_only: bool = False) -> Iterator[Session]:
         """Get SQLAlchemy session for index.db.
@@ -250,6 +309,9 @@ class StorageManager:
         IMPORTANT: Snapshots are immutable. When querying snapshots, prefer
         read_only=True to prevent accidental modifications via session.
         """
+        if not self._index_enabled or self.index_engine is None:
+            raise RuntimeError("Index database is disabled for this storage manager.")
+
         Session = sessionmaker(bind=self.index_engine)
         session = Session()
 
@@ -274,7 +336,22 @@ class StorageManager:
         Returns:
             Context manager yielding a SQLAlchemy session
         """
+        if not self._work_enabled or self.work_engine is None:
+            raise RuntimeError("Work database is disabled for this storage manager.")
+
         Session = sessionmaker(bind=self.work_engine)
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    @contextmanager
+    def get_training_session(self) -> Iterator[Session]:
+        """Get SQLAlchemy session for training.db."""
+        self.ensure_training_db()
+
+        Session = sessionmaker(bind=self.training_engine)
         session = Session()
         try:
             yield session
