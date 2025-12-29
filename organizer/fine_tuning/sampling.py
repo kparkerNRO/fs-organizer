@@ -345,7 +345,9 @@ def write_sample_csv(
                 sibling_names = []
 
             # Get file extensions
-            extensions = sorted(descendant_exts.get(node.node_id, set()))[:ext_sample_size]
+            extensions = sorted(descendant_exts.get(node.node_id, set()))[
+                :ext_sample_size
+            ]
 
             # Run heuristic classifier if enabled
             heuristic_label = ""

@@ -37,7 +37,9 @@ def load_samples(
 
 def get_newest_label_run_id(session: Session) -> Optional[int]:
     """Get the newest (highest ID) label run from the database."""
-    return session.execute(select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)).scalar()
+    return session.execute(
+        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
+    ).scalar()
 
 
 def save_predictions_to_db(
@@ -91,7 +93,9 @@ def create_model_run(
         run_type = "baseline" if use_baseline else "evaluation"
 
     base_model_id = f"setfit-{run_type}-{taxonomy}"
-    model_version = f"baseline-{taxonomy}" if use_baseline else model_path or f"unknown-{taxonomy}"
+    model_version = (
+        f"baseline-{taxonomy}" if use_baseline else model_path or f"unknown-{taxonomy}"
+    )
 
     run = ModelRun(
         started_at=datetime.now().isoformat(),

@@ -108,9 +108,7 @@ def record_model_run(
         )
 
     split_label = config.get("split") or "all"
-    run.notes = (
-        f"Run type: {run_type}, Taxonomy: {taxonomy}, Split: {split_label}{metrics_summary}"
-    )
+    run.notes = f"Run type: {run_type}, Taxonomy: {taxonomy}, Split: {split_label}{metrics_summary}"
 
     session.commit()
     return run

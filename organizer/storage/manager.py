@@ -124,8 +124,12 @@ class StorageManager:
         self._work_enabled = enable_work
         self._training_enabled = enable_training
 
-        self.index_path = index_path or (database_path / "index.db" if enable_index else None)
-        self.work_path = work_path or (database_path / "work.db" if enable_work else None)
+        self.index_path = index_path or (
+            database_path / "index.db" if enable_index else None
+        )
+        self.work_path = work_path or (
+            database_path / "work.db" if enable_work else None
+        )
         self.training_path = training_path or (
             database_path / "training.db" if enable_training else None
         )
@@ -256,7 +260,9 @@ class StorageManager:
     def ensure_training_db(self) -> None:
         """Ensure training.db exists and has expected schema version."""
         if not self._training_enabled or not self.training_path:
-            raise RuntimeError("Training database is disabled for this storage manager.")
+            raise RuntimeError(
+                "Training database is disabled for this storage manager."
+            )
 
         if self.training_engine is None:
             self._init_training_schema()
@@ -273,7 +279,9 @@ class StorageManager:
 
         self.training_engine = create_engine(db_url)
         TrainingBase.metadata.create_all(self.training_engine)
-        self._verify_training_schema_version(self.training_engine, TRAINING_SCHEMA_VERSION, Meta)
+        self._verify_training_schema_version(
+            self.training_engine, TRAINING_SCHEMA_VERSION, Meta
+        )
 
     @staticmethod
     def _verify_training_schema_version(engine, expected_version, meta_model) -> None:
