@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from storage.index_models import Snapshot
 from storage.manager import StorageManager
 from storage.training_manager import get_or_create_training_session
+from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
 
 from fine_tuning.feature_extraction import extract_features as extract_fn
@@ -492,6 +493,12 @@ def predict(
         "-o",
         help="Save predictions to CSV file",
     ),
+    label_run_id: int | None = typer.Option(
+        None,
+        "--label-run-id",
+        "-l",
+        help="Label run ID to use for training labels (defaults to newest)",
+    ),
 ):
     """Run classifier predictions on training dataset.
 
@@ -513,6 +520,12 @@ def predict(
             --training-db outputs/training.db \\
             --use-baseline \\
             --taxonomy v2
+
+        # Use specific label run
+        uv run python -m organizer.fine_tuning.cli predict \\
+            --training-db outputs/training.db \\
+            --model-path ./models/classifier_v1 \\
+            --label-run-id 3
     """
     # Validation
     if not use_baseline and not model_path:
@@ -535,7 +548,22 @@ def predict(
     engine = create_engine(f"sqlite:///{training_db}")
 
     with Session(engine) as session:
-        samples = load_samples(session, split=split, labeled_only=labeled_only)
+        # Get newest label run if not specified
+        effective_label_run_id = label_run_id
+        if effective_label_run_id is None:
+            from fine_tuning.run_classifier import get_newest_label_run_id
+
+            effective_label_run_id = get_newest_label_run_id(session)
+            if effective_label_run_id is None:
+                typer.echo("Error: No label runs found in database", err=True)
+                raise typer.Exit(1)
+            typer.echo(f"Using newest label run: {effective_label_run_id}")
+        else:
+            typer.echo(f"Using specified label run: {effective_label_run_id}")
+
+        samples = load_samples(
+            session, split=split, labeled_only=labeled_only, label_run_id=effective_label_run_id
+        )
         typer.echo(f"✓ Loaded {len(samples)} samples")
 
         if not samples:
@@ -748,11 +776,17 @@ def extract_features(
         with Session(index_engine) as index_session:
             typer.echo("Processing nodes...")
 
+            # Create label run
+            label_run = LabelRun(snapshot_id=snapshot_id, label_source="unlabeled")
+            training_session.add(label_run)
+            training_session.flush()
+
             num_samples = extract_fn(
                 index_session=index_session,
                 training_session=training_session,
                 snapshot_id=snapshot_id,
                 config=config,
+                label_run=label_run,
                 batch_size=batch_size,
             )
 
@@ -1117,6 +1151,11 @@ def apply_classifications(
 
     try:
         for snapshot_id in snapshot_ids:
+            # Create label run
+            label_run = LabelRun(snapshot_id=snapshot_id, label_source="manual")
+            training_session.add(label_run)
+            training_session.flush()
+
             typer.echo(f"\nProcessing snapshot {snapshot_id}...")
 
             with storage.get_index_session(read_only=True) as index_session:
@@ -1144,12 +1183,12 @@ def apply_classifications(
                     training_session=training_session,
                     snapshot_id=snapshot_id,
                     config=get_config(),
+                    label_run=label_run,
                 )
                 typer.echo(f"  ✓ Created {num_samples} training samples")
 
         # Apply labels from CSV
         typer.echo(f"\nApplying labels from CSV...")
-        from storage.training_models import TrainingSample
 
         labeled_count = 0
         for row in rows:
@@ -1174,7 +1213,6 @@ def apply_classifications(
             # Update label
             sample.label = row["label"]
             sample.label_confidence = 1.0
-            sample.labeler = labeler
             if split:
                 sample.split = split
 

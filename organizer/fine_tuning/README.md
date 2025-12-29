@@ -58,7 +58,7 @@ uv run python organizer.py model predict \
   --training-db data/training.db \
   --use-baseline \
   --labeled-only \
-  --output-file baseline_results.csv
+  --output-file outputs/baseline_results.csv
 ```
 
 The console will output a detailed performance report, including the key **Macro F1-Score**.

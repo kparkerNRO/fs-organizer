@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from storage.training_models import (
+    LabelRun,
     ModelRun,
     SamplePrediction,
     TrainingBase,
@@ -15,6 +16,7 @@ from storage.training_models import (
 from fine_tuning.run_classifier import (
     create_model_run,
     evaluate_predictions,
+    get_newest_label_run_id,
     load_samples,
     save_predictions_to_db,
 )
@@ -38,10 +40,16 @@ def db_session():
 @pytest.fixture
 def sample_training_samples(db_session):
     """Create sample training data"""
+    # Create a label run first
+    label_run = LabelRun(snapshot_id=1, label_source="test")
+    db_session.add(label_run)
+    db_session.flush()
+
     samples = [
         TrainingSample(
             snapshot_id=1,
             node_id=1,
+            label_run_id=label_run.id,
             name_raw="John Doe",
             name_norm="john doe",
             kind="directory",
@@ -54,6 +62,7 @@ def sample_training_samples(db_session):
         TrainingSample(
             snapshot_id=1,
             node_id=2,
+            label_run_id=label_run.id,
             name_raw="Character Art",
             name_norm="character art",
             kind="directory",
@@ -66,6 +75,7 @@ def sample_training_samples(db_session):
         TrainingSample(
             snapshot_id=1,
             node_id=3,
+            label_run_id=label_run.id,
             name_raw="High Resolution",
             name_norm="high resolution",
             kind="directory",
@@ -78,6 +88,7 @@ def sample_training_samples(db_session):
         TrainingSample(
             snapshot_id=1,
             node_id=4,
+            label_run_id=label_run.id,
             name_raw="Unlabeled Folder",
             name_norm="unlabeled folder",
             kind="directory",
@@ -124,6 +135,58 @@ class TestLoadSamples:
         samples = load_samples(db_session, split="train", labeled_only=True)
         assert len(samples) == 2
         assert all(s.split == "train" and s.label is not None for s in samples)
+
+    def test_load_by_label_run_id(self, db_session, sample_training_samples):
+        """Load samples filtered by label_run_id"""
+        # Create a second label run with different samples
+        label_run2 = LabelRun(snapshot_id=2, label_source="test2")
+        db_session.add(label_run2)
+        db_session.flush()
+
+        sample2 = TrainingSample(
+            snapshot_id=2,
+            node_id=5,
+            label_run_id=label_run2.id,
+            name_raw="Test",
+            name_norm="test",
+            kind="directory",
+            file_source="filesystem",
+            depth=1,
+            text="test",
+            label="other",
+            split="train",
+        )
+        db_session.add(sample2)
+        db_session.commit()
+
+        # Load samples from first label run
+        label_run1_id = sample_training_samples[0].label_run_id
+        samples1 = load_samples(db_session, label_run_id=label_run1_id)
+        assert len(samples1) == 4
+        assert all(s.label_run_id == label_run1_id for s in samples1)
+
+        # Load samples from second label run
+        samples2 = load_samples(db_session, label_run_id=label_run2.id)
+        assert len(samples2) == 1
+        assert samples2[0].label_run_id == label_run2.id
+
+    def test_get_newest_label_run_id(self, db_session, sample_training_samples):
+        """Test getting the newest label run ID"""
+        # Create additional label runs
+        label_run2 = LabelRun(snapshot_id=2, label_source="test2")
+        label_run3 = LabelRun(snapshot_id=3, label_source="test3")
+        db_session.add_all([label_run2, label_run3])
+        db_session.commit()
+
+        # Get newest label run ID
+        newest_id = get_newest_label_run_id(db_session)
+        assert newest_id == label_run3.id
+
+    def test_get_newest_label_run_id_empty(self, db_session):
+        """Test getting newest label run ID when none exist"""
+        # Don't use sample_training_samples fixture
+        newest_id = get_newest_label_run_id(db_session)
+        assert newest_id is None
 
 
 class TestEvaluatePredictions:
@@ -230,10 +293,16 @@ class TestSavePredictionsToDb:
 
     def test_save_predictions_without_labels(self, db_session):
         """Test saving predictions for unlabeled samples"""
+        # Create a label run first
+        label_run = LabelRun(snapshot_id=1, label_source="test")
+        db_session.add(label_run)
+        db_session.flush()
+
         # Create unlabeled sample
         sample = TrainingSample(
             snapshot_id=1,
             node_id=100,
+            label_run_id=label_run.id,
             name_raw="Unlabeled",
             name_norm="unlabeled",
             kind="directory",

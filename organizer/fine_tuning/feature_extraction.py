@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
 from storage.manager import NodeKind
-from storage.training_models import TrainingSample
+from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.filename_processing import clean_filename
 from utils.text_processing import has_matching_token, normalize_string, tokenize_string
@@ -23,6 +23,7 @@ def extract_features(
     training_session: Session,
     snapshot_id: int,
     config: Config,
+    label_run:LabelRun,
     *,
     child_cap: int = 20,
     sibling_cap: int = 20,
@@ -92,8 +93,10 @@ def extract_features(
     total_saved = 0
 
     for nid, n in nodes_by_id.items():
-        # Only process dirs for now
-        if n.kind != NodeKind.DIR:
+        # Only process dirs and ZIP files (treated as containers)
+        # ZIP files are identified by having .zip extension (not just file_source='zip_file')
+        is_zip_file = n.ext and n.ext.lower() in ('.zip', 'zip')
+        if n.kind != NodeKind.DIR and not is_zip_file:
             continue
 
         name_norm = processed_name_by_id[nid]
@@ -171,6 +174,7 @@ def extract_features(
             child_has_format_cue=child_has_format_cue,
             sibling_has_variant_hint=sibling_has_variant_hint,
             text=text,
+            label_run=label_run
         )
 
         samples.append(sample)

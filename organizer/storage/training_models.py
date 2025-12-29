@@ -22,6 +22,81 @@ class TrainingBase(DeclarativeBase):
     pass
 
 
+class LabelRun(TrainingBase):
+    """
+    Represents the run of the data labeling
+    """
+    __tablename__ = "label_run"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int]
+    label_source: Mapped[str]
+
+    samples: Mapped[List["TrainingSample"]] = relationship(
+        back_populates="label_run", cascade="all, delete-orphan"
+    )
+
+
+class TrainingSample(TrainingBase):
+    """Feature vector extracted from a node for model training.
+
+    Stores extracted features for classifier fine-tuning.
+    """
+
+    __tablename__ = "training_sample"
+
+    sample_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int]  # FK to index.db (cross-database)
+    node_id: Mapped[int]  # FK to index.db (cross-database)
+    label_run_id: Mapped[int] = mapped_column(ForeignKey("label_run.id"))
+
+    # Raw context
+    name_raw: Mapped[str] = mapped_column(String)
+    name_norm: Mapped[str] = mapped_column(String)
+    parent_name_norm: Mapped[Optional[str]]
+    grandparent_name_norm: Mapped[Optional[str]]
+    kind: Mapped[str] = mapped_column(String)  # 'file' | 'dir'
+    file_source: Mapped[str] = mapped_column(String)
+    depth: Mapped[int] = mapped_column(Integer)
+
+    # Structural context (JSON arrays)
+    child_names_topk_json: Mapped[Optional[str]] = mapped_column(String)
+    sibling_names_topk_json: Mapped[Optional[str]] = mapped_column(String)
+    descendant_file_exts_topk_json: Mapped[Optional[str]] = mapped_column(String)
+
+    # Cue flags
+    has_collab_cue: Mapped[bool] = mapped_column(Boolean, default=False)
+    looks_like_format: Mapped[bool] = mapped_column(Boolean, default=False)
+    child_has_media_type_cue: Mapped[bool] = mapped_column(Boolean, default=False)
+    child_has_variant_hint: Mapped[bool] = mapped_column(Boolean, default=False)
+    child_has_format_cue: Mapped[bool] = mapped_column(Boolean, default=False)
+    sibling_has_variant_hint: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Model input text
+    text: Mapped[str] = mapped_column(String)
+
+    # Label (optional, can be added later)
+    label: Mapped[Optional[str]]  # 'primary_author' | 'secondary_author' | etc.
+    label_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    # labeler: Mapped[Optional[str]]  # 'manual' | 'llm' | 'structural'
+
+    # Data split
+    split: Mapped[Optional[str]]  # 'train' | 'validation' | 'test'
+
+    label_run: Mapped[LabelRun] = relationship(back_populates="samples")
+
+
+    __table_args__ = (
+        Index("idx_training_sample_snapshot", "snapshot_id"),
+        Index("idx_training_sample_node", "node_id"),
+        Index(
+            "idx_training_sample_snapshot_node", "snapshot_id", "node_id", unique=True
+        ),
+        Index("idx_training_sample_split", "split"),
+        Index("idx_training_sample_label", "label"),
+    )
+
+
 class ModelRun(TrainingBase):
     """Model run for training or evaluation.
 
@@ -86,61 +161,6 @@ class ModelRun(TrainingBase):
         back_populates="run", cascade="all, delete-orphan"
     )
 
-
-class TrainingSample(TrainingBase):
-    """Feature vector extracted from a node for model training.
-
-    Stores extracted features for classifier fine-tuning.
-    """
-
-    __tablename__ = "training_sample"
-
-    sample_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    snapshot_id: Mapped[int]  # FK to index.db (cross-database)
-    node_id: Mapped[int]  # FK to index.db (cross-database)
-
-    # Raw context
-    name_raw: Mapped[str] = mapped_column(String)
-    name_norm: Mapped[str] = mapped_column(String)
-    parent_name_norm: Mapped[Optional[str]]
-    grandparent_name_norm: Mapped[Optional[str]]
-    kind: Mapped[str] = mapped_column(String)  # 'file' | 'dir'
-    file_source: Mapped[str] = mapped_column(String)
-    depth: Mapped[int] = mapped_column(Integer)
-
-    # Structural context (JSON arrays)
-    child_names_topk_json: Mapped[Optional[str]] = mapped_column(String)
-    sibling_names_topk_json: Mapped[Optional[str]] = mapped_column(String)
-    descendant_file_exts_topk_json: Mapped[Optional[str]] = mapped_column(String)
-
-    # Cue flags
-    has_collab_cue: Mapped[bool] = mapped_column(Boolean, default=False)
-    looks_like_format: Mapped[bool] = mapped_column(Boolean, default=False)
-    child_has_media_type_cue: Mapped[bool] = mapped_column(Boolean, default=False)
-    child_has_variant_hint: Mapped[bool] = mapped_column(Boolean, default=False)
-    child_has_format_cue: Mapped[bool] = mapped_column(Boolean, default=False)
-    sibling_has_variant_hint: Mapped[bool] = mapped_column(Boolean, default=False)
-
-    # Model input text
-    text: Mapped[str] = mapped_column(String)
-
-    # Label (optional, can be added later)
-    label: Mapped[Optional[str]]  # 'primary_author' | 'secondary_author' | etc.
-    label_confidence: Mapped[Optional[float]] = mapped_column(Float)
-    labeler: Mapped[Optional[str]]  # 'manual' | 'llm' | 'structural'
-
-    # Data split
-    split: Mapped[Optional[str]]  # 'train' | 'validation' | 'test'
-
-    __table_args__ = (
-        Index("idx_training_sample_snapshot", "snapshot_id"),
-        Index("idx_training_sample_node", "node_id"),
-        Index(
-            "idx_training_sample_snapshot_node", "snapshot_id", "node_id", unique=True
-        ),
-        Index("idx_training_sample_split", "split"),
-        Index("idx_training_sample_label", "label"),
-    )
 
 
 class TrainingEpoch(TrainingBase):

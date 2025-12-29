@@ -44,6 +44,7 @@ from storage.training_models import (
     SamplePrediction,
     ModelRun,
     TrainingSample,
+    LabelRun,
 )
 from fine_tuning.taxonomy import get_labels
 
@@ -128,7 +129,10 @@ class SetFitClassifier:
 
 
 def load_samples(
-    session: Session, split: Optional[str] = None, labeled_only: bool = False
+    session: Session,
+    split: Optional[str] = None,
+    labeled_only: bool = False,
+    label_run_id: Optional[int] = None,
 ) -> List[TrainingSample]:
     """Load training samples from database.
 
@@ -136,11 +140,15 @@ def load_samples(
         session: SQLAlchemy session
         split: Optional split filter ('train', 'validation', 'test')
         labeled_only: Only load samples with labels
+        label_run_id: Optional label run ID to filter by
 
     Returns:
         List of TrainingSample objects
     """
     query = select(TrainingSample)
+
+    if label_run_id is not None:
+        query = query.where(TrainingSample.label_run_id == label_run_id)
 
     if split:
         query = query.where(TrainingSample.split == split)
@@ -151,6 +159,21 @@ def load_samples(
 
     samples = session.execute(query).scalars().all()
     return list(samples)
+
+
+def get_newest_label_run_id(session: Session) -> Optional[int]:
+    """Get the newest (highest ID) label run from the database.
+
+    Args:
+        session: SQLAlchemy session
+
+    Returns:
+        The ID of the newest label run, or None if no label runs exist
+    """
+    result = session.execute(
+        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
+    ).scalar()
+    return result
 
 
 def evaluate_predictions(
@@ -393,6 +416,11 @@ def main():
         type=str,
         help="Save predictions to CSV file",
     )
+    parser.add_argument(
+        "--label_run_id",
+        type=int,
+        help="Label run ID to use for training labels (defaults to newest)",
+    )
 
     args = parser.parse_args()
 
@@ -410,8 +438,19 @@ def main():
     # Load samples
     print(f"Loading samples from {db_path}...")
     with Session(engine) as session:
+        # Get newest label run if not specified
+        effective_label_run_id = args.label_run_id or get_newest_label_run_id(session)
+        if effective_label_run_id is None:
+            print("Error: No label runs found in database", file=__import__('sys').stderr)
+            return
+        else:
+            print(f"Using specified label run: {effective_label_run_id}")
+
         samples = load_samples(
-            session, split=args.split, labeled_only=args.labeled_only
+            session,
+            split=args.split,
+            labeled_only=args.labeled_only,
+            label_run_id=effective_label_run_id,
         )
         print(f"Loaded {len(samples)} samples")
 
