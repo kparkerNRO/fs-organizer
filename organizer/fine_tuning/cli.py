@@ -2,11 +2,12 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import typer
 from sqlalchemy.orm import Session
 from storage.training_manager import get_or_create_training_session
+from storage.training_models import LabelRun, TrainingSample
 
 from .common import (
     create_model_run,

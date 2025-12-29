@@ -1,7 +1,7 @@
 """Extract features for model training."""
 
 import json
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
