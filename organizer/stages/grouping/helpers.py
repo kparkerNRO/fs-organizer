@@ -55,7 +55,9 @@ def normalized_grouping(group: list) -> Optional[dict[str, list[str]]]:
 
         for category2 in group:
             if category != category2:
-                if normalize_for_comparison(category) == normalize_for_comparison(category2):
+                if normalize_for_comparison(category) == normalize_for_comparison(
+                    category2
+                ):
                     if category[0].isupper():
                         new_grouping[category] = [category]
                         new_grouping[category2] = [category]

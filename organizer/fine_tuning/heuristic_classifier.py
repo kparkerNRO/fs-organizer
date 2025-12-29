@@ -68,7 +68,7 @@ THEME_KEYWORDS = {
     "unlit",
     "simple",
     "Portrait",
-    "Fullbody"
+    "Fullbody",
 }
 
 # Organizational folder keywords
@@ -170,7 +170,9 @@ class HeuristicClassifier:
             results.append(result)
 
         # 3. Check for creators (high confidence at low depth)
-        result = self._check_creators(name, depth, parent_name, children_names, sibling_names)
+        result = self._check_creators(
+            name, depth, parent_name, children_names, sibling_names
+        )
         if result:
             results.append(result)
 
@@ -309,7 +311,7 @@ class HeuristicClassifier:
         """Check if folder represents an asset type."""
         matches = get_matching_patterns(name, list(ASSET_TYPE_KEYWORDS))
         matches.extend(get_matching_patterns(name, self.config.media_types))
-        
+
         if matches:
             # Check file extensions for additional confidence
             confidence = 0.8

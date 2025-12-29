@@ -131,8 +131,7 @@ def _build_creator_remove_cache(creators: dict[str, dict[str, Any]]) -> dict[str
     }
 
 
-
-class Config (BaseModel):
+class Config(BaseModel):
     creators: dict[str, dict[str, Any]]
     creator_removes: dict[str, list[str]]
     creator_strings: set[str]

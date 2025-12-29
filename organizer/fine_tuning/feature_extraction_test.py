@@ -319,7 +319,9 @@ class TestExtractFeatures:
         assert high_res_sample.grandparent_name_norm == "Artist Name"
         assert high_res_sample.depth == 2
 
-    def test_child_names_captured(self, index_session, training_session, sample_nodes, test_config, label_run):
+    def test_child_names_captured(
+        self, index_session, training_session, sample_nodes, test_config, label_run
+    ):
         """Test that child names are captured"""
         extract_features(
             index_session,
@@ -363,7 +365,9 @@ class TestExtractFeatures:
 
         sibling_names = json.loads(high_res_sample.sibling_names_topk_json)
         # Sibling names are normalized via _processed_name
-        assert any("low" in name.lower() and "res" in name.lower() for name in sibling_names)
+        assert any(
+            "low" in name.lower() and "res" in name.lower() for name in sibling_names
+        )
 
     def test_descendant_extensions(
         self, index_session, training_session, sample_nodes, test_config, label_run
@@ -387,7 +391,9 @@ class TestExtractFeatures:
         exts = json.loads(char_art_sample.descendant_file_exts_topk_json)
         assert "png" in exts or "jpg" in exts
 
-    def test_cue_detection(self, index_session, training_session, sample_nodes, test_config, label_run):
+    def test_cue_detection(
+        self, index_session, training_session, sample_nodes, test_config, label_run
+    ):
         """Test that cue markers are detected"""
         extract_features(
             index_session,
@@ -407,7 +413,9 @@ class TestExtractFeatures:
         # Should detect "resolution" as variant hint
         assert high_res_sample.sibling_has_variant_hint is True
 
-    def test_text_field_format(self, index_session, training_session, sample_nodes, test_config, label_run):
+    def test_text_field_format(
+        self, index_session, training_session, sample_nodes, test_config, label_run
+    ):
         """Test that text field is properly formatted"""
         extract_features(
             index_session,
@@ -433,7 +441,9 @@ class TestExtractFeatures:
         assert "exts:" in sample.text
         assert "flags:" in sample.text
 
-    def test_zip_file_handling(self, index_session, training_session, sample_nodes, test_config, label_run):
+    def test_zip_file_handling(
+        self, index_session, training_session, sample_nodes, test_config, label_run
+    ):
         """Test that ZIP files are treated as containers"""
         extract_features(
             index_session,
@@ -457,7 +467,9 @@ class TestExtractFeatures:
         child_names = json.loads(zip_sample.child_names_topk_json)
         assert any("texture" in name for name in child_names)
 
-    def test_batch_processing(self, index_session, training_session, sample_nodes, test_config, label_run):
+    def test_batch_processing(
+        self, index_session, training_session, sample_nodes, test_config, label_run
+    ):
         """Test batch processing with small batch size"""
         num_created = extract_features(
             index_session,
@@ -538,7 +550,9 @@ class TestExtractFeatures:
         child_names = json.loads(parent_sample.child_names_topk_json)
         assert len(child_names) <= 10
 
-    def test_empty_snapshot(self, index_session, training_session, test_config, label_run):
+    def test_empty_snapshot(
+        self, index_session, training_session, test_config, label_run
+    ):
         """Test extraction with non-existent snapshot"""
         # Create a label_run for snapshot 999
         label_run_999 = LabelRun(snapshot_id=999, label_source="test")

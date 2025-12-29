@@ -27,7 +27,6 @@ app = typer.Typer()
 app.add_typer(fine_tuning_app, name="model")
 
 
-
 @app.command()
 def gather(
     base_path: Path = typer.Argument(
@@ -122,8 +121,6 @@ def pipeline(
     typer.echo(
         f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}"
     )
-
-
 
 
 # FastAPI endpoints

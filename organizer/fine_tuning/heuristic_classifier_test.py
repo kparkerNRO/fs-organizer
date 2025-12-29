@@ -185,7 +185,9 @@ class TestHeuristicClassifier:
         classifier = HeuristicClassifier(test_config, taxonomy="v2")
 
         # Folder under "Collaborator Content" parent
-        result = classifier.classify("Mystery Folder", parent_name="Collaborator Content")
+        result = classifier.classify(
+            "Mystery Folder", parent_name="Collaborator Content"
+        )
 
         # Should be classified as creator due to parent context
         # (if it matches other heuristics or has high confidence from parent)

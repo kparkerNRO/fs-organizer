@@ -108,7 +108,9 @@ def select_training_samples(
         # Scale down proportionally
         scale_factor = sample_size / total_allocated
         for depth in samples_per_depth:
-            samples_per_depth[depth] = max(1, int(samples_per_depth[depth] * scale_factor))
+            samples_per_depth[depth] = max(
+                1, int(samples_per_depth[depth] * scale_factor)
+            )
 
     # Sample from each depth with diversity clustering
     selected: List[Node] = []
@@ -245,7 +247,11 @@ def write_sample_csv(
         heuristic_taxonomy: Taxonomy for heuristic classifier ('v1' or 'v2')
     """
     # Load all nodes for snapshot to build adjacency
-    all_nodes = session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars().all()
+    all_nodes = (
+        session.execute(select(Node).where(Node.snapshot_id == snapshot_id))
+        .scalars()
+        .all()
+    )
 
     # Build node lookup and parent->children map
     nodes_by_id: Dict[int, Node] = {n.node_id: n for n in all_nodes}
@@ -269,9 +275,10 @@ def write_sample_csv(
     heuristic_classifier = None
     if use_heuristic:
         try:
-
             config = get_config()
-            heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
+            heuristic_classifier = HeuristicClassifier(
+                config, taxonomy=heuristic_taxonomy
+            )
         except Exception as e:
             print(f"Warning: Could not initialize heuristic classifier: {e}")
             use_heuristic = False
@@ -285,14 +292,20 @@ def write_sample_csv(
 
         for node in nodes:
             # Get parent and grandparent
-            parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+            parent = (
+                nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+            )
             grandparent = (
-                nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id else None
+                nodes_by_id.get(parent.parent_node_id)
+                if parent and parent.parent_node_id
+                else None
             )
 
             # Get children (folders only)
             children = [
-                c for c in children_by_parent.get(node.node_id, []) if c.kind == NodeKind.DIR.value
+                c
+                for c in children_by_parent.get(node.node_id, [])
+                if c.kind == NodeKind.DIR.value
             ]
             child_names = sorted({c.name for c in children})[:child_sample_size]
 
@@ -425,7 +438,9 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         if len(unlabeled) <= 10:
             rows_str = ", ".join(map(str, unlabeled))
         else:
-            rows_str = ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
+            rows_str = (
+                ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
+            )
 
         raise ValueError(
             f"Found {len(unlabeled)} rows with missing labels.\n"
@@ -456,7 +471,9 @@ def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
             if len(row_nums) <= 5:
                 rows_str = ", ".join(map(str, row_nums))
             else:
-                rows_str = ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
+                rows_str = (
+                    ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
+                )
             error_msg.append(f"  '{label}': rows {rows_str}")
 
         error_msg.append(f"\nValid labels are: {', '.join(sorted(valid_labels))}")

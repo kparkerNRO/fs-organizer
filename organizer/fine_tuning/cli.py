@@ -325,7 +325,12 @@ def train(
     # If hardneg_labels is empty, use sensible defaults based on taxonomy
     if not hardneg_labels.strip():
         if taxonomy == "legacy":
-            default_labels = ["primary_author", "secondary_author", "collection", "subject"]
+            default_labels = [
+                "primary_author",
+                "secondary_author",
+                "collection",
+                "subject",
+            ]
         elif taxonomy == "v1":
             default_labels = ["person_or_group", "content"]
         else:  # v2
@@ -521,7 +526,10 @@ def predict(
             typer.echo(f"Using specified label run: {effective_label_run_id}")
 
         samples = load_samples(
-            session, split=split, labeled_only=labeled_only, label_run_id=effective_label_run_id
+            session,
+            split=split,
+            labeled_only=labeled_only,
+            label_run_id=effective_label_run_id,
         )
         typer.echo(f"✓ Loaded {len(samples)} samples")
 
@@ -543,12 +551,16 @@ def predict(
 
         # Get true labels (if available)
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+        y_pred_labeled = [
+            pred for i, pred in enumerate(predictions) if samples[i].label
+        ]
 
         # Evaluate
         if y_true and y_pred_labeled:
             typer.echo(f"\nEvaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
+            metrics = evaluate_predictions(
+                y_true, y_pred_labeled, classifier.labels, verbose=True
+            )
         else:
             typer.echo("\nNo labeled samples found. Skipping evaluation.")
             metrics = {}
@@ -765,7 +777,10 @@ def zero_shot(
             typer.echo(f"Using specified label run: {effective_label_run_id}")
 
         samples = load_samples(
-            session, split=split, labeled_only=labeled_only, label_run_id=effective_label_run_id
+            session,
+            split=split,
+            labeled_only=labeled_only,
+            label_run_id=effective_label_run_id,
         )
         typer.echo(f"✓ Loaded {len(samples)} samples")
 
@@ -783,12 +798,16 @@ def zero_shot(
 
         # Get true labels (if available)
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+        y_pred_labeled = [
+            pred for i, pred in enumerate(predictions) if samples[i].label
+        ]
 
         # Evaluate
         if y_true and y_pred_labeled:
             typer.echo(f"\nEvaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
+            metrics = evaluate_predictions(
+                y_true, y_pred_labeled, classifier.labels, verbose=True
+            )
         else:
             typer.echo("\nNo labeled samples found. Skipping evaluation.")
             metrics = {}
@@ -835,9 +854,7 @@ def zero_shot(
         metrics_summary = ""
         if metrics:
             metrics_summary = f", Accuracy: {metrics.get('accuracy', 0):.4f}, Macro-F1: {metrics.get('macro_f1', 0):.4f}, Weighted-F1: {metrics.get('weighted_f1', 0):.4f}"
-        run.notes = (
-            f"Run type: zero-shot, Taxonomy: {taxonomy}, Split: {split or 'all'}{metrics_summary}"
-        )
+        run.notes = f"Run type: zero-shot, Taxonomy: {taxonomy}, Split: {split or 'all'}{metrics_summary}"
 
         session.commit()
 
@@ -1084,7 +1101,9 @@ def generate_samples(
         typer.echo(f"Using snapshot_id: {snapshot_id}")
 
     with Session(engine) as session:
-        typer.echo(f"Selecting {sample_size} diverse samples from snapshot {snapshot_id}...")
+        typer.echo(
+            f"Selecting {sample_size} diverse samples from snapshot {snapshot_id}..."
+        )
         typer.echo(f"  Depth range: {min_depth}-{max_depth}")
         typer.echo(f"  Diversity factor: {diversity_factor}")
 
@@ -1106,7 +1125,9 @@ def generate_samples(
         # Write CSV
         typer.echo(f"Writing samples to {output_csv}...")
         if use_heuristic:
-            typer.echo(f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})...")
+            typer.echo(
+                f"  Including heuristic predictions (taxonomy={heuristic_taxonomy})..."
+            )
         write_sample_csv(
             output_path=output_csv,
             nodes=samples,
@@ -1141,8 +1162,12 @@ def select_data(
     sample_size: int = typer.Option(
         200, "--sample-size", "-n", help="Target number of samples to select"
     ),
-    min_depth: int = typer.Option(1, "--min-depth", help="Minimum folder depth to sample"),
-    max_depth: int = typer.Option(10, "--max-depth", help="Maximum folder depth to sample"),
+    min_depth: int = typer.Option(
+        1, "--min-depth", help="Minimum folder depth to sample"
+    ),
+    max_depth: int = typer.Option(
+        10, "--max-depth", help="Maximum folder depth to sample"
+    ),
     diversity_factor: float = typer.Option(
         0.7,
         "--diversity",
@@ -1172,22 +1197,30 @@ def select_data(
         if snapshot_id is None:
             # Get most recent snapshot
             snapshot = (
-                session.execute(sql_select(Snapshot).order_by(Snapshot.created_at.desc()))
+                session.execute(
+                    sql_select(Snapshot).order_by(Snapshot.created_at.desc())
+                )
                 .scalars()
                 .first()
             )
 
             if not snapshot:
                 typer.echo("❌ No snapshots found in index.db", err=True)
-                typer.echo("   Run 'gather' command first to create a snapshot", err=True)
+                typer.echo(
+                    "   Run 'gather' command first to create a snapshot", err=True
+                )
                 raise typer.Exit(1)
 
             snapshot_id = snapshot.snapshot_id
-            typer.echo(f"Using most recent snapshot: {snapshot_id} (created {snapshot.created_at})")
+            typer.echo(
+                f"Using most recent snapshot: {snapshot_id} (created {snapshot.created_at})"
+            )
         else:
             # Validate snapshot exists
             snapshot = (
-                session.execute(sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id))
+                session.execute(
+                    sql_select(Snapshot).where(Snapshot.snapshot_id == snapshot_id)
+                )
                 .scalars()
                 .first()
             )

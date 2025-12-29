@@ -163,7 +163,9 @@ class ZeroShotClassifier:
             exp_sim = np.exp(sim_row / temperature)
             probs = exp_sim / np.sum(exp_sim)
 
-            prob_dict = {label: float(prob) for label, prob in zip(self.label_names, probs)}
+            prob_dict = {
+                label: float(prob) for label, prob in zip(self.label_names, probs)
+            }
             all_probabilities.append(prob_dict)
 
         return predictions, confidences, all_probabilities
@@ -561,7 +563,9 @@ def main():
         # Get newest label run if not specified
         effective_label_run_id = args.label_run_id or get_newest_label_run_id(session)
         if effective_label_run_id is None:
-            print("Error: No label runs found in database", file=__import__('sys').stderr)
+            print(
+                "Error: No label runs found in database", file=__import__("sys").stderr
+            )
             return
         else:
             print(f"Using specified label run: {effective_label_run_id}")

@@ -27,6 +27,7 @@ class TestNormalizeString:
         assert normalize_string("") == ""
         assert normalize_string("   ") == ""
 
+
 class TestHasCloseTextMatch:
     """Test has_close_text_match function."""
 

@@ -26,6 +26,7 @@ class LabelRun(TrainingBase):
     """
     Represents the run of the data labeling
     """
+
     __tablename__ = "label_run"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -84,7 +85,6 @@ class TrainingSample(TrainingBase):
     split: Mapped[Optional[str]]  # 'train' | 'validation' | 'test'
 
     label_run: Mapped[LabelRun] = relationship(back_populates="samples")
-
 
     __table_args__ = (
         Index("idx_training_sample_snapshot", "snapshot_id"),
@@ -160,7 +160,6 @@ class ModelRun(TrainingBase):
     predictions: Mapped[List["SamplePrediction"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
-
 
 
 class TrainingEpoch(TrainingBase):

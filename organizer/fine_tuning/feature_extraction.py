@@ -18,12 +18,13 @@ from utils.filename_processing import clean_filename
 from utils.text_processing import has_matching_token, normalize_string, tokenize_string
 from fine_tuning.heuristic_classifier import COLLAB_MARKERS
 
+
 def extract_features(
     index_session: Session,
     training_session: Session,
     snapshot_id: int,
     config: Config,
-    label_run:LabelRun,
+    label_run: LabelRun,
     *,
     child_cap: int = 20,
     sibling_cap: int = 20,
@@ -51,8 +52,10 @@ def extract_features(
         - ZIP content nodes already have parent_node_id pointing at that 'zip_file' node
     """
 
-    # Load nodes 
-    rows = index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
+    # Load nodes
+    rows = index_session.execute(
+        select(Node).where(Node.snapshot_id == snapshot_id)
+    ).scalars()
 
     # TODO: compute frequencies of words
 
@@ -95,7 +98,7 @@ def extract_features(
     for nid, n in nodes_by_id.items():
         # Only process dirs and ZIP files (treated as containers)
         # ZIP files are identified by having .zip extension (not just file_source='zip_file')
-        is_zip_file = n.ext and n.ext.lower() in ('.zip', 'zip')
+        is_zip_file = n.ext and n.ext.lower() in (".zip", "zip")
         if n.kind != NodeKind.DIR and not is_zip_file:
             continue
 
@@ -117,23 +120,34 @@ def extract_features(
         )
 
         child_names = sorted({processed_name_by_id[c] for c in child_ids})[:child_cap]
-        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[:sibling_cap]
+        sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids})[
+            :sibling_cap
+        ]
 
         # cues from children/siblings
         child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
         sibling_token_bag = [t for sn in sibling_names for t in tokenize_string(sn)]
 
-        child_has_media_type_cue = has_matching_token(child_token_bag, config.media_types)
-        child_has_variant_hint = has_matching_token(child_token_bag, config.variant_types)
+        child_has_media_type_cue = has_matching_token(
+            child_token_bag, config.media_types
+        )
+        child_has_variant_hint = has_matching_token(
+            child_token_bag, config.variant_types
+        )
         child_has_format_cue = any(
             cn.strip(".").lower() in config.format_types for cn in child_names
         )
 
-        sibling_has_variant_hint = has_matching_token(sibling_token_bag, config.variant_types)
+        sibling_has_variant_hint = has_matching_token(
+            sibling_token_bag, config.variant_types
+        )
 
         # collab cue from self or parent
-        has_collab_cue = has_matching_token(tokenize_string(n.name), COLLAB_MARKERS) or (
-            parent is not None and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
+        has_collab_cue = has_matching_token(
+            tokenize_string(n.name), COLLAB_MARKERS
+        ) or (
+            parent is not None
+            and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
         )
 
         looks_like_format = config.is_media_type(n.name)
@@ -174,7 +188,7 @@ def extract_features(
             child_has_format_cue=child_has_format_cue,
             sibling_has_variant_hint=sibling_has_variant_hint,
             text=text,
-            label_run=label_run
+            label_run=label_run,
         )
 
         samples.append(sample)
