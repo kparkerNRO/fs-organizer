@@ -12,11 +12,6 @@ from data_models.database import (
 )
 from grouping.group_cleanup import refine_group
 from logging import getLogger
-from grouping.nlp_grouping import (
-    cluster_with_custom_metric,
-    prepare_records,
-    compute_custom_distance_matrix,
-)
 from utils.config import KNOWN_VARIANT_TOKENS
 from utils.filename_utils import clean_filename, split_view_type
 

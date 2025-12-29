@@ -25,8 +25,6 @@ interface FolderBrowserProps {
   treeType: TREE_TYPE;
 }
 
-const TREE_STATE_KEY = "treeState";
-
 interface TreeState {
   tree: FolderV2;
   expandedFolders: Set<string>;
@@ -35,10 +33,10 @@ interface TreeState {
 }
 
 class FolderBrowserErrorBoundary extends React.Component<
-  React.PropsWithChildren<{}>,
+  React.PropsWithChildren<Record<string, never>>,
   { hasError: boolean }
 > {
-  constructor(props: React.PropsWithChildren<{}>) {
+  constructor(props: React.PropsWithChildren<Record<string, never>>) {
     super(props);
     this.state = { hasError: false };
   }
@@ -135,39 +133,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     }
   }, [folderTreeHook.modifiedTree, propFolderTree]);
 
-  // Helper function to get all folder paths in the order they appear in the tree
-  const getAllFolderPathsInOrder = (
-    tree: FolderV2,
-    parentPath: string = ""
-  ): string[] => {
-    if (!tree) return [];
-
-    const paths: string[] = [];
-    const currentPath = buildNodePath(parentPath, tree.name);
-
-    // Add current folder path (skip root)
-    if (currentPath !== "root") {
-      paths.push(currentPath);
-    }
-
-    // Recursively add children folder paths
-    if (tree.children) {
-      for (const child of tree.children) {
-        if (!isFileNode(child)) {
-          paths.push(
-            ...getAllFolderPathsInOrder(child as FolderV2, currentPath)
-          );
-        }
-      }
-    }
-
-    return paths;
-  };
-
   // Helper function to get folders at the same level as the given folder path
   const getFoldersAtSameLevel = (
     tree: FolderV2,
-    targetPath: string
+    targetPath: string,
   ): string[] => {
     if (!tree) return [];
 
@@ -212,7 +181,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         });
       }
     },
-    []
+    [],
   );
 
   // Context Menu
@@ -247,7 +216,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
     setTimeout(() => {
       const fileElement = scrollContainerRef.current?.querySelector(
-        `[data-file-id="${fileId}"]`
+        `[data-file-id="${fileId}"]`,
       ) as HTMLElement;
 
       if (fileElement && scrollContainerRef.current) {
@@ -422,7 +391,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const handleItemClick = (
     item: FolderV2 | File,
     itemPath: string,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     const isFile = isFileNode(item);
 
@@ -444,7 +413,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       if (e.ctrlKey || e.metaKey) {
         setTreeState((prev) => {
           const isAlreadySelected = prev.selectedFolderPaths.some(
-            (f) => f === itemPath
+            (f) => f === itemPath,
           );
           if (e.ctrlKey || e.metaKey) {
             // Multi-select folders
@@ -505,7 +474,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           const endIndex = Math.max(lastIndex, currentIndex);
           const selectedRange = sameLevelFolders.slice(
             startIndex,
-            endIndex + 1
+            endIndex + 1,
           );
 
           // Replace selection with the new range (don't combine with existing selections from other levels)
@@ -536,7 +505,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const handleItemRightClick = (
     item: FolderV2 | File,
     itemPath: string,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.preventDefault();
 
@@ -589,7 +558,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       });
       closeContextMenu();
     },
-    []
+    [],
   );
 
   const handleRenameSubmit = async (e: React.FormEvent) => {
@@ -601,12 +570,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
     const result = await folderTreeHook.renameItem(
       renamingItem.itemPath,
-      renamingItem.newName.trim()
+      renamingItem.newName.trim(),
     );
 
-    if (result.success) {
+    if (result?.success) {
       console.log(`Successfully renamed to "${renamingItem.newName.trim()}"`);
-    } else {
+    } else if (result) {
       console.error("Rename failed:", result.error);
       // You could show a toast/notification here
     }
@@ -646,14 +615,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
     const result = await folderTreeHook.createFolder(
       creatingFolder.parentPath,
-      creatingFolder.folderName.trim()
+      creatingFolder.folderName.trim(),
     );
 
-    if (result.success) {
+    if (result?.success) {
       console.log(
-        `Successfully created folder "${creatingFolder.folderName.trim()}"`
+        `Successfully created folder "${creatingFolder.folderName.trim()}"`,
       );
-    } else {
+    } else if (result) {
       console.error("Create folder failed:", result.error);
       // You could show a toast/notification here
     }
@@ -695,7 +664,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               navigator.clipboard.writeText(itemPath);
               closeContextMenu();
             },
-          }
+          },
         );
       } else {
         // Get the current active tree to ensure we have the most up-to-date reference
@@ -743,7 +712,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                       const result = await folderTreeHook.invertItems(itemPath);
                       if (result.success) {
                         console.log(
-                          "Successfully inverted folder with children"
+                          "Successfully inverted folder with children",
                         );
                       } else {
                         console.error("Invert failed:", result.error);
@@ -766,7 +735,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                 try {
                   const result = await folderTreeHook.mergeItems(
                     treeState.selectedFolderPaths,
-                    "Merged Folder"
+                    "Merged Folder",
                   );
                   if (result.success) {
                     console.log("Successfully merged folders");
@@ -784,9 +753,8 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             // Check if the selected folders can be flattened using the validation function
             const flattenCheck = canFlattenFolders(
               currentTree,
-              treeState.selectedFolderPaths
+              treeState.selectedFolderPaths,
             );
-
 
             if (flattenCheck && flattenCheck.canFlatten) {
               menuItems.push({
@@ -797,7 +765,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                   setTimeout(async () => {
                     try {
                       const result = await folderTreeHook.flattenItems(
-                        treeState.selectedFolderPaths
+                        treeState.selectedFolderPaths,
                       );
                       if (result.success) {
                         console.log("Successfully flattened folders");
@@ -841,14 +809,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       propFolderTree,
       startCreatingFolder,
       startRenaming,
-    ]
+    ],
   );
 
   // Drag and drop handlers
   const handleDragStart = (
     e: React.DragEvent,
     item: FolderV2 | File,
-    itemPath: string
+    itemPath: string,
   ) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", itemPath);
@@ -871,7 +839,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const handleDragOver = (
     e: React.DragEvent,
     targetPath: string,
-    targetItem: FolderV2 | File
+    targetItem: FolderV2 | File,
   ) => {
     e.preventDefault();
 
@@ -907,7 +875,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   const handleDrop = async (
     e: React.DragEvent,
     targetPath: string,
-    targetItem: FolderV2 | File
+    targetItem: FolderV2 | File,
   ) => {
     e.preventDefault();
 
@@ -959,14 +927,14 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       }
       return false;
     },
-    []
+    [],
   );
 
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
     expandedFolders: Set<string>,
-    parentPath: string = ""
+    parentPath: string = "",
   ): React.ReactNode => {
     const nodePath = buildNodePath(parentPath, node.name);
     const isFile = isFileNode(node);
@@ -985,7 +953,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         ? (() => {
             const pathToFile = getFilePathInTree(
               treeState.tree!,
-              treeState.selectedFileId
+              treeState.selectedFileId,
             );
             if (!pathToFile) return false;
 
@@ -1114,7 +1082,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           <div>
             {hasChildren &&
               (node as FolderV2).children?.map((child) =>
-                renderNode(child, level + 1, expandedFolders, nodePath)
+                renderNode(child, level + 1, expandedFolders, nodePath),
               )}
             {/* Render new folder input if creating folder in this location */}
             {creatingFolder && creatingFolder.parentPath === nodePath && (
@@ -1175,7 +1143,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                       treeState.tree,
                       0,
                       treeState.expandedFolders,
-                      ""
+                      "",
                     )}
                 </div>
               </div>
@@ -1191,7 +1159,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             onClose={closeContextMenu}
             menu_items={getContextMenuItems(
               contextMenu.item,
-              contextMenu.itemPath
+              contextMenu.itemPath,
             )}
           />
         )}

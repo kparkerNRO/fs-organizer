@@ -251,7 +251,7 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
         (progress) => {
           updateState({ progress: Math.round(progress * 100) });
         },
-        controller.signal
+        controller.signal,
       );
 
       // Check if operation was cancelled
@@ -744,7 +744,7 @@ const ReviewStep: React.FC<StepProps> = ({ state, updateState, onPrev }) => {
       const result = await applyOrganization(
         state.organizedStructure,
         state.targetPath,
-        state.duplicateHandling
+        state.duplicateHandling,
       );
 
       clearInterval(progressInterval);

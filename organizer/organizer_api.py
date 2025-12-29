@@ -2,11 +2,8 @@ from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from pathlib import Path
 import json
 import shutil
-import uuid
-import asyncio
 from datetime import datetime
-from enum import Enum
-from typing import Dict, Any
+from typing import Dict
 
 from sqlalchemy import Cast, String, select
 from api.models import GatherRequest, AsyncTaskResponse
@@ -32,14 +29,13 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql import func
 from fastapi.middleware.cors import CORSMiddleware
 
-from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
+from pipeline.gather import gather_folder_structure_and_store
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
-from pipeline.folder_reconstruction import get_folder_heirarchy
 
 app = FastAPI()
 app.add_middleware(
-    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly  
+    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -462,7 +458,9 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
-        calculate_folder_structure(Path(db_path), structure_type=StructureType.organized)
+        calculate_folder_structure(
+            Path(db_path), structure_type=StructureType.organized
+        )
 
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(

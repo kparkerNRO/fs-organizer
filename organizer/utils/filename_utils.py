@@ -1,6 +1,5 @@
 import re
 import logging
-from pathlib import Path
 from typing import Optional
 
 from utils.common import VIEW_TYPES

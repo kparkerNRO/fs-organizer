@@ -92,7 +92,7 @@ export interface Folder extends FolderV2 {
 }
 
 // Async task management types
-export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type TaskStatus = "pending" | "running" | "completed" | "failed";
 
 export interface AsyncTaskResponse {
   task_id: string;

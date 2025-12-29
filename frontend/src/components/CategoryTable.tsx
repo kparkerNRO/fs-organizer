@@ -63,7 +63,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
   // Initialize state from pageState
   const [expandedCategories, setExpandedCategories] = useState<number[]>(
-    pageState.expandedCategories
+    pageState.expandedCategories,
   );
 
   // Handle sort column click
@@ -147,7 +147,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   const handleContextMenu = (
     e: React.MouseEvent,
     folder: LegacyFolder,
-    parentCategory: Folder
+    parentCategory: Folder,
   ) => {
     e.preventDefault();
 
@@ -187,7 +187,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       ...category,
       children:
         category.children?.filter(
-          (child) => !selectedFolders.some((f) => f.id === child.id)
+          (child) => !selectedFolders.some((f) => f.id === child.id),
         ) || [],
     }));
 
@@ -232,7 +232,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       children: selectedFolders.map((child) =>
         folders.some((f) => f.id === child.id)
           ? { ...child, name: child.name.replace(prefix, "").trim() }
-          : child
+          : child,
       ),
       count: selectedFolders.length,
     };
@@ -242,7 +242,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       ...category,
       children:
         category.children?.filter(
-          (child) => !selectedFolders.some((f) => f.id === child.id)
+          (child) => !selectedFolders.some((f) => f.id === child.id),
         ) || [],
     }));
 
@@ -257,7 +257,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
   const handleDragStart = (
     folder: LegacyFolder,
     category: Folder,
-    e: React.DragEvent
+    e: React.DragEvent,
   ) => {
     const working_folders = selectedFolders.some((f) => f.id === folder.id)
       ? selectedFolders
@@ -270,7 +270,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       JSON.stringify({
         sourceCategoryId: category.id,
         folders: working_folders,
-      })
+      }),
     );
   };
 
@@ -298,14 +298,16 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
 
       if (sourceCategoryId === targetCategory.id) return;
 
-      const foldersToMove = folders.map((folder: LegacyFolder) => ({ ...folder }));
+      const foldersToMove = folders.map((folder: LegacyFolder) => ({
+        ...folder,
+      }));
 
       const updatedCategories = categories.map((category) => {
         // source case
         if (category.id === sourceCategoryId) {
           const new_children = (category.children || []).filter(
             (child) =>
-              !foldersToMove.some((f: { id: number }) => f.id === child.id)
+              !foldersToMove.some((f: { id: number }) => f.id === child.id),
           );
           return {
             ...category,
@@ -330,7 +332,7 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
       onUpdateCategories(updatedCategories);
 
       const updatedTargetCategory = updatedCategories.find(
-        (c) => c.id === targetCategory.id
+        (c) => c.id === targetCategory.id,
       );
       setActiveCategory(updatedTargetCategory || null);
 
@@ -349,14 +351,14 @@ export const CategoryTable: React.FC<CategoryTableProps> = ({
     setExpandedCategories((prev) =>
       prev.includes(categoryId)
         ? prev.filter((id) => id !== categoryId)
-        : [...prev, categoryId]
+        : [...prev, categoryId],
     );
   };
 
   const handleFolderSelection = (
     folder: LegacyFolder,
     parentCategory: Folder,
-    e: React.MouseEvent
+    e: React.MouseEvent,
   ) => {
     e.stopPropagation();
 
@@ -540,7 +542,6 @@ const HeaderContainer = styled.div`
   align-items: center;
   margin-bottom: 2rem;
 `;
-
 
 const SearchInput = styled.input`
   padding: 0.5rem 1rem;

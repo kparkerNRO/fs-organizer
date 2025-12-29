@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { FolderV2, File } from "../types/types";
+import { FolderV2 } from "../types/types";
 import {
   FolderTreeNode,
   FolderTreePath,
@@ -10,15 +10,11 @@ import {
   moveNode,
   findNodeByPath,
   findParentByPath,
-  isFileNode,
   flattenFolders,
   invertFolder,
   deleteFolders,
   createFolder,
 } from "../utils/folderTreeOperations";
-
-
-
 
 export interface FolderTreeState {
   // Tree data
@@ -45,28 +41,28 @@ export interface FolderTreeActions {
   // Node operations
   renameItem: (
     targetPath: FolderTreePath,
-    newName: string
+    newName: string,
   ) => Promise<FolderTreeOperationResult>;
   createFolder: (
     parentPath: FolderTreePath,
-    folderName: string
+    folderName: string,
   ) => Promise<FolderTreeOperationResult>;
   mergeItems: (
     sourcePaths: FolderTreePath[],
-    targetName: string
+    targetName: string,
   ) => Promise<FolderTreeOperationResult>;
   moveItem: (
     sourcePath: FolderTreePath,
-    targetPath: FolderTreePath
+    targetPath: FolderTreePath,
   ) => Promise<FolderTreeOperationResult>;
   deleteItems: (
-    targetPaths: FolderTreePath[]
+    targetPaths: FolderTreePath[],
   ) => Promise<FolderTreeOperationResult>;
   flattenItems: (
-    sourcePaths: FolderTreePath[]
+    sourcePaths: FolderTreePath[],
   ) => Promise<FolderTreeOperationResult>;
   invertItems: (
-    targetPath: FolderTreePath
+    targetPath: FolderTreePath,
   ) => Promise<FolderTreeOperationResult>;
 
   // Utility functions
@@ -78,24 +74,6 @@ export interface FolderTreeActions {
 }
 
 export type UseFolderTreeReturn = FolderTreeState & FolderTreeActions;
-
-// Helper function to get file path in tree
-const getFilePathInTree = (
-  tree: FolderV2 | File,
-  fileId: number,
-  path: string[] = []
-): string[] | null => {
-  if (isFileNode(tree) && tree.id === fileId) {
-    return path;
-  }
-  if (!isFileNode(tree) && tree.children) {
-    for (const child of tree.children) {
-      const childPath = getFilePathInTree(child, fileId, [...path, tree.name]);
-      if (childPath) return childPath;
-    }
-  }
-  return null;
-};
 
 export const useFolderTree = (): UseFolderTreeReturn => {
   // State management
@@ -142,7 +120,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
   const renameItem = useCallback(
     async (
       targetPath: FolderTreePath,
-      newName: string
+      newName: string,
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -180,13 +158,13 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to rename item" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const mergeItems = useCallback(
     async (
       sourcePaths: FolderTreePath[],
-      targetName: string
+      targetName: string,
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -227,13 +205,13 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to merge items" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const moveItem = useCallback(
     async (
       sourcePath: FolderTreePath,
-      targetPath: FolderTreePath
+      targetPath: FolderTreePath,
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -271,12 +249,12 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to move item" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const flattenItems = useCallback(
     async (
-      sourcePaths: FolderTreePath[]
+      sourcePaths: FolderTreePath[],
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -316,12 +294,12 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to flatten items" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const deleteItems = useCallback(
     async (
-      targetPaths: FolderTreePath[]
+      targetPaths: FolderTreePath[],
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -358,7 +336,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to delete item" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const invertItems = useCallback(
@@ -398,13 +376,13 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to invert folder" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   const createFolderMethod = useCallback(
     async (
       parentPath: FolderTreePath,
-      folderName: string
+      folderName: string,
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -442,7 +420,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to create folder" };
       }
     },
-    [activeTree]
+    [activeTree],
   );
 
   // Utility functions
@@ -450,7 +428,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     (targetPath: FolderTreePath): FolderTreeNode | null => {
       return activeTree ? findNodeByPath(activeTree, targetPath) : null;
     },
-    [activeTree]
+    [activeTree],
   );
 
   const getNodeParent = useCallback(
@@ -459,7 +437,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         ? findParentByPath(activeTree, targetPath)
         : { parent: null, parentPath: "" };
     },
-    [activeTree]
+    [activeTree],
   );
 
   return {

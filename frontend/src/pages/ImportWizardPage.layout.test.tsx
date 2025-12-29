@@ -66,7 +66,7 @@ describe("ImportWizardPage Layout Consistency", () => {
 
     // Navigate to step 2
     const sourceInput = screen.getByPlaceholderText(
-      "Select folder or enter path..."
+      "Select folder or enter path...",
     );
     fireEvent.change(sourceInput, { target: { value: "/test/path" } });
 
@@ -84,14 +84,14 @@ describe("ImportWizardPage Layout Consistency", () => {
     // Step 2: Compare dimensions
     const step2Dimensions = getContainerDimensions();
     expect(step2Dimensions.container?.width).toBe(
-      step1Dimensions.container?.width
+      step1Dimensions.container?.width,
     );
     expect(step2Dimensions.container?.height).toBe(
-      step1Dimensions.container?.height
+      step1Dimensions.container?.height,
     );
     expect(step2Dimensions.content?.width).toBe(step1Dimensions.content?.width);
     expect(step2Dimensions.content?.height).toBe(
-      step1Dimensions.content?.height
+      step1Dimensions.content?.height,
     );
 
     // Navigate to step 3
@@ -105,14 +105,14 @@ describe("ImportWizardPage Layout Consistency", () => {
     // Step 3: Compare dimensions
     const step3Dimensions = getContainerDimensions();
     expect(step3Dimensions.container?.width).toBe(
-      step1Dimensions.container?.width
+      step1Dimensions.container?.width,
     );
     expect(step3Dimensions.container?.height).toBe(
-      step1Dimensions.container?.height
+      step1Dimensions.container?.height,
     );
     expect(step3Dimensions.content?.width).toBe(step1Dimensions.content?.width);
     expect(step3Dimensions.content?.height).toBe(
-      step1Dimensions.content?.height
+      step1Dimensions.content?.height,
     );
 
     // Navigate to step 4
@@ -126,14 +126,14 @@ describe("ImportWizardPage Layout Consistency", () => {
     // Step 4: Compare dimensions
     const step4Dimensions = getContainerDimensions();
     expect(step4Dimensions.container?.width).toBe(
-      step1Dimensions.container?.width
+      step1Dimensions.container?.width,
     );
     expect(step4Dimensions.container?.height).toBe(
-      step1Dimensions.container?.height
+      step1Dimensions.container?.height,
     );
     expect(step4Dimensions.content?.width).toBe(step1Dimensions.content?.width);
     expect(step4Dimensions.content?.height).toBe(
-      step1Dimensions.content?.height
+      step1Dimensions.content?.height,
     );
   });
 
@@ -145,7 +145,7 @@ describe("ImportWizardPage Layout Consistency", () => {
 
     // Trigger loading state
     const sourceInput = screen.getByPlaceholderText(
-      "Select folder or enter path..."
+      "Select folder or enter path...",
     );
     fireEvent.change(sourceInput, { target: { value: "/test/path" } });
 
@@ -155,16 +155,16 @@ describe("ImportWizardPage Layout Consistency", () => {
     // Check dimensions during loading (should be same)
     const loadingDimensions = getContainerDimensions();
     expect(loadingDimensions.container?.width).toBe(
-      initialDimensions.container?.width
+      initialDimensions.container?.width,
     );
     expect(loadingDimensions.container?.height).toBe(
-      initialDimensions.container?.height
+      initialDimensions.container?.height,
     );
     expect(loadingDimensions.content?.width).toBe(
-      initialDimensions.content?.width
+      initialDimensions.content?.width,
     );
     expect(loadingDimensions.content?.height).toBe(
-      initialDimensions.content?.height
+      initialDimensions.content?.height,
     );
   });
 

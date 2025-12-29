@@ -74,14 +74,14 @@ export const CategoriesPage: React.FC = () => {
     await fetchCategoryData(
       pagination.currentPage,
       pagination.pageSize,
-      sort_config
+      sort_config,
     );
   };
 
   const fetchCategoryData = async (
     page: number,
     page_size: number,
-    sort_config?: SortConfig
+    sort_config?: SortConfig,
   ) => {
     try {
       const response = await fetchCategories({

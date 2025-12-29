@@ -2,7 +2,6 @@
 Tests for tag decomposition functionality
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from sqlalchemy.orm import Session

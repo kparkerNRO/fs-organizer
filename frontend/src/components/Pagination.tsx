@@ -1,6 +1,6 @@
-import React from 'react';
-import styled from 'styled-components';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React from "react";
+import styled from "styled-components";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface PaginationProps {
   currentPage: number;
@@ -56,7 +56,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       </PageSizeSelector>
 
       <PageInfo>
-        Showing {Math.min((currentPage - 1) * pageSize + 1, totalItems)} to{' '}
+        Showing {Math.min((currentPage - 1) * pageSize + 1, totalItems)} to{" "}
         {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
       </PageInfo>
 
@@ -110,7 +110,7 @@ const Select = styled.select`
   border: 1px solid #e5e7eb;
   border-radius: 0.375rem;
   outline: none;
-  
+
   &:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
@@ -133,8 +133,8 @@ const PaginationButton = styled.button<{ disabled?: boolean }>`
   border: 1px solid #e5e7eb;
   border-radius: 0.375rem;
   background: white;
-  color: ${props => props.disabled ? '#d1d5db' : '#374151'};
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
+  color: ${(props) => (props.disabled ? "#d1d5db" : "#374151")};
+  cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
 
   &:hover:not(:disabled) {
     background-color: #f3f4f6;
@@ -143,13 +143,13 @@ const PaginationButton = styled.button<{ disabled?: boolean }>`
 
 const PageNumber = styled.button<{ $active?: boolean }>`
   padding: 0.375rem 0.75rem;
-  border: 1px solid ${props => props.$active ? '#3b82f6' : '#e5e7eb'};
+  border: 1px solid ${(props) => (props.$active ? "#3b82f6" : "#e5e7eb")};
   border-radius: 0.375rem;
-  background: ${props => props.$active ? '#3b82f6' : 'white'};
-  color: ${props => props.$active ? 'white' : '#374151'};
+  background: ${(props) => (props.$active ? "#3b82f6" : "white")};
+  color: ${(props) => (props.$active ? "white" : "#374151")};
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    background-color: ${props => props.$active ? '#2563eb' : '#f3f4f6'};
+    background-color: ${(props) => (props.$active ? "#2563eb" : "#f3f4f6")};
   }
 `;

@@ -112,7 +112,7 @@ export const FolderStructurePage: React.FC = () => {
       console.log("Saving folder state:", selectedFileId);
       localStorage.setItem(
         CACHE_KEYS.FOLDER_STATE,
-        JSON.stringify(selectedFileId)
+        JSON.stringify(selectedFileId),
       );
     }
   }, [selectedFileId, isStateLoaded]);
@@ -172,7 +172,7 @@ export const FolderStructurePage: React.FC = () => {
               onClick={(e) => {
                 e.stopPropagation();
                 alert(
-                  "Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Escape to clear file selection\n• Toggle 'Sync scroll' to automatically scroll to selected files"
+                  "Instructions:\n\n• Click files to highlight and auto-expand in other view\n• Click folders to expand/collapse\n• Escape to clear file selection\n• Toggle 'Sync scroll' to automatically scroll to selected files",
                 );
               }}
             >
