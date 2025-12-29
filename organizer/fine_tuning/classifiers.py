@@ -18,7 +18,9 @@ try:
     from setfit import SetFitModel
     from sentence_transformers import SentenceTransformer
 except ImportError as e:
-    print(f"Error: {e}. Please install dependencies: pip install setfit sentence-transformers")
+    print(
+        f"Error: {e}. Please install dependencies: pip install setfit sentence-transformers"
+    )
     raise
 
 
@@ -95,7 +97,9 @@ class ZeroShotClassifier:
             temperature = 0.5
             exp_sim = np.exp(sim_row / temperature)
             probs = exp_sim / np.sum(exp_sim)
-            prob_dict = {label: float(prob) for label, prob in zip(self.label_names, probs)}
+            prob_dict = {
+                label: float(prob) for label, prob in zip(self.label_names, probs)
+            }
             all_probabilities.append(prob_dict)
 
         return predictions, confidences, all_probabilities
@@ -112,7 +116,9 @@ class SetFitClassifier:
     ):
         """Initialize SetFit classifier."""
         if use_baseline:
-            self.model = SetFitModel.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
+            self.model = SetFitModel.from_pretrained(
+                "sentence-transformers/all-MiniLM-L6-v2"
+            )
         else:
             if not model_path:
                 raise ValueError("model_path required when use_baseline=False")

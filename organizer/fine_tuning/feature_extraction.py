@@ -53,28 +53,41 @@ def _create_training_sample(
     name_norm = processed_name_by_id[node.node_id]
     parent_id = node.parent_node_id
     parent = nodes_by_id.get(parent_id) if parent_id is not None else None
-    grandparent = nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id is not None else None
+    grandparent = (
+        nodes_by_id.get(parent.parent_node_id)
+        if parent and parent.parent_node_id is not None
+        else None
+    )
 
     child_ids = children_by_parent.get(node.node_id, [])
     sibling_ids = children_by_parent.get(parent_id, []) if parent_id else []
-    
+
     child_names = sorted({processed_name_by_id[c] for c in child_ids})[:child_cap]
-    sibling_names = sorted({processed_name_by_id[s] for s in sibling_ids if s != node.node_id})[:sibling_cap]
+    sibling_names = sorted(
+        {processed_name_by_id[s] for s in sibling_ids if s != node.node_id}
+    )[:sibling_cap]
 
     child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
     sibling_token_bag = [t for sn in sibling_names for t in tokenize_string(sn)]
 
     flags = {
         "collab": has_matching_token(tokenize_string(node.name), COLLAB_MARKERS)
-        or (parent is not None and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)),
+        or (
+            parent is not None
+            and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
+        ),
         "childMedia": has_matching_token(child_token_bag, config.media_types),
         "childVarHint": has_matching_token(child_token_bag, config.variant_types),
-        "childFmt": any(cn.strip(".").lower() in config.format_types for cn in child_names),
+        "childFmt": any(
+            cn.strip(".").lower() in config.format_types for cn in child_names
+        ),
         "sibVarHint": has_matching_token(sibling_token_bag, config.variant_types),
     }
 
     exts = sorted(descendant_exts[node.node_id])[:ext_cap]
-    text = _build_feature_text(node, name_norm, parent, grandparent, sibling_names, child_names, exts, flags)
+    text = _build_feature_text(
+        node, name_norm, parent, grandparent, sibling_names, child_names, exts, flags
+    )
 
     return TrainingSample(
         snapshot_id=node.snapshot_id,
@@ -100,7 +113,6 @@ def _create_training_sample(
     )
 
 
-
 def extract_features(
     index_session: Session,
     training_session: Session,
@@ -116,7 +128,9 @@ def extract_features(
     """
     Extract features for all nodes in a snapshot and save to training database.
     """
-    nodes_by_id, processed_name_by_id, children_by_parent = load_and_index_nodes(index_session, snapshot_id)
+    nodes_by_id, processed_name_by_id, children_by_parent = load_and_index_nodes(
+        index_session, snapshot_id
+    )
     if not nodes_by_id:
         return 0
 
@@ -131,8 +145,16 @@ def extract_features(
             continue
 
         sample = _create_training_sample(
-            node, label_run, config, nodes_by_id, processed_name_by_id,
-            children_by_parent, descendant_exts, child_cap, sibling_cap, ext_cap
+            node,
+            label_run,
+            config,
+            nodes_by_id,
+            processed_name_by_id,
+            children_by_parent,
+            descendant_exts,
+            child_cap,
+            sibling_cap,
+            ext_cap,
         )
         samples.append(sample)
 

@@ -122,11 +122,13 @@ class StorageManager:
         self._init_work_schema()
         self._init_training_schema()
 
-    def _init_schema(self, db_path: Path, base, version_key: str, expected_version: str, meta_model) -> Engine:
+    def _init_schema(
+        self, db_path: Path, base, version_key: str, expected_version: str, meta_model
+    ) -> Engine:
         """Generic schema initializer for a database."""
         engine = create_engine(f"sqlite:///{db_path}")
         base.metadata.create_all(engine)
-        
+
         with Session(engine) as session:
             meta = session.query(meta_model).filter_by(key=version_key).first()
             if meta is None:
@@ -143,7 +145,11 @@ class StorageManager:
     def _init_index_schema(self):
         """Initialize index.db schema and verify version."""
         self.index_engine = self._init_schema(
-            self.index_path, IndexBase, "schema_version", INDEX_SCHEMA_VERSION, IndexMeta
+            self.index_path,
+            IndexBase,
+            "schema_version",
+            INDEX_SCHEMA_VERSION,
+            IndexMeta,
         )
 
     def _init_work_schema(self):
@@ -155,7 +161,11 @@ class StorageManager:
     def _init_training_schema(self):
         """Initialize training.db schema and verify version."""
         self.training_engine = self._init_schema(
-            self.training_path, TrainingBase, "schema_version", TRAINING_SCHEMA_VERSION, TrainingMeta
+            self.training_path,
+            TrainingBase,
+            "schema_version",
+            TRAINING_SCHEMA_VERSION,
+            TrainingMeta,
         )
 
     @contextmanager
@@ -177,11 +187,13 @@ class StorageManager:
         session = SessionLocal()
 
         if read_only:
+
             @event.listens_for(session, "before_flush")
             def prevent_flush(session, flush_context, instances):
                 raise RuntimeError(
                     f"Cannot modify {db_type}.db with read-only session."
                 )
+
         try:
             yield session
         finally:

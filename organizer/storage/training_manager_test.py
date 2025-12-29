@@ -1,7 +1,5 @@
 """Tests for training_manager.py"""
 
-import json
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -135,8 +133,17 @@ class TestLoadSamples:
         db_session.flush()
 
         sample2 = TrainingSample(
-            snapshot_id=2, node_id=5, label_run_id=label_run2.id, name_raw="Test", name_norm="test",
-            kind="directory", file_source="filesystem", depth=1, text="test", label="other", split="train",
+            snapshot_id=2,
+            node_id=5,
+            label_run_id=label_run2.id,
+            name_raw="Test",
+            name_norm="test",
+            kind="directory",
+            file_source="filesystem",
+            depth=1,
+            text="test",
+            label="other",
+            split="train",
         )
         db_session.add(sample2)
         db_session.commit()
@@ -172,7 +179,11 @@ class TestSavePredictionsToDb:
     def test_save_predictions(self, db_session, sample_training_samples):
         """Test saving predictions to database"""
         run = create_model_run(
-            db_session, model_path="test_model", taxonomy="legacy", use_baseline=False, config={"test": True},
+            db_session,
+            model_path="test_model",
+            taxonomy="legacy",
+            use_baseline=False,
+            config={"test": True},
         )
 
         samples = sample_training_samples[:2]
@@ -184,7 +195,13 @@ class TestSavePredictionsToDb:
         ]
 
         num_saved = save_predictions_to_db(
-            db_session, samples, predictions, confidences, probabilities, run_id=run.run_id, prediction_type="test",
+            db_session,
+            samples,
+            predictions,
+            confidences,
+            probabilities,
+            run_id=run.run_id,
+            prediction_type="test",
         )
         assert num_saved == 2
 
@@ -206,15 +223,36 @@ class TestSavePredictionsToDb:
         db_session.flush()
 
         sample = TrainingSample(
-            snapshot_id=1, node_id=100, label_run_id=label_run.id, name_raw="Unlabeled", name_norm="unlabeled",
-            kind="directory", file_source="filesystem", depth=1, text="test", label=None,
+            snapshot_id=1,
+            node_id=100,
+            label_run_id=label_run.id,
+            name_raw="Unlabeled",
+            name_norm="unlabeled",
+            kind="directory",
+            file_source="filesystem",
+            depth=1,
+            text="test",
+            label=None,
         )
         db_session.add(sample)
         db_session.commit()
 
-        run = create_model_run(db_session, model_path="test_model", taxonomy="legacy", use_baseline=False, config={})
+        run = create_model_run(
+            db_session,
+            model_path="test_model",
+            taxonomy="legacy",
+            use_baseline=False,
+            config={},
+        )
 
-        num_saved = save_predictions_to_db(db_session, [sample], ["subject"], [0.75], [{"subject": 0.75}], run_id=run.run_id)
+        num_saved = save_predictions_to_db(
+            db_session,
+            [sample],
+            ["subject"],
+            [0.75],
+            [{"subject": 0.75}],
+            run_id=run.run_id,
+        )
         assert num_saved == 1
 
         pred = db_session.query(SamplePrediction).first()
@@ -228,7 +266,11 @@ class TestCreateModelRun:
     def test_create_baseline_run(self, db_session):
         """Test creating baseline model run"""
         run = create_model_run(
-            db_session, model_path=None, taxonomy="v2", use_baseline=True, config={"batch_size": 32},
+            db_session,
+            model_path=None,
+            taxonomy="v2",
+            use_baseline=True,
+            config={"batch_size": 32},
         )
         assert run.run_id is not None
         assert run.run_type == "baseline"
@@ -239,8 +281,12 @@ class TestCreateModelRun:
     def test_create_finetuned_run(self, db_session):
         """Test creating fine-tuned model run"""
         run = create_model_run(
-            db_session, model_path="/path/to/model", taxonomy="v1", use_baseline=False,
-            config={"learning_rate": 0.001}, run_type="training",
+            db_session,
+            model_path="/path/to/model",
+            taxonomy="v1",
+            use_baseline=False,
+            config={"learning_rate": 0.001},
+            run_type="training",
         )
         assert run.run_type == "training"
         assert run.model_version == "/path/to/model"

@@ -1,6 +1,7 @@
 """
 Shared utility functions for the fine-tuning module.
 """
+
 from typing import Dict, List, Optional, Set, Tuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,7 +15,9 @@ def load_and_index_nodes(
     session: Session, snapshot_id: int
 ) -> Tuple[Dict[int, Node], Dict[int, str], Dict[Optional[int], List[int]]]:
     """Load all nodes for a snapshot and build relationship indexes."""
-    rows = session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
+    rows = session.execute(
+        select(Node).where(Node.snapshot_id == snapshot_id)
+    ).scalars()
     nodes_by_id: Dict[int, Node] = {}
     processed_name_by_id: Dict[int, str] = {}
     children_by_parent: Dict[Optional[int], List[int]] = {}

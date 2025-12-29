@@ -6,6 +6,7 @@ This module provides typer commands for all fine-tuning related operations:
 - Generating training samples
 - Managing datasets
 """
+
 import csv
 from collections import defaultdict
 from datetime import datetime
@@ -91,7 +92,9 @@ def _get_highest_snapshot_id(manager: StorageManager) -> int:
     with manager.get_index_session(read_only=True) as session:
         result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
         if result is None:
-            typer.echo(f"Error: No snapshots found in {manager.get_index_db_path()}", err=True)
+            typer.echo(
+                f"Error: No snapshots found in {manager.get_index_db_path()}", err=True
+            )
             raise typer.Exit(1)
         return result
 
@@ -125,10 +128,28 @@ def _save_predictions_to_csv(
 
     with output_file.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["sample_id", "name", "true_label", "predicted_label", "confidence", "is_correct"])
+        writer.writerow(
+            [
+                "sample_id",
+                "name",
+                "true_label",
+                "predicted_label",
+                "confidence",
+                "is_correct",
+            ]
+        )
         for sample, pred, conf in zip(samples, predictions, confidences):
             is_correct = "1" if sample.label and sample.label == pred else "0"
-            writer.writerow([sample.sample_id, sample.name_raw, sample.label or "", pred, f"{conf:.4f}", is_correct])
+            writer.writerow(
+                [
+                    sample.sample_id,
+                    sample.name_raw,
+                    sample.label or "",
+                    pred,
+                    f"{conf:.4f}",
+                    is_correct,
+                ]
+            )
     typer.echo(f"✓ Saved {len(samples)} predictions to {output_file}")
 
 
@@ -197,8 +218,12 @@ def _prepare_training_data(
     manager = StorageManager(settings.storage_path)
     typer.echo(f"Loading training data from {manager.get_training_db_path()}...")
     with manager.get_training_session() as session:
-        effective_label_run_id = _get_effective_label_run_id(session, settings.label_run_id)
-        samples = load_samples(session, labeled_only=True, label_run_id=effective_label_run_id)
+        effective_label_run_id = _get_effective_label_run_id(
+            session, settings.label_run_id
+        )
+        samples = load_samples(
+            session, labeled_only=True, label_run_id=effective_label_run_id
+        )
 
     if not samples:
         typer.echo("Error: No labeled training samples found in database", err=True)
@@ -217,16 +242,25 @@ def _prepare_training_data(
 
     typer.echo(f"Splitting data (test_size={settings.test_size})...")
     indices = list(range(len(labels)))
-    train_idx, test_idx = train_test_split(indices, test_size=settings.test_size, random_state=settings.seed, stratify=labels)
+    train_idx, test_idx = train_test_split(
+        indices,
+        test_size=settings.test_size,
+        random_state=settings.seed,
+        stratify=labels,
+    )
 
     train_texts = [texts[i] for i in train_idx]
     train_leaf_keys = [leaf_keys[i] for i in train_idx]
     train_labels = [labels[i] for i in train_idx]
 
-    test_ds = Dataset.from_dict({"text": [texts[i] for i in test_idx], "label": [labels[i] for i in test_idx]})
+    test_ds = Dataset.from_dict(
+        {"text": [texts[i] for i in test_idx], "label": [labels[i] for i in test_idx]}
+    )
 
     if not settings.no_hard_negatives:
-        confusable = {s.strip() for s in settings.hardneg_labels.split(",") if s.strip()}
+        confusable = {
+            s.strip() for s in settings.hardneg_labels.split(",") if s.strip()
+        }
         typer.echo(f"Mining hard negatives for labels: {', '.join(confusable)}...")
         extra_texts, extra_labels = _augment_with_hard_negatives(
             train_texts=train_texts,
@@ -259,7 +293,9 @@ def _create_and_save_run_results(
     metrics: Dict[str, Any],
 ) -> None:
     """Creates a ModelRun, saves all results to the database and optionally to CSV."""
-    run_type_label = "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
+    run_type_label = (
+        "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
+    )
     if isinstance(settings, FullPredictSettings) and settings.use_baseline:
         run_type_label = "baseline"
 
@@ -286,7 +322,11 @@ def _create_and_save_run_results(
         run.final_val_accuracy = metrics.get("accuracy")
         run.final_val_f1 = metrics.get("macro_f1")
 
-    metrics_summary = f", Accuracy: {metrics.get('accuracy', 0):.4f}, Macro-F1: {metrics.get('macro_f1', 0):.4f}" if metrics else ""
+    metrics_summary = (
+        f", Accuracy: {metrics.get('accuracy', 0):.4f}, Macro-F1: {metrics.get('macro_f1', 0):.4f}"
+        if metrics
+        else ""
+    )
     run.notes = f"Run type: {run_type_label}, Taxonomy: {settings.taxonomy}, Split: {settings.split or 'all'}{metrics_summary}"
 
     session.commit()
@@ -294,12 +334,20 @@ def _create_and_save_run_results(
 
     if settings.save_predictions:
         num_saved = save_predictions_to_db(
-            session, samples, predictions, confidences, probabilities, run_id=run.run_id, prediction_type=settings.split or "all"
+            session,
+            samples,
+            predictions,
+            confidences,
+            probabilities,
+            run_id=run.run_id,
+            prediction_type=settings.split or "all",
         )
         typer.echo(f"✓ Saved {num_saved} predictions to database")
 
     if settings.output_file:
-        _save_predictions_to_csv(settings.output_file, samples, predictions, confidences)
+        _save_predictions_to_csv(
+            settings.output_file, samples, predictions, confidences
+        )
 
 
 def _predict_and_evaluate(
@@ -309,10 +357,19 @@ def _predict_and_evaluate(
     """Shared logic for prediction, evaluation, and saving results."""
     manager = StorageManager(settings.storage_path)
     with manager.get_training_session() as session:
-        effective_label_run_id = _get_effective_label_run_id(session, settings.label_run_id)
+        effective_label_run_id = _get_effective_label_run_id(
+            session, settings.label_run_id
+        )
 
-        samples = load_samples(session, split=settings.split, labeled_only=settings.labeled_only, label_run_id=effective_label_run_id)
-        typer.echo(f"✓ Loaded {len(samples)} samples from {manager.get_training_db_path()}")
+        samples = load_samples(
+            session,
+            split=settings.split,
+            labeled_only=settings.labeled_only,
+            label_run_id=effective_label_run_id,
+        )
+        typer.echo(
+            f"✓ Loaded {len(samples)} samples from {manager.get_training_db_path()}"
+        )
 
         if not samples:
             typer.echo("No samples found. Exiting.")
@@ -322,16 +379,29 @@ def _predict_and_evaluate(
         predictions, confidences, probabilities = classifier.predict(samples)
 
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+        y_pred_labeled = [
+            pred for i, pred in enumerate(predictions) if samples[i].label
+        ]
 
         metrics = {}
         if y_true and y_pred_labeled:
             typer.echo(f"\nEvaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
+            metrics = evaluate_predictions(
+                y_true, y_pred_labeled, classifier.labels, verbose=True
+            )
         else:
             typer.echo("\nNo labeled samples found. Skipping evaluation.")
 
-        _create_and_save_run_results(session, settings, classifier, samples, predictions, confidences, probabilities, metrics)
+        _create_and_save_run_results(
+            session,
+            settings,
+            classifier,
+            samples,
+            predictions,
+            confidences,
+            probabilities,
+            metrics,
+        )
 
 
 # --- Typer Commands ---
@@ -347,7 +417,7 @@ def train(
         exists=True,
         dir_okay=False,
         readable=True,
-    )
+    ),
 ) -> None:
     """Train a SetFit classifier using settings from a config file."""
     settings = _load_settings(FullTrainingSettings, config_path)
@@ -371,10 +441,17 @@ def train(
     y_pred = trainer.model.predict(test_ds["text"])
     macro_f1 = f1_score(y_true, y_pred, average="macro")
 
-    typer.echo(f"\n{ '=' * 80}")
+    typer.echo(f"\n{'=' * 80}")
     typer.echo(f"Macro F1-Score: {macro_f1:.4f}")
-    typer.echo(f"{ '=' * 80}\n")
-    typer.echo(classification_report(y_true, y_pred, target_names=[id2label[i] for i in range(len(id2label))], digits=4))
+    typer.echo(f"{'=' * 80}\n")
+    typer.echo(
+        classification_report(
+            y_true,
+            y_pred,
+            target_names=[id2label[i] for i in range(len(id2label))],
+            digits=4,
+        )
+    )
 
     settings.output_dir.mkdir(parents=True, exist_ok=True)
     trainer.model.save_pretrained(str(settings.output_dir))
@@ -391,21 +468,27 @@ def predict(
         exists=True,
         dir_okay=False,
         readable=True,
-    )
+    ),
 ) -> None:
     """Run classifier predictions using settings from a config file."""
     settings = _load_settings(FullPredictSettings, config_path)
 
     if not settings.use_baseline and not settings.model_path:
-        typer.echo("Error: --model-path is required unless --use-baseline is set", err=True)
+        typer.echo(
+            "Error: --model-path is required unless --use-baseline is set", err=True
+        )
         raise typer.Exit(1)
 
     if settings.use_baseline:
-        typer.echo(f"Initializing baseline SetFit model (taxonomy={settings.taxonomy})...")
+        typer.echo(
+            f"Initializing baseline SetFit model (taxonomy={settings.taxonomy})..."
+        )
         classifier = SetFitClassifier(taxonomy=settings.taxonomy, use_baseline=True)
     else:
         typer.echo(f"Loading fine-tuned model from {settings.model_path}...")
-        classifier = SetFitClassifier(model_path=str(settings.model_path), taxonomy=settings.taxonomy)
+        classifier = SetFitClassifier(
+            model_path=str(settings.model_path), taxonomy=settings.taxonomy
+        )
 
     _predict_and_evaluate(settings, classifier)
     typer.echo("\n✓ Done!")
@@ -421,7 +504,7 @@ def zero_shot(
         exists=True,
         dir_okay=False,
         readable=True,
-    )
+    ),
 ) -> None:
     """Run zero-shot classification using settings from a config file."""
     settings = _load_settings(FullZeroShotSettings, config_path)
@@ -441,7 +524,7 @@ def extract_features(
         exists=True,
         dir_okay=False,
         readable=True,
-    )
+    ),
 ) -> None:
     """Extract features from index.db and populate training.db."""
     settings = _load_settings(FeatureExtractionSettings, config_path)
@@ -454,7 +537,10 @@ def extract_features(
         typer.echo(f"Using snapshot_id: {snapshot_id}")
 
     typer.echo(f"Extracting features from snapshot {snapshot_id}...")
-    with manager.get_training_session() as training_session, manager.get_index_session(read_only=True) as index_session:
+    with (
+        manager.get_training_session() as training_session,
+        manager.get_index_session(read_only=True) as index_session,
+    ):
         try:
             label_run = LabelRun(snapshot_id=snapshot_id, label_source="unlabeled")
             training_session.add(label_run)
@@ -469,7 +555,9 @@ def extract_features(
                 batch_size=settings.batch_size,
             )
             training_session.commit()
-            typer.echo(f"✓ Created {num_samples} training samples in {manager.get_training_db_path()}")
+            typer.echo(
+                f"✓ Created {num_samples} training samples in {manager.get_training_db_path()}"
+            )
         except Exception as e:
             typer.echo(f"Error during feature extraction: {e}", err=True)
             training_session.rollback()
@@ -487,7 +575,7 @@ def generate_samples(
         exists=True,
         dir_okay=False,
         readable=True,
-    )
+    ),
 ) -> None:
     """Generate training samples CSV for manual labeling."""
     settings = _load_settings(GenerateSamplesSettings, config_path)
@@ -535,7 +623,9 @@ def _validate_input_csv(input_csv: Path, taxonomy: str) -> List[Dict[str, Any]]:
         raise typer.Exit(1)
 
 
-def _create_label_runs(session: Session, snapshot_ids: List[int]) -> Dict[int, LabelRun]:
+def _create_label_runs(
+    session: Session, snapshot_ids: List[int]
+) -> Dict[int, LabelRun]:
     """Create new manual LabelRun entries for each snapshot."""
     label_runs = {}
     for snapshot_id in snapshot_ids:
@@ -546,7 +636,9 @@ def _create_label_runs(session: Session, snapshot_ids: List[int]) -> Dict[int, L
     return label_runs
 
 
-def _create_samples_for_runs(index_session: Session, training_session: Session, label_runs: Dict[int, LabelRun]) -> None:
+def _create_samples_for_runs(
+    index_session: Session, training_session: Session, label_runs: Dict[int, LabelRun]
+) -> None:
     """Run feature extraction to create TrainingSample stubs for each label run."""
     config = get_config()
     for snapshot_id, label_run in label_runs.items():
@@ -557,14 +649,23 @@ def _create_samples_for_runs(index_session: Session, training_session: Session, 
             config=config,
             label_run=label_run,
         )
-        typer.echo(f"  ✓ Created {num_samples} training samples for snapshot {snapshot_id}")
+        typer.echo(
+            f"  ✓ Created {num_samples} training samples for snapshot {snapshot_id}"
+        )
 
 
-def _apply_labels_to_samples(session: Session, rows: List[Dict[str, Any]], label_runs: Dict[int, LabelRun], split: Optional[str]) -> int:
+def _apply_labels_to_samples(
+    session: Session,
+    rows: List[Dict[str, Any]],
+    label_runs: Dict[int, LabelRun],
+    split: Optional[str],
+) -> int:
     """Apply labels from CSV rows to TrainingSample objects, optimized."""
     samples_by_node_id: Dict[Tuple[int, int], TrainingSample] = {}
     for label_run in label_runs.values():
-        samples_for_run = session.query(TrainingSample).filter_by(label_run_id=label_run.id).all()
+        samples_for_run = (
+            session.query(TrainingSample).filter_by(label_run_id=label_run.id).all()
+        )
         for sample in samples_for_run:
             if sample.node_id is not None:
                 samples_by_node_id[(label_run.snapshot_id, sample.node_id)] = sample
@@ -613,7 +714,9 @@ def apply_classifications(
             with manager.get_index_session(read_only=True) as index_session:
                 _create_samples_for_runs(index_session, training_session, label_runs)
 
-            labeled_count = _apply_labels_to_samples(training_session, rows, label_runs, settings.split)
+            labeled_count = _apply_labels_to_samples(
+                training_session, rows, label_runs, settings.split
+            )
             training_session.commit()
             typer.echo(f"✓ Applied {labeled_count} labels to training database")
     except Exception as e:

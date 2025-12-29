@@ -1,6 +1,7 @@
 """
 Evaluation utilities for the fine-tuning pipeline.
 """
+
 from collections import defaultdict
 from typing import Dict, List, Set
 
@@ -31,8 +32,12 @@ def evaluate_predictions(
     """
     # Calculate metrics
     accuracy = accuracy_score(y_true, y_pred)
-    macro_f1 = f1_score(y_true, y_pred, average="macro", labels=sorted(labels), zero_division=0)
-    weighted_f1 = f1_score(y_true, y_pred, average="weighted", labels=sorted(labels), zero_division=0)
+    macro_f1 = f1_score(
+        y_true, y_pred, average="macro", labels=sorted(labels), zero_division=0
+    )
+    weighted_f1 = f1_score(
+        y_true, y_pred, average="weighted", labels=sorted(labels), zero_division=0
+    )
 
     metrics = {
         "accuracy": accuracy,

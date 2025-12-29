@@ -3,6 +3,7 @@
 Provides utilities for querying and modifying the training.db database.
 Session management is handled by the StorageManager.
 """
+
 import json
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -31,13 +32,17 @@ def load_samples(
     if split:
         query = query.where(TrainingSample.split == split)
     if labeled_only:
-        query = query.where(TrainingSample.label.isnot(None) & (TrainingSample.label != ""))
+        query = query.where(
+            TrainingSample.label.isnot(None) & (TrainingSample.label != "")
+        )
     return list(session.execute(query).scalars().all())
 
 
 def get_newest_label_run_id(session: Session) -> Optional[int]:
     """Get the newest (highest ID) label run from the database."""
-    return session.execute(select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)).scalar_one_or_none()
+    return session.execute(
+        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
+    ).scalar_one_or_none()
 
 
 def save_predictions_to_db(
@@ -51,7 +56,9 @@ def save_predictions_to_db(
 ) -> int:
     """Save predictions to database."""
     prediction_objects = []
-    for sample, pred, conf, probs in zip(samples, predictions, confidences, probabilities):
+    for sample, pred, conf, probs in zip(
+        samples, predictions, confidences, probabilities
+    ):
         is_correct = None
         if sample.label:
             is_correct = sample.label == pred
@@ -86,7 +93,13 @@ def create_model_run(
         run_type = "baseline" if use_baseline else "evaluation"
 
     base_model_id = f"setfit-{run_type}-{taxonomy}"
-    model_version = f"baseline-{taxonomy}" if use_baseline else model_path if model_path else f"unknown-{taxonomy}"
+    model_version = (
+        f"baseline-{taxonomy}"
+        if use_baseline
+        else model_path
+        if model_path
+        else f"unknown-{taxonomy}"
+    )
 
     run = ModelRun(
         started_at=datetime.now().isoformat(),

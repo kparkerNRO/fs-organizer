@@ -2,7 +2,7 @@ import csv
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session, select
 from storage.index_models import Node
@@ -119,7 +119,7 @@ def _sample_from_clusters(
     """Sample nodes from clusters to maximize diversity."""
     if not clusters:
         return []
-    
+
     # Flatten clusters into a list of nodes, ensuring at least one from each
     selected: List[Node] = []
     # Take one from each cluster to guarantee diversity
@@ -129,8 +129,9 @@ def _sample_from_clusters(
 
     # Fill remaining from all available nodes
     remaining_nodes = [node for cluster in clusters for node in cluster]
-    
+
     import random
+
     random.shuffle(remaining_nodes)
 
     needed = num_samples - len(selected)
@@ -171,19 +172,39 @@ def write_sample_csv(
         writer.writeheader()
 
         for node in nodes:
-            parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
-            grandparent = nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id else None
+            parent = (
+                nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+            )
+            grandparent = (
+                nodes_by_id.get(parent.parent_node_id)
+                if parent and parent.parent_node_id
+                else None
+            )
 
-            child_nodes = [nodes_by_id[cid] for cid in children_by_parent.get(node.node_id, []) if cid in nodes_by_id and nodes_by_id[cid].kind == NodeKind.DIR]
+            child_nodes = [
+                nodes_by_id[cid]
+                for cid in children_by_parent.get(node.node_id, [])
+                if cid in nodes_by_id and nodes_by_id[cid].kind == NodeKind.DIR
+            ]
             child_names = sorted({c.name for c in child_nodes})[:child_sample_size]
 
             if parent:
-                sibling_nodes = [nodes_by_id[sid] for sid in children_by_parent.get(parent.node_id, []) if sid != node.node_id and sid in nodes_by_id and nodes_by_id[sid].kind == NodeKind.DIR]
-                sibling_names = sorted({s.name for s in sibling_nodes})[:sibling_sample_size]
+                sibling_nodes = [
+                    nodes_by_id[sid]
+                    for sid in children_by_parent.get(parent.node_id, [])
+                    if sid != node.node_id
+                    and sid in nodes_by_id
+                    and nodes_by_id[sid].kind == NodeKind.DIR
+                ]
+                sibling_names = sorted({s.name for s in sibling_nodes})[
+                    :sibling_sample_size
+                ]
             else:
                 sibling_names = []
 
-            extensions = sorted(descendant_exts.get(node.node_id, set()))[:ext_sample_size]
+            extensions = sorted(descendant_exts.get(node.node_id, set()))[
+                :ext_sample_size
+            ]
 
             row = {
                 "snapshot_id": snapshot_id,
@@ -252,7 +273,7 @@ def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
                 snapshot_id = int(row["snapshot_id"])
                 node_id = int(row["node_id"])
                 label = row["label"].strip()
-                
+
                 # Create a flexible dictionary from the row
                 parsed_row = {
                     "snapshot_id": snapshot_id,
