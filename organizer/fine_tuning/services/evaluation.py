@@ -2,6 +2,7 @@
 Evaluation utilities for the fine-tuning pipeline.
 """
 
+import logging
 from collections import defaultdict
 from typing import Dict, List, Set
 
@@ -12,13 +13,15 @@ from sklearn.metrics import (
     f1_score,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def evaluate_predictions(
     y_true: List[str],
     y_pred: List[str],
     labels: Set[str],
     verbose: bool = True,
-) -> Dict:
+) -> Dict[str, float | int]:
     """Evaluate predictions and print metrics.
 
     Args:
@@ -47,18 +50,18 @@ def evaluate_predictions(
     }
 
     if verbose:
-        print("\n" + "=" * 80)
-        print("EVALUATION RESULTS")
-        print("=" * 80)
-        print(f"\nTotal Samples: {len(y_true)}")
-        print(f"Accuracy: {accuracy:.4f}")
-        print(f"Macro F1-Score: {macro_f1:.4f}")
-        print(f"Weighted F1-Score: {weighted_f1:.4f}")
+        logger.info("=" * 80)
+        logger.info("EVALUATION RESULTS")
+        logger.info("=" * 80)
+        logger.info(f"Total Samples: {len(y_true)}")
+        logger.info(f"Accuracy: {accuracy:.4f}")
+        logger.info(f"Macro F1-Score: {macro_f1:.4f}")
+        logger.info(f"Weighted F1-Score: {weighted_f1:.4f}")
 
-        print("\n" + "-" * 80)
-        print("CLASSIFICATION REPORT")
-        print("-" * 80)
-        print(
+        logger.info("-" * 80)
+        logger.info("CLASSIFICATION REPORT")
+        logger.info("-" * 80)
+        logger.info(
             classification_report(
                 y_true,
                 y_pred,
@@ -69,29 +72,29 @@ def evaluate_predictions(
             )
         )
 
-        print("\n" + "-" * 80)
-        print("CONFUSION MATRIX")
-        print("-" * 80)
+        logger.info("-" * 80)
+        logger.info("CONFUSION MATRIX")
+        logger.info("-" * 80)
         cm = confusion_matrix(y_true, y_pred, labels=sorted(labels))
         label_list = sorted(labels)
 
-        # Print header
-        print(f"{'':20s}", end="")
+        # Build confusion matrix header
+        header = f"{'':20s}"
         for label in label_list:
-            print(f"{label[:15]:>15s}", end=" ")
-        print()
+            header += f"{label[:15]:>15s} "
+        logger.info(header)
 
-        # Print rows
+        # Build confusion matrix rows
         for i, true_label in enumerate(label_list):
-            print(f"{true_label[:20]:20s}", end="")
+            row = f"{true_label[:20]:20s}"
             for j in range(len(label_list)):
-                print(f"{cm[i, j]:>15d}", end=" ")
-            print()
+                row += f"{cm[i, j]:>15d} "
+            logger.info(row)
 
-        # Print most common errors
-        print("\n" + "-" * 80)
-        print("MOST COMMON ERRORS")
-        print("-" * 80)
+        # Log most common errors
+        logger.info("-" * 80)
+        logger.info("MOST COMMON ERRORS")
+        logger.info("-" * 80)
 
         errors = defaultdict(int)
         for true, pred in zip(y_true, y_pred):
@@ -100,6 +103,6 @@ def evaluate_predictions(
 
         sorted_errors = sorted(errors.items(), key=lambda x: x[1], reverse=True)
         for (true, pred), count in sorted_errors[:10]:
-            print(f"  {true:20s} -> {pred:20s}: {count:4d} errors")
+            logger.info(f"  {true:20s} -> {pred:20s}: {count:4d} errors")
 
     return metrics

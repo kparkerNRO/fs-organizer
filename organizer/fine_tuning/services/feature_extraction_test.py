@@ -3,17 +3,17 @@
 import json
 
 import pytest
+from fine_tuning.services.feature_extraction import (
+    FeatureExtractionSettings,
+    extract_features_for_run,
+)
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from storage.index_models import IndexBase, Node, Snapshot
 from storage.manager import NodeKind
-from storage.training_models import TrainingBase, TrainingSample, LabelRun
+from storage.training_models import LabelRun, TrainingBase, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token
-
-from fine_tuning.services.feature_extraction import (
-    extract_features,
-)
 
 
 @pytest.fixture
@@ -68,6 +68,19 @@ def label_run(training_session):
     training_session.add(label_run)
     training_session.flush()
     return label_run
+
+
+@pytest.fixture
+def test_settings():
+    """Create test settings for feature extraction"""
+    return FeatureExtractionSettings(
+        index_db="",  # Not used in tests
+        training_db="",  # Not used in tests
+        batch_size=1000,
+        child_cap=5,
+        sibling_cap=5,
+        ext_cap=10,
+    )
 
 
 @pytest.fixture
@@ -275,15 +288,22 @@ class TestExtractFeatures:
     """Test extract_features function"""
 
     def test_basic_feature_extraction(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test basic feature extraction from nodes"""
-        num_created = extract_features(
+        num_created = extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # Should create one sample per node, but only directories and ZIP files
@@ -296,15 +316,22 @@ class TestExtractFeatures:
         assert len(samples) == 6
 
     def test_parent_child_relationships(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that parent-child relationships are captured"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # Find the "High Resolution" folder sample
@@ -320,15 +347,22 @@ class TestExtractFeatures:
         assert high_res_sample.depth == 2
 
     def test_child_names_captured(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that child names are captured"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # Find the "High Resolution" folder which has two children
@@ -345,15 +379,22 @@ class TestExtractFeatures:
         assert any("warrior" in name for name in child_names)
 
     def test_sibling_names_captured(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that sibling names are captured"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # "High Resolution" has sibling "Low Res"
@@ -370,15 +411,22 @@ class TestExtractFeatures:
         )
 
     def test_descendant_extensions(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that descendant file extensions are captured"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # "Character Art" folder contains descendant files with .png and .jpg
@@ -392,15 +440,22 @@ class TestExtractFeatures:
         assert "png" in exts or "jpg" in exts
 
     def test_cue_detection(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that cue markers are detected"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # "High Resolution" should have variant hint from children
@@ -414,15 +469,22 @@ class TestExtractFeatures:
         assert high_res_sample.sibling_has_variant_hint is True
 
     def test_text_field_format(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that text field is properly formatted"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         sample = (
@@ -442,15 +504,22 @@ class TestExtractFeatures:
         assert "flags:" in sample.text
 
     def test_zip_file_handling(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test that ZIP files are treated as containers"""
-        extract_features(
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
+            settings=test_settings,
         )
 
         # Find the ZIP file sample
@@ -468,16 +537,31 @@ class TestExtractFeatures:
         assert any("texture" in name for name in child_names)
 
     def test_batch_processing(
-        self, index_session, training_session, sample_nodes, test_config, label_run
+        self,
+        index_session,
+        training_session,
+        sample_nodes,
+        test_config,
+        label_run,
+        test_settings,
     ):
         """Test batch processing with small batch size"""
-        num_created = extract_features(
+        # Override batch_size for this test
+        settings = FeatureExtractionSettings(
+            index_db="",
+            training_db="",
+            batch_size=3,  # Small batch size to test batching logic
+            child_cap=test_settings.child_cap,
+            sibling_cap=test_settings.sibling_cap,
+            ext_cap=test_settings.ext_cap,
+        )
+        num_created = extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
-            batch_size=3,  # Small batch size to test batching logic
+            settings=settings,
         )
 
         # Only directories and ZIP files are processed
@@ -487,7 +571,9 @@ class TestExtractFeatures:
         samples = training_session.query(TrainingSample).all()
         assert len(samples) == 6
 
-    def test_child_cap(self, index_session, training_session, test_config, label_run):
+    def test_child_cap(
+        self, index_session, training_session, test_config, label_run, test_settings
+    ):
         """Test that child_cap limits number of children stored"""
         # Create snapshot first
         snapshot = Snapshot(
@@ -532,13 +618,22 @@ class TestExtractFeatures:
 
         index_session.commit()
 
-        extract_features(
+        # Override child_cap for this test
+        settings = FeatureExtractionSettings(
+            index_db="",
+            training_db="",
+            batch_size=test_settings.batch_size,
+            child_cap=10,
+            sibling_cap=test_settings.sibling_cap,
+            ext_cap=test_settings.ext_cap,
+        )
+        extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=1,
             config=test_config,
             label_run=label_run,
-            child_cap=10,
+            settings=settings,
         )
 
         parent_sample = (
@@ -551,7 +646,7 @@ class TestExtractFeatures:
         assert len(child_names) <= 10
 
     def test_empty_snapshot(
-        self, index_session, training_session, test_config, label_run
+        self, index_session, training_session, test_config, label_run, test_settings
     ):
         """Test extraction with non-existent snapshot"""
         # Create a label_run for snapshot 999
@@ -559,12 +654,13 @@ class TestExtractFeatures:
         training_session.add(label_run_999)
         training_session.flush()
 
-        num_created = extract_features(
+        num_created = extract_features_for_run(
             index_session,
             training_session,
             snapshot_id=999,  # Non-existent
             config=test_config,
             label_run=label_run_999,
+            settings=test_settings,
         )
 
         assert num_created == 0

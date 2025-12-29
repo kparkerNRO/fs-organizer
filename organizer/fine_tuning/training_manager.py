@@ -5,18 +5,22 @@ in the training database.
 """
 
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
+from storage.index_models import Snapshot
+from storage.manager import StorageManager
 from storage.training_models import (
     LabelRun,
     ModelRun,
     SamplePrediction,
     TrainingSample,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def load_samples(
@@ -176,3 +180,25 @@ def create_model_run(
     session.refresh(run)
 
     return run
+
+
+def get_highest_snapshot_id(manager: StorageManager) -> int:
+    """Get the highest snapshot_id from the index database."""
+    with manager.get_index_session(read_only=True) as session:
+        result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
+        if result is None:
+            raise ValueError(f"No snapshots found in {manager.get_index_db_path()}")
+        return result
+
+
+def get_effective_label_run_id(session: Session, label_run_id: int | None) -> int:
+    """Get the effective label run ID, defaulting to the newest if not specified."""
+    if label_run_id is not None:
+        logger.info(f"Using specified label run: {label_run_id}")
+        return label_run_id
+
+    effective_label_run_id = get_newest_label_run_id(session)
+    if effective_label_run_id is None:
+        raise ValueError("No label runs found in database")
+    logger.info(f"Using newest label run: {effective_label_run_id}")
+    return effective_label_run_id

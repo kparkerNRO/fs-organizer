@@ -1,14 +1,41 @@
 import json
 from typing import Dict, List, Optional, Set
 
+from fine_tuning.heuristic_classifier import COLLAB_MARKERS
+from fine_tuning.settings import StorageSettings
+from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
+from pydantic import Field
 from sqlalchemy.orm import Session
 from storage.index_models import Node
-from storage.manager import NodeKind
+from storage.manager import NodeKind, StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
-from fine_tuning.heuristic_classifier import COLLAB_MARKERS
-from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
+
+
+class FeatureExtractionSettings(StorageSettings):
+    """Settings for the 'extract-features' command."""
+
+    snapshot_id: Optional[int] = Field(
+        None,
+        description="Snapshot ID to extract features from (defaults to highest snapshot_id if unset)",
+    )
+    batch_size: int = Field(
+        1000,
+        description="Number of samples to insert per batch",
+    )
+    child_cap: int = Field(
+        5,
+        description="Maximum number of child folder names to include in features",
+    )
+    sibling_cap: int = Field(
+        5,
+        description="Maximum number of sibling folder names to include in features",
+    )
+    ext_cap: int = Field(
+        10,
+        description="Maximum number of file extensions to include in features",
+    )
 
 
 def _build_feature_text(
@@ -113,21 +140,14 @@ def _create_training_sample(
     )
 
 
-def extract_features(
+def extract_features_for_run(
     index_session: Session,
     training_session: Session,
     snapshot_id: int,
     config: Config,
     label_run: LabelRun,
-    *,
-    child_cap: int = 20,
-    sibling_cap: int = 20,
-    ext_cap: int = 12,
-    batch_size: int = 1000,
+    settings: FeatureExtractionSettings,
 ) -> int:
-    """
-    Extract features for all nodes in a snapshot and save to training database.
-    """
     nodes_by_id, processed_name_by_id, children_by_parent = load_and_index_nodes(
         index_session, snapshot_id
     )
@@ -152,13 +172,13 @@ def extract_features(
             processed_name_by_id,
             children_by_parent,
             descendant_exts,
-            child_cap,
-            sibling_cap,
-            ext_cap,
+            settings.child_cap,
+            settings.sibling_cap,
+            settings.ext_cap,
         )
         samples.append(sample)
 
-        if len(samples) >= batch_size:
+        if len(samples) >= settings.batch_size:
             training_session.add_all(samples)
             training_session.flush()
             total_saved += len(samples)
@@ -170,3 +190,25 @@ def extract_features(
         total_saved += len(samples)
 
     return total_saved
+
+
+def extract_features_from_snapshot(
+    settings: FeatureExtractionSettings,
+    manager: StorageManager,
+    config: Config,
+    snapshot_id: int,
+) -> int:
+    """
+    Extract features for all nodes in a snapshot and save to training database.
+    """
+    with (
+        manager.get_training_session() as training_session,
+        manager.get_index_session(read_only=True) as index_session,
+    ):
+        label_run = LabelRun(snapshot_id=snapshot_id, label_source="unlabeled")
+        training_session.add(label_run)
+        training_session.flush()
+
+        return extract_features_for_run(
+            index_session, training_session, snapshot_id, config, label_run, settings
+        )

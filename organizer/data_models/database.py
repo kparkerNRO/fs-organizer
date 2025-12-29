@@ -17,7 +17,7 @@ from sqlalchemy.orm import (
     mapped_column,
 )
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class Base(DeclarativeBase):
@@ -154,7 +154,9 @@ class GroupingIteration(Base):
     __tablename__ = "grouping_iterations"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     description: Mapped[Optional[str]]
     parameters: Mapped[Optional[dict]] = mapped_column(JsonDict)
 

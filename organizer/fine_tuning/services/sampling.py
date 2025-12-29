@@ -1,19 +1,25 @@
 import csv
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
+from fine_tuning.heuristic_classifier import HeuristicClassifier
+from fine_tuning.services.feature_extraction import extract_features_for_run
+from fine_tuning.settings import StorageSettings
+from fine_tuning.taxonomy import get_labels
+from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
+from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
-from storage.manager import NodeKind
+from storage.manager import NodeKind, StorageManager
+from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
 from utils.text_processing import char_trigrams, jaccard_similarity
 
-from fine_tuning.heuristic_classifier import HeuristicClassifier
-from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
-
+logger = logging.getLogger(__name__)
 
 # CSV column schema for training samples
 CSV_COLUMNS = [
@@ -35,13 +41,79 @@ CSV_COLUMNS = [
 ]
 
 
+class GenerateSamplesSettings(StorageSettings):
+    """Settings for the 'generate-samples' command."""
+
+    output_csv: Path = Field(
+        ...,
+        description="Path to output CSV file for manual labeling",
+    )
+    snapshot_id: Optional[int] = Field(
+        None,
+        description="Snapshot ID to generate samples from (defaults to highest snapshot_id if unset)",
+    )
+    sample_size: int = Field(
+        800,
+        description="Number of samples to generate",
+    )
+    min_depth: int = Field(
+        1,
+        description="Minimum folder depth to sample from",
+    )
+    max_depth: int = Field(
+        10,
+        description="Maximum folder depth to sample from",
+    )
+    diversity_factor: float = Field(
+        0.7,
+        description="Balance between random and diverse sampling (0-1, higher=more diverse)",
+    )
+    use_heuristic: bool = Field(
+        True,
+        description="Include heuristic classifier predictions in CSV output",
+    )
+    heuristic_taxonomy: str = Field(
+        "v2",
+        description="Taxonomy for heuristic classifier (v1 or v2)",
+    )
+
+
+class ApplyClassificationsSettings(StorageSettings):
+    """Settings for the 'apply-classifications' command."""
+
+    input_csv: Path = Field(
+        ...,
+        description="CSV file with manual classifications",
+    )
+    labeler: str = Field(
+        "manual",
+        description="Name of the labeler (e.g., 'manual', 'human-v1')",
+    )
+    split: Optional[str] = Field(
+        None,
+        description="Data split: 'train', 'validation', or 'test'",
+    )
+    taxonomy: str = Field(
+        "v2",
+        description="Label taxonomy to validate against: v1, v2, or legacy",
+    )
+    validate_only: bool = Field(
+        False,
+        description="Only validate CSV without writing to database",
+    )
+
+
+###############################
+# Select samples
+###############################
+
+
 def select_training_samples(
     session: Session,
     snapshot_id: int,
     sample_size: int,
     min_depth: int,
     max_depth: int,
-    diversity_factor: float,
 ) -> List[Node]:
     """Select diverse training samples from a snapshot using stratified sampling."""
     nodes = (
@@ -85,7 +157,7 @@ def select_training_samples(
             selected.extend(depth_nodes)
             continue
         clusters = _cluster_by_similarity(depth_nodes, threshold=0.4)
-        sampled = _sample_from_clusters(clusters, num_samples, diversity_factor)
+        sampled = _sample_from_clusters(clusters, num_samples)
         selected.extend(sampled)
 
     return selected[:sample_size]
@@ -114,9 +186,7 @@ def _cluster_by_similarity(nodes: List[Node], threshold: float) -> List[List[Nod
     return [[nodes[idx] for idx in cluster] for cluster in clusters]
 
 
-def _sample_from_clusters(
-    clusters: List[List[Node]], num_samples: int, diversity_factor: float
-) -> List[Node]:
+def _sample_from_clusters(clusters: List[List[Node]], num_samples: int) -> List[Node]:
     """Sample nodes from clusters to maximize diversity."""
     if not clusters:
         return []
@@ -165,7 +235,7 @@ def write_sample_csv(
                 config, taxonomy=heuristic_taxonomy
             )
         except Exception as e:
-            print(f"Warning: Could not initialize heuristic classifier: {e}")
+            logger.warning(f"Could not initialize heuristic classifier: {e}")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as f:
@@ -239,6 +309,38 @@ def write_sample_csv(
                 row["heuristic_reason"] = result.reason
 
             writer.writerow(row)
+
+
+def generate_sample_data(
+    settings: GenerateSamplesSettings, manager: StorageManager, snapshot_id: int
+) -> int:
+    with manager.get_index_session(read_only=True) as session:
+        samples = select_training_samples(
+            session=session,
+            snapshot_id=snapshot_id,
+            sample_size=settings.sample_size,
+            min_depth=settings.min_depth,
+            max_depth=settings.max_depth,
+        )
+        if not samples:
+            logger.error("No samples found matching criteria")
+            raise ValueError("No samples found matching criteria")
+
+        write_sample_csv(
+            output_path=settings.output_csv,
+            nodes=samples,
+            session=session,
+            snapshot_id=snapshot_id,
+            use_heuristic=settings.use_heuristic,
+            heuristic_taxonomy=settings.heuristic_taxonomy,
+        )
+
+        return len(samples)
+
+
+###############################
+# Ingest labeled samples
+###############################
 
 
 def read_classification_csv(csv_path: Path) -> List[Dict[str, Any]]:
@@ -320,7 +422,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         )
 
 
-def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
+def validate_label_values(rows: List[Dict[str, Any]], valid_labels: set[str]) -> None:
     """Validate that all labels are valid.
 
     Args:
@@ -349,3 +451,115 @@ def validate_label_values(rows: List[Dict[str, Any]], valid_labels) -> None:
 
         error_msg.append(f"\nValid labels are: {', '.join(sorted(valid_labels))}")
         raise ValueError("\n".join(error_msg))
+
+
+def validate_input_csv(input_csv: Path, taxonomy: str) -> List[Dict[str, Any]]:
+    """Read and validate the classification CSV."""
+    try:
+        rows = read_classification_csv(input_csv)
+        valid_labels = get_labels(taxonomy)
+        validate_all_labels_present(rows)
+        validate_label_values(rows, valid_labels)
+        logger.info("All labels are valid")
+        return rows
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise
+
+
+def create_samples_for_runs(
+    index_session: Session,
+    training_session: Session,
+    label_runs: Dict[int, LabelRun],
+    settings: ApplyClassificationsSettings,
+) -> None:
+    """Run feature extraction to create TrainingSample stubs for each label run."""
+    from fine_tuning.services.feature_extraction import FeatureExtractionSettings
+
+    config = get_config()
+    # Create a FeatureExtractionSettings object from ApplyClassificationsSettings
+    extraction_settings = FeatureExtractionSettings(
+        storage_path=settings.storage_path,
+        batch_size=1000,
+        child_cap=5,
+        sibling_cap=5,
+        ext_cap=10,
+    )
+    for snapshot_id, label_run in label_runs.items():
+        num_samples = extract_features_for_run(
+            index_session=index_session,
+            training_session=training_session,
+            snapshot_id=snapshot_id,
+            config=config,
+            label_run=label_run,
+            settings=extraction_settings,
+        )
+        logger.info(
+            f"Created {num_samples} training samples for snapshot {snapshot_id}"
+        )
+
+
+def create_label_runs(session: Session, snapshot_ids: List[int]) -> Dict[int, LabelRun]:
+    """Create new manual LabelRun entries for each snapshot."""
+    label_runs = {}
+    for snapshot_id in snapshot_ids:
+        label_run = LabelRun(snapshot_id=snapshot_id, label_source="manual")
+        session.add(label_run)
+        label_runs[snapshot_id] = label_run
+    session.flush()  # Assign IDs to label_run objects
+    return label_runs
+
+
+def apply_labels_to_samples(
+    session: Session,
+    rows: List[Dict[str, Any]],
+    label_runs: Dict[int, LabelRun],
+    split: Optional[str],
+) -> int:
+    """Apply labels from CSV rows to TrainingSample objects, optimized."""
+    samples_by_node_id: Dict[Tuple[int, int], TrainingSample] = {}
+    for label_run in label_runs.values():
+        samples_for_run = (
+            session.query(TrainingSample).filter_by(label_run_id=label_run.id).all()
+        )
+        for sample in samples_for_run:
+            if sample.node_id is not None:
+                samples_by_node_id[(label_run.snapshot_id, sample.node_id)] = sample
+
+    labeled_count = 0
+    for row in rows:
+        snapshot_id = row["snapshot_id"]
+        node_id = row["node_id"]
+        sample = samples_by_node_id.get((snapshot_id, node_id))
+
+        if sample:
+            sample.label = row["label"]
+            sample.label_confidence = 1.0
+            if split:
+                sample.split = split
+            labeled_count += 1
+    return labeled_count
+
+
+def apply_sample_classifications(
+    settings: ApplyClassificationsSettings, manager: StorageManager
+) -> None:
+    rows = validate_input_csv(settings.input_csv, settings.taxonomy)
+
+    with (
+        manager.get_training_session() as training_session,
+        manager.get_index_session(read_only=True) as index_session,
+    ):
+        snapshot_ids = sorted(list(set(row["snapshot_id"] for row in rows)))
+        label_runs = create_label_runs(training_session, snapshot_ids)
+
+        with manager.get_index_session(read_only=True) as index_session:
+            create_samples_for_runs(
+                index_session, training_session, label_runs, settings
+            )
+
+        labeled_count = apply_labels_to_samples(
+            training_session, rows, label_runs, settings.split
+        )
+        training_session.commit()
+        logger.info(f"Applied {labeled_count} labels to training database")
