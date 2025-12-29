@@ -44,7 +44,7 @@ from fine_tuning.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from fine_tuning.taxonomy import get_labels
+from fine_tuning.taxonomy import get_labels, convert_label, is_valid_label
 from utils.text_processing import char_trigrams, jaccard_similarity
 
 app = typer.Typer(
@@ -152,9 +152,9 @@ def train(
         help="Oversampling factor for hard negatives",
     ),
     hardneg_labels: str = typer.Option(
-        "primary_author,secondary_author,collection,subject",
+        "",
         "--hardneg-labels",
-        help="Comma-separated labels to mine hard negatives for",
+        help="Comma-separated labels to mine hard negatives for (defaults to all confusable labels in taxonomy)",
     ),
     test_size: float = typer.Option(
         0.2,
@@ -202,15 +202,6 @@ def train(
         raise typer.Exit(1)
 
     LABELS = sorted(get_labels(taxonomy))
-
-    # Validation
-    if not no_triplet_loss and (batch_size % samples_per_label != 0):
-        typer.echo(
-            f"Error: batch_size ({batch_size}) must be a multiple of "
-            f"samples_per_label ({samples_per_label}) when using triplet loss",
-            err=True,
-        )
-        raise typer.Exit(1)
 
     # Helper function for hard negative mining
     def augment_with_hard_negatives(
@@ -329,22 +320,19 @@ def train(
         {"text": [texts[i] for i in test_idx], "label": [labels[i] for i in test_idx]}
     )
 
-    # Validate triplet loss requirements
-    if not no_triplet_loss:
-        counts = defaultdict(int)
-        for y in train_labels:
-            counts[y] += 1
-        too_small = [id2label[y] for y, c in counts.items() if c < 2]
-        if too_small:
-            typer.echo(
-                f"Error: Triplet loss requires >=2 train examples per label.\n"
-                f"These labels have <2 in the train split: {too_small}",
-                err=True,
-            )
-            raise typer.Exit(1)
-
     # Hard-negative oversampling
-    confusable = {s.strip() for s in hardneg_labels.split(",") if s.strip()}
+    # If hardneg_labels is empty, use sensible defaults based on taxonomy
+    if not hardneg_labels.strip():
+        if taxonomy == "legacy":
+            default_labels = ["primary_author", "secondary_author", "collection", "subject"]
+        elif taxonomy == "v1":
+            default_labels = ["person_or_group", "content"]
+        else:  # v2
+            default_labels = ["creator_or_studio", "content_subject"]
+        confusable = set(default_labels)
+    else:
+        confusable = {s.strip() for s in hardneg_labels.split(",") if s.strip()}
+
     typer.echo(f"Mining hard negatives for labels: {', '.join(confusable)}...")
 
     extra_texts, extra_labels = augment_with_hard_negatives(
@@ -373,18 +361,12 @@ def train(
         model=setfit_model,
         train_dataset=train_ds,
         eval_dataset=test_ds,
-        batch_size=batch_size,
         num_epochs=num_epochs,
-        learning_rate=learning_rate,
         column_mapping={"text": "text", "label": "label"},
     )
 
     if not no_triplet_loss:
-        typer.echo("Using batch-hard triplet loss")
-        trainer_kwargs.update(
-            loss=BatchHardSoftMarginTripletLoss,
-            samples_per_label=samples_per_label,
-        )
+        typer.echo("Note: Custom triplet loss not supported in this SetFit version, using default loss")
 
     trainer = SetFitTrainer(**trainer_kwargs)
 
@@ -1285,6 +1267,12 @@ def apply_classifications(
         "--split",
         help="Data split: 'train', 'validation', or 'test'",
     ),
+    taxonomy: str = typer.Option(
+        "v2",
+        "--taxonomy",
+        "-x",
+        help="Label taxonomy to validate against: v1, v2, or legacy",
+    ),
     validate_only: bool = typer.Option(
         False,
         "--validate-only",
@@ -1319,13 +1307,19 @@ def apply_classifications(
 
     typer.echo(f"✓ Read {len(rows)} rows")
 
-    # Validate labels
-    typer.echo("Validating labels...")
-    from fine_tuning.taxonomy import LABELS_V2
+    # Validate taxonomy parameter
+    if taxonomy not in ["v1", "v2", "legacy"]:
+        typer.echo(f"❌ Invalid taxonomy '{taxonomy}'", err=True)
+        typer.echo("Valid taxonomies: v1, v2, legacy")
+        raise typer.Exit(1)
+
+    # Validate labels using specified taxonomy
+    typer.echo(f"Validating labels against {taxonomy} taxonomy...")
+    valid_labels = get_labels(taxonomy)
 
     try:
         validate_all_labels_present(rows)
-        validate_label_values(rows, LABELS_V2)
+        validate_label_values(rows, valid_labels)
     except ValueError as e:
         typer.echo(f"❌ Validation error:\n{e}", err=True)
         raise typer.Exit(1)
