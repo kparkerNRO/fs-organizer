@@ -31,6 +31,7 @@ from utils.config import get_config
 from fine_tuning.feature_extraction import extract_features as extract_fn
 from fine_tuning.run_classifier import (
     SetFitClassifier,
+    ZeroShotClassifier,
     create_model_run,
     evaluate_predictions,
     load_samples,
@@ -648,6 +649,243 @@ def predict(
 
         typer.echo(
             f"✓ Saved metrics to database (run_id={run.run_id}, type={run_type_label}, taxonomy={taxonomy})"
+        )
+        if metrics:
+            typer.echo(f"  Accuracy: {metrics.get('accuracy', 0):.4f}")
+            typer.echo(f"  Macro F1: {metrics.get('macro_f1', 0):.4f}")
+            typer.echo(f"  Weighted F1: {metrics.get('weighted_f1', 0):.4f}")
+
+        # Save predictions to database (optional)
+        if save_predictions:
+            typer.echo("\nSaving predictions to database...")
+
+            num_saved = save_predictions_to_db(
+                session,
+                samples,
+                predictions,
+                confidences,
+                probabilities,
+                run_id=run.run_id,
+                prediction_type=split or "all",
+            )
+
+            typer.echo(f"✓ Saved {num_saved} predictions")
+
+        # Save to CSV
+        if output_file:
+            typer.echo(f"\nSaving predictions to {output_file}...")
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+
+            import csv
+
+            with output_file.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(
+                    [
+                        "sample_id",
+                        "name",
+                        "true_label",
+                        "predicted_label",
+                        "confidence",
+                        "is_correct",
+                    ]
+                )
+
+                for sample, pred, conf in zip(samples, predictions, confidences):
+                    is_correct = ""
+                    if sample.label:
+                        is_correct = "1" if sample.label == pred else "0"
+
+                    writer.writerow(
+                        [
+                            sample.sample_id,
+                            sample.name_raw,
+                            sample.label or "",
+                            pred,
+                            f"{conf:.4f}",
+                            is_correct,
+                        ]
+                    )
+
+            typer.echo(f"✓ Saved {len(samples)} predictions to {output_file}")
+
+    typer.echo("\n✓ Done!")
+
+
+@app.command("zero-shot")
+def zero_shot(
+    training_db: Path = typer.Option(
+        ...,
+        "--training-db",
+        "-d",
+        help="Path to training.db database",
+        exists=True,
+        dir_okay=False,
+    ),
+    taxonomy: str = typer.Option(
+        "v2",
+        "--taxonomy",
+        "-t",
+        help="Label taxonomy to use: v1, v2, or legacy",
+    ),
+    split: str = typer.Option(
+        None,
+        "--split",
+        "-s",
+        help="Only evaluate on specific split: train, validation, or test",
+    ),
+    labeled_only: bool = typer.Option(
+        False,
+        "--labeled-only",
+        help="Only run on samples with labels (for evaluation)",
+    ),
+    save_predictions: bool = typer.Option(
+        False,
+        "--save-predictions",
+        help="Save predictions to database",
+    ),
+    output_file: Path = typer.Option(
+        None,
+        "--output-file",
+        "-o",
+        help="Save predictions to CSV file",
+    ),
+    label_run_id: int | None = typer.Option(
+        None,
+        "--label-run-id",
+        "-l",
+        help="Label run ID to use for training labels (defaults to newest)",
+    ),
+):
+    """Run zero-shot classification using embedding similarity (no training needed).
+
+    This command uses a sentence transformer model to classify folders by computing
+    semantic similarity between folder features and label descriptions. No training
+    is required - it works immediately on any dataset.
+
+    Example:
+        # Run zero-shot classifier on test set
+        uv run python organizer/organizer.py model zero-shot \\
+            --training-db outputs/training.db \\
+            --split test \\
+            --labeled-only \\
+            --save-predictions
+
+        # Run on all samples with v2 taxonomy
+        uv run python organizer/organizer.py model zero-shot \\
+            --training-db outputs/training.db \\
+            --taxonomy v2
+
+        # Use specific label run
+        uv run python organizer/organizer.py model zero-shot \\
+            --training-db outputs/training.db \\
+            --label-run-id 3
+    """
+    # Validation
+    if taxonomy not in ["v1", "v2", "legacy"]:
+        typer.echo(f"Error: Invalid taxonomy '{taxonomy}'", err=True)
+        raise typer.Exit(1)
+
+    if split and split not in ["train", "validation", "test"]:
+        typer.echo(f"Error: Invalid split '{split}'", err=True)
+        raise typer.Exit(1)
+
+    # Connect to database
+    typer.echo(f"Loading samples from {training_db}...")
+    engine = create_engine(f"sqlite:///{training_db}")
+
+    with Session(engine) as session:
+        # Get newest label run if not specified
+        effective_label_run_id = label_run_id
+        if effective_label_run_id is None:
+            from fine_tuning.run_classifier import get_newest_label_run_id
+
+            effective_label_run_id = get_newest_label_run_id(session)
+            if effective_label_run_id is None:
+                typer.echo("Error: No label runs found in database", err=True)
+                raise typer.Exit(1)
+            typer.echo(f"Using newest label run: {effective_label_run_id}")
+        else:
+            typer.echo(f"Using specified label run: {effective_label_run_id}")
+
+        samples = load_samples(
+            session, split=split, labeled_only=labeled_only, label_run_id=effective_label_run_id
+        )
+        typer.echo(f"✓ Loaded {len(samples)} samples")
+
+        if not samples:
+            typer.echo("No samples found. Exiting.")
+            raise typer.Exit(0)
+
+        # Initialize zero-shot classifier
+        typer.echo(f"\nInitializing zero-shot classifier (taxonomy={taxonomy})...")
+        classifier = ZeroShotClassifier(taxonomy=taxonomy)
+
+        # Run predictions
+        typer.echo("\nRunning zero-shot predictions...")
+        predictions, confidences, probabilities = classifier.predict(samples)
+
+        # Get true labels (if available)
+        y_true = [s.label for s in samples if s.label]
+        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+
+        # Evaluate
+        if y_true and y_pred_labeled:
+            typer.echo(f"\nEvaluating {len(y_true)} labeled samples...")
+            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
+        else:
+            typer.echo("\nNo labeled samples found. Skipping evaluation.")
+            metrics = {}
+
+        # Save metrics to database
+        typer.echo("\nSaving metrics to database...")
+        from datetime import datetime
+
+        config = {
+            "use_zero_shot": True,
+            "taxonomy": taxonomy,
+            "split": split,
+            "labeled_only": labeled_only,
+        }
+
+        # Add metrics to config for storage
+        if metrics:
+            config["metrics"] = {
+                "accuracy": metrics.get("accuracy"),
+                "macro_f1": metrics.get("macro_f1"),
+                "weighted_f1": metrics.get("weighted_f1"),
+                "num_samples": metrics.get("num_samples"),
+            }
+
+        run = create_model_run(
+            session,
+            model_path=None,
+            taxonomy=taxonomy,
+            use_baseline=False,  # This is different - it's zero-shot
+            config=config,
+            run_type="zero-shot",
+        )
+
+        # Update run with metrics and metadata
+        run.status = "completed"
+        run.finished_at = datetime.now().isoformat()
+        run.test_samples_count = len(samples)
+
+        # Save primary metrics to dedicated fields
+        if metrics:
+            run.final_val_accuracy = metrics.get("accuracy")
+            run.final_val_f1 = metrics.get("macro_f1")
+
+        # Add notes describing the run
+        metrics_summary = ""
+        if metrics:
+            metrics_summary = f", Accuracy: {metrics.get('accuracy', 0):.4f}, Macro-F1: {metrics.get('macro_f1', 0):.4f}, Weighted-F1: {metrics.get('weighted_f1', 0):.4f}"
+        run.notes = f"Run type: zero-shot, Taxonomy: {taxonomy}, Split: {split or 'all'}{metrics_summary}"
+
+        session.commit()
+
+        typer.echo(
+            f"✓ Saved metrics to database (run_id={run.run_id}, type=zero-shot, taxonomy={taxonomy})"
         )
         if metrics:
             typer.echo(f"  Accuracy: {metrics.get('accuracy', 0):.4f}")
