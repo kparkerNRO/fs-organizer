@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Iterator
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -33,23 +33,22 @@ from storage.work_models import (
     Meta as WorkMeta,
     WORK_SCHEMA_VERSION,
 )
+from storage.training_models import (
+    TrainingBase,
+    Meta as TrainingMeta,
+    TRAINING_SCHEMA_VERSION,
+)
 
 
 # Default paths
 DATA_DIR = Path(__file__).parent.parent / "data"
-# INDEX_DB = DATA_DIR / "index.db"
-# WORK_DB = DATA_DIR /  "work.db"
 
 
 # CRITICAL: Set PRAGMAs per connection, not per engine
 # SQLite requires these settings on every new connection
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_conn, connection_record):
-    """Set SQLite PRAGMAs for every new connection.
-
-    CRITICAL: This must be done per connection, not just once during engine init.
-    Without this, new connections will silently disable foreign key enforcement.
-    """
+    """Set SQLite PRAGMAs for every new connection."""
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
@@ -90,208 +89,121 @@ class IngestionJob:
 
 
 class StorageManager:
-    """Manager for index.db and work.db databases.
+    """Manager for index.db, work.db, and training.db databases."""
 
-    This class provides the main interface for creating snapshots, managing runs,
-    and querying data across both databases.
+    def __init__(self, storage_path: Path | None):
+        """Initialize storage manager for all databases."""
+        if storage_path is None:
+            storage_path = DATA_DIR
+        self.storage_path = storage_path
+        self.index_path = storage_path / "index.db"
+        self.work_path = storage_path / "work.db"
+        self.training_path = storage_path / "training.db"
 
-    IMPORTANT:
-    - Snapshots in index.db are immutable after creation
-    - Cross-database references (snapshot_id, node_id) are validated at application level
-    - Schema versions are checked on initialization
-    """
+        self.index_engine: Optional[Engine] = None
+        self.work_engine: Optional[Engine] = None
+        self.training_engine: Optional[Engine] = None
 
-    def __init__(
-        self,
-        database_path: Path | None,
-    ):
-        """Initialize storage manager.
-
-        Args:
-            database_path: Path to output path where the databases live (defaults to data/)
-        """
-        if database_path is None:
-            database_path = DATA_DIR
-        self.index_path = database_path / "index.db"
-        self.work_path = database_path / "work.db"
-
-        # Store engines for later use
-        self.index_engine = None
-        self.work_engine = None
-
-        # Ensure databases exist and schemas are initialized
         self._ensure_databases()
+
+    def get_index_db_path(self) -> Path:
+        return self.index_path
+
+    def get_work_db_path(self) -> Path:
+        return self.work_path
+
+    def get_training_db_path(self) -> Path:
+        return self.training_path
 
     def _ensure_databases(self):
         """Ensure database files exist and schemas are initialized."""
-        # Create parent directories
-        self.index_path.parent.mkdir(parents=True, exist_ok=True)
-        self.work_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Initialize schemas
+        self.storage_path.mkdir(parents=True, exist_ok=True)
         self._init_index_schema()
         self._init_work_schema()
+        self._init_training_schema()
+
+    def _init_schema(self, db_path: Path, base, version_key: str, expected_version: str, meta_model) -> Engine:
+        """Generic schema initializer for a database."""
+        engine = create_engine(f"sqlite:///{db_path}")
+        base.metadata.create_all(engine)
+        
+        with Session(engine) as session:
+            meta = session.query(meta_model).filter_by(key=version_key).first()
+            if meta is None:
+                meta = meta_model(key=version_key, value=expected_version)
+                session.add(meta)
+                session.commit()
+            elif meta.value != expected_version:
+                raise RuntimeError(
+                    f"{db_path.name} schema version mismatch: "
+                    f"database is v{meta.value}, code expects v{expected_version}."
+                )
+        return engine
 
     def _init_index_schema(self):
-        """Initialize index.db schema and verify version.
-
-        CRITICAL: PRAGMAs are set via event listener (see module-level decorator)
-        to ensure they apply to ALL connections, not just the first one.
-        """
-        # Handle in-memory database path
-        if str(self.index_path) == ":memory:":
-            db_url = "sqlite:///:memory:"
-        else:
-            db_url = f"sqlite:///{self.index_path}"
-
-        self.index_engine = create_engine(db_url)
-
-        # Create tables if needed
-        IndexBase.metadata.create_all(self.index_engine)
-
-        # Check/set schema version
-        self._verify_index_schema_version(self.index_engine)
-
-    def _verify_index_schema_version(self, engine):
-        """Verify index.db schema version matches code version.
-
-        Args:
-            engine: SQLAlchemy engine for index.db
-
-        Raises:
-            RuntimeError: If schema version mismatch detected
-        """
-        Session = sessionmaker(bind=engine)
-        session = Session()
-
-        try:
-            # Get stored version
-            meta = session.query(IndexMeta).filter_by(key="schema_version").first()
-
-            if meta is None:
-                # New database, set version
-                meta = IndexMeta(key="schema_version", value=INDEX_SCHEMA_VERSION)
-                session.add(meta)
-                session.commit()
-            else:
-                # Existing database, check version
-                if meta.value != INDEX_SCHEMA_VERSION:
-                    raise RuntimeError(
-                        f"index.db schema version mismatch: "
-                        f"database is v{meta.value}, code expects v{INDEX_SCHEMA_VERSION}. "
-                        f"Delete {self.index_path} and re-run gather to regenerate snapshots."
-                    )
-        finally:
-            session.close()
+        """Initialize index.db schema and verify version."""
+        self.index_engine = self._init_schema(
+            self.index_path, IndexBase, "schema_version", INDEX_SCHEMA_VERSION, IndexMeta
+        )
 
     def _init_work_schema(self):
-        """Initialize work.db schema and verify version.
+        """Initialize work.db schema and verify version."""
+        self.work_engine = self._init_schema(
+            self.work_path, WorkBase, "schema_version", WORK_SCHEMA_VERSION, WorkMeta
+        )
 
-        PRAGMAs are set via event listener (see module-level decorator)
-        to ensure they apply to ALL connections, not just the first one.
-        """
-        # Handle in-memory database path
-        if str(self.work_path) == ":memory:":
-            db_url = "sqlite:///:memory:"
-        else:
-            db_url = f"sqlite:///{self.work_path}"
-
-        self.work_engine = create_engine(db_url)
-
-        # Create tables if needed
-        WorkBase.metadata.create_all(self.work_engine)
-
-        # Check/set schema version
-        self._verify_work_schema_version(self.work_engine)
-
-    def _verify_work_schema_version(self, engine):
-        """Verify work.db schema version matches code version.
-
-        Args:
-            engine: SQLAlchemy engine for work.db
-
-        Raises:
-            RuntimeError: If schema version mismatch detected
-        """
-        Session = sessionmaker(bind=engine)
-        session = Session()
-
-        try:
-            # Get stored version
-            meta = session.query(WorkMeta).filter_by(key="schema_version").first()
-
-            if meta is None:
-                # New database, set version
-                meta = WorkMeta(key="schema_version", value=WORK_SCHEMA_VERSION)
-                session.add(meta)
-                session.commit()
-            else:
-                # Existing database, check version
-                if meta.value != WORK_SCHEMA_VERSION:
-                    raise RuntimeError(
-                        f"work.db schema version mismatch: "
-                        f"database is v{meta.value}, code expects v{WORK_SCHEMA_VERSION}. "
-                        f"Delete {self.work_path} to recreate (WARNING: loses all run data)."
-                    )
-        finally:
-            session.close()
+    def _init_training_schema(self):
+        """Initialize training.db schema and verify version."""
+        self.training_engine = self._init_schema(
+            self.training_path, TrainingBase, "schema_version", TRAINING_SCHEMA_VERSION, TrainingMeta
+        )
 
     @contextmanager
-    def get_index_session(self, read_only: bool = False) -> Iterator[Session]:
-        """Get SQLAlchemy session for index.db.
+    def get_session(self, db_type: str, read_only: bool = False) -> Iterator[Session]:
+        """Get a SQLAlchemy session for the specified database type."""
+        if db_type == "index":
+            engine = self.index_engine
+        elif db_type == "work":
+            engine = self.work_engine
+        elif db_type == "training":
+            engine = self.training_engine
+        else:
+            raise ValueError(f"Unknown database type: {db_type}")
 
-        Args:
-            read_only: If True, returns session that raises error on flush/commit.
-                      Use for snapshot queries to prevent accidental mutations.
+        if engine is None:
+            raise RuntimeError(f"{db_type} engine not initialized.")
 
-        Returns:
-            Context manager yielding a SQLAlchemy session
-
-        IMPORTANT: Snapshots are immutable. When querying snapshots, prefer
-        read_only=True to prevent accidental modifications via session.
-        """
-        Session = sessionmaker(bind=self.index_engine)
-        session = Session()
+        SessionLocal = sessionmaker(bind=engine)
+        session = SessionLocal()
 
         if read_only:
-            # Prevent writes by raising on flush
             @event.listens_for(session, "before_flush")
             def prevent_flush(session, flush_context, instances):
                 raise RuntimeError(
-                    "Cannot modify index.db with read-only session. "
-                    "Snapshots are immutable after creation."
+                    f"Cannot modify {db_type}.db with read-only session."
                 )
-
         try:
             yield session
         finally:
             session.close()
 
-    @contextmanager
+    def get_index_session(self, read_only: bool = False) -> Iterator[Session]:
+        """Context manager for an index.db session."""
+        return self.get_session("index", read_only=read_only)
+
     def get_work_session(self) -> Iterator[Session]:
-        """Get SQLAlchemy session for work.db.
+        """Context manager for a work.db session."""
+        return self.get_session("work")
 
-        Returns:
-            Context manager yielding a SQLAlchemy session
-        """
-        Session = sessionmaker(bind=self.work_engine)
-        session = Session()
-        try:
-            yield session
-        finally:
-            session.close()
+    def get_training_session(self) -> Iterator[Session]:
+        """Context manager for a training.db session."""
+        return self.get_session("training")
 
-    # Referential integrity validation methods
+    # ... (rest of the class remains the same)
+    # ...
 
     def _validate_snapshot_exists(self, snapshot_id: int) -> bool:
-        """Check if snapshot exists in index.db.
-
-        Args:
-            snapshot_id: Snapshot ID to check
-
-        Returns:
-            True if snapshot exists, False otherwise
-        """
+        """Check if snapshot exists in index.db."""
         with self.get_index_session(read_only=True) as session:
             return (
                 session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
@@ -299,15 +211,7 @@ class StorageManager:
             )
 
     def _validate_node_exists(self, node_id: int, snapshot_id: int) -> bool:
-        """Check if node exists in index.db for given snapshot.
-
-        Args:
-            node_id: Node ID to check
-            snapshot_id: Snapshot ID the node should belong to
-
-        Returns:
-            True if node exists in snapshot, False otherwise
-        """
+        """Check if node exists in index.db for given snapshot."""
         with self.get_index_session(read_only=True) as session:
             return (
                 session.query(Node)
@@ -317,14 +221,7 @@ class StorageManager:
             )
 
     def _check_snapshot_has_runs(self, snapshot_id: int) -> bool:
-        """Check if any runs reference this snapshot in work.db.
-
-        Args:
-            snapshot_id: Snapshot ID to check
-
-        Returns:
-            True if runs exist that reference snapshot, False otherwise
-        """
+        """Check if any runs reference this snapshot in work.db."""
         with self.get_work_session() as session:
             return (
                 session.query(Run).filter_by(snapshot_id=snapshot_id).first()
@@ -332,69 +229,39 @@ class StorageManager:
             )
 
     def _validate_snapshot_id_matches_run(self, snapshot_id: int, run_id: int) -> bool:
-        """Validate that provided snapshot_id matches the run's snapshot_id.
-
-        CRITICAL: Work tables (StageState, GroupIteration) store snapshot_id redundantly.
-        This method prevents inconsistencies where snapshot_id diverges from run.snapshot_id.
-
-        Args:
-            snapshot_id: Snapshot ID to validate
-            run_id: Run ID to check against
-
-        Returns:
-            True if snapshot_id matches run's snapshot_id, False otherwise
-        """
+        """Validate that provided snapshot_id matches the run's snapshot_id."""
         with self.get_work_session() as session:
             run = session.query(Run).filter_by(run_id=run_id).first()
             if not run:
                 return False
             return run.snapshot_id == snapshot_id
 
-    # Deletion methods with referential integrity
-
     def delete_snapshot(self, snapshot_id: int):
-        """Delete snapshot. Fails if runs exist that reference it.
-
-        Args:
-            snapshot_id: Snapshot ID to delete
-
-        Raises:
-            ValueError: If runs still reference this snapshot
-        """
-        # CRITICAL: Check for referencing runs
+        """Delete snapshot. Fails if runs exist that reference it."""
         if self._check_snapshot_has_runs(snapshot_id):
             raise ValueError(
                 f"Cannot delete snapshot {snapshot_id}: "
                 f"runs still reference it. Delete runs first."
             )
-
-        # Safe to delete
         with self.get_index_session() as session:
             snapshot = (
                 session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
             )
             if snapshot:
-                session.delete(
-                    snapshot
-                )  # Cascades to nodes, node_features via SQLAlchemy
+                session.delete(snapshot)
                 session.commit()
 
     def delete_run(self, run_id: int):
-        """Delete run and all associated work data.
-
-        Args:
-            run_id: Run ID to delete
-        """
+        """Delete run and all associated work data."""
         with self.get_work_session() as session:
             run = session.query(Run).filter_by(run_id=run_id).first()
             if run:
-                # SQLAlchemy cascade deletes stages, group_iterations, etc.
                 session.delete(run)
                 session.commit()
 
     def _finish_run(self, run_id: int, status: RunStatus) -> None:
         """Mark a run as finished with a status and timestamp."""
-        finished_at = datetime.utcnow().isoformat()
+        finished_at = datetime.now(UTC).isoformat()
         with self.get_work_session() as session:
             run = session.query(Run).filter_by(run_id=run_id).first()
             if run:
@@ -414,12 +281,8 @@ class StorageManager:
         notes: Optional[str] = None,
         reference_hash: Optional[str] = None,
     ) -> Iterator[IngestionJob]:
-        """Create a snapshot + run for a new ingestion job.
-
-        The ingestion code can use the returned StorageManager to add nodes,
-        update stages, or write work data while the job is running.
-        """
-        created_at = datetime.utcnow().isoformat()
+        """Create a snapshot + run for a new ingestion job."""
+        created_at = datetime.now(UTC).isoformat()
         root_path_value = Path(root_path)
         reference_hash_value = reference_hash or compute_reference_hash()
         config_hash_value = config_hash or reference_hash_value
@@ -462,24 +325,14 @@ class StorageManager:
         else:
             self._finish_run(run_id, RunStatus.COMPLETED)
 
-    # Placeholder methods for modification prevention
-
     def update_node(self, node_id: int, **kwargs):
-        """NOT ALLOWED: Nodes cannot be modified after snapshot creation.
-
-        Raises:
-            NotImplementedError: Always, as nodes are immutable
-        """
+        """NOT ALLOWED: Nodes cannot be modified after snapshot creation."""
         raise NotImplementedError(
             "Nodes are immutable. Create a new snapshot to capture changes."
         )
 
     def compute_node_features(self, snapshot_id: int):
-        """NOT ALLOWED: Features must be computed during snapshot creation.
-
-        Raises:
-            NotImplementedError: Always, as features must be computed atomically
-        """
+        """NOT ALLOWED: Features must be computed during snapshot creation."""
         raise NotImplementedError(
             "Node features are computed during ingest_filesystem(). "
             "This method should not be called externally."

@@ -1,93 +1,106 @@
-"""Training database manager.
+"""Training database data access layer.
 
-Provides utilities for creating and managing the training.db database,
-including initialization, schema management, and session creation.
+Provides utilities for querying and modifying the training.db database.
+Session management is handled by the StorageManager.
 """
+import json
+from datetime import datetime
+from typing import Dict, List, Optional
 
-from pathlib import Path
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from storage.training_models import TrainingBase, Meta, TRAINING_SCHEMA_VERSION
-
-
-def init_training_db(db_path: Path) -> None:
-    """
-    Initialize a new training database with schema.
-
-    Args:
-        db_path: Path where the training.db file should be created
-    """
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    engine = create_engine(f"sqlite:///{db_path}")
-
-    # Create all tables
-    TrainingBase.metadata.create_all(engine)
-
-    # Store schema version in meta table
-    with Session(engine) as session:
-        version_meta = Meta(key="schema_version", value=TRAINING_SCHEMA_VERSION)
-        session.merge(version_meta)
-        session.commit()
-
-    engine.dispose()
+from storage.training_models import (
+    LabelRun,
+    ModelRun,
+    SamplePrediction,
+    TrainingSample,
+)
 
 
-def get_training_session(db_path: Path) -> Session:
-    """
-    Get a SQLAlchemy session for the training database.
+def load_samples(
+    session: Session,
+    split: Optional[str] = None,
+    labeled_only: bool = False,
+    label_run_id: Optional[int] = None,
+) -> List[TrainingSample]:
+    """Load training samples from database."""
+    query = select(TrainingSample)
+    if label_run_id is not None:
+        query = query.where(TrainingSample.label_run_id == label_run_id)
+    if split:
+        query = query.where(TrainingSample.split == split)
+    if labeled_only:
+        query = query.where(TrainingSample.label.isnot(None) & (TrainingSample.label != ""))
+    return list(session.execute(query).scalars().all())
 
-    Args:
-        db_path: Path to the training.db file
 
-    Returns:
-        SQLAlchemy Session instance
-    """
-    if not db_path.exists():
-        raise FileNotFoundError(
-            f"Training database not found at {db_path}. "
-            "Call init_training_db() first to create it."
+def get_newest_label_run_id(session: Session) -> Optional[int]:
+    """Get the newest (highest ID) label run from the database."""
+    return session.execute(select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)).scalar_one_or_none()
+
+
+def save_predictions_to_db(
+    session: Session,
+    samples: List[TrainingSample],
+    predictions: List[str],
+    confidences: List[float],
+    probabilities: List[Dict[str, float]],
+    run_id: int,
+    prediction_type: str = "test",
+) -> int:
+    """Save predictions to database."""
+    prediction_objects = []
+    for sample, pred, conf, probs in zip(samples, predictions, confidences, probabilities):
+        is_correct = None
+        if sample.label:
+            is_correct = sample.label == pred
+        prediction_obj = SamplePrediction(
+            run_id=run_id,
+            sample_id=sample.sample_id,
+            predicted_label=pred,
+            confidence=conf,
+            probabilities_json=json.dumps(probs),
+            true_label=sample.label,
+            is_correct=is_correct,
+            prediction_type=prediction_type,
         )
+        prediction_objects.append(prediction_obj)
 
-    engine = create_engine(f"sqlite:///{db_path}")
-    SessionLocal = sessionmaker(bind=engine)
-    return SessionLocal()
-
-
-def get_schema_version(db_path: Path) -> str | None:
-    """
-    Get the schema version from the training database.
-
-    Args:
-        db_path: Path to the training.db file
-
-    Returns:
-        Schema version string or None if not set
-    """
-    if not db_path.exists():
-        return None
-
-    engine = create_engine(f"sqlite:///{db_path}")
-    with Session(engine) as session:
-        result = session.execute(
-            text("SELECT value FROM meta WHERE key = 'schema_version'")
-        ).fetchone()
-        engine.dispose()
-        return result[0] if result else None
+    session.add_all(prediction_objects)
+    session.commit()
+    return len(prediction_objects)
 
 
-def get_or_create_training_session(db_path: Path) -> Session:
-    """
-    Get a session for the training database, creating it if it doesn't exist.
+def create_model_run(
+    session: Session,
+    model_path: Optional[str],
+    taxonomy: str,
+    use_baseline: bool,
+    config: Dict,
+    run_type: Optional[str] = None,
+    training_data_source: Optional[str] = None,
+) -> ModelRun:
+    """Create a new model run record."""
+    if run_type is None:
+        run_type = "baseline" if use_baseline else "evaluation"
 
-    Args:
-        db_path: Path to the training.db file
+    base_model_id = f"setfit-{run_type}-{taxonomy}"
+    model_version = f"baseline-{taxonomy}" if use_baseline else model_path if model_path else f"unknown-{taxonomy}"
 
-    Returns:
-        SQLAlchemy Session instance
-    """
-    if not db_path.exists():
-        init_training_db(db_path)
+    run = ModelRun(
+        started_at=datetime.now().isoformat(),
+        status="running",
+        run_type=run_type,
+        base_model_id=base_model_id,
+        model_version=model_version,
+        model_type="setfit",
+        taxonomy=taxonomy,
+        training_data_source=training_data_source,
+        hyperparameters_json=json.dumps(config),
+    )
 
-    return get_training_session(db_path)
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run

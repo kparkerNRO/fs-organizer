@@ -24,7 +24,7 @@ from storage.work_models import (
 
 @pytest.fixture
 def storage_manager(tmp_path: Path) -> StorageManager:
-    return StorageManager(database_path=tmp_path)
+    return StorageManager(storage_path=tmp_path)
 
 
 @pytest.fixture
