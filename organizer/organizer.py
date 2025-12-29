@@ -10,6 +10,7 @@ from stages.folder_reconstruction import (
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from utils.export_structure import export_snapshot_structure
 
 from fine_tuning.cli import app as fine_tuning_app
 
@@ -85,6 +86,44 @@ def folders(
     recalculate_cleaned_paths_for_structure(db_path, structure_type=structure_type)
     get_folder_heirarchy(db_path, type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
+
+
+@app.command()
+def export_structure(
+    output_path: Path = typer.Argument(..., help="Output JSON file path"),
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
+    ),
+    include_files: bool = typer.Option(
+        False,
+        "--include-files",
+        "-f",
+        help="Include files in the directory structure (default: directories only)",
+    ),
+):
+    """
+    Export the most recent snapshot's directory structure to a JSON file.
+    """
+    try:
+        result = export_snapshot_structure(
+            output_path=output_path,
+            storage_path=storage_path,
+            include_files=include_files,
+        )
+
+        typer.echo(
+            f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}"
+        )
+        typer.echo(f"Root path: {result['root_path']}")
+        typer.echo(f"Found {result['total_nodes']} nodes")
+        typer.echo(f"✓ Exported directory structure to {result['output_path']}")
+
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()
