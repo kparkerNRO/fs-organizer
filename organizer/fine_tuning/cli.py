@@ -23,7 +23,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from storage.index_models import Snapshot
 from storage.manager import StorageManager
-from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
 from utils.text_processing import char_trigrams, jaccard_similarity
 
@@ -47,12 +46,13 @@ from fine_tuning.settings import (
     ZeroShotSettings,
 )
 from fine_tuning.taxonomy import get_labels
-from storage.training_manager import (
+from fine_tuning.training_manager import (
     create_model_run,
     get_newest_label_run_id,
     load_samples,
     save_predictions_to_db,
 )
+from fine_tuning.training_models import LabelRun, TrainingSample
 
 # --- Typer App Initialization ---
 app = typer.Typer(
@@ -203,7 +203,7 @@ def _augment_with_hard_negatives(
 
 
 def _prepare_training_data(
-    settings: FullTrainingSettings,
+    settings: FullTrainingSettings, manager: StorageManager
 ) -> Tuple[Dataset, Dataset, Dict[int, str]]:
     """Loads, processes, and splits data into training and test datasets."""
     try:
@@ -215,7 +215,6 @@ def _prepare_training_data(
     label2id = {label: i for i, label in enumerate(labels_list)}
     id2label = {i: label for label, i in label2id.items()}
 
-    manager = StorageManager(settings.storage_path)
     typer.echo(f"Loading training data from {manager.get_training_db_path()}...")
     with manager.get_training_session() as session:
         effective_label_run_id = _get_effective_label_run_id(
@@ -353,9 +352,9 @@ def _create_and_save_run_results(
 def _predict_and_evaluate(
     settings: Union[FullPredictSettings, FullZeroShotSettings],
     classifier: Union[SetFitClassifier, ZeroShotClassifier],
+    manager: StorageManager,
 ) -> None:
     """Shared logic for prediction, evaluation, and saving results."""
-    manager = StorageManager(settings.storage_path)
     with manager.get_training_session() as session:
         effective_label_run_id = _get_effective_label_run_id(
             session, settings.label_run_id
@@ -421,7 +420,8 @@ def train(
 ) -> None:
     """Train a SetFit classifier using settings from a config file."""
     settings = _load_settings(FullTrainingSettings, config_path)
-    train_ds, test_ds, id2label = _prepare_training_data(settings)
+    manager = StorageManager(settings.storage_path)
+    train_ds, test_ds, id2label = _prepare_training_data(settings, manager)
 
     typer.echo(f"Initializing model: {settings.model}")
     model = SetFitModel.from_pretrained(settings.model)
@@ -472,6 +472,7 @@ def predict(
 ) -> None:
     """Run classifier predictions using settings from a config file."""
     settings = _load_settings(FullPredictSettings, config_path)
+    manager = StorageManager(settings.storage_path)
 
     if not settings.use_baseline and not settings.model_path:
         typer.echo(
@@ -490,7 +491,7 @@ def predict(
             model_path=str(settings.model_path), taxonomy=settings.taxonomy
         )
 
-    _predict_and_evaluate(settings, classifier)
+    _predict_and_evaluate(settings, classifier, manager)
     typer.echo("\n✓ Done!")
 
 
@@ -508,9 +509,10 @@ def zero_shot(
 ) -> None:
     """Run zero-shot classification using settings from a config file."""
     settings = _load_settings(FullZeroShotSettings, config_path)
+    manager = StorageManager(settings.storage_path)
     typer.echo(f"Initializing zero-shot classifier (taxonomy={settings.taxonomy})...")
     classifier = ZeroShotClassifier(taxonomy=settings.taxonomy)
-    _predict_and_evaluate(settings, classifier)
+    _predict_and_evaluate(settings, classifier, manager)
     typer.echo("\n✓ Done!")
 
 

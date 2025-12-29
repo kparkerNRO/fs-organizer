@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from storage.training_models import (
+from fine_tuning.training_models import (
     LabelRun,
     ModelRun,
     SamplePrediction,

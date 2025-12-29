@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Set
 from sqlalchemy.orm import Session
 from storage.index_models import Node
 from storage.manager import NodeKind
-from storage.training_models import LabelRun, TrainingSample
+from fine_tuning.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
 from fine_tuning.heuristic_classifier import COLLAB_MARKERS

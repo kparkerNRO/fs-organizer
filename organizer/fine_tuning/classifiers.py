@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
-from storage.training_models import TrainingSample
+from fine_tuning.training_models import TrainingSample
 from fine_tuning.taxonomy import get_labels
 
 # Dependencies for classifiers, install with `pip install setfit sentence-transformers`

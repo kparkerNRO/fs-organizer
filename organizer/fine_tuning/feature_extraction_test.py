@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from storage.index_models import IndexBase, Node, Snapshot
 from storage.manager import NodeKind
-from storage.training_models import TrainingBase, TrainingSample, LabelRun
+from fine_tuning.training_models import TrainingBase, TrainingSample, LabelRun
 from utils.config import Config
 from utils.text_processing import has_matching_token
 

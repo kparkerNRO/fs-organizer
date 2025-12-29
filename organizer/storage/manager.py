@@ -33,7 +33,7 @@ from storage.work_models import (
     Meta as WorkMeta,
     WORK_SCHEMA_VERSION,
 )
-from storage.training_models import (
+from fine_tuning.training_models import (
     TrainingBase,
     Meta as TrainingMeta,
     TRAINING_SCHEMA_VERSION,

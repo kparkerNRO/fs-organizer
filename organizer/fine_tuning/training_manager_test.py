@@ -3,13 +3,13 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from storage.training_models import (
+from fine_tuning.training_models import (
     LabelRun,
     SamplePrediction,
     TrainingBase,
     TrainingSample,
 )
-from storage.training_manager import (
+from fine_tuning.training_manager import (
     create_model_run,
     get_newest_label_run_id,
     load_samples,
