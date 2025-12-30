@@ -15,7 +15,6 @@ from fine_tuning.services.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from storage.index_models import Node
 from storage.manager import NodeKind
 
 from .factories import LabelRunFactory, NodeFactory, TrainingSampleFactory
@@ -98,42 +97,9 @@ class TestClusterBySimilarity:
     def test_basic_clustering(self):
         """Test basic clustering of similar names"""
         nodes = [
-            Node(
-                node_id=1,
-                snapshot_id=1,
-                name="Character Art",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path="Character Art",
-                abs_path="/test/Character Art",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=2,
-                snapshot_id=1,
-                name="Character Arts",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path="Character Arts",
-                abs_path="/test/Character Arts",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=3,
-                snapshot_id=1,
-                name="Environment",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path="Environment",
-                abs_path="/test/Environment",
-                ext=None,
-                file_source="filesystem",
-            ),
+            NodeFactory.build(node_id=1, name="Character Art"),
+            NodeFactory.build(node_id=2, name="Character Arts"),
+            NodeFactory.build(node_id=3, name="Environment"),
         ]
 
         clusters = _cluster_by_similarity(nodes, threshold=0.4)
@@ -151,18 +117,7 @@ class TestClusterBySimilarity:
 
     def test_single_node(self):
         """Test clustering with single node"""
-        node = Node(
-            node_id=1,
-            snapshot_id=1,
-            name="Test",
-            kind=NodeKind.DIR,
-            parent_node_id=None,
-            depth=1,
-            rel_path="Test",
-            abs_path="/test/Test",
-            ext=None,
-            file_source="filesystem",
-        )
+        node = NodeFactory.build(node_id=1, name="Test")
 
         clusters = _cluster_by_similarity([node], threshold=0.5)
         assert len(clusters) == 1
@@ -170,21 +125,7 @@ class TestClusterBySimilarity:
 
     def test_threshold_effect(self):
         """Test that threshold affects clustering"""
-        nodes = [
-            Node(
-                node_id=i,
-                snapshot_id=1,
-                name=f"folder_{i}",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path=f"folder_{i}",
-                abs_path=f"/test/folder_{i}",
-                ext=None,
-                file_source="filesystem",
-            )
-            for i in range(5)
-        ]
+        nodes = [NodeFactory.build(node_id=i, name=f"folder_{i}") for i in range(5)]
 
         # Lower threshold should result in fewer clusters (more grouping)
         clusters_low = _cluster_by_similarity(nodes, threshold=0.2)
@@ -203,45 +144,10 @@ class TestSampleFromClusters:
         """Test basic sampling from clusters"""
         clusters = [
             [
-                Node(
-                    node_id=1,
-                    snapshot_id=1,
-                    name="A1",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path="A1",
-                    abs_path="/test/A1",
-                    ext=None,
-                    file_source="filesystem",
-                ),
-                Node(
-                    node_id=2,
-                    snapshot_id=1,
-                    name="A2",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path="A2",
-                    abs_path="/test/A2",
-                    ext=None,
-                    file_source="filesystem",
-                ),
+                NodeFactory.build(node_id=1, name="A1"),
+                NodeFactory.build(node_id=2, name="A2"),
             ],
-            [
-                Node(
-                    node_id=3,
-                    snapshot_id=1,
-                    name="B1",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path="B1",
-                    abs_path="/test/B1",
-                    ext=None,
-                    file_source="filesystem",
-                )
-            ],
+            [NodeFactory.build(node_id=3, name="B1")],
         ]
 
         samples = _sample_from_clusters(clusters, num_samples=2)
@@ -255,23 +161,7 @@ class TestSampleFromClusters:
 
     def test_sample_size_limit(self):
         """Test that sample size is respected"""
-        clusters = [
-            [
-                Node(
-                    node_id=i,
-                    snapshot_id=1,
-                    name=f"Node{i}",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path=f"Node{i}",
-                    abs_path=f"/test/Node{i}",
-                    ext=None,
-                    file_source="filesystem",
-                )
-                for i in range(10)
-            ]
-        ]
+        clusters = [[NodeFactory.build(node_id=i, name=f"Node{i}") for i in range(10)]]
 
         samples = _sample_from_clusters(clusters, num_samples=5)
 
@@ -281,51 +171,9 @@ class TestSampleFromClusters:
         """Test that sampling prefers one from each cluster"""
         # Create 3 clusters with different sizes
         clusters = [
-            [
-                Node(
-                    node_id=i,
-                    snapshot_id=1,
-                    name=f"A{i}",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path=f"A{i}",
-                    abs_path=f"/test/A{i}",
-                    ext=None,
-                    file_source="filesystem",
-                )
-                for i in range(5)
-            ],
-            [
-                Node(
-                    node_id=i + 100,
-                    snapshot_id=1,
-                    name=f"B{i}",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path=f"B{i}",
-                    abs_path=f"/test/B{i}",
-                    ext=None,
-                    file_source="filesystem",
-                )
-                for i in range(3)
-            ],
-            [
-                Node(
-                    node_id=i + 200,
-                    snapshot_id=1,
-                    name=f"C{i}",
-                    kind=NodeKind.DIR,
-                    parent_node_id=None,
-                    depth=1,
-                    rel_path=f"C{i}",
-                    abs_path=f"/test/C{i}",
-                    ext=None,
-                    file_source="filesystem",
-                )
-                for i in range(2)
-            ],
+            [NodeFactory.build(node_id=i, name=f"A{i}") for i in range(5)],
+            [NodeFactory.build(node_id=i + 100, name=f"B{i}") for i in range(3)],
+            [NodeFactory.build(node_id=i + 200, name=f"C{i}") for i in range(2)],
         ]
 
         samples = _sample_from_clusters(clusters, num_samples=3)
@@ -339,28 +187,13 @@ class TestWriteSampleCsv:
 
     def test_basic_csv_writing(self, index_session, sample_snapshot, tmp_path):
         """Test basic CSV writing without heuristic"""
-        nodes = [
-            Node(
-                node_id=1,
-                snapshot_id=1,
-                name="TestFolder",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path="TestFolder",
-                abs_path="/test/TestFolder",
-                ext=None,
-                file_source="filesystem",
-            )
-        ]
-        index_session.add_all(nodes)
-        index_session.commit()
+        node = NodeFactory(node_id=1, snapshot_id=1, name="TestFolder", depth=1)
 
         output_path = tmp_path / "test.csv"
 
         write_sample_csv(
             output_path=output_path,
-            nodes=nodes,
+            nodes=[node],
             session=index_session,
             snapshot_id=1,
             use_heuristic=False,
@@ -383,52 +216,21 @@ class TestWriteSampleCsv:
         self, index_session, sample_snapshot, tmp_path
     ):
         """Test CSV includes parent and grandparent information"""
-        nodes = [
-            Node(
-                node_id=1,
-                snapshot_id=1,
-                name="Grandparent",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=0,
-                rel_path="Grandparent",
-                abs_path="/test/Grandparent",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=2,
-                snapshot_id=1,
-                name="Parent",
-                kind=NodeKind.DIR,
-                parent_node_id=1,
-                depth=1,
-                rel_path="Grandparent/Parent",
-                abs_path="/test/Grandparent/Parent",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=3,
-                snapshot_id=1,
-                name="Target",
-                kind=NodeKind.DIR,
-                parent_node_id=2,
-                depth=2,
-                rel_path="Grandparent/Parent/Target",
-                abs_path="/test/Grandparent/Parent/Target",
-                ext=None,
-                file_source="filesystem",
-            ),
-        ]
-        index_session.add_all(nodes)
-        index_session.commit()
+        grandparent = NodeFactory(
+            node_id=1, snapshot_id=1, name="Grandparent", parent_node_id=None, depth=0
+        )
+        parent = NodeFactory(
+            node_id=2, snapshot_id=1, name="Parent", parent_node_id=1, depth=1
+        )
+        target = NodeFactory(
+            node_id=3, snapshot_id=1, name="Target", parent_node_id=2, depth=2
+        )
 
         output_path = tmp_path / "test.csv"
 
         write_sample_csv(
             output_path=output_path,
-            nodes=[nodes[2]],  # Only write Target node
+            nodes=[target],
             session=index_session,
             snapshot_id=1,
             use_heuristic=False,
@@ -679,30 +481,15 @@ class TestCreateLabelRuns:
 class TestApplyLabelsToSamples:
     """Test apply_labels_to_samples function"""
 
-    def test_apply_labels_basic(self, training_session):
+    def test_apply_labels_basic(self, training_session, label_run):
         """Test applying labels to samples"""
-        # Create label run
-        label_run = LabelRun(snapshot_id=1, label_source="manual")
-        training_session.add(label_run)
-        training_session.flush()
-
         # Create samples
-        samples = [
-            TrainingSample(
-                label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=100,
-                name_raw="test1",
-            ),
-            TrainingSample(
-                label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=101,
-                name_raw="test2",
-            ),
-        ]
-        training_session.add_all(samples)
-        training_session.commit()
+        TrainingSampleFactory(
+            label_run_id=label_run.id, snapshot_id=1, node_id=100, name_raw="test1"
+        )
+        TrainingSampleFactory(
+            label_run_id=label_run.id, snapshot_id=1, node_id=101, name_raw="test2"
+        )
 
         # Prepare CSV rows
         rows = [
@@ -719,35 +506,20 @@ class TestApplyLabelsToSamples:
         assert labeled_count == 2
 
         # Verify labels were applied
-        sample1 = (
-            training_session.query(TrainingSample)
-            .filter_by(node_id=100)
-            .first()
-        )
+        from storage.training_models import TrainingSample
+
+        sample1 = training_session.query(TrainingSample).filter_by(node_id=100).first()
         assert sample1.label == "variant"
         assert sample1.label_confidence == 1.0
 
-        sample2 = (
-            training_session.query(TrainingSample)
-            .filter_by(node_id=101)
-            .first()
-        )
+        sample2 = training_session.query(TrainingSample).filter_by(node_id=101).first()
         assert sample2.label == "subject"
 
-    def test_apply_labels_with_split(self, training_session):
+    def test_apply_labels_with_split(self, training_session, label_run):
         """Test applying labels with split assignment"""
-        label_run = LabelRun(snapshot_id=1, label_source="manual")
-        training_session.add(label_run)
-        training_session.flush()
-
-        sample = TrainingSample(
-            label_run_id=label_run.id,
-            snapshot_id=1,
-            node_id=100,
-            name_raw="test",
+        TrainingSampleFactory(
+            label_run_id=label_run.id, snapshot_id=1, node_id=100, name_raw="test"
         )
-        training_session.add(sample)
-        training_session.commit()
 
         rows = [{"snapshot_id": 1, "node_id": 100, "label": "variant"}]
         label_runs_dict = {1: label_run}
@@ -756,19 +528,15 @@ class TestApplyLabelsToSamples:
             training_session, rows, label_runs_dict, split="train"
         )
 
+        from storage.training_models import TrainingSample
+
         updated_sample = (
-            training_session.query(TrainingSample)
-            .filter_by(node_id=100)
-            .first()
+            training_session.query(TrainingSample).filter_by(node_id=100).first()
         )
         assert updated_sample.split == "train"
 
-    def test_apply_labels_missing_sample(self, training_session):
+    def test_apply_labels_missing_sample(self, training_session, label_run):
         """Test that missing samples are skipped"""
-        label_run = LabelRun(snapshot_id=1, label_source="manual")
-        training_session.add(label_run)
-        training_session.flush()
-
         rows = [{"snapshot_id": 1, "node_id": 999, "label": "variant"}]
         label_runs_dict = {1: label_run}
 
