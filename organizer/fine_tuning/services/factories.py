@@ -1,7 +1,7 @@
 """Test data factories using factory_boy"""
 
 import factory
-from factory import Faker, LazyAttribute, Sequence, SubFactory
+from factory import Faker, LazyAttribute, Sequence
 from factory.alchemy import SQLAlchemyModelFactory
 from storage.index_models import Node, Snapshot
 from storage.manager import NodeKind
@@ -36,7 +36,7 @@ class NodeFactory(BaseFactory):
 
     node_id = Sequence(lambda n: n + 1)
     snapshot_id = 1
-    name = Faker("word")
+    name = Sequence(lambda n: f"node_{n}")
     kind = NodeKind.DIR
     parent_node_id = None
     depth = 0
@@ -62,7 +62,7 @@ class FileNodeFactory(NodeFactory):
 
     kind = NodeKind.FILE
     ext = ".txt"
-    name = LazyAttribute(lambda obj: f"{Faker('word').generate()}{obj.ext}")
+    name = Sequence(lambda n: f"file_{n}.txt")
 
 
 class LabelRunFactory(BaseFactory):
@@ -88,8 +88,12 @@ class TrainingSampleFactory(BaseFactory):
     node_id = Sequence(lambda n: n + 100)
     name_raw = Faker("word")
     name_norm = LazyAttribute(lambda obj: obj.name_raw.lower())
+    kind = "dir"
+    file_source = "filesystem"
     text = Faker("sentence")
-    label = factory.Iterator(["variant", "subject", "other", "collection"])
+    label = factory.Iterator(
+        ["asset_type", "content_subject", "creator_or_studio", "descriptor", "other"]
+    )
     split = "train"
     depth = 1
 

@@ -9,8 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from storage.index_models import IndexBase
 from storage.training_models import TrainingBase
-
-from .factories import (
+from fine_tuning.services.factories import (
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
@@ -33,10 +32,10 @@ def setup_factory_seed():
     else:
         seed = random.randint(0, 2**32 - 1)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Factory seed: {seed}")
     print(f"To reproduce this test run, set: FACTORY_SEED={seed}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     Faker.seed(seed)
     random.seed(seed)

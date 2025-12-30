@@ -16,8 +16,7 @@ from fine_tuning.services.sampling import (
     write_sample_csv,
 )
 from storage.manager import NodeKind
-
-from .factories import LabelRunFactory, NodeFactory, TrainingSampleFactory
+from fine_tuning.services.factories import NodeFactory, TrainingSampleFactory
 
 
 class TestSelectTrainingSamples:
@@ -108,7 +107,9 @@ class TestClusterBySimilarity:
         assert len(clusters) == 2
 
         # Verify cluster contents
-        cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters]
+        cluster_names = [
+            sorted([node.name for node in cluster]) for cluster in clusters
+        ]
         cluster_names.sort()  # Sort for deterministic comparison
 
         assert cluster_names == [
@@ -150,7 +151,9 @@ class TestClusterBySimilarity:
 
         # Verify low threshold groups similar items
         assert len(clusters_low) == 3
-        low_cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters_low]
+        low_cluster_names = [
+            sorted([node.name for node in cluster]) for cluster in clusters_low
+        ]
         low_cluster_names.sort()
         assert low_cluster_names == [
             ["Folder ABC", "Folder XYZ"],
@@ -160,7 +163,9 @@ class TestClusterBySimilarity:
 
         # Verify high threshold separates all items
         assert len(clusters_high) == 5
-        high_cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters_high]
+        high_cluster_names = [
+            sorted([node.name for node in cluster]) for cluster in clusters_high
+        ]
         high_cluster_names.sort()
         assert high_cluster_names == [
             ["Folder ABC"],
@@ -259,10 +264,10 @@ class TestWriteSampleCsv:
         self, index_session, sample_snapshot, tmp_path
     ):
         """Test CSV includes parent and grandparent information"""
-        grandparent = NodeFactory(
+        _grandparent = NodeFactory(
             node_id=1, snapshot_id=1, name="Grandparent", parent_node_id=None, depth=0
         )
-        parent = NodeFactory(
+        _parent = NodeFactory(
             node_id=2, snapshot_id=1, name="Parent", parent_node_id=1, depth=1
         )
         target = NodeFactory(
@@ -302,10 +307,20 @@ class TestReadClassificationCsv:
             )
             writer.writeheader()
             writer.writerow(
-                {"snapshot_id": "1", "node_id": "100", "name": "Test", "label": "variant"}
+                {
+                    "snapshot_id": "1",
+                    "node_id": "100",
+                    "name": "Test",
+                    "label": "variant",
+                }
             )
             writer.writerow(
-                {"snapshot_id": "1", "node_id": "101", "name": "Test2", "label": "subject"}
+                {
+                    "snapshot_id": "1",
+                    "node_id": "101",
+                    "name": "Test2",
+                    "label": "subject",
+                }
             )
 
         rows = read_classification_csv(csv_path)
@@ -436,7 +451,11 @@ class TestValidateLabelValues:
             ),
             # Invalid label - should fail
             (
-                [{"label": "variant"}, {"label": "invalid_label"}, {"label": "subject"}],
+                [
+                    {"label": "variant"},
+                    {"label": "invalid_label"},
+                    {"label": "subject"},
+                ],
                 {"variant", "subject", "other"},
                 True,
                 "invalid labels",
@@ -480,13 +499,18 @@ class TestValidateInputCsv:
             )
             writer.writeheader()
             writer.writerow(
-                {"snapshot_id": "1", "node_id": "100", "name": "Test", "label": "variant"}
+                {
+                    "snapshot_id": "1",
+                    "node_id": "100",
+                    "name": "Test",
+                    "label": "asset_type",
+                }
             )
 
         rows = validate_input_csv(csv_path, taxonomy="v2")
 
         assert len(rows) == 1
-        assert rows[0]["label"] == "variant"
+        assert rows[0]["label"] == "asset_type"
 
     def test_invalid_taxonomy(self, tmp_path):
         """Test error on invalid taxonomy"""
@@ -567,9 +591,7 @@ class TestApplyLabelsToSamples:
         rows = [{"snapshot_id": 1, "node_id": 100, "label": "variant"}]
         label_runs_dict = {1: label_run}
 
-        apply_labels_to_samples(
-            training_session, rows, label_runs_dict, split="train"
-        )
+        apply_labels_to_samples(training_session, rows, label_runs_dict, split="train")
 
         from storage.training_models import TrainingSample
 

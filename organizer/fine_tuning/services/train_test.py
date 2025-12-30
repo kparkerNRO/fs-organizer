@@ -24,7 +24,11 @@ class TestAugmentWithHardNegatives:
             "Low Resolution Images",
             "Character Designs",
         ]
-        train_leaf_keys = ["high_resolution_images", "low_resolution_images", "character_designs"]
+        train_leaf_keys = [
+            "high_resolution_images",
+            "low_resolution_images",
+            "character_designs",
+        ]
         train_labels = [0, 0, 1]  # First two are same class (variant)
         id2label = {0: "variant", 1: "subject"}
         confusable_labels = {"variant"}
@@ -404,7 +408,13 @@ class TestPrepareTrainingData:
         ],
     )
     def test_test_size_parameter(
-        self, training_session, label_run, tmp_path, test_size, expected_train, expected_test
+        self,
+        training_session,
+        label_run,
+        tmp_path,
+        test_size,
+        expected_train,
+        expected_test,
     ):
         """Test that test_size parameter affects split"""
         samples = [

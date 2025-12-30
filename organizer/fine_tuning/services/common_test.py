@@ -10,8 +10,11 @@ from fine_tuning.services.common import (
 )
 from storage.index_models import Node
 from storage.manager import NodeKind
-
-from .factories import LabelRunFactory, NodeFactory, TrainingSampleFactory
+from fine_tuning.services.factories import (
+    LabelRunFactory,
+    NodeFactory,
+    TrainingSampleFactory,
+)
 
 
 class TestLoadSamples:
@@ -33,7 +36,9 @@ class TestLoadSamples:
             ("test", 1),
         ],
     )
-    def test_load_samples_by_split(self, training_session, label_run, split, expected_count):
+    def test_load_samples_by_split(
+        self, training_session, label_run, split, expected_count
+    ):
         """Test loading samples filtered by split"""
         TrainingSampleFactory(label_run_id=label_run.id, split="train")
         TrainingSampleFactory(label_run_id=label_run.id, split="validation")
@@ -44,29 +49,33 @@ class TestLoadSamples:
 
     def test_load_labeled_only(self, training_session, label_run):
         """Test loading only labeled samples"""
-        TrainingSampleFactory(label_run_id=label_run.id, label="variant")
+        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
         TrainingSampleFactory(label_run_id=label_run.id, label=None)
         TrainingSampleFactory(label_run_id=label_run.id, label="")
 
         loaded = load_samples(training_session, labeled_only=True)
         assert len(loaded) == 1
-        assert loaded[0].label == "variant"
+        assert loaded[0].label == "asset_type"
 
     def test_load_by_label_run_id(self, training_session, label_run):
         """Test loading samples filtered by label run ID"""
         label_run2 = LabelRunFactory(snapshot_id=2)
 
-        TrainingSampleFactory(label_run_id=label_run.id, label="variant")
-        TrainingSampleFactory(label_run_id=label_run2.id, label="subject")
+        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
+        TrainingSampleFactory(label_run_id=label_run2.id, label="content_subject")
 
         loaded = load_samples(training_session, label_run_id=label_run.id)
         assert len(loaded) == 1
-        assert loaded[0].label == "variant"
+        assert loaded[0].label == "asset_type"
 
     def test_load_combined_filters(self, training_session, label_run):
         """Test loading samples with multiple filters combined"""
-        TrainingSampleFactory(label_run_id=label_run.id, label="variant", split="train")
-        TrainingSampleFactory(label_run_id=label_run.id, label="subject", split="validation")
+        TrainingSampleFactory(
+            label_run_id=label_run.id, label="asset_type", split="train"
+        )
+        TrainingSampleFactory(
+            label_run_id=label_run.id, label="content_subject", split="validation"
+        )
         TrainingSampleFactory(label_run_id=label_run.id, label=None, split="train")
 
         loaded = load_samples(
@@ -76,7 +85,7 @@ class TestLoadSamples:
             label_run_id=label_run.id,
         )
         assert len(loaded) == 1
-        assert loaded[0].label == "variant"
+        assert loaded[0].label == "asset_type"
 
 
 class TestLoadAndIndexNodes:
@@ -84,12 +93,30 @@ class TestLoadAndIndexNodes:
 
     def test_load_basic_hierarchy(self, index_session, sample_snapshot):
         """Test loading nodes and building indexes"""
-        NodeFactory(node_id=1, snapshot_id=1, name="root", parent_node_id=None, depth=0)
-        NodeFactory(node_id=2, snapshot_id=1, name="child", parent_node_id=1, depth=1)
+        NodeFactory(
+            node_id=1,
+            snapshot_id=1,
+            name="root",
+            rel_path="root",
+            abs_path="/test/root",
+            parent_node_id=None,
+            depth=0,
+        )
+        NodeFactory(
+            node_id=2,
+            snapshot_id=1,
+            name="child",
+            rel_path="root/child",
+            abs_path="/test/root/child",
+            parent_node_id=1,
+            depth=1,
+        )
         NodeFactory(
             node_id=3,
             snapshot_id=1,
             name="file.txt",
+            rel_path="root/child/file.txt",
+            abs_path="/test/root/child/file.txt",
             kind=NodeKind.FILE,
             parent_node_id=2,
             depth=2,
@@ -105,7 +132,8 @@ class TestLoadAndIndexNodes:
         assert len(processed_name_by_id) == 3
         assert processed_name_by_id[1] == "root"
 
-        assert set(children_by_parent.keys()) == {1, 2}
+        assert set(children_by_parent.keys()) == {None, 1, 2}
+        assert children_by_parent[None] == [1]
         assert children_by_parent[1] == [2]
         assert children_by_parent[2] == [3]
 
@@ -132,18 +160,21 @@ class TestPrecomputeDescendantExtensions:
                 kind=NodeKind.DIR,
                 parent_node_id=None,
                 ext=None,
+                depth=0,
             ),
             2: NodeFactory.build(
                 node_id=2,
                 kind=NodeKind.FILE,
                 parent_node_id=1,
                 ext=".txt",
+                depth=1,
             ),
             3: NodeFactory.build(
                 node_id=3,
                 kind=NodeKind.FILE,
                 parent_node_id=1,
                 ext=".png",
+                depth=1,
             ),
         }
 
@@ -167,18 +198,21 @@ class TestPrecomputeDescendantExtensions:
                 kind=NodeKind.DIR,
                 parent_node_id=None,
                 ext=None,
+                depth=0,
             ),
             2: NodeFactory.build(
                 node_id=2,
                 kind=NodeKind.DIR,
                 parent_node_id=1,
                 ext=None,
+                depth=1,
             ),
             3: NodeFactory.build(
                 node_id=3,
                 kind=NodeKind.FILE,
                 parent_node_id=2,
                 ext=".jpg",
+                depth=2,
             ),
         }
 
@@ -203,12 +237,29 @@ class TestExtractFeatureNodes:
 
     def test_basic_extraction(self, index_session, sample_snapshot):
         """Test basic feature node extraction"""
-        parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
-        target = NodeFactory(node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1)
+        _parent = NodeFactory(
+            node_id=1,
+            snapshot_id=1,
+            name="Parent",
+            rel_path="Parent",
+            abs_path="/test/Parent",
+            depth=0,
+        )
+        target = NodeFactory(
+            node_id=2,
+            snapshot_id=1,
+            name="Target",
+            rel_path="Parent/Target",
+            abs_path="/test/Parent/Target",
+            parent_node_id=1,
+            depth=1,
+        )
         NodeFactory(
             node_id=3,
             snapshot_id=1,
             name="file.txt",
+            rel_path="Parent/Target/file.txt",
+            abs_path="/test/Parent/Target/file.txt",
             kind=NodeKind.FILE,
             parent_node_id=2,
             depth=2,
@@ -232,14 +283,20 @@ class TestExtractFeatureNodes:
         assert feature_node.grandparent is None
         assert len(feature_node.child_nodes) == 1
         assert len(feature_node.sibling_nodes) == 0
-        assert feature_node.descendent_extentions == {"txt"}
+        assert feature_node.descendent_extentions == ["txt"]
 
     def test_with_siblings(self, index_session, sample_snapshot):
         """Test extraction with sibling nodes"""
-        parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
-        target = NodeFactory(node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1)
-        NodeFactory(node_id=3, snapshot_id=1, name="Sibling1", parent_node_id=1, depth=1)
-        NodeFactory(node_id=4, snapshot_id=1, name="Sibling2", parent_node_id=1, depth=1)
+        _parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
+        target = NodeFactory(
+            node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1
+        )
+        NodeFactory(
+            node_id=3, snapshot_id=1, name="Sibling1", parent_node_id=1, depth=1
+        )
+        NodeFactory(
+            node_id=4, snapshot_id=1, name="Sibling2", parent_node_id=1, depth=1
+        )
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
@@ -257,8 +314,10 @@ class TestExtractFeatureNodes:
 
     def test_max_siblings_cap(self, index_session, sample_snapshot):
         """Test that max_siblings limits sibling count"""
-        parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
-        target = NodeFactory(node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1)
+        _parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
+        target = NodeFactory(
+            node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1
+        )
 
         # Add 10 siblings using factory
         for i in range(10):

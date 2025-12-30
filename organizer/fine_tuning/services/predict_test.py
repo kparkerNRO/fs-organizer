@@ -243,6 +243,7 @@ class TestCreateAndSaveRunResults:
 
     def test_save_results_with_metrics(self, training_session):
         """Test saving run results with evaluation metrics"""
+
         # Create a simple mock classifier class
         class MockClassifier:
             labels = ["variant", "subject", "other"]
