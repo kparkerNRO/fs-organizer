@@ -202,6 +202,30 @@ For each test:
 - `Sequence(lambda n: n + 1)` - Auto-increment IDs
 - `factory.Iterator([...])` - Cycle through values
 
+## Reproducibility and Seeding
+
+The test suite uses a random seed for factory-generated data to ensure:
+- Tests exercise different data variations across runs
+- Failed tests can be reproduced by reusing the same seed
+
+**How it works:**
+- Each test run generates a random seed (or uses `FACTORY_SEED` env var)
+- The seed is printed at the start of the test run
+- To reproduce a test failure, set the seed from the output:
+  ```bash
+  FACTORY_SEED=1234567890 pytest
+  ```
+
+**Example output:**
+```
+======================================================================
+Factory seed: 1234567890
+To reproduce this test run, set: FACTORY_SEED=1234567890
+======================================================================
+```
+
+This is configured in `conftest.py` via the `setup_factory_seed` fixture.
+
 ## Summary
 
 The factory pattern transforms verbose, repetitive test setup into concise declarations
