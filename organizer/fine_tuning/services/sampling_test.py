@@ -17,7 +17,8 @@ from fine_tuning.services.sampling import (
 )
 from storage.index_models import Node
 from storage.manager import NodeKind
-from storage.training_models import LabelRun, TrainingSample
+
+from .factories import LabelRunFactory, NodeFactory, TrainingSampleFactory
 
 
 class TestSelectTrainingSamples:
@@ -25,24 +26,9 @@ class TestSelectTrainingSamples:
 
     def test_basic_selection(self, index_session, sample_snapshot):
         """Test basic sample selection"""
-        nodes = []
+        # Create 20 nodes using factory
         for i in range(20):
-            node = Node(
-                node_id=i + 1,
-                snapshot_id=1,
-                name=f"folder_{i}",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path=f"folder_{i}",
-                abs_path=f"/test/folder_{i}",
-                ext=None,
-                file_source="filesystem",
-            )
-            nodes.append(node)
-
-        index_session.add_all(nodes)
-        index_session.commit()
+            NodeFactory(node_id=i + 1, snapshot_id=1, depth=1)
 
         samples = select_training_samples(
             session=index_session,
@@ -58,46 +44,9 @@ class TestSelectTrainingSamples:
 
     def test_depth_filtering(self, index_session, sample_snapshot):
         """Test that depth filtering works correctly"""
-        nodes = [
-            Node(
-                node_id=1,
-                snapshot_id=1,
-                name="depth0",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=0,
-                rel_path="depth0",
-                abs_path="/test/depth0",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=2,
-                snapshot_id=1,
-                name="depth2",
-                kind=NodeKind.DIR,
-                parent_node_id=1,
-                depth=2,
-                rel_path="depth0/depth2",
-                abs_path="/test/depth0/depth2",
-                ext=None,
-                file_source="filesystem",
-            ),
-            Node(
-                node_id=3,
-                snapshot_id=1,
-                name="depth5",
-                kind=NodeKind.DIR,
-                parent_node_id=2,
-                depth=5,
-                rel_path="depth0/depth2/depth5",
-                abs_path="/test/depth0/depth2/depth5",
-                ext=None,
-                file_source="filesystem",
-            ),
-        ]
-        index_session.add_all(nodes)
-        index_session.commit()
+        NodeFactory(node_id=1, snapshot_id=1, name="depth0", depth=0)
+        NodeFactory(node_id=2, snapshot_id=1, name="depth2", parent_node_id=1, depth=2)
+        NodeFactory(node_id=3, snapshot_id=1, name="depth5", parent_node_id=2, depth=5)
 
         samples = select_training_samples(
             session=index_session,
@@ -127,24 +76,9 @@ class TestSelectTrainingSamples:
 
     def test_sample_size_cap(self, index_session, sample_snapshot):
         """Test that sample size is respected"""
-        nodes = []
+        # Create 100 nodes using factory
         for i in range(100):
-            node = Node(
-                node_id=i + 1,
-                snapshot_id=1,
-                name=f"folder_{i}",
-                kind=NodeKind.DIR,
-                parent_node_id=None,
-                depth=1,
-                rel_path=f"folder_{i}",
-                abs_path=f"/test/folder_{i}",
-                ext=None,
-                file_source="filesystem",
-            )
-            nodes.append(node)
-
-        index_session.add_all(nodes)
-        index_session.commit()
+            NodeFactory(node_id=i + 1, snapshot_id=1, depth=1)
 
         samples = select_training_samples(
             session=index_session,

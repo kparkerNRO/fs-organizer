@@ -7,7 +7,9 @@ from fine_tuning.services.train import (
     prepare_training_data,
 )
 from storage.manager import StorageManager
-from storage.training_models import TrainingBase, TrainingSample
+from storage.training_models import TrainingBase
+
+from .factories import TrainingSampleFactory
 
 
 class TestAugmentWithHardNegatives:
@@ -199,73 +201,51 @@ class TestPrepareTrainingData:
 
     def test_basic_data_preparation(self, training_session, label_run, tmp_path):
         """Test basic training data preparation"""
-        # Create labeled training samples
+        # Create labeled training samples using factory
         samples = [
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=1,
-                name_raw="High Res",
                 name_norm="high_res",
-                text="Test text 1",
                 label="variant",
             ),
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=2,
-                name_raw="Character Art",
                 name_norm="character_art",
-                text="Test text 2",
                 label="subject",
             ),
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=3,
-                name_raw="Environment",
                 name_norm="environment",
-                text="Test text 3",
                 label="other",
             ),
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=4,
-                name_raw="Low Res",
                 name_norm="low_res",
-                text="Test text 4",
                 label="variant",
             ),
         ]
-        training_session.add_all(samples)
-        training_session.commit()
 
-        # Create a temporary database for StorageManager
-        db_path = tmp_path / "test.db"
+        # Create manager
+        manager = StorageManager(
+            index_db_path=str(tmp_path / "index.db"),
+            training_db_path=str(tmp_path / "test.db"),
+        )
+
+        # Initialize training database
+        manager._init_training_db(TrainingBase)
+
+        # Add samples to manager's database
+        with manager.get_training_session() as session:
+            for sample in samples:
+                session.merge(sample)
+            session.commit()
 
         # Create config
         config = TrainConfigSettings(
             test_size=0.5,
             seed=42,
-            no_hard_negatives=True,  # Disable for simpler test
+            no_hard_negatives=True,
         )
-
-        # Create manager
-        manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(db_path),
-        )
-
-        # Initialize training database
-        from storage.training_models import TrainingBase
-
-        manager._init_training_db(TrainingBase)
-
-        # Add samples to manager's database
-        with manager.get_training_session() as session:
-            session.add_all(samples)
-            session.commit()
 
         train_ds, test_ds, id2label = prepare_training_data(
             config=config,
@@ -287,36 +267,34 @@ class TestPrepareTrainingData:
     def test_with_hard_negatives(self, training_session, label_run, tmp_path):
         """Test data preparation with hard negative mining enabled"""
         samples = [
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=1,
-                name_raw="High Res",
                 name_norm="high_res",
-                text="Test text 1",
                 label="variant",
             ),
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=2,
-                name_raw="Low Res",
                 name_norm="low_res",
-                text="Test text 2",
                 label="variant",
             ),
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=3,
-                name_raw="Character",
                 name_norm="character",
-                text="Test text 3",
                 label="subject",
             ),
         ]
-        training_session.add_all(samples)
-        training_session.commit()
+
+        manager = StorageManager(
+            index_db_path=str(tmp_path / "index.db"),
+            training_db_path=str(tmp_path / "test.db"),
+        )
+
+        manager._init_training_db(TrainingBase)
+
+        with manager.get_training_session() as session:
+            for sample in samples:
+                session.merge(sample)
+            session.commit()
 
         config = TrainConfigSettings(
             test_size=0.33,
@@ -327,19 +305,6 @@ class TestPrepareTrainingData:
             hardneg_min_sim=0.3,
             hardneg_factor=1,
         )
-
-        manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
-        )
-
-        from storage.training_models import TrainingBase
-
-        manager._init_training_db(TrainingBase)
-
-        with manager.get_training_session() as session:
-            session.add_all(samples)
-            session.commit()
 
         train_ds, test_ds, id2label = prepare_training_data(
             config=config,
@@ -354,34 +319,22 @@ class TestPrepareTrainingData:
 
     def test_no_labeled_samples(self, training_session, label_run, tmp_path):
         """Test error when no labeled samples are found"""
-        # Create unlabeled sample
-        sample = TrainingSample(
-            label_run_id=label_run.id,
-            snapshot_id=1,
-            node_id=1,
-            name_raw="Test",
-            label=None,  # Unlabeled
-        )
-        training_session.add(sample)
-        training_session.commit()
+        sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
 
-        config = TrainConfigSettings()
         manager = StorageManager(
             index_db_path=str(tmp_path / "index.db"),
             training_db_path=str(tmp_path / "test.db"),
         )
 
-        from storage.training_models import TrainingBase
-
         manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
-            session.add(sample)
+            session.merge(sample)
             session.commit()
 
         with pytest.raises(ValueError, match="No labeled training samples"):
             prepare_training_data(
-                config=config,
+                config=TrainConfigSettings(),
                 manager=manager,
                 taxonomy="v2",
                 label_run_id=label_run.id,
@@ -389,36 +342,25 @@ class TestPrepareTrainingData:
 
     def test_unknown_labels(self, training_session, label_run, tmp_path):
         """Test error when unknown labels are found"""
-        # Create sample with invalid label
-        sample = TrainingSample(
+        sample = TrainingSampleFactory(
             label_run_id=label_run.id,
-            snapshot_id=1,
-            node_id=1,
-            name_raw="Test",
-            name_norm="test",
-            text="Test text",
             label="invalid_label_xyz",
         )
-        training_session.add(sample)
-        training_session.commit()
 
-        config = TrainConfigSettings()
         manager = StorageManager(
             index_db_path=str(tmp_path / "index.db"),
             training_db_path=str(tmp_path / "test.db"),
         )
 
-        from storage.training_models import TrainingBase
-
         manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
-            session.add(sample)
+            session.merge(sample)
             session.commit()
 
         with pytest.raises(ValueError, match="Unknown labels found"):
             prepare_training_data(
-                config=config,
+                config=TrainConfigSettings(),
                 manager=manager,
                 taxonomy="v2",
                 label_run_id=label_run.id,
@@ -452,38 +394,31 @@ class TestPrepareTrainingData:
     ):
         """Test that test_size parameter affects split"""
         samples = [
-            TrainingSample(
+            TrainingSampleFactory(
                 label_run_id=label_run.id,
-                snapshot_id=1,
-                node_id=i,
-                name_raw=f"Test{i}",
                 name_norm=f"test{i}",
-                text=f"Test text {i}",
                 label="variant" if i % 2 == 0 else "subject",
             )
             for i in range(10)
         ]
-        training_session.add_all(samples)
-        training_session.commit()
-
-        config = TrainConfigSettings(
-            test_size=test_size,
-            seed=42,
-            no_hard_negatives=True,
-        )
 
         manager = StorageManager(
             index_db_path=str(tmp_path / "index.db"),
             training_db_path=str(tmp_path / "test.db"),
         )
 
-        from storage.training_models import TrainingBase
-
         manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
-            session.add_all(samples)
+            for sample in samples:
+                session.merge(sample)
             session.commit()
+
+        config = TrainConfigSettings(
+            test_size=test_size,
+            seed=42,
+            no_hard_negatives=True,
+        )
 
         train_ds, test_ds, id2label = prepare_training_data(
             config=config,

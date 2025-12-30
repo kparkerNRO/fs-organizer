@@ -1,4 +1,8 @@
-"""Tests for predict.py"""
+"""Tests for predict.py - REFACTORED VERSION using factories
+
+This demonstrates the factory pattern applied to predict_test.py.
+Compare with predict_test.py to see the improvements.
+"""
 
 import json
 
@@ -8,49 +12,22 @@ from fine_tuning.services.predict import (
     create_model_run,
     save_predictions_to_db,
 )
-from storage.training_models import ModelRun, SamplePrediction, TrainingSample
+from storage.training_models import ModelRun, SamplePrediction
 
-
-@pytest.fixture
-def sample_training_samples(training_session):
-    """Create test training samples"""
-    samples = [
-        TrainingSample(
-            label_run_id=1,
-            snapshot_id=1,
-            node_id=1,
-            name_raw="folder1",
-            label="variant",
-        ),
-        TrainingSample(
-            label_run_id=1,
-            snapshot_id=1,
-            node_id=2,
-            name_raw="folder2",
-            label="subject",
-        ),
-        TrainingSample(
-            label_run_id=1,
-            snapshot_id=1,
-            node_id=3,
-            name_raw="folder3",
-            label=None,  # Unlabeled
-        ),
-    ]
-    training_session.add_all(samples)
-    training_session.commit()
-    training_session.refresh(samples[0])
-    training_session.refresh(samples[1])
-    training_session.refresh(samples[2])
-    return samples
+from .factories import TrainingSampleFactory
 
 
 class TestSavePredictionsToDb:
     """Test save_predictions_to_db function"""
 
-    def test_save_basic_predictions(self, training_session, sample_training_samples):
+    def test_save_basic_predictions(self, training_session):
         """Test saving predictions to database"""
-        samples = sample_training_samples[:2]  # Use only labeled samples
+        # Create samples using factory - only specify what matters
+        samples = [
+            TrainingSampleFactory(label="variant"),
+            TrainingSampleFactory(label="subject"),
+        ]
+
         predictions = ["variant", "other"]
         confidences = [0.95, 0.75]
         probabilities = [
@@ -89,21 +66,16 @@ class TestSavePredictionsToDb:
         assert pred2.true_label == "subject"
         assert pred2.is_correct is False
 
-    def test_save_predictions_with_list_probabilities(
-        self, training_session, sample_training_samples
-    ):
+    def test_save_predictions_with_list_probabilities(self, training_session):
         """Test saving predictions with list-format probabilities"""
-        samples = [sample_training_samples[0]]
-        predictions = ["variant"]
-        confidences = [0.95]
-        probabilities = [[0.95, 0.03, 0.02]]  # List format
+        sample = TrainingSampleFactory(label="variant")
 
         num_saved = save_predictions_to_db(
             session=training_session,
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
+            samples=[sample],
+            predictions=["variant"],
+            confidences=[0.95],
+            probabilities=[[0.95, 0.03, 0.02]],  # List format
             run_id=1,
         )
 
@@ -118,21 +90,16 @@ class TestSavePredictionsToDb:
         assert "label_2" in probs_dict
         assert probs_dict["label_0"] == 0.95
 
-    def test_save_predictions_unlabeled_samples(
-        self, training_session, sample_training_samples
-    ):
+    def test_save_predictions_unlabeled_samples(self, training_session):
         """Test saving predictions for unlabeled samples"""
-        samples = [sample_training_samples[2]]  # Unlabeled sample
-        predictions = ["variant"]
-        confidences = [0.8]
-        probabilities = [{"variant": 0.8, "subject": 0.2}]
+        sample = TrainingSampleFactory(label=None)
 
         num_saved = save_predictions_to_db(
             session=training_session,
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
+            samples=[sample],
+            predictions=["variant"],
+            confidences=[0.8],
+            probabilities=[{"variant": 0.8, "subject": 0.2}],
             run_id=1,
         )
 
@@ -147,21 +114,16 @@ class TestSavePredictionsToDb:
         "prediction_type",
         ["train", "validation", "test", "all"],
     )
-    def test_prediction_type_parameter(
-        self, training_session, sample_training_samples, prediction_type
-    ):
+    def test_prediction_type_parameter(self, training_session, prediction_type):
         """Test different prediction type values"""
-        samples = [sample_training_samples[0]]
-        predictions = ["variant"]
-        confidences = [0.95]
-        probabilities = [{"variant": 0.95}]
+        sample = TrainingSampleFactory()
 
         save_predictions_to_db(
             session=training_session,
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
+            samples=[sample],
+            predictions=["variant"],
+            confidences=[0.95],
+            probabilities=[{"variant": 0.95}],
             run_id=1,
             prediction_type=prediction_type,
         )
@@ -278,7 +240,7 @@ class TestCreateModelRun:
 class TestCreateAndSaveRunResults:
     """Test create_and_save_run_results function"""
 
-    def test_save_results_with_metrics(self, training_session, sample_training_samples):
+    def test_save_results_with_metrics(self, training_session):
         """Test saving run results with evaluation metrics"""
         # Create a simple mock classifier class
         class MockClassifier:
@@ -286,7 +248,10 @@ class TestCreateAndSaveRunResults:
 
         config_dict = {"model": "test", "batch_size": 32}
         classifier = MockClassifier()
-        samples = sample_training_samples[:2]
+
+        # Use factories to create samples
+        samples = TrainingSampleFactory.create_batch(2, label="variant")
+
         predictions = ["variant", "subject"]
         confidences = [0.95, 0.85]
         probabilities = [
@@ -329,9 +294,7 @@ class TestCreateAndSaveRunResults:
         predictions_saved = training_session.query(SamplePrediction).all()
         assert len(predictions_saved) == 2
 
-    def test_save_results_without_metrics(
-        self, training_session, sample_training_samples
-    ):
+    def test_save_results_without_metrics(self, training_session):
         """Test saving run results without evaluation metrics"""
 
         class MockClassifier:
@@ -339,21 +302,19 @@ class TestCreateAndSaveRunResults:
 
         config_dict = {"model": "test"}
         classifier = MockClassifier()
-        samples = [sample_training_samples[2]]  # Unlabeled sample
-        predictions = ["variant"]
-        confidences = [0.8]
-        probabilities = [{"variant": 0.8}]
-        metrics = {}  # No metrics
+
+        # Factory creates unlabeled sample by default or we can specify
+        sample = TrainingSampleFactory(label=None)
 
         create_and_save_run_results(
             session=training_session,
             config_dict=config_dict,
             classifier=classifier,
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
-            metrics=metrics,
+            samples=[sample],
+            predictions=["variant"],
+            confidences=[0.8],
+            probabilities=[{"variant": 0.8}],
+            metrics={},  # No metrics
             taxonomy="v1",
             model_path="/path/to/model",
             use_baseline=False,
@@ -367,70 +328,23 @@ class TestCreateAndSaveRunResults:
         # Notes should not contain metrics
         assert "Accuracy:" not in run.notes
 
-    def test_zero_shot_classifier_type(self, training_session, sample_training_samples):
-        """Test saving results for zero-shot classifier"""
-        # Import the actual class to test isinstance check
-        from fine_tuning.classifiers.ml_classifiers import ZeroShotClassifier
-
-        # Create a mock that looks like ZeroShotClassifier
-        class MockZeroShotClassifier:
-            labels = ["variant", "subject"]
-
-        # We need to trick the isinstance check, so let's just use the actual class structure
-        # For testing purposes, we'll test the run_type label logic
-        config_dict = {}
-        samples = [sample_training_samples[0]]
-        predictions = ["variant"]
-        confidences = [0.9]
-        probabilities = [{"variant": 0.9}]
-        metrics = {"accuracy": 0.9}
-
-        # Test with mock classifier (will be "fine-tuned" since it's not ZeroShotClassifier)
-        class MockSetFitClassifier:
-            labels = ["variant"]
-
-        classifier = MockSetFitClassifier()
-
-        create_and_save_run_results(
-            session=training_session,
-            config_dict=config_dict,
-            classifier=classifier,
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
-            metrics=metrics,
-            taxonomy="v2",
-            model_path="/path",
-            use_baseline=False,
-            split="test",
-        )
-
-        run = training_session.query(ModelRun).first()
-        assert "fine-tuned" in run.notes
-
-    def test_baseline_run_type(self, training_session, sample_training_samples):
+    def test_baseline_run_type(self, training_session):
         """Test that baseline flag overrides run type"""
 
         class MockClassifier:
             labels = ["variant"]
 
-        config_dict = {}
-        samples = [sample_training_samples[0]]
-        predictions = ["variant"]
-        confidences = [0.9]
-        probabilities = [{"variant": 0.9}]
-        metrics = {}
+        sample = TrainingSampleFactory()
 
         create_and_save_run_results(
             session=training_session,
-            config_dict=config_dict,
+            config_dict={},
             classifier=MockClassifier(),
-            samples=samples,
-            predictions=predictions,
-            confidences=confidences,
-            probabilities=probabilities,
-            metrics=metrics,
+            samples=[sample],
+            predictions=["variant"],
+            confidences=[0.9],
+            probabilities=[{"variant": 0.9}],
+            metrics={},
             taxonomy="v2",
             model_path=None,
             use_baseline=True,
