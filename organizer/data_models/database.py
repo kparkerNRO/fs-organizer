@@ -243,7 +243,7 @@ def get_sessionmaker(db_path: Path):
 
 
 def reset_tables(
-    db_path: Path, tables: List[Any] = None, legacy_tables: List[str] = None
+    db_path: Path, tables: List[Any] | None = None, legacy_tables: List[str] | None = None
 ):
     """Reset specified tables in the database."""
     if tables is None:

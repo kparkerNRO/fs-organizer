@@ -42,7 +42,7 @@ def export_snapshot_structure(
         if not include_files:
             query = query.where(Node.kind == "dir")
 
-        nodes = session.execute(query.order_by(Node.rel_path)).scalars().all()
+        nodes = list(session.execute(query.order_by(Node.rel_path)).scalars().all())
 
         # Build tree structure
         tree = _build_tree_structure(snapshot, nodes, include_files)

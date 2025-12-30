@@ -192,12 +192,12 @@ def refine_groups(
             current_group_id += len(subgroups) + 1
 
             # Calculate overall group confidence
-            group_category.overall_confidence = (
+            group_category.overall_confidence = (  # type: ignore[attr-defined]
                 min(member_confidences) if member_confidences else 0.5
             )
             group_category.count = len(group_members)
             group_category.needs_review = (
-                group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+                group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD  # type: ignore[attr-defined]
             )
 
             # group_categories.append(group_category)
@@ -207,14 +207,14 @@ def refine_groups(
                 sub_member_confidences = [
                     e.confidence for e in subcategory_to_entry[subgroup.name]
                 ]
-                subgroup.overall_confidence = (
+                subgroup.overall_confidence = (  # type: ignore[attr-defined]
                     min(sub_member_confidences) if sub_member_confidences else 0.5
                 )
                 subgroup.count = len(
                     [e for e in group_members if e.processed_name == subgroup.name]
                 )
                 subgroup.needs_review = (
-                    subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD
+                    subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD  # type: ignore[attr-defined]
                 )
 
                 session.add(subgroup)
@@ -316,11 +316,12 @@ def compact_groups(session: Session):
                     existing_group.confidence, group.confidence
                 )
                 if existing_group.pre_processed_name != group.pre_processed_name:
-                    existing_group.pre_processed_name = (
-                        existing_group.pre_processed_name
-                        + ";"
-                        + group.pre_processed_name
-                    )
+                    if existing_group.pre_processed_name and group.pre_processed_name:
+                        existing_group.pre_processed_name = (
+                            existing_group.pre_processed_name
+                            + ";"
+                            + group.pre_processed_name
+                        )
 
             else:
                 new_entry = GroupCategoryEntry(

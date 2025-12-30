@@ -134,7 +134,6 @@ def prepare_training_data(
     augment_fn: Callable[
         ..., Tuple[List[str], List[int]]
     ] = augment_with_hard_negatives,
-    get_labels_fn: Callable[[str], list[str]] = get_labels,
 ) -> Tuple[Dataset, Dataset, Dict[int, str]]:
     """Loads, processes, and splits data into training and test datasets."""
     try:
@@ -209,7 +208,7 @@ def train_model(
     config: TrainConfigSettings,
     manager: StorageManager,
     taxonomy: str,
-    label_run_id: int | None,
+    label_run_id: int,
     output_dir: Path,
 ) -> None:
     train_ds, test_ds, id2label = prepare_training_data(

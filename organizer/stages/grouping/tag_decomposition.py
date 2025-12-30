@@ -692,7 +692,7 @@ def detect_prefix_suffix_patterns(
 ##################
 # hierarchical processing
 ###################
-def analyze_hierarchical_patterns(vocabulary) -> Dict[str, Dict]:
+def analyze_hierarchical_patterns(vocabulary: list[str]) -> Dict[str, Dict]:
     """Detect hierarchical tag patterns like 'Base Tag', 'Base Tag Extension', 'Base Tag Extension Extra'"""
     logger.info("Analyzing hierarchical tag patterns...")
 
@@ -705,7 +705,7 @@ def analyze_hierarchical_patterns(vocabulary) -> Dict[str, Dict]:
     prefix_groups = defaultdict(list)
 
     # Sort tags by length to process shorter ones first
-    sorted_tags = sorted(vocabulary, key=len)
+    sorted_tags: list[str] = sorted(vocabulary, key=len)  # type: ignore[assignment]
 
     for tag in sorted_tags:
         words = tag.split()
@@ -1555,7 +1555,7 @@ def decompose_compound_tags(session: Session) -> None:
     stmt = select(GroupCategoryEntry).where(
         GroupCategoryEntry.iteration_id == iteration_id - 1
     )
-    entries = session.scalars(stmt).all()
+    entries = list(session.scalars(stmt).all())
 
     if not entries:
         logger.warning("No entries found for tag decomposition")

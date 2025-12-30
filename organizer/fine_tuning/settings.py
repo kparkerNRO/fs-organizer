@@ -16,13 +16,13 @@ class StorageSettings(BaseSettings):
         description="Base directory for storage and model paths.",
     )
 
-    storage_path: Path = Field(
-        "data",
+    storage_path: Path = Field(  # type: ignore[assignment]
+        default="data",
         description="Path to the main storage directory containing all databases.",
     )
 
-    model_path: Path = Field(
-        "models",
+    model_path: Path = Field(  # type: ignore[assignment]
+        default="models",
         description="Path to the directory containing trained models.",
     )
 

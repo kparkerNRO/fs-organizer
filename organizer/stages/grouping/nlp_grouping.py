@@ -98,9 +98,9 @@ def prepare_records(
         ClusterItem(
             folder_id=pair[1].id,
             partial_category_id=pair[0].id,
-            name=pair[0].processed_name,
-            original_name=pair[0].pre_processed_name,
-            text_vec=vectorizer.transform([pair[0].processed_name]).toarray()[0],
+            name=pair[0].processed_name or "",
+            original_name=pair[0].pre_processed_name or "",
+            text_vec=vectorizer.transform([pair[0].processed_name or ""]).toarray()[0],
             depth=pair[1].depth or 1,
             path=Path(pair[1].folder_path) if pair[1] else Path(),
         )

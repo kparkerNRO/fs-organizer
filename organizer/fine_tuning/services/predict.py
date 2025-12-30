@@ -41,7 +41,7 @@ def save_predictions_to_db(
     samples: List[TrainingSample],
     predictions: List[str],
     confidences: List[float],
-    probabilities: List[Union[List[float], Dict[str, float]]],
+    probabilities: List[Dict[str, float]],
     run_id: int,
     prediction_type: str = "test",
 ) -> int:
@@ -154,7 +154,7 @@ def create_and_save_run_results(
     samples: List[TrainingSample],
     predictions: List[str],
     confidences: List[float],
-    probabilities: List[Union[List[float], Dict[str, float]]],
+    probabilities: List[Dict[str, float]],
     metrics: Dict[str, Any],
     taxonomy: str,
     model_path: Path | None,
@@ -323,4 +323,5 @@ def predict_zero_shot(
         label_run_id=label_run_id,
         split=split,
         labeled_only=settings.labeled_only,
+        model_path=None,  # Zero-shot has no model path
     )

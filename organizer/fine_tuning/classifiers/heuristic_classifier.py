@@ -290,7 +290,7 @@ class HeuristicClassifier:
     ) -> Optional[ClassificationResult]:
         """Check if folder represents an asset type."""
         matches = get_matching_patterns(name, list(ASSET_TYPE_KEYWORDS))
-        matches.extend(get_matching_patterns(name, self.config.media_types))
+        matches.extend(get_matching_patterns(name, list(self.config.media_types)))
 
         if matches:
             # Check file extensions for additional confidence
@@ -311,7 +311,7 @@ class HeuristicClassifier:
     def _check_themes(self, name: str) -> Optional[ClassificationResult]:
         """Check if folder represents a theme/genre."""
         matches = get_matching_patterns(name, list(THEME_KEYWORDS))
-        matches.extend(get_matching_patterns(name, self.config.format_types))
+        matches.extend(get_matching_patterns(name, list(self.config.format_types)))
 
         if matches:
             return ClassificationResult(

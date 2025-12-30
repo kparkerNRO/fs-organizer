@@ -58,10 +58,10 @@ def get_effective_label_run_id(
         logger.info(f"Using specified label run: {label_run_id}")
         return label_run_id
 
-    with manager.get_index_session(read_only=True) as session:
+    with manager.get_training_session() as session:
         result = session.execute(select(func.max(LabelRun.id))).scalar()
         if result is None:
-            raise ValueError(f"No label runs found in {manager.index_path}")
+            raise ValueError(f"No label runs found in {manager.training_path}")
         return result
 
 
@@ -100,7 +100,7 @@ def load_settings(settings_class: type[T], config_path: Path | None) -> T:
         )
         return settings_class()
     except ValidationError as e:
-        logger.error(f"Error validating config file {config_path}: {e}", err=True)
+        logger.error(f"Error validating config file {config_path}: {e}")
         raise typer.Exit(1)
 
 
@@ -313,7 +313,7 @@ def generate_samples(
     """Generate training samples CSV for manual labeling."""
     setup_logging()
     base_settings = StorageSettings()
-    settings = load_settings(GenerateSamplesSettings, config_path)
+    settings = load_settings(GenerateSamplesSettings, config_path)  # type: ignore[type-var]
     manager = StorageManager(base_settings.storage_path, initialize_training=True)
 
     output_csv = output_csv or (base_settings.storage_path / "samples.csv")
@@ -345,7 +345,7 @@ def apply_classifications(
 ) -> None:
     """Validate and store manually-labeled CSV in the training database."""
     setup_logging()
-    settings = load_settings(ApplyClassificationsSettings, config_path)
+    settings = load_settings(ApplyClassificationsSettings, config_path)  # type: ignore[type-var]
     base_settings = StorageSettings()
     input_csv = input_csv or (base_settings.storage_path / "samples.csv")
     manager = StorageManager(base_settings.storage_path, initialize_training=True)

@@ -52,7 +52,7 @@ def process_folders(session: Session):
     for parent_path, folders in grouped_folders.items():
         folder_id_to_folder = {folder.id: folder for folder in folders}
         cleaned_name_to_id = {folder.cleaned_name: folder.id for folder in folders}
-        token_grouping = common_token_grouping(cleaned_name_to_id.keys())
+        token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))
         if token_grouping:
             for name, category in token_grouping.items():
                 id = cleaned_name_to_id[name]

@@ -127,6 +127,10 @@ class SetFitClassifier:
         """Predict labels for multiple samples."""
         texts = [sample.text for sample in samples]
         predictions = self.model.predict(texts)
+        try:
+            predictions_list = predictions.tolist()  # type: ignore[union-attr]
+        except AttributeError:
+            predictions_list = list(predictions)  # type: ignore[arg-type]
 
         try:
             probs = self.model.predict_proba(texts)
@@ -137,10 +141,10 @@ class SetFitClassifier:
                 for prob_row in probs
             ]
         except Exception:
-            confidences = [1.0] * len(predictions)
+            confidences = [1.0] * len(predictions_list)
             all_probabilities = [
                 {label: (1.0 if label == pred else 0.0) for label in self.labels}
-                for pred in predictions
+                for pred in predictions_list
             ]
 
-        return predictions.tolist(), confidences, all_probabilities
+        return predictions_list, confidences, all_probabilities
