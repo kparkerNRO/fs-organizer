@@ -3,7 +3,7 @@
 import pytest
 from utils.config import get_config
 
-from fine_tuning.heuristic_classifier import HeuristicClassifier
+from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
 
 
 @pytest.fixture

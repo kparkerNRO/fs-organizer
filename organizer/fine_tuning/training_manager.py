@@ -4,21 +4,19 @@ Provides utilities for managing training samples, label runs, and model runs
 in the training database.
 """
 
-import json
 import logging
-from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Set, Tuple, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from storage.index_models import Snapshot
-from storage.manager import StorageManager
+from storage.index_models import Node, Snapshot
+from storage.manager import NodeKind, StorageManager
 from storage.training_models import (
     LabelRun,
-    ModelRun,
-    SamplePrediction,
     TrainingSample,
 )
+from utils.filename_processing import clean_filename
+from utils.text_processing import normalize_string
 
 logger = logging.getLogger(__name__)
 
@@ -71,117 +69,6 @@ def get_newest_label_run_id(session: Session) -> int | None:
     return result
 
 
-def save_predictions_to_db(
-    session: Session,
-    samples: List[TrainingSample],
-    predictions: List[str],
-    confidences: List[float],
-    probabilities: List[List[float]],
-    run_id: int,
-    prediction_type: str = "test",
-) -> int:
-    """Save predictions to database.
-
-    Args:
-        session: SQLAlchemy session
-        samples: List of samples
-        predictions: List of predicted labels
-        confidences: List of confidence scores
-        probabilities: List of probability lists
-        run_id: TrainingRun ID
-        prediction_type: Type of prediction ('train', 'validation', 'test')
-
-    Returns:
-        Number of predictions saved
-    """
-    prediction_objects = []
-
-    for sample, pred, conf, probs in zip(
-        samples, predictions, confidences, probabilities
-    ):
-        is_correct = None
-        if sample.label:
-            is_correct = sample.label == pred
-
-        # Convert probabilities list to dict if needed
-        if isinstance(probs, list):
-            probs_dict = {f"label_{i}": p for i, p in enumerate(probs)}
-        else:
-            probs_dict = probs
-
-        prediction_obj = SamplePrediction(
-            run_id=run_id,
-            sample_id=sample.sample_id,
-            predicted_label=pred,
-            confidence=conf,
-            probabilities_json=json.dumps(probs_dict),
-            true_label=sample.label,
-            is_correct=is_correct,
-            prediction_type=prediction_type,
-        )
-        prediction_objects.append(prediction_obj)
-
-    session.add_all(prediction_objects)
-    session.commit()
-
-    return len(prediction_objects)
-
-
-def create_model_run(
-    session: Session,
-    model_path: str | None,
-    taxonomy: str,
-    use_baseline: bool,
-    config: Dict,
-    run_type: str | None = None,
-    training_data_source: str | None = None,
-) -> ModelRun:
-    """Create a new model run record.
-
-    Args:
-        session: SQLAlchemy session
-        model_path: Path to fine-tuned model (or None if baseline)
-        taxonomy: Taxonomy version
-        use_baseline: Whether using baseline model
-        config: Configuration dict
-        run_type: Type of run ('training', 'evaluation', 'baseline'). Auto-detected if None.
-        training_data_source: Description of training data source (optional)
-
-    Returns:
-        ModelRun object
-    """
-    # Auto-detect run type if not specified
-    if run_type is None:
-        run_type = "baseline" if use_baseline else "evaluation"
-
-    # Store run type and taxonomy clearly in base_model_id
-    base_model_id = f"setfit-{run_type}-{taxonomy}"
-
-    # Store model path or baseline indicator in model_version
-    if use_baseline:
-        model_version = f"baseline-{taxonomy}"
-    else:
-        model_version = model_path if model_path else f"unknown-{taxonomy}"
-
-    run = ModelRun(
-        started_at=datetime.now().isoformat(),
-        status="running",
-        run_type=run_type,
-        base_model_id=base_model_id,
-        model_version=model_version,
-        model_type="setfit",
-        taxonomy=taxonomy,
-        training_data_source=training_data_source,
-        hyperparameters_json=json.dumps(config),
-    )
-
-    session.add(run)
-    session.commit()
-    session.refresh(run)
-
-    return run
-
-
 def get_highest_snapshot_id(manager: StorageManager) -> int:
     """Get the highest snapshot_id from the index database."""
     with manager.get_index_session(read_only=True) as session:
@@ -202,3 +89,42 @@ def get_effective_label_run_id(session: Session, label_run_id: int | None) -> in
         raise ValueError("No label runs found in database")
     logger.info(f"Using newest label run: {effective_label_run_id}")
     return effective_label_run_id
+
+
+def load_and_index_nodes(
+    session: Session, snapshot_id: int
+) -> Tuple[Dict[int, Node], Dict[int, str], Dict[Optional[int], List[int]]]:
+    """Load all nodes for a snapshot and build relationship indexes."""
+    rows = session.execute(
+        select(Node).where(Node.snapshot_id == snapshot_id)
+    ).scalars()
+    nodes_by_id: Dict[int, Node] = {}
+    processed_name_by_id: Dict[int, str] = {}
+    children_by_parent: Dict[Optional[int], List[int]] = {}
+    for r in rows:
+        nodes_by_id[r.node_id] = r
+        processed_name_by_id[r.node_id] = clean_filename(r.name)
+        children_by_parent.setdefault(r.parent_node_id, []).append(r.node_id)
+    return nodes_by_id, processed_name_by_id, children_by_parent
+
+
+def precompute_descendant_extensions(
+    nodes_by_id: Dict[int, Node], children_by_parent: Dict[Optional[int], List[int]]
+) -> Dict[int, Set[str]]:
+    """Precompute the set of all descendant file extensions for each node using dynamic programming."""
+    depth_groups: Dict[int, List[int]] = {}
+    max_depth = 0
+    for node_id, n in nodes_by_id.items():
+        d = int(n.depth)
+        depth_groups.setdefault(d, []).append(node_id)
+        max_depth = max(max_depth, d)
+
+    descendant_exts: Dict[int, Set[str]] = {nid: set() for nid in nodes_by_id}
+    for d in range(max_depth, -1, -1):
+        for nid in depth_groups.get(d, []):
+            node = nodes_by_id[nid]
+            if node.kind == NodeKind.FILE and node.ext:
+                descendant_exts[nid].add(normalize_string(node.ext).strip("."))
+            for cid in children_by_parent.get(nid, []):
+                descendant_exts[nid].update(descendant_exts[cid])
+    return descendant_exts

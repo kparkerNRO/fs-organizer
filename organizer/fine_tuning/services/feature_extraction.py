@@ -1,9 +1,15 @@
 import json
+import logging
 from typing import Dict, List, Optional, Set
 
-from fine_tuning.heuristic_classifier import COLLAB_MARKERS
+from fine_tuning.classifiers.heuristic_classifier import (
+    COLLAB_MARKERS,
+)
 from fine_tuning.settings import StorageSettings
-from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
+from fine_tuning.training_manager import (
+    load_and_index_nodes,
+    precompute_descendant_extensions,
+)
 from pydantic import Field
 from sqlalchemy.orm import Session
 from storage.index_models import Node
@@ -11,6 +17,8 @@ from storage.manager import NodeKind, StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
+
+logger = logging.getLogger(__name__)
 
 
 class FeatureExtractionSettings(StorageSettings):

@@ -5,11 +5,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fine_tuning.heuristic_classifier import HeuristicClassifier
-from fine_tuning.services.feature_extraction import extract_features_for_run
+from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
+from fine_tuning.services.feature_extraction import (
+    extract_features_for_run,
+)
 from fine_tuning.settings import StorageSettings
 from fine_tuning.taxonomy import get_labels
-from fine_tuning.utils import load_and_index_nodes, precompute_descendant_extensions
+from fine_tuning.training_manager import (
+    load_and_index_nodes,
+    precompute_descendant_extensions,
+)
 from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
