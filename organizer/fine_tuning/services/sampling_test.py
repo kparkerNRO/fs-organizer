@@ -1,8 +1,6 @@
 """Tests for sampling.py"""
 
 import csv
-import json
-from pathlib import Path
 
 import pytest
 from fine_tuning.services.sampling import (
@@ -17,45 +15,9 @@ from fine_tuning.services.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from storage.index_models import IndexBase, Node, Snapshot
+from storage.index_models import Node
 from storage.manager import NodeKind
-from storage.training_models import LabelRun, TrainingBase, TrainingSample
-
-
-@pytest.fixture
-def index_session():
-    """Create in-memory test database for index data"""
-    engine = create_engine("sqlite:///:memory:")
-    IndexBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture
-def training_session():
-    """Create in-memory test database for training data"""
-    engine = create_engine("sqlite:///:memory:")
-    TrainingBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture
-def sample_snapshot(index_session):
-    """Create a test snapshot"""
-    snapshot = Snapshot(
-        snapshot_id=1,
-        created_at="2024-01-01T00:00:00",
-        root_path="/test",
-        root_abs_path="/test",
-    )
-    index_session.add(snapshot)
-    index_session.flush()
-    return snapshot
+from storage.training_models import LabelRun, TrainingSample
 
 
 class TestSelectTrainingSamples:

@@ -6,29 +6,8 @@ from fine_tuning.services.train import (
     augment_with_hard_negatives,
     prepare_training_data,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from storage.manager import StorageManager
-from storage.training_models import LabelRun, TrainingBase, TrainingSample
-
-
-@pytest.fixture
-def training_session():
-    """Create in-memory test database for training data"""
-    engine = create_engine("sqlite:///:memory:")
-    TrainingBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture
-def label_run(training_session):
-    """Create a test label run"""
-    label_run = LabelRun(snapshot_id=1, label_source="test")
-    training_session.add(label_run)
-    training_session.flush()
-    return label_run
+from storage.training_models import TrainingBase, TrainingSample
 
 
 class TestAugmentWithHardNegatives:

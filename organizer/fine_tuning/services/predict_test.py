@@ -1,7 +1,6 @@
 """Tests for predict.py"""
 
 import json
-from datetime import datetime
 
 import pytest
 from fine_tuning.services.predict import (
@@ -9,19 +8,7 @@ from fine_tuning.services.predict import (
     create_model_run,
     save_predictions_to_db,
 )
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from storage.training_models import ModelRun, SamplePrediction, TrainingBase, TrainingSample
-
-
-@pytest.fixture
-def training_session():
-    """Create in-memory test database for training data"""
-    engine = create_engine("sqlite:///:memory:")
-    TrainingBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        yield session
+from storage.training_models import ModelRun, SamplePrediction, TrainingSample
 
 
 @pytest.fixture
