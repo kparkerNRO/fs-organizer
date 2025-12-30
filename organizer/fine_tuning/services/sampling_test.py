@@ -104,9 +104,10 @@ class TestClusterBySimilarity:
 
         clusters = _cluster_by_similarity(nodes, threshold=0.4)
 
-        # Similar names should be clustered together
-        assert len(clusters) >= 1
-        # Total nodes should be preserved
+        # "Character Art" and "Character Arts" are similar → 1 cluster
+        # "Environment" is dissimilar → separate cluster
+        assert len(clusters) == 2
+        # Verify all nodes are preserved
         total_nodes = sum(len(cluster) for cluster in clusters)
         assert total_nodes == 3
 
@@ -124,15 +125,30 @@ class TestClusterBySimilarity:
         assert len(clusters[0]) == 1
 
     def test_threshold_effect(self):
-        """Test that threshold affects clustering"""
-        nodes = [NodeFactory.build(node_id=i, name=f"folder_{i}") for i in range(5)]
+        """Test that threshold affects clustering behavior"""
+        # Create nodes with varying similarity:
+        # - "Image Res" and "Image Resolution" are similar (high similarity)
+        # - "Folder ABC" and "Folder XYZ" are moderately similar (same prefix)
+        # - "Random Data" is dissimilar to all
+        nodes = [
+            NodeFactory.build(node_id=1, name="Image Res"),
+            NodeFactory.build(node_id=2, name="Image Resolution"),
+            NodeFactory.build(node_id=3, name="Folder ABC"),
+            NodeFactory.build(node_id=4, name="Folder XYZ"),
+            NodeFactory.build(node_id=5, name="Random Data"),
+        ]
 
-        # Lower threshold should result in fewer clusters (more grouping)
+        # Low threshold (0.2): More permissive, groups more items together
         clusters_low = _cluster_by_similarity(nodes, threshold=0.2)
-        # Higher threshold should result in more clusters (less grouping)
+        # High threshold (0.9): Strict, only very similar items cluster
         clusters_high = _cluster_by_similarity(nodes, threshold=0.9)
 
-        # All nodes should be accounted for in both cases
+        # Low threshold: "Image Res"+"Image Resolution" cluster,
+        # "Folder ABC"+"Folder XYZ" cluster, "Random Data" alone = 3 clusters
+        assert len(clusters_low) == 3
+        # High threshold: Each dissimilar enough to be separate = 5 clusters
+        assert len(clusters_high) == 5
+        # All nodes preserved in both
         assert sum(len(c) for c in clusters_low) == 5
         assert sum(len(c) for c in clusters_high) == 5
 
@@ -160,12 +176,13 @@ class TestSampleFromClusters:
         assert len(samples) == 0
 
     def test_sample_size_limit(self):
-        """Test that sample size is respected"""
+        """Test that sample size is exactly respected"""
         clusters = [[NodeFactory.build(node_id=i, name=f"Node{i}") for i in range(10)]]
 
         samples = _sample_from_clusters(clusters, num_samples=5)
 
-        assert len(samples) <= 5
+        # Should return exactly the requested number of samples
+        assert len(samples) == 5
 
     def test_diversity_preference(self):
         """Test that sampling prefers one from each cluster"""
