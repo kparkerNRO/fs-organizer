@@ -372,9 +372,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
 
     if unlabeled:
         if len(unlabeled) <= 10:
-            rows_str = ", ".join(
-                map(str, unlabeled)
-            )  # ty:ignore[invalid-argument-type]
+            rows_str = ", ".join(map(str, unlabeled))  # ty:ignore[invalid-argument-type]
         else:
             rows_str = (
                 ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
