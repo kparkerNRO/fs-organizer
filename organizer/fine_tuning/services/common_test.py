@@ -128,43 +128,25 @@ class TestPrecomputeDescendantExtensions:
 
     def test_basic_extension_computation(self):
         """Test computing descendant extensions"""
-        # Create mock nodes - don't persist to DB since we're testing the function directly
+        # Use factory.build() to create nodes without persisting to DB
         nodes_by_id = {
-            1: Node(
+            1: NodeFactory.build(
                 node_id=1,
-                snapshot_id=1,
-                name="root",
                 kind=NodeKind.DIR,
                 parent_node_id=None,
-                depth=0,
-                rel_path="root",
-                abs_path="/test/root",
                 ext=None,
-                file_source="filesystem",
             ),
-            2: Node(
+            2: NodeFactory.build(
                 node_id=2,
-                snapshot_id=1,
-                name="file.txt",
                 kind=NodeKind.FILE,
                 parent_node_id=1,
-                depth=1,
-                rel_path="root/file.txt",
-                abs_path="/test/root/file.txt",
                 ext=".txt",
-                file_source="filesystem",
             ),
-            3: Node(
+            3: NodeFactory.build(
                 node_id=3,
-                snapshot_id=1,
-                name="file.png",
                 kind=NodeKind.FILE,
                 parent_node_id=1,
-                depth=1,
-                rel_path="root/file.png",
-                abs_path="/test/root/file.png",
                 ext=".png",
-                file_source="filesystem",
             ),
         }
 
@@ -184,41 +166,23 @@ class TestPrecomputeDescendantExtensions:
     def test_nested_hierarchy(self):
         """Test extension computation with nested folders"""
         nodes_by_id = {
-            1: Node(
+            1: NodeFactory.build(
                 node_id=1,
-                snapshot_id=1,
-                name="root",
                 kind=NodeKind.DIR,
                 parent_node_id=None,
-                depth=0,
-                rel_path="root",
-                abs_path="/test/root",
                 ext=None,
-                file_source="filesystem",
             ),
-            2: Node(
+            2: NodeFactory.build(
                 node_id=2,
-                snapshot_id=1,
-                name="subfolder",
                 kind=NodeKind.DIR,
                 parent_node_id=1,
-                depth=1,
-                rel_path="root/subfolder",
-                abs_path="/test/root/subfolder",
                 ext=None,
-                file_source="filesystem",
             ),
-            3: Node(
+            3: NodeFactory.build(
                 node_id=3,
-                snapshot_id=1,
-                name="deep.jpg",
                 kind=NodeKind.FILE,
                 parent_node_id=2,
-                depth=2,
-                rel_path="root/subfolder/deep.jpg",
-                abs_path="/test/root/subfolder/deep.jpg",
                 ext=".jpg",
-                file_source="filesystem",
             ),
         }
 
