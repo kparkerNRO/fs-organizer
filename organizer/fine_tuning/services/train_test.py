@@ -7,7 +7,6 @@ from fine_tuning.services.train import (
     prepare_training_data,
 )
 from storage.manager import StorageManager
-from storage.training_models import TrainingBase
 
 from .factories import TrainingSampleFactory
 
@@ -240,12 +239,10 @@ class TestPrepareTrainingData:
 
         # Create manager
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
-
-        # Initialize training database
-        manager._init_training_db(TrainingBase)
 
         # Add samples to manager's database
         with manager.get_training_session() as session:
@@ -385,8 +382,9 @@ class TestPrepareTrainingData:
         """Test error with invalid taxonomy"""
         config = TrainConfigSettings()
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
 
         with pytest.raises(ValueError):
