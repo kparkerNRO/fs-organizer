@@ -41,6 +41,13 @@ from fine_tuning.settings import StorageSettings
 
 T = TypeVar("T", bound=BaseModel)
 
+DEFAULT_CONFIG_DIR = Path(__file__).resolve().parents[1] / "config" / "fine_tuning"
+
+
+def default_config_path(filename: str) -> Path:
+    """Return the default config path for a fine-tuning command."""
+    return DEFAULT_CONFIG_DIR / filename
+
 
 def get_effective_label_run_id(
     manager: StorageManager, label_run_id: int | None
@@ -59,7 +66,7 @@ def get_effective_label_run_id(
 
 
 def get_effective_snapshot_id(manager: StorageManager, snapshot_id: int | None) -> int:
-    """Get the effective label run ID, defaulting to the newest if not specified."""
+    """Get the effective snapshot ID, defaulting to the newest if not specified."""
 
     if snapshot_id is not None:
         logger.info(f"Using specified snapshot: {snapshot_id}")
@@ -68,7 +75,7 @@ def get_effective_snapshot_id(manager: StorageManager, snapshot_id: int | None) 
     with manager.get_index_session(read_only=True) as session:
         result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
         if result is None:
-            raise ValueError(f"No label runs found in {manager.index_path}")
+            raise ValueError(f"No snapshots found in {manager.index_path}")
         return result
 
 
@@ -111,10 +118,15 @@ app = typer.Typer(
 @app.command()
 def train(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("train.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with training configuration (hyperparameters). If not provided, default settings are used.",
+        help="Path to a JSON file with training configuration (hyperparameters).",
+    ),
+    model_path: Path | None = typer.Option(
+        None,
+        "--model-path",
+        help="Path to save the trained model (overrides default).",
     ),
     label_run_id: int | None = typer.Option(
         None,
@@ -132,18 +144,35 @@ def train(
 
     label_run_id = get_effective_label_run_id(manager, label_run_id)
 
-    train_model(
-        config, manager, base_settings.taxonomy, label_run_id, base_settings.model_path
-    )
+    effective_model_path = model_path or base_settings.model_path
+
+    try:
+        train_model(
+            config,
+            manager,
+            base_settings.taxonomy,
+            label_run_id,
+            effective_model_path,
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo("Done!")
 
 
 @app.command()
 def predict(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("predict.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with prediction configuration. If not provided, default settings are used.",
+        help="Path to a JSON file with prediction configuration.",
+    ),
+    model_path: Path | None = typer.Option(
+        None,
+        "--model-path",
+        help="Path to load the trained model (overrides default).",
     ),
     label_run_id: int | None = typer.Option(
         None,
@@ -162,7 +191,8 @@ def predict(
     base_settings = StorageSettings()
     config = load_settings(PredictConfigSettings, config_path)
 
-    if not config.use_baseline and not base_settings.model_path:
+    effective_model_path = model_path or base_settings.model_path
+    if not config.use_baseline and not effective_model_path:
         typer.echo(
             "Error: --model-path is required unless use_baseline is set in config",
             err=True,
@@ -172,14 +202,18 @@ def predict(
 
     label_run_id = get_effective_label_run_id(manager, label_run_id)
 
-    predict_setfit(
-        config,
-        manager,
-        base_settings.taxonomy,
-        label_run_id,
-        split,
-        base_settings.model_path,
-    )
+    try:
+        predict_setfit(
+            config,
+            manager,
+            base_settings.taxonomy,
+            label_run_id,
+            split,
+            effective_model_path,
+        )
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
     typer.echo("Done!")
 
@@ -187,10 +221,10 @@ def predict(
 @app.command("zero-shot")
 def zero_shot(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("zero_shot.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with zero-shot configuration. If not provided, default settings are used.",
+        help="Path to a JSON file with zero-shot configuration.",
     ),
     label_run_id: int | None = typer.Option(
         None,
@@ -212,17 +246,21 @@ def zero_shot(
 
     manager = StorageManager(base_settings.storage_path, initialize_training=True)
     label_run_id = get_effective_label_run_id(manager, label_run_id)
-    predict_zero_shot(config, manager, base_settings.taxonomy, label_run_id, split)
+    try:
+        predict_zero_shot(config, manager, base_settings.taxonomy, label_run_id, split)
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
     typer.echo("Done!")
 
 
 @app.command()
 def extract_features(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("extract_features.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with feature extraction configuration. If not provided, default settings are used.",
+        help="Path to a JSON file with feature extraction configuration.",
     ),
     snapshot_id: int | None = typer.Option(
         None,
@@ -256,25 +294,29 @@ def extract_features(
 @app.command()
 def generate_samples(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("generate_samples.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with sample generation settings. If not provided, default settings are used.",
+        help="Path to a JSON file with sample generation settings.",
     ),
     snapshot_id: int | None = typer.Option(
         None,
         "--snapshot-id",
         help="Snapshot ID to extract features from (defaults to highest snapshot_id).",
     ),
-    # ADD: Output CSV path, optional, defaults to StorageSettings().storage_path.samples.csv
+    output_csv: Path | None = typer.Option(
+        None,
+        "--output-csv",
+        help="Path to write the samples CSV (overrides default).",
+    ),
 ) -> None:
     """Generate training samples CSV for manual labeling."""
     setup_logging()
-    settings = load_settings(GenerateSamplesSettings, config_path)
-    manager = StorageManager(settings.storage_path, initialize_training=True)
     base_settings = StorageSettings()
+    settings = load_settings(GenerateSamplesSettings, config_path)
+    manager = StorageManager(base_settings.storage_path, initialize_training=True)
 
-    output_csv = base_settings.storage_path / "samples.csv"
+    output_csv = output_csv or (base_settings.storage_path / "samples.csv")
 
     snapshot_id = get_effective_snapshot_id(manager, snapshot_id)
     num_samples = generate_sample_data(
@@ -284,28 +326,29 @@ def generate_samples(
         output_csv=output_csv,
     )
 
-    typer.echo(f"Saved {num_samples} samples to {settings.output_csv}")
+    typer.echo(f"Saved {num_samples} samples to {output_csv}")
 
 
 @app.command("apply-classifications")
 def apply_classifications(
     config_path: Path | None = typer.Option(
-        None,
+        default_config_path("apply_classifications.json"),
         "--config",
         "-c",
-        help="Path to a JSON file with classification application settings. If not provided, default settings are used.",
+        help="Path to a JSON file with classification application settings.",
     ),
-    # Add: input_csv, optional, defaults to StorageSettings().storage_path.samples.csv
+    input_csv: Path | None = typer.Option(
+        None,
+        "--input-csv",
+        help="Path to the labeled samples CSV (overrides default).",
+    ),
 ) -> None:
     """Validate and store manually-labeled CSV in the training database."""
     setup_logging()
-    base_settings = StorageSettings()
-
-    input_csv = base_settings.storage_path / "samples.csv"
-
     settings = load_settings(ApplyClassificationsSettings, config_path)
-
-    manager = StorageManager(settings.storage_path, initialize_training=True)
+    base_settings = StorageSettings()
+    input_csv = input_csv or (base_settings.storage_path / "samples.csv")
+    manager = StorageManager(base_settings.storage_path, initialize_training=True)
     try:
         apply_sample_classifications(
             settings, manager, input_csv=input_csv, taxonomy=base_settings.taxonomy

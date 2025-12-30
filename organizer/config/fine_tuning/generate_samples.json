@@ -1,0 +1,8 @@
+{
+  "sample_size": 800,
+  "min_depth": 1,
+  "max_depth": 10,
+  "diversity_factor": 0.7,
+  "use_heuristic": true,
+  "heuristic_taxonomy": "v2"
+}

@@ -1,0 +1,15 @@
+{
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "batch_size": 32,
+  "num_epochs": 4,
+  "learning_rate": 2e-05,
+  "samples_per_label": 2,
+  "hardneg_k": 2,
+  "hardneg_min_sim": 0.25,
+  "hardneg_factor": 2,
+  "hardneg_labels": "",
+  "test_size": 0.2,
+  "seed": 42,
+  "no_triplet_loss": false,
+  "no_hard_negatives": false
+}

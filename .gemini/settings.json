@@ -5,7 +5,6 @@
         "git status",
         "git add .",
         "git commit",
-        "git push",
         "git pull",
         "git diff" 
         // OR use a wildcard if supported by your specific version, 

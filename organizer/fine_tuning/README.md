@@ -23,10 +23,9 @@ Next, process the snapshot to extract features (like folder depth, parent names,
 
 ```bash
 uv run python organizer.py model extract-features \
-  --index-db data/index.db \
-  --training-db data/training.db
+  --snapshot-id 1
 ```
-This creates a new database `outputs/training.db` populated with feature vectors for all your folders.
+This reads `data/index.db` and creates/updates `data/training.db` with feature vectors for all folders in the snapshot.
 
 #### Step 3: Generate Evaluation Samples (30 sec)
 
@@ -34,10 +33,11 @@ Generate a small, diverse set of samples for manual labeling. 200 is enough for 
 
 ```bash
 uv run python organizer.py model generate-samples \
-  --index-db data/index.db \
+  --snapshot-id 1 \
   --output-csv outputs/baseline_eval.csv \
-  --sample-size 200
+  --config organizer/config/fine_tuning/generate_samples.json
 ```
+The sample size and diversity settings come from the JSON config file.
 
 #### Step 4: Label Samples (10-20 min)
 
@@ -46,7 +46,9 @@ Open `baseline_eval.csv` in a spreadsheet editor. Your job is to fill in the `la
 Once you've labeled the samples, import them back into the training database:
 
 ```bash
-uv run python organizer.py model apply-classifications outputs/baseline_eval.csv --storage data
+uv run python organizer.py model apply-classifications \
+  --input-csv outputs/baseline_eval.csv \
+  --config organizer/config/fine_tuning/apply_classifications.json
 ```
 
 #### Step 5: Evaluate Baseline Model (1 min)
@@ -55,11 +57,9 @@ Now, run the pre-trained baseline model against your labeled samples to see how 
 
 ```bash
 uv run python organizer.py model predict \
-  --training-db data/training.db \
-  --use-baseline \
-  --labeled-only \
-  --output-file outputs/baseline_results.csv
+  --config organizer/config/fine_tuning/predict_baseline.json
 ```
+In your config file, set `use_baseline=true` and `labeled_only=true` to evaluate only labeled samples.
 
 The console will output a detailed performance report, including the key **Macro F1-Score**.
 
@@ -75,10 +75,9 @@ Generate a larger set of samples for labeling. 800-1200 samples is a good target
 
 ```bash
 uv run python organizer.py model generate-samples \
-  --index-db data/index.db \
-  --output-csv training_samples.csv \
   --snapshot-id 1 \
-  --sample-size 1200
+  --output-csv training_samples.csv \
+  --config organizer/config/fine_tuning/generate_samples.json
 ```
 
 ### Step 2: Label Your Data
@@ -91,32 +90,21 @@ Once your data is labeled, train your model using the training database. This pr
 
 ```bash
 uv run python organizer.py model train \
-  --training-db data/training.db \
-  --taxonomy legacy \
-  --output-dir ./models/my_classifier \
-  --num-epochs 8
+  --config organizer/config/fine_tuning/train.json \
+  --model-path ./models/my_classifier
 ```
-
-**Taxonomy Options:**
-- `legacy`: Original labels (primary_author, secondary_author, collection, subject, media_format, media_type, variant, other)
-- `v1`: Simplified labels (person_or_group, content, media_bucket, descriptor, other, unknown)
-- `v2`: Refined labels (creator_or_studio, content_subject, asset_type, descriptor, other, unknown)
 
 If you have multiple label runs, you can specify which one to use:
 
 ```bash
 uv run python organizer.py model train \
-  --training-db outputs/training.db \
   --label-run-id 3 \
-  --taxonomy v2 \
-  --output-dir ./models/my_classifier \
-  --num-epochs 8
+  --config organizer/config/fine_tuning/train.json \
+  --model-path ./models/my_classifier
 ```
 
 The command will automatically:
-- Use the newest label run (unless you specify `--label-run-id`)
 - Load labeled samples from the database
-- Use the specified taxonomy for label validation
 - Split your data into train/test sets
 - Train the model with hard negative mining
 - Run evaluation and save the final model to the specified directory
@@ -127,12 +115,10 @@ With a trained model, you can now run it on all the unlabeled folders in your da
 
 ```bash
 uv run python organizer.py model predict \
-  --training-db outputs/training.db \
   --model-path ./models/my_classifier \
-  --save-predictions \
-  --output-file all_predictions.csv
+  --config organizer/config/fine_tuning/predict.json
 ```
-This will generate a `predictions.csv` file containing the predicted label for every folder.
+This writes predictions into `data/training.db` and logs evaluation metrics if labels exist.
 
 ---
 
@@ -165,20 +151,29 @@ This is the canonical set of labels used for classification.
 
 All commands are run via `uv run python organizer.py model <COMMAND>`.
 
+Each command defaults to a config file under `organizer/config/fine_tuning/`. Pass `--config` to override the default file.
+
+### Base Path Override (Debug Only)
+
+The fine-tuning CLI uses `StorageSettings.base_path` to resolve default data and model folders. You normally should not change this, but you can override it for debugging or special runs by setting the environment variable on the command line:
+
+```bash
+FS_ORGANIZER_BASE_PATH=/tmp/fs-organizer \
+  uv run python organizer.py model train
+```
+
 ### `extract-features`
 Extracts classification features from a snapshot and populates the training database.
 
 **Usage:**
 ```bash
 uv run python organizer.py model extract-features \
-    --index-db <path/to/index.db> \
-    --training-db <path/to/training.db> \
-    --snapshot-id <id>
+    --snapshot-id <id> \
+    --config organizer/config/fine_tuning/extract_features.json
 ```
 **Key Parameters:**
-*   `--index-db`: Path to the source `index.db` created by the `gather` command.
-*   `--training-db`: Path to the target `training.db` where features will be stored.
 *   `--snapshot-id`: (Optional) The snapshot to process. Defaults to the latest one.
+*   `--config`: (Optional) JSON config for feature extraction (batch sizes, caps). Defaults are used if omitted.
 
 ### `generate-samples`
 Generates a CSV of diverse folder samples for manual labeling.
@@ -186,52 +181,79 @@ Generates a CSV of diverse folder samples for manual labeling.
 **Usage:**
 ```bash
 uv run python organizer.py model generate-samples \
-    --index-db <path/to/index.db> \
+    --snapshot-id <id> \
     --output-csv <path/to/samples.csv> \
-    --sample-size 1000
+    --config organizer/config/fine_tuning/generate_samples.json
 ```
 **Key Parameters:**
+*   `--snapshot-id`: (Optional) Snapshot to sample from. Defaults to the latest one.
 *   `--output-csv`: The path where the generated CSV file will be saved.
-*   `--sample-size`: The number of samples to generate (e.g., 200 for baseline, 1000+ for fine-tuning).
-*   `--diversity-factor`: (0-1) A factor to control the diversity of samples. Higher is more diverse.
+*   `--config`: (Optional) JSON config for sample size, depth range, and diversity.
 
 ### `train`
-Trains a SetFit classifier on a labeled CSV file.
+Trains a SetFit classifier on labeled samples stored in the training database.
 
 **Usage:**
 ```bash
 uv run python organizer.py model train \
-    --data <path/to/labeled_samples.csv> \
-    --output-dir <path/to/save/model> \
-    --num-epochs 8
+    --config organizer/config/fine_tuning/train.json \
+    --model-path <path/to/save/model> \
+    --label-run-id <id>
 ```
 **Key Parameters:**
-*   `--data`: Path to your CSV file containing `path` and `label` columns.
-*   `--output-dir`: Directory where the trained model will be saved.
-*   `--num-epochs`: Number of training epochs (default: 6). More epochs can lead to better performance but also risk overfitting.
-*   `--test-size`: Fraction of data to hold out for testing (default: 0.2).
+*   `--config`: (Optional) JSON config for hyperparameters (epochs, batch size, hard negatives).
+*   `--model-path`: (Optional) Override the default model directory.
+*   `--label-run-id`: (Optional) Label run to use (defaults to newest).
 
 ### `predict`
-Runs a trained model (or the baseline) against a dataset to generate predictions.
+Runs a trained model (or the baseline) against samples in the training database.
 
 **Usage:**
 ```bash
 # Using a fine-tuned model
 uv run python organizer.py model predict \
-    --training-db <path/to/training.db> \
-    --model-path <path/to/your/model>
+    --model-path <path/to/your/model> \
+    --config organizer/config/fine_tuning/predict.json
 
 # Using the baseline model for evaluation
 uv run python organizer.py model predict \
-    --training-db <path/to/training.db> \
-    --use-baseline --labeled-only
+    --config organizer/config/fine_tuning/predict_baseline.json
 ```
 **Key Parameters:**
-*   `--model-path`: Path to a fine-tuned model directory.
-*   `--use-baseline`: If set, uses the pre-trained baseline model instead of a fine-tuned one.
-*   `--labeled-only`: Use this for evaluation. It runs predictions only on samples that have a ground-truth label.
-*   `--save-predictions`: If set, saves the output predictions back into the database.
-*   `--output-file`: (Optional) Exports all predictions to a CSV file.
+*   `--config`: (Optional) JSON config with `use_baseline` and `labeled_only`.
+*   `--model-path`: Path to a fine-tuned model directory (required unless `use_baseline=true`).
+*   `--label-run-id`: (Optional) Label run to evaluate against (defaults to newest).
+*   `--split`: (Optional) Only run on a specific split: `train`, `validation`, or `test`.
+
+Predictions and evaluation results are stored in `data/training.db`.
+
+### `zero-shot`
+Runs zero-shot classification using the taxonomy without fine-tuning.
+
+**Usage:**
+```bash
+uv run python organizer.py model zero-shot \
+    --config organizer/config/fine_tuning/zero_shot.json \
+    --label-run-id <id> \
+    --split <train|validation|test>
+```
+**Key Parameters:**
+*   `--config`: (Optional) JSON config with `labeled_only`.
+*   `--label-run-id`: (Optional) Label run to evaluate against (defaults to newest).
+*   `--split`: (Optional) Only run on a specific split: `train`, `validation`, or `test`.
+
+### `apply-classifications`
+Validates and imports a labeled samples CSV into the training database.
+
+**Usage:**
+```bash
+uv run python organizer.py model apply-classifications \
+    --input-csv <path/to/labeled_samples.csv> \
+    --config organizer/config/fine_tuning/apply_classifications.json
+```
+**Key Parameters:**
+*   `--input-csv`: Path to the labeled samples CSV (defaults to `<storage_path>/samples.csv`).
+*   `--config`: (Optional) JSON config for `labeler`, `split`, and `validate_only`.
 
 ---
 
