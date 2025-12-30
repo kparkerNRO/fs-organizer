@@ -30,8 +30,8 @@ class TestAugmentWithHardNegatives:
             "character_designs",
         ]
         train_labels = [0, 0, 1]  # First two are same class (variant)
-        id2label = {0: "variant", 1: "subject"}
-        confusable_labels = {"variant"}
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
 
         extra_texts, extra_labels = augment_with_hard_negatives(
             train_texts=train_texts,
@@ -56,8 +56,8 @@ class TestAugmentWithHardNegatives:
         train_texts = ["AAA", "BBB", "CCC"]
         train_leaf_keys = ["aaa", "bbb", "ccc"]
         train_labels = [0, 1, 2]
-        id2label = {0: "variant", 1: "subject", 2: "other"}
-        confusable_labels = {"variant"}
+        id2label = {0: "asset_type", 1: "content_subject", 2: "other"}
+        confusable_labels = {"asset_type"}
 
         extra_texts, extra_labels = augment_with_hard_negatives(
             train_texts=train_texts,
@@ -79,7 +79,7 @@ class TestAugmentWithHardNegatives:
         train_texts = ["Text1", "Text2"]
         train_leaf_keys = ["text1", "text2"]
         train_labels = [0, 1]
-        id2label = {0: "variant", 1: "subject"}
+        id2label = {0: "asset_type", 1: "content_subject"}
         confusable_labels = set()  # Empty set
 
         extra_texts, extra_labels = augment_with_hard_negatives(
@@ -115,8 +115,8 @@ class TestAugmentWithHardNegatives:
             "character_art",
         ]
         train_labels = [0, 0, 0, 0, 1]
-        id2label = {0: "variant", 1: "subject"}
-        confusable_labels = {"variant"}
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
 
         # Test with k=1: each of 4 variants finds 1 similar neighbor = 4 total
         extra_texts_k1, extra_labels_k1 = augment_with_hard_negatives(
@@ -153,8 +153,8 @@ class TestAugmentWithHardNegatives:
         train_texts = ["High Res Folder", "Low Res Folder", "Character Art"]
         train_leaf_keys = ["high_res_folder", "low_res_folder", "character_art"]
         train_labels = [0, 0, 1]
-        id2label = {0: "variant", 1: "subject"}
-        confusable_labels = {"variant"}
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
 
         # Test with factor=1: 2 variants × 1 neighbor × 1 factor = 2
         extra_texts_f1, extra_labels_f1 = augment_with_hard_negatives(
@@ -190,8 +190,8 @@ class TestAugmentWithHardNegatives:
         train_texts = ["Text1", "Text2", "Text3"]
         train_leaf_keys = ["", "text2", ""]  # Some empty
         train_labels = [0, 1, 0]
-        id2label = {0: "variant", 1: "subject"}
-        confusable_labels = {"variant"}
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
 
         extra_texts, extra_labels = augment_with_hard_negatives(
             train_texts=train_texts,
@@ -219,12 +219,12 @@ class TestPrepareTrainingData:
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="high_res",
-                label="variant",
+                label="asset_type",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="character_art",
-                label="subject",
+                label="content_subject",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
@@ -234,7 +234,7 @@ class TestPrepareTrainingData:
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="low_res",
-                label="variant",
+                label="asset_type",
             ),
         ]
 
@@ -283,19 +283,19 @@ class TestPrepareTrainingData:
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="high_res",
-                label="variant",
+                label="asset_type",
                 text="High Resolution",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="low_res",
-                label="variant",
+                label="asset_type",
                 text="Low Resolution",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="character",
-                label="subject",
+                label="content_subject",
                 text="Character",
             ),
         ]
@@ -316,7 +316,7 @@ class TestPrepareTrainingData:
             test_size=0.33,
             seed=42,
             no_hard_negatives=False,
-            hardneg_labels="variant",
+            hardneg_labels="asset_type",
             hardneg_k=1,
             hardneg_min_sim=0.3,
             hardneg_factor=1,
@@ -421,7 +421,7 @@ class TestPrepareTrainingData:
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm=f"test{i}",
-                label="variant" if i % 2 == 0 else "subject",
+                label="asset_type" if i % 2 == 0 else "content_subject",
             )
             for i in range(10)
         ]
