@@ -1,19 +1,20 @@
 import json
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from fine_tuning.classifiers.heuristic_classifier import (
     COLLAB_MARKERS,
 )
 from fine_tuning.settings import StorageSettings
-from fine_tuning.training_manager import (
-    load_and_index_nodes,
-    precompute_descendant_extensions,
+from fine_tuning.services.common import (
+    FeatureNodeCore,
+    extract_feature_nodes,
 )
 from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
-from storage.manager import NodeKind, StorageManager
+from storage.manager import StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
@@ -72,82 +73,6 @@ def _build_feature_text(
     )
 
 
-def _create_training_sample(
-    node: Node,
-    label_run: LabelRun,
-    config: Config,
-    nodes_by_id: Dict[int, Node],
-    processed_name_by_id: Dict[int, str],
-    children_by_parent: Dict[Optional[int], List[int]],
-    descendant_exts: Dict[int, Set[str]],
-    child_cap: int,
-    sibling_cap: int,
-    ext_cap: int,
-) -> TrainingSample:
-    """Create a single TrainingSample object for a given node."""
-    name_norm = processed_name_by_id[node.node_id]
-    parent_id = node.parent_node_id
-    parent = nodes_by_id.get(parent_id) if parent_id is not None else None
-    grandparent = (
-        nodes_by_id.get(parent.parent_node_id)
-        if parent and parent.parent_node_id is not None
-        else None
-    )
-
-    child_ids = children_by_parent.get(node.node_id, [])
-    sibling_ids = children_by_parent.get(parent_id, []) if parent_id else []
-
-    child_names = sorted({processed_name_by_id[c] for c in child_ids})[:child_cap]
-    sibling_names = sorted(
-        {processed_name_by_id[s] for s in sibling_ids if s != node.node_id}
-    )[:sibling_cap]
-
-    child_token_bag = [t for cn in child_names for t in tokenize_string(cn)]
-    sibling_token_bag = [t for sn in sibling_names for t in tokenize_string(sn)]
-
-    flags = {
-        "collab": has_matching_token(tokenize_string(node.name), COLLAB_MARKERS)
-        or (
-            parent is not None
-            and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
-        ),
-        "childMedia": has_matching_token(child_token_bag, config.media_types),
-        "childVarHint": has_matching_token(child_token_bag, config.variant_types),
-        "childFmt": any(
-            cn.strip(".").lower() in config.format_types for cn in child_names
-        ),
-        "sibVarHint": has_matching_token(sibling_token_bag, config.variant_types),
-    }
-
-    exts = sorted(descendant_exts[node.node_id])[:ext_cap]
-    text = _build_feature_text(
-        node, name_norm, parent, grandparent, sibling_names, child_names, exts, flags
-    )
-
-    return TrainingSample(
-        snapshot_id=node.snapshot_id,
-        node_id=node.node_id,
-        name_raw=node.name,
-        name_norm=name_norm,
-        parent_name_norm=parent.name if parent else None,
-        grandparent_name_norm=grandparent.name if grandparent else None,
-        kind=node.kind,
-        file_source=node.file_source,
-        depth=int(node.depth),
-        child_names_topk_json=json.dumps(child_names),
-        sibling_names_topk_json=json.dumps(sibling_names),
-        descendant_file_exts_topk_json=json.dumps(exts),
-        has_collab_cue=flags["collab"],
-        looks_like_format=config.is_media_type(node.name),
-        child_has_media_type_cue=flags["childMedia"],
-        child_has_variant_hint=flags["childVarHint"],
-        child_has_format_cue=flags["childFmt"],
-        sibling_has_variant_hint=flags["sibVarHint"],
-        text=text,
-        label_run=label_run,
-    )
-
-
 def extract_features_for_run(
     index_session: Session,
     training_session: Session,
@@ -156,42 +81,96 @@ def extract_features_for_run(
     label_run: LabelRun,
     settings: FeatureExtractionSettings,
 ) -> int:
-    nodes_by_id, processed_name_by_id, children_by_parent = load_and_index_nodes(
-        index_session, snapshot_id
+    rows = list(
+        index_session.execute(
+            select(Node).where(Node.snapshot_id == snapshot_id)
+        ).scalars()
     )
-    if not nodes_by_id:
-        return 0
 
-    descendant_exts = precompute_descendant_extensions(nodes_by_id, children_by_parent)
+    feature_nodes: list[FeatureNodeCore] = extract_feature_nodes(
+        index_session=index_session,
+        snapshot_id=snapshot_id,
+        nodes=rows,
+        max_siblings=settings.child_cap,
+        max_descendents=settings.ext_cap,
+        max_children=settings.child_cap,
+    )
 
     samples: List[TrainingSample] = []
     total_saved = 0
 
-    for node in nodes_by_id.values():
-        is_zip_file = node.ext and node.ext.lower() in (".zip", "zip")
-        if node.kind != NodeKind.DIR and not is_zip_file:
-            continue
+    for feature_node in feature_nodes:
+        node = feature_node.node
+        parent = feature_node.parent
+        grandparent = feature_node.grandparent
+        name_norm = ""  # TODO
+        # name_norm = processed_name_by_id[node.node_id]
 
-        sample = _create_training_sample(
+        child_token_bag = [
+            t for cn in feature_node.child_names for t in tokenize_string(cn)
+        ]
+        sibling_token_bag = [
+            t for sn in feature_node.sibling_names for t in tokenize_string(sn)
+        ]
+
+        flags = {
+            "collab": has_matching_token(tokenize_string(node.name), COLLAB_MARKERS)
+            or (
+                parent is not None
+                and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
+            ),
+            "childMedia": has_matching_token(child_token_bag, config.media_types),
+            "childVarHint": has_matching_token(child_token_bag, config.variant_types),
+            "childFmt": any(
+                cn.strip(".").lower() in config.format_types
+                for cn in feature_node.child_names
+            ),
+            "sibVarHint": has_matching_token(sibling_token_bag, config.variant_types),
+        }
+
+        text = _build_feature_text(
             node,
-            label_run,
-            config,
-            nodes_by_id,
-            processed_name_by_id,
-            children_by_parent,
-            descendant_exts,
-            settings.child_cap,
-            settings.sibling_cap,
-            settings.ext_cap,
+            name_norm,
+            parent,
+            grandparent,
+            feature_node.sibling_names,
+            feature_node.child_names,
+            feature_node.descendent_extentions,
+            flags,
         )
-        samples.append(sample)
 
+        training_sample = TrainingSample(
+            snapshot_id=feature_node.snapshot_id,
+            node_id=feature_node.node.node_id,
+            name_raw=feature_node.node.name,
+            name_norm=name_norm,
+            parent_name_norm=feature_node.parent_name,
+            grandparent_name_norm=feature_node.grandparent_name,
+            kind=feature_node.node.kind,
+            file_source=feature_node.node.file_source,
+            depth=int(feature_node.node.depth),
+            child_names_topk_json=json.dumps(feature_node.child_names),
+            sibling_names_topk_json=json.dumps(feature_node.sibling_names),
+            descendant_file_exts_topk_json=json.dumps(
+                feature_node.descendent_extentions
+            ),
+            has_collab_cue=flags["collab"],
+            looks_like_format=config.is_media_type(node.name),
+            child_has_media_type_cue=flags["childMedia"],
+            child_has_variant_hint=flags["childVarHint"],
+            child_has_format_cue=flags["childFmt"],
+            sibling_has_variant_hint=flags["sibVarHint"],
+            text=text,
+            label_run=label_run,
+        )
+        samples.append(training_sample)
+
+        # Batch flush. TODO: does sqlalchemy do this better?
         if len(samples) >= settings.batch_size:
             training_session.add_all(samples)
             training_session.flush()
             total_saved += len(samples)
             samples = []
-
     if samples:
         training_session.add_all(samples)
         training_session.flush()

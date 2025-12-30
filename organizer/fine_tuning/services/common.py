@@ -5,8 +5,9 @@ in the training database.
 """
 
 import logging
-from typing import Dict, List, Set, Tuple, Optional
+from typing import Dict, List, Optional, Set, Tuple
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from storage.index_models import Node, Snapshot
@@ -54,21 +55,6 @@ def load_samples(
     return list(samples)
 
 
-def get_newest_label_run_id(session: Session) -> int | None:
-    """Get the newest (highest ID) label run from the database.
-
-    Args:
-        session: SQLAlchemy session
-
-    Returns:
-        The ID of the newest label run, or None if no label runs exist
-    """
-    result = session.execute(
-        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
-    ).scalar()
-    return result
-
-
 def get_highest_snapshot_id(manager: StorageManager) -> int:
     """Get the highest snapshot_id from the index database."""
     with manager.get_index_session(read_only=True) as session:
@@ -84,14 +70,16 @@ def get_effective_label_run_id(session: Session, label_run_id: int | None) -> in
         logger.info(f"Using specified label run: {label_run_id}")
         return label_run_id
 
-    effective_label_run_id = get_newest_label_run_id(session)
+    effective_label_run_id = session.execute(
+        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
+    ).scalar()
     if effective_label_run_id is None:
         raise ValueError("No label runs found in database")
     logger.info(f"Using newest label run: {effective_label_run_id}")
     return effective_label_run_id
 
 
-def load_and_index_nodes(
+def _load_and_index_nodes(
     session: Session, snapshot_id: int
 ) -> Tuple[Dict[int, Node], Dict[int, str], Dict[Optional[int], List[int]]]:
     """Load all nodes for a snapshot and build relationship indexes."""
@@ -108,7 +96,7 @@ def load_and_index_nodes(
     return nodes_by_id, processed_name_by_id, children_by_parent
 
 
-def precompute_descendant_extensions(
+def _precompute_descendant_extensions(
     nodes_by_id: Dict[int, Node], children_by_parent: Dict[Optional[int], List[int]]
 ) -> Dict[int, Set[str]]:
     """Precompute the set of all descendant file extensions for each node using dynamic programming."""
@@ -128,3 +116,93 @@ def precompute_descendant_extensions(
             for cid in children_by_parent.get(nid, []):
                 descendant_exts[nid].update(descendant_exts[cid])
     return descendant_exts
+
+
+class FeatureNodeCore(BaseModel):
+    snapshot_id: int
+    node: Node
+    parent: Node | None
+    grandparent: Node | None
+    child_nodes: list[Node]
+    sibling_nodes: list[Node]
+    descendent_extentions: list[str]
+
+    max_siblings: int
+    max_descendents: int
+    max_children: int
+
+    @property
+    def grandparent_name(self):
+        return self.grandparent.name if self.grandparent else None
+
+    @property
+    def parent_name(self):
+        return self.parent.name if self.parent else None
+
+    @property
+    def child_names(self):
+        return [node.name for node in self.child_nodes]
+
+    @property
+    def sibling_names(self):
+        return [node.name for node in self.sibling_nodes]
+
+
+def extract_feature_nodes(
+    index_session: Session,
+    snapshot_id: int,
+    nodes: list[Node],
+    max_siblings: int,
+    max_descendents: int,
+    max_children: int,
+):
+    nodes_by_id, processed_name_by_id, children_by_parent = _load_and_index_nodes(
+        index_session, snapshot_id
+    )
+
+    descendant_exts = _precompute_descendant_extensions(nodes_by_id, children_by_parent)
+
+    feature_nodes: list[FeatureNodeCore] = []
+
+    for node in nodes:
+        is_zip_file = node.ext and node.ext.lower() in (".zip", "zip")
+        if node.kind != NodeKind.DIR and not is_zip_file:
+            continue
+
+        parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
+        grandparent = (
+            nodes_by_id.get(parent.parent_node_id)
+            if parent and parent.parent_node_id
+            else None
+        )
+
+        child_nodes = [
+            nodes_by_id[cid]
+            for cid in children_by_parent.get(node.node_id, [])
+            if cid in nodes_by_id and nodes_by_id[cid].kind == NodeKind.DIR
+        ][:max_children]
+
+        if parent:
+            sibling_nodes = [
+                nodes_by_id[sid]
+                for sid in children_by_parent.get(parent.node_id, [])
+                if sid != node.node_id
+                and sid in nodes_by_id
+                and nodes_by_id[sid].kind == NodeKind.DIR
+            ][:max_siblings]
+
+        extensions = sorted(descendant_exts.get(node.node_id, set()))[:max_descendents]
+        core_node = FeatureNodeCore(
+            snapshot_id=snapshot_id,
+            node=node,
+            parent=parent,
+            grandparent=grandparent,
+            child_nodes=child_nodes,
+            sibling_nodes=sibling_nodes,
+            descendent_extentions=extensions,
+            max_siblings=max_siblings,
+            max_descendents=max_descendents,
+            max_children=max_children,
+        )
+
+        feature_nodes.append(core_node)

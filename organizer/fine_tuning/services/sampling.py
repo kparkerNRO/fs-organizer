@@ -11,9 +11,8 @@ from fine_tuning.services.feature_extraction import (
 )
 from fine_tuning.settings import StorageSettings
 from fine_tuning.taxonomy import get_labels
-from fine_tuning.training_manager import (
-    load_and_index_nodes,
-    precompute_descendant_extensions,
+from fine_tuning.services.common import (
+    extract_feature_nodes,
 )
 from pydantic import Field
 from sqlalchemy import select
@@ -229,8 +228,6 @@ def write_sample_csv(
     heuristic_taxonomy: str = "v2",
 ) -> None:
     """Write training sample CSV with context columns, efficiently."""
-    nodes_by_id, _, children_by_parent = load_and_index_nodes(session, snapshot_id)
-    descendant_exts = precompute_descendant_extensions(nodes_by_id, children_by_parent)
 
     heuristic_classifier = None
     if use_heuristic:
@@ -242,58 +239,33 @@ def write_sample_csv(
         except Exception as e:
             logger.warning(f"Could not initialize heuristic classifier: {e}")
 
+    feature_nodes = extract_feature_nodes(
+        index_session=session,
+        snapshot_id=snapshot_id,
+        nodes=nodes,
+        max_siblings=sibling_sample_size,
+        max_descendents=ext_sample_size,
+        max_children=child_sample_size,
+    )
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         writer.writeheader()
 
-        for node in nodes:
-            parent = (
-                nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
-            )
-            grandparent = (
-                nodes_by_id.get(parent.parent_node_id)
-                if parent and parent.parent_node_id
-                else None
-            )
-
-            child_nodes = [
-                nodes_by_id[cid]
-                for cid in children_by_parent.get(node.node_id, [])
-                if cid in nodes_by_id and nodes_by_id[cid].kind == NodeKind.DIR
-            ]
-            child_names = sorted({c.name for c in child_nodes})[:child_sample_size]
-
-            if parent:
-                sibling_nodes = [
-                    nodes_by_id[sid]
-                    for sid in children_by_parent.get(parent.node_id, [])
-                    if sid != node.node_id
-                    and sid in nodes_by_id
-                    and nodes_by_id[sid].kind == NodeKind.DIR
-                ]
-                sibling_names = sorted({s.name for s in sibling_nodes})[
-                    :sibling_sample_size
-                ]
-            else:
-                sibling_names = []
-
-            extensions = sorted(descendant_exts.get(node.node_id, set()))[
-                :ext_sample_size
-            ]
-
+        for feature_node in feature_nodes:
             row = {
                 "snapshot_id": snapshot_id,
-                "node_id": node.node_id,
-                "rel_path": node.rel_path,
-                "depth": node.depth,
-                "parent_name": parent.name if parent else "",
-                "grandparent_name": grandparent.name if grandparent else "",
-                "num_children": len(child_nodes),
-                "child_names_sample": json.dumps(child_names),
-                "sibling_names_sample": json.dumps(sibling_names),
-                "file_extensions": json.dumps(extensions),
-                "name": node.name,
+                "node_id": feature_node.node.node_id,
+                "rel_path": feature_node.node.rel_path,
+                "depth": feature_node.node.depth,
+                "parent_name": feature_node.parent_name,
+                "grandparent_name": feature_node.grandparent_name,
+                "num_children": len(feature_node.child_nodes),
+                "child_names_sample": json.dumps(feature_node.child_names),
+                "sibling_names_sample": json.dumps(feature_node.sibling_names),
+                "file_extensions": json.dumps(feature_node.descendent_extentions),
+                "name": feature_node.node.name,
                 "heuristic_label": "",
                 "heuristic_confidence": "",
                 "heuristic_reason": "",
@@ -302,12 +274,12 @@ def write_sample_csv(
 
             if heuristic_classifier:
                 result = heuristic_classifier.classify(
-                    name=node.name,
-                    depth=node.depth,
-                    parent_name=parent.name if parent else None,
-                    children_names=child_names,
-                    sibling_names=sibling_names,
-                    file_extensions=extensions,
+                    name=feature_node.node.name,
+                    depth=feature_node.node.depth,
+                    parent_name=feature_node.parent.name,
+                    children_names=feature_node.child_names,
+                    sibling_names=feature_node.sibling_names,
+                    file_extensions=feature_node.descendent_extentions,
                 )
                 row["heuristic_label"] = result.label
                 row["heuristic_confidence"] = f"{result.confidence:.3f}"

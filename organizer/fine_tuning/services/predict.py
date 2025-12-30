@@ -1,6 +1,5 @@
-import csv
-import logging
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
@@ -8,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
 from fine_tuning.services.evaluation import evaluate_predictions
 from fine_tuning.settings import CommonSettings
-from fine_tuning.training_manager import (
+from fine_tuning.services.common import (
     get_effective_label_run_id,
     load_samples,
 )
@@ -39,14 +38,6 @@ class PredictSettings(BaseModel):
         False,
         description="Only run on samples with labels (for evaluation)",
     )
-    save_predictions: bool = Field(
-        False,
-        description="Save predictions to database",
-    )
-    output_file: Optional[Path] = Field(
-        None,
-        description="Save predictions to CSV file",
-    )
 
 
 class ZeroShotSettings(BaseModel):
@@ -60,14 +51,6 @@ class ZeroShotSettings(BaseModel):
         False,
         description="Only run on samples with labels (for evaluation)",
     )
-    save_predictions: bool = Field(
-        False,
-        description="Save predictions to database",
-    )
-    output_file: Optional[Path] = Field(
-        None,
-        description="Save predictions to CSV file",
-    )
 
 
 class FullPredictSettings(CommonSettings, PredictSettings):
@@ -78,49 +61,12 @@ class FullZeroShotSettings(CommonSettings, ZeroShotSettings):
     pass
 
 
-def save_predictions_to_csv(
-    output_file: Path,
-    samples: List[TrainingSample],
-    predictions: List[str],
-    confidences: List[float],
-) -> None:
-    """Save predictions to a CSV file."""
-    logger.info(f"Saving predictions to {output_file}...")
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with output_file.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(
-            [
-                "sample_id",
-                "name",
-                "true_label",
-                "predicted_label",
-                "confidence",
-                "is_correct",
-            ]
-        )
-        for sample, pred, conf in zip(samples, predictions, confidences):
-            is_correct = "1" if sample.label and sample.label == pred else "0"
-            writer.writerow(
-                [
-                    sample.sample_id,
-                    sample.name_raw,
-                    sample.label or "",
-                    pred,
-                    f"{conf:.4f}",
-                    is_correct,
-                ]
-            )
-    logger.info(f"Saved {len(samples)} predictions to {output_file}")
-
-
 def save_predictions_to_db(
     session: Session,
     samples: List[TrainingSample],
     predictions: List[str],
     confidences: List[float],
-    probabilities: List[List[float]],
+    probabilities: List[Union[List[float], Dict[str, float]]],
     run_id: int,
     prediction_type: str = "test",
 ) -> int:
@@ -131,7 +77,7 @@ def save_predictions_to_db(
         samples: List of samples
         predictions: List of predicted labels
         confidences: List of confidence scores
-        probabilities: List of probability lists
+        probabilities: List of probability dicts or lists
         run_id: TrainingRun ID
         prediction_type: Type of prediction ('train', 'validation', 'test')
 
@@ -233,10 +179,10 @@ def create_and_save_run_results(
     samples: List[TrainingSample],
     predictions: List[str],
     confidences: List[float],
-    probabilities: List[List[float]],
+    probabilities: List[Union[List[float], Dict[str, float]]],
     metrics: Dict[str, Any],
 ) -> None:
-    """Creates a ModelRun, saves all results to the database and optionally to CSV."""
+    """Creates a ModelRun and saves all results to the database."""
     run_type_label = (
         "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
     )
@@ -281,20 +227,17 @@ def create_and_save_run_results(
     session.commit()
     logger.info(f"Saved run metadata (run_id={run.run_id})")
 
-    if settings.save_predictions:
-        num_saved = save_predictions_to_db(
-            session,
-            samples,
-            predictions,
-            confidences,
-            probabilities,
-            run_id=run.run_id,
-            prediction_type=settings.split or "all",
-        )
-        logger.info(f"Saved {num_saved} predictions to database")
-
-    if settings.output_file:
-        save_predictions_to_csv(settings.output_file, samples, predictions, confidences)
+    # Always save predictions to database
+    num_saved = save_predictions_to_db(
+        session,
+        samples,
+        predictions,
+        confidences,
+        probabilities,
+        run_id=run.run_id,
+        prediction_type=settings.split or "all",
+    )
+    logger.info(f"Saved {num_saved} predictions to database")
 
 
 def predict_and_evaluate(

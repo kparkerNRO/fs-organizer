@@ -34,7 +34,7 @@ from fine_tuning.services.sampling import (
     generate_sample_data,
 )
 from fine_tuning.services.train import FullTrainingSettings, train_model
-from fine_tuning.training_manager import get_highest_snapshot_id
+from fine_tuning.services.common import get_highest_snapshot_id
 
 T = TypeVar("T", bound=BaseModel)
 

@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 from datasets import Dataset
 from fine_tuning.settings import CommonSettings
 from fine_tuning.taxonomy import get_labels
-from fine_tuning.training_manager import get_effective_label_run_id, load_samples
+from fine_tuning.services.common import get_effective_label_run_id, load_samples
 from pydantic import BaseModel, Field
 from setfit import SetFitModel, SetFitTrainer
 from sklearn.metrics import classification_report, f1_score
