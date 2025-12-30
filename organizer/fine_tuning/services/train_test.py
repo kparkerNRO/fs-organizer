@@ -254,13 +254,13 @@ class TestPrepareTrainingData:
             label_run_id=label_run.id,
         )
 
-        # Check that datasets were created
-        assert len(train_ds) > 0
-        assert len(test_ds) > 0
+        # Check that datasets were created with correct split (50% test_size)
+        assert len(train_ds) == 2
+        assert len(test_ds) == 2
         assert len(train_ds) + len(test_ds) == 4
 
-        # Check id2label mapping
-        assert len(id2label) > 0
+        # Check id2label mapping (3 unique labels: variant, subject, other)
+        assert len(id2label) == 3
         assert all(isinstance(k, int) for k in id2label.keys())
         assert all(isinstance(v, str) for v in id2label.values())
 

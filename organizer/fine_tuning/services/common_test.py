@@ -281,7 +281,7 @@ class TestExtractFeatureNodes:
 
         assert len(feature_nodes) == 1
         # Should cap at max_siblings
-        assert len(feature_nodes[0].sibling_nodes) <= 3
+        assert len(feature_nodes[0].sibling_nodes) == 3
 
     def test_zip_file_extraction(self, index_session, sample_snapshot):
         """Test extraction for ZIP files"""

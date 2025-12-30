@@ -88,8 +88,8 @@ class TestSelectTrainingSamples:
             max_depth=5,
         )
 
-        # Should not exceed requested sample size
-        assert len(samples) <= 20
+        # Should return exactly the requested sample size
+        assert len(samples) == 20
 
 
 class TestClusterBySimilarity:
@@ -247,8 +247,6 @@ class TestSampleFromClusters:
         samples = _sample_from_clusters(clusters, num_samples=2)
 
         assert len(samples) == 2
-        # Should get at least one from each cluster for diversity
-        assert len(samples) <= 2
 
     def test_empty_clusters(self):
         """Test sampling from empty clusters"""
