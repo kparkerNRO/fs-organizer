@@ -6,9 +6,11 @@
         "git add .",
         "git commit",
         "git pull",
-        "git diff" 
-        // OR use a wildcard if supported by your specific version, 
-        // but explicit listing is safer.
+        "git diff",
+        "git branch",
+        "uv run pytest",
+        "uv run organizer",
+        "just"
       ]
     }
   }

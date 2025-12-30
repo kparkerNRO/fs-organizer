@@ -3,6 +3,9 @@
 import csv
 
 import pytest
+from storage.manager import NodeKind
+
+from fine_tuning.services.factories import NodeFactory, TrainingSampleFactory
 from fine_tuning.services.sampling import (
     _cluster_by_similarity,
     _sample_from_clusters,
@@ -15,8 +18,6 @@ from fine_tuning.services.sampling import (
     validate_label_values,
     write_sample_csv,
 )
-from storage.manager import NodeKind
-from fine_tuning.services.factories import NodeFactory, TrainingSampleFactory
 
 
 class TestSelectTrainingSamples:
@@ -25,8 +26,7 @@ class TestSelectTrainingSamples:
     def test_basic_selection(self, index_session, sample_snapshot):
         """Test basic sample selection"""
         # Create 20 nodes using factory
-        for i in range(20):
-            NodeFactory(node_id=i + 1, snapshot_id=1, depth=1)
+        nodes = NodeFactory.create_batch(20, snapshot_id=1, depth=1)
 
         samples = select_training_samples(
             session=index_session,
@@ -39,6 +39,8 @@ class TestSelectTrainingSamples:
         assert len(samples) == 10
         # All samples should be directories
         assert all(s.kind == NodeKind.DIR for s in samples)
+        # All samples should come from the created nodes
+        assert {s.node_id for s in samples}.issubset({n.node_id for n in nodes})
 
     def test_depth_filtering(self, index_session, sample_snapshot):
         """Test that depth filtering works correctly"""
@@ -55,9 +57,7 @@ class TestSelectTrainingSamples:
         )
 
         # Should only include nodes at depth 2 and 5 (not depth 0)
-        assert len(samples) == 2
-        depths = {s.depth for s in samples}
-        assert depths == {2, 5}
+        assert {s.depth for s in samples} == {2, 5}
 
     def test_empty_result(self, index_session, sample_snapshot):
         """Test selection with no matching nodes"""
@@ -74,8 +74,7 @@ class TestSelectTrainingSamples:
     def test_sample_size_cap(self, index_session, sample_snapshot):
         """Test that sample size is respected"""
         # Create 100 nodes using factory
-        for i in range(100):
-            NodeFactory(node_id=i + 1, snapshot_id=1, depth=1)
+        NodeFactory.create_batch(100, snapshot_id=1, depth=1)
 
         samples = select_training_samples(
             session=index_session,
@@ -102,20 +101,13 @@ class TestClusterBySimilarity:
 
         clusters = _cluster_by_similarity(nodes, threshold=0.4)
 
-        # "Character Art" and "Character Arts" are similar → 1 cluster
-        # "Environment" is dissimilar → separate cluster
-        assert len(clusters) == 2
+        # Convert to set of frozensets for order-independent comparison
+        cluster_sets = {frozenset(node.name for node in c) for c in clusters}
 
-        # Verify cluster contents
-        cluster_names = [
-            sorted([node.name for node in cluster]) for cluster in clusters
-        ]
-        cluster_names.sort()  # Sort for deterministic comparison
-
-        assert cluster_names == [
-            ["Character Art", "Character Arts"],
-            ["Environment"],
-        ]
+        assert cluster_sets == {
+            frozenset(["Character Art", "Character Arts"]),
+            frozenset(["Environment"]),
+        }
 
     def test_empty_input(self):
         """Test clustering with empty input"""
@@ -129,13 +121,10 @@ class TestClusterBySimilarity:
         clusters = _cluster_by_similarity([node], threshold=0.5)
         assert len(clusters) == 1
         assert len(clusters[0]) == 1
+        assert clusters[0][0].name == "Test"
 
     def test_threshold_effect(self):
         """Test that threshold affects clustering behavior"""
-        # Create nodes with varying similarity:
-        # - "Image Res" and "Image Resolution" are similar (high similarity)
-        # - "Folder ABC" and "Folder XYZ" are moderately similar (same prefix)
-        # - "Random Data" is dissimilar to all
         nodes = [
             NodeFactory.build(node_id=1, name="Image Res"),
             NodeFactory.build(node_id=2, name="Image Resolution"),
@@ -146,34 +135,23 @@ class TestClusterBySimilarity:
 
         # Low threshold (0.2): More permissive, groups more items together
         clusters_low = _cluster_by_similarity(nodes, threshold=0.2)
+        cluster_sets_low = {frozenset(n.name for n in c) for c in clusters_low}
+        assert cluster_sets_low == {
+            frozenset(["Image Res", "Image Resolution"]),
+            frozenset(["Folder ABC", "Folder XYZ"]),
+            frozenset(["Random Data"]),
+        }
+
         # High threshold (0.9): Strict, only very similar items cluster
         clusters_high = _cluster_by_similarity(nodes, threshold=0.9)
-
-        # Verify low threshold groups similar items
-        assert len(clusters_low) == 3
-        low_cluster_names = [
-            sorted([node.name for node in cluster]) for cluster in clusters_low
-        ]
-        low_cluster_names.sort()
-        assert low_cluster_names == [
-            ["Folder ABC", "Folder XYZ"],
-            ["Image Res", "Image Resolution"],
-            ["Random Data"],
-        ]
-
-        # Verify high threshold separates all items
-        assert len(clusters_high) == 5
-        high_cluster_names = [
-            sorted([node.name for node in cluster]) for cluster in clusters_high
-        ]
-        high_cluster_names.sort()
-        assert high_cluster_names == [
-            ["Folder ABC"],
-            ["Folder XYZ"],
-            ["Image Res"],
-            ["Image Resolution"],
-            ["Random Data"],
-        ]
+        cluster_sets_high = {frozenset(n.name for n in c) for c in clusters_high}
+        assert cluster_sets_high == {
+            frozenset(["Image Res"]),
+            frozenset(["Image Resolution"]),
+            frozenset(["Folder ABC"]),
+            frozenset(["Folder XYZ"]),
+            frozenset(["Random Data"]),
+        }
 
 
 class TestSampleFromClusters:
@@ -192,6 +170,9 @@ class TestSampleFromClusters:
         samples = _sample_from_clusters(clusters, num_samples=2)
 
         assert len(samples) == 2
+        # Check that samples are from the original nodes
+        original_node_ids = {1, 2, 3}
+        assert {s.node_id for s in samples}.issubset(original_node_ids)
 
     def test_empty_clusters(self):
         """Test sampling from empty clusters"""
@@ -236,6 +217,7 @@ class TestWriteSampleCsv:
     def test_basic_csv_writing(self, index_session, sample_snapshot, tmp_path):
         """Test basic CSV writing without heuristic"""
         node = NodeFactory(node_id=1, snapshot_id=1, name="TestFolder", depth=1)
+        index_session.flush()
 
         output_path = tmp_path / "test.csv"
 
@@ -249,30 +231,33 @@ class TestWriteSampleCsv:
 
         assert output_path.exists()
 
-        # Read and verify CSV
         with output_path.open("r") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
+        # This assertion is brittle, but confirms the core fields.
+        # A more robust test might not check every single field.
         assert len(rows) == 1
-        assert rows[0]["name"] == "TestFolder"
-        assert rows[0]["snapshot_id"] == "1"
-        assert rows[0]["node_id"] == "1"
-        assert rows[0]["label"] == ""
+        expected_row = {
+            "snapshot_id": "1",
+            "node_id": "1",
+            "name": "TestFolder",
+            "grandparent_name": "",
+            "parent_name": "",
+            "label": "",
+        }
+        assert all(rows[0].get(key) == value for key, value in expected_row.items())
 
     def test_csv_with_parent_and_grandparent(
         self, index_session, sample_snapshot, tmp_path
     ):
         """Test CSV includes parent and grandparent information"""
-        _grandparent = NodeFactory(
-            node_id=1, snapshot_id=1, name="Grandparent", parent_node_id=None, depth=0
-        )
-        _parent = NodeFactory(
-            node_id=2, snapshot_id=1, name="Parent", parent_node_id=1, depth=1
-        )
+        NodeFactory(node_id=1, snapshot_id=1, name="Grandparent", depth=0)
+        NodeFactory(node_id=2, snapshot_id=1, name="Parent", parent_node_id=1, depth=1)
         target = NodeFactory(
             node_id=3, snapshot_id=1, name="Target", parent_node_id=2, depth=2
         )
+        index_session.flush()
 
         output_path = tmp_path / "test.csv"
 
@@ -285,10 +270,10 @@ class TestWriteSampleCsv:
         )
 
         with output_path.open("r") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
+            rows = list(csv.DictReader(f))
 
         assert len(rows) == 1
+        assert rows[0]["name"] == "Target"
         assert rows[0]["parent_name"] == "Parent"
         assert rows[0]["grandparent_name"] == "Grandparent"
 
@@ -299,37 +284,22 @@ class TestReadClassificationCsv:
     def test_basic_csv_reading(self, tmp_path):
         """Test reading a basic CSV file"""
         csv_path = tmp_path / "test.csv"
+        fieldnames = ["snapshot_id", "node_id", "name", "label"]
+        expected_rows = [
+            {"snapshot_id": 1, "node_id": 100, "name": "Test", "label": "variant"},
+            {"snapshot_id": 1, "node_id": 101, "name": "Test2", "label": "subject"},
+        ]
 
-        # Write a test CSV
         with csv_path.open("w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["snapshot_id", "node_id", "name", "label"]
-            )
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerow(
-                {
-                    "snapshot_id": "1",
-                    "node_id": "100",
-                    "name": "Test",
-                    "label": "variant",
-                }
-            )
-            writer.writerow(
-                {
-                    "snapshot_id": "1",
-                    "node_id": "101",
-                    "name": "Test2",
-                    "label": "subject",
-                }
-            )
+            for row in expected_rows:
+                # Write with string values as they would be in a real CSV
+                writer.writerow({k: str(v) for k, v in row.items()})
 
         rows = read_classification_csv(csv_path)
 
-        assert len(rows) == 2
-        assert rows[0]["snapshot_id"] == 1
-        assert rows[0]["node_id"] == 100
-        assert rows[0]["label"] == "variant"
-        assert rows[1]["label"] == "subject"
+        assert rows == expected_rows
 
     def test_missing_required_columns(self, tmp_path):
         """Test error on missing required columns"""
@@ -354,35 +324,27 @@ class TestReadClassificationCsv:
     def test_extra_columns(self, tmp_path):
         """Test that extra columns are preserved"""
         csv_path = tmp_path / "test.csv"
-
+        row_data = {
+            "snapshot_id": "1",
+            "node_id": "100",
+            "label": "variant",
+            "extra_col": "value1",
+            "another_col": "value2",
+        }
         with csv_path.open("w", newline="") as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=[
-                    "snapshot_id",
-                    "node_id",
-                    "label",
-                    "extra_col",
-                    "another_col",
-                ],
-            )
+            writer = csv.DictWriter(f, fieldnames=row_data.keys())
             writer.writeheader()
-            writer.writerow(
-                {
-                    "snapshot_id": "1",
-                    "node_id": "100",
-                    "label": "variant",
-                    "extra_col": "value1",
-                    "another_col": "value2",
-                }
-            )
+            writer.writerow(row_data)
 
         rows = read_classification_csv(csv_path)
 
         assert len(rows) == 1
-        assert "extra_col" in rows[0]
-        assert "another_col" in rows[0]
+        # Check that all original data is present after parsing
+        assert rows[0]["snapshot_id"] == 1
+        assert rows[0]["node_id"] == 100
+        assert rows[0]["label"] == "variant"
         assert rows[0]["extra_col"] == "value1"
+        assert rows[0]["another_col"] == "value2"
 
 
 class TestValidateAllLabelsPresent:
@@ -402,12 +364,12 @@ class TestValidateAllLabelsPresent:
     def test_missing_labels(self):
         """Test validation fails when labels are missing"""
         rows = [
-            {"label": "variant"},
-            {"label": ""},
-            {"label": "subject"},
+            {"label": "variant", "name": "A"},
+            {"label": "", "name": "B"},
+            {"label": "subject", "name": "C"},
         ]
 
-        with pytest.raises(ValueError, match="missing labels"):
+        with pytest.raises(ValueError, match="Found 1 rows with missing labels"):
             validate_all_labels_present(rows)
 
     def test_empty_label_list(self):
@@ -417,16 +379,16 @@ class TestValidateAllLabelsPresent:
     def test_error_message_format(self):
         """Test error message includes row numbers"""
         rows = [
-            {"label": "variant"},
-            {"label": ""},
-            {"label": ""},
+            {"label": "variant", "name": "A"},
+            {"label": "", "name": "B"},
+            {"label": "", "name": "C"},
         ]
 
         with pytest.raises(ValueError) as exc_info:
             validate_all_labels_present(rows)
 
         # Error should mention specific rows (row 2 is first data row)
-        assert "3, 4" in str(exc_info.value)
+        assert "Rows: 3, 4" in str(exc_info.value)
 
 
 class TestValidateLabelValues:
@@ -458,7 +420,7 @@ class TestValidateLabelValues:
                 ],
                 {"variant", "subject", "other"},
                 True,
-                "invalid labels",
+                "Found invalid labels",
             ),
         ],
     )
@@ -481,9 +443,8 @@ class TestValidateLabelValues:
 
         error_msg = str(exc_info.value)
         # Verify all valid labels are mentioned in error
-        assert "variant" in error_msg
-        assert "subject" in error_msg
-        assert "other" in error_msg
+        assert "'invalid': rows 2" in error_msg
+        assert "Valid labels are: other, subject, variant" in error_msg
 
 
 class TestValidateInputCsv:
@@ -521,7 +482,7 @@ class TestValidateInputCsv:
             writer.writeheader()
             writer.writerow({"snapshot_id": "1", "node_id": "100", "label": "variant"})
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Unknown taxonomy: invalid_taxonomy"):
             validate_input_csv(csv_path, taxonomy="invalid_taxonomy")
 
 
@@ -533,9 +494,10 @@ class TestCreateLabelRuns:
         label_runs = create_label_runs(training_session, [1])
 
         assert set(label_runs.keys()) == {1}
-        assert label_runs[1].snapshot_id == 1
-        assert label_runs[1].label_source == "manual"
-        assert label_runs[1].id is not None
+        run = label_runs[1]
+        assert run.snapshot_id == 1
+        assert run.label_source == "manual"
+        assert run.id is not None
 
     def test_create_multiple_runs(self, training_session):
         """Test creating multiple label runs"""
@@ -543,6 +505,7 @@ class TestCreateLabelRuns:
 
         assert set(label_runs.keys()) == {1, 2, 3}
         assert all(lr.label_source == "manual" for lr in label_runs.values())
+        assert all(lr.snapshot_id in {1, 2, 3} for lr in label_runs.values())
 
 
 class TestApplyLabelsToSamples:
@@ -550,20 +513,27 @@ class TestApplyLabelsToSamples:
 
     def test_apply_labels_basic(self, training_session, label_run):
         """Test applying labels to samples"""
-        # Create samples
-        TrainingSampleFactory(
-            label_run_id=label_run.id, snapshot_id=1, node_id=100, name_raw="test1"
+        # Create samples with known IDs and without labels to start
+        s1 = TrainingSampleFactory(
+            label_run_id=label_run.id,
+            snapshot_id=1,
+            node_id=100,
+            name_raw="test1",
+            label=None,
         )
-        TrainingSampleFactory(
-            label_run_id=label_run.id, snapshot_id=1, node_id=101, name_raw="test2"
+        s2 = TrainingSampleFactory(
+            label_run_id=label_run.id,
+            snapshot_id=1,
+            node_id=101,
+            name_raw="test2",
+            label=None,
         )
+        training_session.flush()
 
-        # Prepare CSV rows
         rows = [
             {"snapshot_id": 1, "node_id": 100, "label": "variant"},
             {"snapshot_id": 1, "node_id": 101, "label": "subject"},
         ]
-
         label_runs_dict = {1: label_run}
 
         labeled_count = apply_labels_to_samples(
@@ -572,33 +542,31 @@ class TestApplyLabelsToSamples:
 
         assert labeled_count == 2
 
-        # Verify labels were applied
-        from storage.training_models import TrainingSample
-
-        sample1 = training_session.query(TrainingSample).filter_by(node_id=100).first()
-        assert sample1.label == "variant"
-        assert sample1.label_confidence == 1.0
-
-        sample2 = training_session.query(TrainingSample).filter_by(node_id=101).first()
-        assert sample2.label == "subject"
+        training_session.refresh(s1)
+        training_session.refresh(s2)
+        assert s1.label == "variant"
+        assert s1.label_confidence == 1.0
+        assert s2.label == "subject"
 
     def test_apply_labels_with_split(self, training_session, label_run):
         """Test applying labels with split assignment"""
-        TrainingSampleFactory(
-            label_run_id=label_run.id, snapshot_id=1, node_id=100, name_raw="test"
+        sample = TrainingSampleFactory(
+            label_run_id=label_run.id,
+            snapshot_id=1,
+            node_id=100,
+            name_raw="test",
+            label=None,
         )
+        training_session.flush()
 
         rows = [{"snapshot_id": 1, "node_id": 100, "label": "variant"}]
         label_runs_dict = {1: label_run}
 
         apply_labels_to_samples(training_session, rows, label_runs_dict, split="train")
 
-        from storage.training_models import TrainingSample
-
-        updated_sample = (
-            training_session.query(TrainingSample).filter_by(node_id=100).first()
-        )
-        assert updated_sample.split == "train"
+        training_session.refresh(sample)
+        assert sample.split == "train"
+        assert sample.label == "variant"
 
     def test_apply_labels_missing_sample(self, training_session, label_run):
         """Test that missing samples are skipped"""
@@ -609,5 +577,5 @@ class TestApplyLabelsToSamples:
             training_session, rows, label_runs_dict, split=None
         )
 
-        # Should not label non-existent sample
+        # Should not label non-existent sample and should not raise error
         assert labeled_count == 0

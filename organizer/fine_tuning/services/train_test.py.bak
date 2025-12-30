@@ -1,0 +1,398 @@
+"""Tests for train.py"""
+
+from collections import Counter
+import pytest
+from fine_tuning.services.train import (
+    TrainConfigSettings,
+    augment_with_hard_negatives,
+    prepare_training_data,
+)
+from storage.manager import StorageManager
+
+from .factories import LabelRunFactory, TrainingSampleFactory
+
+
+@pytest.mark.ml
+class TestAugmentWithHardNegatives:
+    """Test augment_with_hard_negatives function"""
+
+    def test_basic_augmentation(self):
+        """Test basic hard negative augmentation with similar items from different classes"""
+        train_texts = [
+            "High Resolution Images",
+            "Low Resolution Images",
+            "High Resolution Characters",
+        ]
+        train_leaf_keys = [
+            "high_resolution_images",
+            "low_resolution_images",
+            "high_resolution_characters",
+        ]
+        # First two are asset_type (0), last is content_subject (1)
+        train_labels = [0, 0, 1]
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
+
+        extra_texts, extra_labels = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=1,
+            min_sim=0.3,
+            factor=1,
+        )
+
+        # Expect 2 anchor-negative pairs from the most similar items
+        # 2 asset_type items find 1 similar content_subject each
+        assert len(extra_texts) == 4
+        assert Counter(extra_labels) == {0: 2, 1: 2}  # 2 asset_type, 2 content_subject
+        assert "High Resolution Images" in extra_texts
+        assert "High Resolution Characters" in extra_texts
+        assert "Low Resolution Images" in extra_texts
+
+    def test_no_similar_candidates(self):
+        """Test when there are no similar candidates due to high threshold"""
+        train_texts = ["AAA", "BBB", "CCC"]
+        train_leaf_keys = ["aaa", "bbb", "ccc"]
+        train_labels = [0, 1, 2]
+        id2label = {0: "asset_type", 1: "content_subject", 2: "other"}
+        confusable_labels = {"asset_type"}
+
+        extra_texts, extra_labels = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=2,
+            min_sim=0.9,
+            factor=2,
+        )
+
+        # Dissimilar strings + high threshold = no hard negatives
+        assert len(extra_texts) == 0
+        assert len(extra_labels) == 0
+
+    def test_empty_confusable_labels(self):
+        """Test with no confusable labels specified"""
+        train_texts = ["Text1", "Text2"]
+        train_leaf_keys = ["text1", "text2"]
+        train_labels = [0, 1]
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = set()
+
+        extra_texts, extra_labels = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=2,
+            min_sim=0.3,
+            factor=2,
+        )
+
+        # Should generate nothing when no labels are confusable
+        assert len(extra_texts) == 0
+        assert len(extra_labels) == 0
+
+    def test_k_parameter(self):
+        """Test that k parameter limits number of hard negatives per sample"""
+        # 1 asset_type item and 4 similar content_subject items (all variations of "resolution")
+        train_texts = [
+            "Resolution A",
+            "Resolution B",
+            "Resolution C",
+            "Resolution D",
+            "Resolution E",
+        ]
+        train_leaf_keys = [
+            "resolution_a",
+            "resolution_b",
+            "resolution_c",
+            "resolution_d",
+            "resolution_e",
+        ]
+        train_labels = [0, 1, 1, 1, 1]  # 1 asset_type (0), 4 content_subject (1)
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
+
+        extra_texts_k1, _ = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=1,
+            min_sim=0.3,
+            factor=1,
+        )
+        assert len(extra_texts_k1) == 2  # 1 anchor + 1 hard negative
+
+        extra_texts_k3, _ = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=3,
+            min_sim=0.3,
+            factor=1,
+        )
+
+        # k=1: 1 anchor + 1 hard negative = 2 samples
+        assert len(extra_texts_k1) == 2
+        # k=3: 1 anchor + 3 hard negatives = 4 samples (should find more than k=1)
+        assert len(extra_texts_k3) == 4
+        assert len(extra_texts_k3) > len(extra_texts_k1)
+
+    def test_factor_parameter(self):
+        """Test that factor parameter multiplies the augmentation amount"""
+        # 2 asset_type items, 1 similar content_subject item
+        train_texts = ["High Res Images", "Low Res Images", "High Res Characters"]
+        train_leaf_keys = ["high_res_images", "low_res_images", "high_res_characters"]
+        train_labels = [0, 0, 1]
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
+
+        extra_texts_f1, _ = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=1,
+            min_sim=0.3,
+            factor=1,
+        )
+        assert len(extra_texts_f1) == 2
+
+        extra_texts_f3, _ = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=1,
+            min_sim=0.3,
+            factor=3,
+        )
+        # Factor=1: at least 1 asset_type finds the content_subject as hard negative = at least 2 samples
+        assert len(extra_texts_f1) == 2
+        # Factor=3: same pairs but repeated 3x = at least 6 samples
+        assert len(extra_texts_f3) == 6
+        # Factor=3 should be 3x factor=1
+        assert len(extra_texts_f3) == 3 * len(extra_texts_f1)
+
+    def test_empty_leaf_keys(self):
+        """Test handling of empty leaf keys"""
+        train_texts = ["Text1", "Text2", "Text3"]
+        train_leaf_keys = ["", "text2", ""]
+        train_labels = [0, 1, 0]
+        id2label = {0: "asset_type", 1: "content_subject"}
+        confusable_labels = {"asset_type"}
+
+        extra_texts, extra_labels = augment_with_hard_negatives(
+            train_texts=train_texts,
+            train_leaf_keys=train_leaf_keys,
+            train_labels=train_labels,
+            id2label=id2label,
+            confusable_labels=confusable_labels,
+            k=1,
+            min_sim=0.3,
+            factor=1,
+        )
+
+        # Should skip samples with empty leaf keys and not generate pairs
+        assert len(extra_texts) == 0
+        assert len( extra_labels) == 0
+
+
+@pytest.mark.ml
+class TestPrepareTrainingData:
+    """Test prepare_training_data function"""
+
+    def test_basic_data_preparation(self, tmp_path):
+        """Test basic training data preparation"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with manager.get_training_session() as session:
+            LabelRunFactory._meta.sqlalchemy_session = session
+            label_run = LabelRunFactory()
+            samples = [
+                TrainingSampleFactory.build(label="asset_type", text="high_res"),
+                TrainingSampleFactory.build(
+                    label="content_subject", text="character_art"
+                ),
+                TrainingSampleFactory.build(label="other", text="environment"),
+                TrainingSampleFactory.build(label="asset_type", text="low_res"),
+                TrainingSampleFactory.build(label="content_subject", text="portraits"),
+                TrainingSampleFactory.build(label="other", text="backgrounds"),
+            ]
+            for s in samples:
+                s.label_run_id = label_run.id
+            session.add(label_run)
+            session.add_all(samples)
+            session.commit()
+            label_run_id = label_run.id
+
+        config = TrainConfigSettings(test_size=0.5, seed=42, no_hard_negatives=True)
+
+        train_ds, test_ds, id2label = prepare_training_data(
+            config=config, manager=manager, taxonomy="v2", label_run_id=label_run_id
+        )
+
+        # Check content of datasets (split is deterministic with seed)
+        train_texts = {d["text"] for d in train_ds}
+        test_texts = {d["text"] for d in test_ds}
+
+        # Based on seed=42 and stratified split
+        assert train_texts == {"backgrounds", "portraits", "high_res"}
+        assert test_texts == {"character_art", "low_res", "environment"}
+        assert len(train_ds) + len(test_ds) == 6
+
+        # Check id2label mapping
+        assert len(id2label) == 6
+        assert all(isinstance(k, int) for k in id2label.keys())
+
+    def test_with_hard_negatives(self, tmp_path):
+        """Test data preparation with hard negative mining enabled"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with manager.get_training_session() as session:
+            LabelRunFactory._meta.sqlalchemy_session = session
+            label_run = LabelRunFactory()
+            samples = [
+                TrainingSampleFactory.build(
+                    label="asset_type", text="High Resolution Images"
+                ),
+                TrainingSampleFactory.build(
+                    label="asset_type", text="Low Resolution Images"
+                ),
+                TrainingSampleFactory.build(
+                    label="content_subject", text="High Resolution Characters"
+                ),
+                TrainingSampleFactory.build(
+                    label="content_subject", text="Low Resolution Characters"
+                ),
+            ]
+            for s in samples:
+                s.label_run_id = label_run.id
+            session.add(label_run)
+            session.add_all(samples)
+            session.commit()
+            label_run_id = label_run.id
+
+        config = TrainConfigSettings(
+            test_size=0.5,
+            seed=42,
+            no_hard_negatives=False,
+            hardneg_labels="asset_type",
+            hardneg_k=1,
+            hardneg_min_sim=0.3,
+            hardneg_factor=1,
+        )
+
+        train_ds, test_ds, id2label = prepare_training_data(
+            config=config, manager=manager, taxonomy="v2", label_run_id=label_run_id
+        )
+
+        # Test set should be unaffected by augmentation
+        assert len(test_ds) == 2
+        test_texts = {d["text"] for d in test_ds}
+        assert test_texts == {"Low Resolution Characters", "High Resolution Images"}
+
+        # Train set should be augmented with hard negatives
+        assert len(train_ds) > 2
+        # It should contain the original training samples
+        original_train_texts = {"Low Resolution Images", "High Resolution Characters"}
+        train_texts = {d["text"] for d in train_ds}
+        assert original_train_texts.issubset(train_texts)
+
+    def test_no_labeled_samples(self, tmp_path):
+        """Test error when no labeled samples are found"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with manager.get_training_session() as session:
+            LabelRunFactory._meta.sqlalchemy_session = session
+            label_run = LabelRunFactory()
+            sample = TrainingSampleFactory.build(label_run_id=label_run.id, label=None)
+            session.add(label_run)
+            session.add(sample)
+            session.commit()
+            label_run_id = label_run.id
+
+        with pytest.raises(ValueError, match="No labeled training samples"):
+            prepare_training_data(
+                config=TrainConfigSettings(),
+                manager=manager,
+                taxonomy="v2",
+                label_run_id=label_run_id,
+            )
+
+    def test_unknown_labels(self, tmp_path):
+        """Test error when unknown labels are found"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with manager.get_training_session() as session:
+            LabelRunFactory._meta.sqlalchemy_session = session
+            label_run = LabelRunFactory()
+            sample = TrainingSampleFactory.build(label="invalid_label_xyz")
+            sample.label_run_id = label_run.id
+            session.add(label_run)
+            session.add(sample)
+            session.commit()
+            label_run_id = label_run.id
+
+        with pytest.raises(ValueError, match="Unknown labels found"):
+            prepare_training_data(
+                config=TrainConfigSettings(),
+                manager=manager,
+                taxonomy="v2",
+                label_run_id=label_run_id,
+            )
+
+    def test_invalid_taxonomy(self, tmp_path):
+        """Test error with invalid taxonomy"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with pytest.raises(ValueError, match="Unknown taxonomy version"):
+            prepare_training_data(
+                config=TrainConfigSettings(),
+                manager=manager,
+                taxonomy="invalid_taxonomy_xyz",
+                label_run_id=1,  # dummy id
+            )
+
+    @pytest.mark.parametrize(
+        "test_size,expected_train,expected_test",
+        [(0.2, 8, 2), (0.5, 5, 5)],
+    )
+    def test_test_size_parameter(
+        self, tmp_path, test_size, expected_train, expected_test
+    ):
+        """Test that test_size parameter affects split"""
+        manager = StorageManager(tmp_path, initialize_training=True)
+        with manager.get_training_session() as session:
+            LabelRunFactory._meta.sqlalchemy_session = session
+            label_run = LabelRunFactory()
+            samples = [
+                TrainingSampleFactory.build(
+                    label="asset_type" if i % 2 == 0 else "content_subject"
+                )
+                for i in range(10)
+            ]
+            for s in samples:
+                s.label_run_id = label_run.id
+            session.add(label_run)
+            session.add_all(samples)
+            session.commit()
+            label_run_id = label_run.id
+
+        config = TrainConfigSettings(
+            test_size=test_size, seed=42, no_hard_negatives=True
+        )
+
+        train_ds, test_ds, _ = prepare_training_data(
+            config=config, manager=manager, taxonomy="v2", label_run_id=label_run_id
+        )
+
+        assert len(train_ds) == expected_train
+        assert len(test_ds) == expected_test

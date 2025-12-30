@@ -28,6 +28,7 @@ class TestSavePredictionsToDb:
             TrainingSampleFactory(label_run_id=label_run.id, label="asset_type"),
             TrainingSampleFactory(label_run_id=label_run.id, label="content_subject"),
         ]
+        training_session.flush()
 
         predictions = ["asset_type", "other"]
         confidences = [0.95, 0.75]
@@ -42,26 +43,31 @@ class TestSavePredictionsToDb:
             predictions=predictions,
             confidences=confidences,
             probabilities=probabilities,
-            run_id=1,
+            run_id=model_run.run_id,
             prediction_type="test",
         )
 
         assert num_saved == 2
 
         # Verify predictions were saved
-        saved_predictions = training_session.query(SamplePrediction).all()
+        saved_predictions = (
+            training_session.query(SamplePrediction)
+            .order_by(SamplePrediction.sample_id)
+            .all()
+        )
+
         assert len(saved_predictions) == 2
+        pred1, pred2 = saved_predictions
 
         # Check first prediction
-        pred1 = saved_predictions[0]
         assert pred1.predicted_label == "asset_type"
         assert pred1.confidence == 0.95
         assert pred1.true_label == "asset_type"
         assert pred1.is_correct is True
         assert pred1.prediction_type == "test"
+        assert pred1.run_id == model_run.run_id
 
         # Check second prediction
-        pred2 = saved_predictions[1]
         assert pred2.predicted_label == "other"
         assert pred2.confidence == 0.75
         assert pred2.true_label == "content_subject"
@@ -72,6 +78,7 @@ class TestSavePredictionsToDb:
     ):
         """Test saving predictions with list-format probabilities"""
         sample = TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
+        training_session.flush()
 
         num_saved = save_predictions_to_db(
             session=training_session,
@@ -79,12 +86,11 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[[0.95, 0.03, 0.02]],  # List format
-            run_id=1,
+            run_id=model_run.run_id,
         )
 
         assert num_saved == 1
-
-        saved_prediction = training_session.query(SamplePrediction).first()
+        saved_prediction = training_session.query(SamplePrediction).one()
         probs_dict = json.loads(saved_prediction.probabilities_json)
 
         # Should convert list to dict with label_N keys
@@ -96,6 +102,7 @@ class TestSavePredictionsToDb:
     ):
         """Test saving predictions for unlabeled samples"""
         sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        training_session.flush()
 
         num_saved = save_predictions_to_db(
             session=training_session,
@@ -103,12 +110,11 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.8],
             probabilities=[{"asset_type": 0.8, "content_subject": 0.2}],
-            run_id=1,
+            run_id=model_run.run_id,
         )
 
         assert num_saved == 1
-
-        saved_prediction = training_session.query(SamplePrediction).first()
+        saved_prediction = training_session.query(SamplePrediction).one()
         assert saved_prediction.predicted_label == "asset_type"
         assert saved_prediction.true_label is None
         assert saved_prediction.is_correct is None  # Can't determine correctness
@@ -122,6 +128,7 @@ class TestSavePredictionsToDb:
     ):
         """Test different prediction type values"""
         sample = TrainingSampleFactory(label_run_id=label_run.id)
+        training_session.flush()
 
         save_predictions_to_db(
             session=training_session,
@@ -129,11 +136,11 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[{"asset_type": 0.95}],
-            run_id=1,
+            run_id=model_run.run_id,
             prediction_type=prediction_type,
         )
 
-        saved_prediction = training_session.query(SamplePrediction).first()
+        saved_prediction = training_session.query(SamplePrediction).one()
         assert saved_prediction.prediction_type == prediction_type
 
 
@@ -259,6 +266,7 @@ class TestCreateAndSaveRunResults:
 
         # Use factories to create samples
         samples = TrainingSampleFactory.create_batch(2, label="asset_type")
+        training_session.flush()
 
         predictions = ["asset_type", "content_subject"]
         confidences = [0.95, 0.85]
@@ -288,19 +296,26 @@ class TestCreateAndSaveRunResults:
         )
 
         # Check run was created and completed
-        run = training_session.query(ModelRun).first()
-        assert run is not None
-        assert run.status == "completed"
-        assert run.finished_at is not None
-        assert run.test_samples_count == 2
-        assert run.final_val_accuracy == 1.0
-        assert run.final_val_f1 == 0.98
-        assert "Accuracy: 1.0000" in run.notes
-        assert "Macro-F1: 0.9800" in run.notes
+        model_run = training_session.query(ModelRun).one()
+        assert model_run.status == "completed"
+        assert model_run.finished_at is not None
+        assert model_run.test_samples_count == 2
+        assert model_run.final_val_accuracy == 1.0
+        assert model_run.final_val_f1 == 0.98
+        assert "Accuracy: 1.0000" in model_run.notes
+        assert "Macro-F1: 0.9800" in model_run.notes
 
         # Check predictions were saved
-        predictions_saved = training_session.query(SamplePrediction).all()
+        predictions_saved = (
+            training_session.query(SamplePrediction)
+            .filter_by(run_id=model_run.run_id)
+            .all()
+        )
         assert len(predictions_saved) == 2
+        assert {p.predicted_label for p in predictions_saved} == {
+            "asset_type",
+            "content_subject",
+        }
 
     def test_save_results_without_metrics(self, training_session, label_run):
         """Test saving run results without evaluation metrics"""
@@ -313,6 +328,7 @@ class TestCreateAndSaveRunResults:
 
         # Factory creates unlabeled sample by default or we can specify
         sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        training_session.flush()
 
         create_and_save_run_results(
             session=training_session,
@@ -329,12 +345,11 @@ class TestCreateAndSaveRunResults:
             split=None,
         )
 
-        run = training_session.query(ModelRun).first()
-        assert run is not None
-        assert run.final_val_accuracy is None
-        assert run.final_val_f1 is None
+        model_run = training_session.query(ModelRun).one()
+        assert model_run.final_val_accuracy is None
+        assert model_run.final_val_f1 is None
         # Notes should not contain metrics
-        assert "Accuracy:" not in run.notes
+        assert "Accuracy:" not in model_run.notes
 
     def test_baseline_run_type(self, training_session, label_run):
         """Test that baseline flag overrides run type"""
@@ -345,6 +360,7 @@ class TestCreateAndSaveRunResults:
         sample = TrainingSampleFactory(
             label_run_id=label_run.id,
         )
+        training_session.flush()
 
         create_and_save_run_results(
             session=training_session,
@@ -361,6 +377,6 @@ class TestCreateAndSaveRunResults:
             split="validation",
         )
 
-        run = training_session.query(ModelRun).first()
-        assert "baseline" in run.notes
-        assert run.run_type == "baseline"
+        model_run = training_session.query(ModelRun).one()
+        assert "baseline" in model_run.notes
+        assert model_run.run_type == "baseline"

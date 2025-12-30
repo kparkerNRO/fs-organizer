@@ -22,11 +22,18 @@ class TestLoadSamples:
 
     def test_load_all_samples(self, training_session, label_run):
         """Test loading all samples without filters"""
-        TrainingSampleFactory.create_batch(2, label_run_id=label_run.id)
-        TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        created_samples = TrainingSampleFactory.create_batch(
+            2, label_run_id=label_run.id
+        )
+        created_samples.append(
+            TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        )
 
         loaded = load_samples(training_session)
+
+        # Verify count and that all created samples are present
         assert len(loaded) == 3
+        assert {s.sample_id for s in loaded} == {s.sample_id for s in created_samples}
 
     @pytest.mark.parametrize(
         "split,expected_count",
@@ -46,6 +53,8 @@ class TestLoadSamples:
 
         loaded = load_samples(training_session, split=split)
         assert len(loaded) == expected_count
+        if expected_count > 0:
+            assert all(sample.split == split for sample in loaded)
 
     def test_load_labeled_only(self, training_session, label_run):
         """Test loading only labeled samples"""
@@ -128,8 +137,7 @@ class TestLoadAndIndexNodes:
         )
 
         assert set(nodes_by_id.keys()) == {1, 2, 3}
-
-        assert len(processed_name_by_id) == 3
+        assert set(processed_name_by_id.keys()) == {1, 2, 3}
         assert processed_name_by_id[1] == "root"
 
         assert set(children_by_parent.keys()) == {None, 1, 2}
@@ -185,10 +193,10 @@ class TestPrecomputeDescendantExtensions:
 
         result = _precompute_descendant_extensions(nodes_by_id, children_by_parent)
 
-        assert len(result) == 3
         assert result[1] == {"txt", "png"}
         assert result[2] == {"txt"}
         assert result[3] == {"png"}
+        assert set(result.keys()) == {1, 2, 3}
 
     def test_nested_hierarchy(self):
         """Test extension computation with nested folders"""
@@ -310,7 +318,10 @@ class TestExtractFeatureNodes:
         assert len(feature_nodes) == 1
         feature_node = feature_nodes[0]
 
-        assert len(feature_node.sibling_nodes) == 2
+        assert {node.name for node in feature_node.sibling_nodes} == {
+            "Sibling1",
+            "Sibling2",
+        }
 
     def test_max_siblings_cap(self, index_session, sample_snapshot):
         """Test that max_siblings limits sibling count"""
@@ -363,7 +374,6 @@ class TestExtractFeatureNodes:
             max_children=5,
         )
 
-        # ZIP files should be extracted
         assert len(feature_nodes) == 1
         assert feature_nodes[0].node.ext == ".zip"
 

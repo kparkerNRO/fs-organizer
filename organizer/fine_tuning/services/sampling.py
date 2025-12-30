@@ -479,15 +479,17 @@ def apply_labels_to_samples(
     label_runs: Dict[int, LabelRun],
     split: Optional[str],
 ) -> int:
-    """Apply labels from CSV rows to TrainingSample objects, optimized."""
+    """
+    Apply labels from CSV rows to TrainingSample objects. Commits to the database
+    """
     samples_by_node_id: Dict[Tuple[int, int], TrainingSample] = {}
-    for label_run in label_runs.values():
+    for snapshot_id, label_run in label_runs.items():
         samples_for_run = (
             session.query(TrainingSample).filter_by(label_run_id=label_run.id).all()
         )
         for sample in samples_for_run:
             if sample.node_id is not None:
-                samples_by_node_id[(label_run.snapshot_id, sample.node_id)] = sample
+                samples_by_node_id[(snapshot_id, sample.node_id)] = sample
 
     labeled_count = 0
     for row in rows:
@@ -501,6 +503,7 @@ def apply_labels_to_samples(
             if split:
                 sample.split = split
             labeled_count += 1
+    session.commit()
     return labeled_count
 
 
