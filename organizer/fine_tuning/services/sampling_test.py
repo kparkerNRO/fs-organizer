@@ -55,11 +55,10 @@ class TestSelectTrainingSamples:
             max_depth=5,
         )
 
-        # Should only include nodes at depth 2 and 5
+        # Should only include nodes at depth 2 and 5 (not depth 0)
         assert len(samples) == 2
         depths = {s.depth for s in samples}
-        assert 0 not in depths
-        assert 2 in depths or 5 in depths
+        assert depths == {2, 5}
 
     def test_empty_result(self, index_session, sample_snapshot):
         """Test selection with no matching nodes"""
@@ -107,9 +106,15 @@ class TestClusterBySimilarity:
         # "Character Art" and "Character Arts" are similar → 1 cluster
         # "Environment" is dissimilar → separate cluster
         assert len(clusters) == 2
-        # Verify all nodes are preserved
-        total_nodes = sum(len(cluster) for cluster in clusters)
-        assert total_nodes == 3
+
+        # Verify cluster contents
+        cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters]
+        cluster_names.sort()  # Sort for deterministic comparison
+
+        assert cluster_names == [
+            ["Character Art", "Character Arts"],
+            ["Environment"],
+        ]
 
     def test_empty_input(self):
         """Test clustering with empty input"""
@@ -143,14 +148,27 @@ class TestClusterBySimilarity:
         # High threshold (0.9): Strict, only very similar items cluster
         clusters_high = _cluster_by_similarity(nodes, threshold=0.9)
 
-        # Low threshold: "Image Res"+"Image Resolution" cluster,
-        # "Folder ABC"+"Folder XYZ" cluster, "Random Data" alone = 3 clusters
+        # Verify low threshold groups similar items
         assert len(clusters_low) == 3
-        # High threshold: Each dissimilar enough to be separate = 5 clusters
+        low_cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters_low]
+        low_cluster_names.sort()
+        assert low_cluster_names == [
+            ["Folder ABC", "Folder XYZ"],
+            ["Image Res", "Image Resolution"],
+            ["Random Data"],
+        ]
+
+        # Verify high threshold separates all items
         assert len(clusters_high) == 5
-        # All nodes preserved in both
-        assert sum(len(c) for c in clusters_low) == 5
-        assert sum(len(c) for c in clusters_high) == 5
+        high_cluster_names = [sorted([node.name for node in cluster]) for cluster in clusters_high]
+        high_cluster_names.sort()
+        assert high_cluster_names == [
+            ["Folder ABC"],
+            ["Folder XYZ"],
+            ["Image Res"],
+            ["Image Resolution"],
+            ["Random Data"],
+        ]
 
 
 class TestSampleFromClusters:
@@ -197,6 +215,14 @@ class TestSampleFromClusters:
 
         # Should get one from each cluster for maximum diversity
         assert len(samples) == 3
+
+        # Verify samples come from different clusters based on node_id ranges
+        sample_ids = {s.node_id for s in samples}
+        has_from_cluster_a = any(id < 100 for id in sample_ids)
+        has_from_cluster_b = any(100 <= id < 200 for id in sample_ids)
+        has_from_cluster_c = any(200 <= id < 300 for id in sample_ids)
+
+        assert has_from_cluster_a and has_from_cluster_b and has_from_cluster_c
 
 
 class TestWriteSampleCsv:
@@ -391,41 +417,40 @@ class TestValidateAllLabelsPresent:
 class TestValidateLabelValues:
     """Test validate_label_values function"""
 
-    def test_all_valid_labels(self):
-        """Test validation passes with all valid labels"""
-        rows = [
-            {"label": "variant"},
-            {"label": "subject"},
-            {"label": "other"},
-        ]
-        valid_labels = {"variant", "subject", "other", "collection"}
-
-        # Should not raise
-        validate_label_values(rows, valid_labels)
-
-    def test_invalid_labels(self):
-        """Test validation fails with invalid labels"""
-        rows = [
-            {"label": "variant"},
-            {"label": "invalid_label"},
-            {"label": "subject"},
-        ]
-        valid_labels = {"variant", "subject", "other"}
-
-        with pytest.raises(ValueError, match="invalid labels"):
+    @pytest.mark.parametrize(
+        "rows,valid_labels,should_raise,error_match",
+        [
+            # All valid labels - should pass
+            (
+                [{"label": "variant"}, {"label": "subject"}, {"label": "other"}],
+                {"variant", "subject", "other", "collection"},
+                False,
+                None,
+            ),
+            # Empty labels ignored - should pass
+            (
+                [{"label": "variant"}, {"label": ""}, {"label": "subject"}],
+                {"variant", "subject"},
+                False,
+                None,
+            ),
+            # Invalid label - should fail
+            (
+                [{"label": "variant"}, {"label": "invalid_label"}, {"label": "subject"}],
+                {"variant", "subject", "other"},
+                True,
+                "invalid labels",
+            ),
+        ],
+    )
+    def test_label_validation(self, rows, valid_labels, should_raise, error_match):
+        """Test label validation with various inputs"""
+        if should_raise:
+            with pytest.raises(ValueError, match=error_match):
+                validate_label_values(rows, valid_labels)
+        else:
+            # Should not raise
             validate_label_values(rows, valid_labels)
-
-    def test_empty_labels_ignored(self):
-        """Test that empty labels are ignored in validation"""
-        rows = [
-            {"label": "variant"},
-            {"label": ""},
-            {"label": "subject"},
-        ]
-        valid_labels = {"variant", "subject"}
-
-        # Should not raise (empty labels are allowed)
-        validate_label_values(rows, valid_labels)
 
     def test_error_message_includes_valid_labels(self):
         """Test error message includes list of valid labels"""
@@ -436,6 +461,7 @@ class TestValidateLabelValues:
             validate_label_values(rows, valid_labels)
 
         error_msg = str(exc_info.value)
+        # Verify all valid labels are mentioned in error
         assert "variant" in error_msg
         assert "subject" in error_msg
         assert "other" in error_msg
