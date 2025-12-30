@@ -17,6 +17,7 @@ from storage.training_models import ModelRun, SamplePrediction
 from .factories import TrainingSampleFactory
 
 
+@pytest.mark.ml
 class TestSavePredictionsToDb:
     """Test save_predictions_to_db function"""
 
@@ -130,6 +131,7 @@ class TestSavePredictionsToDb:
         assert saved_prediction.prediction_type == prediction_type
 
 
+@pytest.mark.ml
 class TestCreateModelRun:
     """Test create_model_run function"""
 
@@ -235,6 +237,7 @@ class TestCreateModelRun:
         assert run_eval.run_type == "evaluation"
 
 
+@pytest.mark.ml
 class TestCreateAndSaveRunResults:
     """Test create_and_save_run_results function"""
 

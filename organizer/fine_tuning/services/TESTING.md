@@ -29,13 +29,13 @@ pytest fine_tuning/services/ -m "ml"
 
 The following test files require ML dependencies:
 - `train_test.py` - Tests for model training functions (requires setfit, datasets)
+- `predict_test.py` - Tests for prediction functions (requires setfit, sentence-transformers via imports)
 
 The following test files do **not** require ML dependencies:
 - `common_test.py` - Common utility functions
 - `sampling_test.py` - Training sample selection
 - `evaluation_test.py` - Prediction evaluation metrics
 - `feature_extraction_test.py` - Feature extraction
-- `predict_test.py` - Prediction database operations (uses mock classifiers)
 
 ### CI/CD Integration
 
