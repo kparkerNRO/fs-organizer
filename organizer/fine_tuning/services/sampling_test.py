@@ -665,8 +665,7 @@ class TestCreateLabelRuns:
         """Test creating a single label run"""
         label_runs = create_label_runs(training_session, [1])
 
-        assert len(label_runs) == 1
-        assert 1 in label_runs
+        assert set(label_runs.keys()) == {1}
         assert label_runs[1].snapshot_id == 1
         assert label_runs[1].label_source == "manual"
         assert label_runs[1].id is not None
@@ -675,8 +674,7 @@ class TestCreateLabelRuns:
         """Test creating multiple label runs"""
         label_runs = create_label_runs(training_session, [1, 2, 3])
 
-        assert len(label_runs) == 3
-        assert all(sid in label_runs for sid in [1, 2, 3])
+        assert set(label_runs.keys()) == {1, 2, 3}
         assert all(lr.label_source == "manual" for lr in label_runs.values())
 
 

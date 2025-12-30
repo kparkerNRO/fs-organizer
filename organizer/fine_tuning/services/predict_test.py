@@ -85,9 +85,7 @@ class TestSavePredictionsToDb:
         probs_dict = json.loads(saved_prediction.probabilities_json)
 
         # Should convert list to dict with label_N keys
-        assert "label_0" in probs_dict
-        assert "label_1" in probs_dict
-        assert "label_2" in probs_dict
+        assert set(probs_dict.keys()) == {"label_0", "label_1", "label_2"}
         assert probs_dict["label_0"] == 0.95
 
     def test_save_predictions_unlabeled_samples(self, training_session):

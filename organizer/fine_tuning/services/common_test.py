@@ -100,17 +100,14 @@ class TestLoadAndIndexNodes:
             index_session, 1
         )
 
-        assert len(nodes_by_id) == 3
-        assert 1 in nodes_by_id
-        assert 2 in nodes_by_id
-        assert 3 in nodes_by_id
+        assert set(nodes_by_id.keys()) == {1, 2, 3}
 
         assert len(processed_name_by_id) == 3
         assert processed_name_by_id[1] == "root"
 
-        assert len(children_by_parent) == 2
-        assert 2 in children_by_parent[1]
-        assert 3 in children_by_parent[2]
+        assert set(children_by_parent.keys()) == {1, 2}
+        assert children_by_parent[1] == [2]
+        assert children_by_parent[2] == [3]
 
     def test_empty_snapshot(self, index_session, sample_snapshot):
         """Test loading from empty snapshot"""
@@ -158,10 +155,9 @@ class TestPrecomputeDescendantExtensions:
         result = _precompute_descendant_extensions(nodes_by_id, children_by_parent)
 
         assert len(result) == 3
-        assert "txt" in result[1]
-        assert "png" in result[1]
-        assert "txt" in result[2]
-        assert "png" in result[3]
+        assert result[1] == {"txt", "png"}
+        assert result[2] == {"txt"}
+        assert result[3] == {"png"}
 
     def test_nested_hierarchy(self):
         """Test extension computation with nested folders"""
@@ -195,11 +191,11 @@ class TestPrecomputeDescendantExtensions:
         result = _precompute_descendant_extensions(nodes_by_id, children_by_parent)
 
         # Root should have jpg from deep descendant
-        assert "jpg" in result[1]
+        assert result[1] == {"jpg"}
         # Subfolder should have jpg from direct child
-        assert "jpg" in result[2]
+        assert result[2] == {"jpg"}
         # File should have its own extension
-        assert "jpg" in result[3]
+        assert result[3] == {"jpg"}
 
 
 class TestExtractFeatureNodes:
@@ -236,7 +232,7 @@ class TestExtractFeatureNodes:
         assert feature_node.grandparent is None
         assert len(feature_node.child_nodes) == 1
         assert len(feature_node.sibling_nodes) == 0
-        assert "txt" in feature_node.descendent_extentions
+        assert feature_node.descendent_extentions == {"txt"}
 
     def test_with_siblings(self, index_session, sample_snapshot):
         """Test extraction with sibling nodes"""
