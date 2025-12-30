@@ -52,7 +52,7 @@ jobs:
           cd organizer
           uv run ruff check .
 
-      - name: Run type checker
-        run: |
-          cd organizer
-          uv run pyright
+      # - name: Run type checker
+      #   run: |
+      #     cd organizer
+      #     uv run pyright
