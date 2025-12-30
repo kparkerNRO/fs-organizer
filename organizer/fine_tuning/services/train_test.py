@@ -16,14 +16,15 @@ class TestAugmentWithHardNegatives:
     """Test augment_with_hard_negatives function"""
 
     def test_basic_augmentation(self):
-        """Test basic hard negative augmentation"""
+        """Test basic hard negative augmentation with similar items"""
+        # Create similar variant items and dissimilar subject item
         train_texts = [
             "High Resolution Images",
             "Low Resolution Images",
             "Character Designs",
         ]
         train_leaf_keys = ["high_resolution_images", "low_resolution_images", "character_designs"]
-        train_labels = [0, 0, 1]  # First two are same class
+        train_labels = [0, 0, 1]  # First two are same class (variant)
         id2label = {0: "variant", 1: "subject"}
         confusable_labels = {"variant"}
 
@@ -38,12 +39,15 @@ class TestAugmentWithHardNegatives:
             factor=1,
         )
 
-        # Should have generated some hard negatives for variant class
-        assert len(extra_texts) >= 0
-        assert len(extra_texts) == len(extra_labels)
+        # Both variant items should find each other as hard negatives (2 pairs)
+        # Each variant finds the other similar variant (k=1, factor=1)
+        assert len(extra_texts) == 2
+        assert len(extra_labels) == 2
+        assert all(label == 0 for label in extra_labels)  # All should be variant class
 
     def test_no_similar_candidates(self):
-        """Test when there are no similar candidates"""
+        """Test when there are no similar candidates due to high threshold"""
+        # Completely dissimilar strings
         train_texts = ["AAA", "BBB", "CCC"]
         train_leaf_keys = ["aaa", "bbb", "ccc"]
         train_labels = [0, 1, 2]
@@ -61,8 +65,9 @@ class TestAugmentWithHardNegatives:
             factor=2,
         )
 
-        # With high threshold, should get few or no hard negatives
-        assert len(extra_texts) >= 0
+        # Dissimilar strings + high threshold = no hard negatives
+        assert len(extra_texts) == 0
+        assert len(extra_labels) == 0
 
     def test_empty_confusable_labels(self):
         """Test with no confusable labels specified"""
@@ -89,6 +94,7 @@ class TestAugmentWithHardNegatives:
 
     def test_k_parameter(self):
         """Test that k parameter limits number of hard negatives per sample"""
+        # 4 similar variant items (all contain "Res"), 1 different subject
         train_texts = [
             "High Res",
             "Medium Res",
@@ -107,7 +113,7 @@ class TestAugmentWithHardNegatives:
         id2label = {0: "variant", 1: "subject"}
         confusable_labels = {"variant"}
 
-        # Test with k=1
+        # Test with k=1: each of 4 variants finds 1 similar neighbor = 4 total
         extra_texts_k1, extra_labels_k1 = augment_with_hard_negatives(
             train_texts=train_texts,
             train_leaf_keys=train_leaf_keys,
@@ -119,7 +125,7 @@ class TestAugmentWithHardNegatives:
             factor=1,
         )
 
-        # Test with k=3
+        # Test with k=3: each of 4 variants finds up to 3 similar neighbors = 12 total
         extra_texts_k3, extra_labels_k3 = augment_with_hard_negatives(
             train_texts=train_texts,
             train_leaf_keys=train_leaf_keys,
@@ -131,20 +137,21 @@ class TestAugmentWithHardNegatives:
             factor=1,
         )
 
-        # Higher k should generally produce more augmented samples
-        # (though this depends on similarity between samples)
-        assert len(extra_texts_k1) >= 0
-        assert len(extra_texts_k3) >= 0
+        # k=1: 4 variants × 1 neighbor = 4
+        assert len(extra_texts_k1) == 4
+        # k=3: 4 variants × 3 neighbors = 12
+        assert len(extra_texts_k3) == 12
 
     def test_factor_parameter(self):
-        """Test that factor parameter affects augmentation amount"""
+        """Test that factor parameter multiplies the augmentation amount"""
+        # 2 similar variant items, 1 different subject
         train_texts = ["High Res Folder", "Low Res Folder", "Character Art"]
         train_leaf_keys = ["high_res_folder", "low_res_folder", "character_art"]
         train_labels = [0, 0, 1]
         id2label = {0: "variant", 1: "subject"}
         confusable_labels = {"variant"}
 
-        # Test with factor=1
+        # Test with factor=1: 2 variants × 1 neighbor × 1 factor = 2
         extra_texts_f1, extra_labels_f1 = augment_with_hard_negatives(
             train_texts=train_texts,
             train_leaf_keys=train_leaf_keys,
@@ -156,7 +163,7 @@ class TestAugmentWithHardNegatives:
             factor=1,
         )
 
-        # Test with factor=3
+        # Test with factor=3: 2 variants × 1 neighbor × 3 factor = 6
         extra_texts_f3, extra_labels_f3 = augment_with_hard_negatives(
             train_texts=train_texts,
             train_leaf_keys=train_leaf_keys,
@@ -168,10 +175,10 @@ class TestAugmentWithHardNegatives:
             factor=3,
         )
 
-        # Higher factor should produce more samples
-        if len(extra_texts_f1) > 0:
-            # Only check if we actually found hard negatives
-            assert len(extra_texts_f3) >= len(extra_texts_f1)
+        # Factor=1: 2 variants find each other as neighbors = 2 hard negatives
+        assert len(extra_texts_f1) == 2
+        # Factor=3: same pairs but repeated 3x = 6 hard negatives
+        assert len(extra_texts_f3) == 6
 
     def test_empty_leaf_keys(self):
         """Test handling of empty leaf keys"""
@@ -271,16 +278,19 @@ class TestPrepareTrainingData:
                 label_run_id=label_run.id,
                 name_norm="high_res",
                 label="variant",
+                text="High Resolution",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="low_res",
                 label="variant",
+                text="Low Resolution",
             ),
             TrainingSampleFactory(
                 label_run_id=label_run.id,
                 name_norm="character",
                 label="subject",
+                text="Character",
             ),
         ]
 
@@ -313,9 +323,11 @@ class TestPrepareTrainingData:
             label_run_id=label_run.id,
         )
 
-        # Training set may be augmented with hard negatives
-        assert len(train_ds) >= 1
-        assert len(test_ds) >= 1
+        # With test_size=0.33 and 3 samples: 2 train, 1 test
+        # Train set has 2 original + 2 hard negatives (2 variant items find each other)
+        assert len(train_ds) == 4
+        assert len(test_ds) == 1
+        assert len(id2label) == 2
 
     def test_no_labeled_samples(self, training_session, label_run, tmp_path):
         """Test error when no labeled samples are found"""
@@ -383,14 +395,14 @@ class TestPrepareTrainingData:
             )
 
     @pytest.mark.parametrize(
-        "test_size,expected_min_test",
+        "test_size,expected_train,expected_test",
         [
-            (0.2, 1),
-            (0.5, 2),
+            (0.2, 8, 2),
+            (0.5, 5, 5),
         ],
     )
     def test_test_size_parameter(
-        self, training_session, label_run, tmp_path, test_size, expected_min_test
+        self, training_session, label_run, tmp_path, test_size, expected_train, expected_test
     ):
         """Test that test_size parameter affects split"""
         samples = [
@@ -427,7 +439,7 @@ class TestPrepareTrainingData:
             label_run_id=label_run.id,
         )
 
-        # Test set should have at least expected_min_test samples
-        assert len(test_ds) >= expected_min_test
-        # Total should still be 10 (without hard negatives)
+        # With seed=42, splits are deterministic
+        assert len(train_ds) == expected_train
+        assert len(test_ds) == expected_test
         assert len(train_ds) + len(test_ds) == 10
