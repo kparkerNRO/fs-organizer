@@ -81,3 +81,9 @@ def label_run(training_session):
 def sample_snapshot(index_session):
     """Create a test snapshot using factory"""
     return SnapshotFactory(snapshot_id=1)
+
+
+@pytest.fixture
+def model_run(training_session):
+    """Create a test model run using factory"""
+    return ModelRunFactory(run_id=1)

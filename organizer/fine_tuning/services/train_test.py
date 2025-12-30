@@ -301,11 +301,10 @@ class TestPrepareTrainingData:
         ]
 
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
-
-        manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
             for sample in samples:
@@ -340,11 +339,10 @@ class TestPrepareTrainingData:
         sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
 
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
-
-        manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
             session.merge(sample)
@@ -366,11 +364,10 @@ class TestPrepareTrainingData:
         )
 
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
-
-        manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
             session.merge(sample)
@@ -427,11 +424,10 @@ class TestPrepareTrainingData:
         ]
 
         manager = StorageManager(
-            index_db_path=str(tmp_path / "index.db"),
-            training_db_path=str(tmp_path / "test.db"),
+            tmp_path,
+            initialize_work=False,
+            initialize_training=True,
         )
-
-        manager._init_training_db(TrainingBase)
 
         with manager.get_training_session() as session:
             for sample in samples:

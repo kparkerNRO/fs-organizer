@@ -21,7 +21,7 @@ from .factories import TrainingSampleFactory
 class TestSavePredictionsToDb:
     """Test save_predictions_to_db function"""
 
-    def test_save_basic_predictions(self, training_session, label_run):
+    def test_save_basic_predictions(self, training_session, label_run, model_run):
         """Test saving predictions to database"""
         # Create samples using factory - only specify what matters
         samples = [
@@ -91,7 +91,9 @@ class TestSavePredictionsToDb:
         assert set(probs_dict.keys()) == {"label_0", "label_1", "label_2"}
         assert probs_dict["label_0"] == 0.95
 
-    def test_save_predictions_unlabeled_samples(self, training_session, label_run):
+    def test_save_predictions_unlabeled_samples(
+        self, training_session, label_run, model_run
+    ):
         """Test saving predictions for unlabeled samples"""
         sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
 
