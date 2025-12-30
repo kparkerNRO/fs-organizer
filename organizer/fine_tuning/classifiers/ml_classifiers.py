@@ -13,15 +13,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from storage.training_models import TrainingSample
 from fine_tuning.taxonomy import get_labels
 
-# Dependencies for classifiers, install with `pip install setfit sentence-transformers`
-try:
-    from setfit import SetFitModel
-    from sentence_transformers import SentenceTransformer
-except ImportError as e:
-    print(
-        f"Error: {e}. Please install dependencies: pip install setfit sentence-transformers"
-    )
-    raise
+from setfit import SetFitModel
+from sentence_transformers import SentenceTransformer
 
 
 class ZeroShotClassifier:
