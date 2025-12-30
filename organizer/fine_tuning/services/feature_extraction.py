@@ -5,12 +5,11 @@ from typing import Dict, List, Optional
 from fine_tuning.classifiers.heuristic_classifier import (
     COLLAB_MARKERS,
 )
-from fine_tuning.settings import StorageSettings
 from fine_tuning.services.common import (
     FeatureNodeCore,
     extract_feature_nodes,
 )
-from pydantic import Field
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
@@ -22,13 +21,9 @@ from utils.text_processing import has_matching_token, tokenize_string
 logger = logging.getLogger(__name__)
 
 
-class FeatureExtractionSettings(StorageSettings):
-    """Settings for the 'extract-features' command."""
+class FeatureExtractionConfigSettings(BaseModel):
+    """Stable feature extraction configuration (loaded from config file)."""
 
-    snapshot_id: Optional[int] = Field(
-        None,
-        description="Snapshot ID to extract features from (defaults to highest snapshot_id if unset)",
-    )
     batch_size: int = Field(
         1000,
         description="Number of samples to insert per batch",
@@ -77,9 +72,9 @@ def extract_features_for_run(
     index_session: Session,
     training_session: Session,
     snapshot_id: int,
-    config: Config,
+    app_config: Config,
     label_run: LabelRun,
-    settings: FeatureExtractionSettings,
+    settings: FeatureExtractionConfigSettings,
 ) -> int:
     rows = list(
         index_session.execute(
@@ -119,13 +114,17 @@ def extract_features_for_run(
                 parent is not None
                 and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
             ),
-            "childMedia": has_matching_token(child_token_bag, config.media_types),
-            "childVarHint": has_matching_token(child_token_bag, config.variant_types),
+            "childMedia": has_matching_token(child_token_bag, app_config.media_types),
+            "childVarHint": has_matching_token(
+                child_token_bag, app_config.variant_types
+            ),
             "childFmt": any(
-                cn.strip(".").lower() in config.format_types
+                cn.strip(".").lower() in app_config.format_types
                 for cn in feature_node.child_names
             ),
-            "sibVarHint": has_matching_token(sibling_token_bag, config.variant_types),
+            "sibVarHint": has_matching_token(
+                sibling_token_bag, app_config.variant_types
+            ),
         }
 
         text = _build_feature_text(
@@ -155,7 +154,7 @@ def extract_features_for_run(
                 feature_node.descendent_extentions
             ),
             has_collab_cue=flags["collab"],
-            looks_like_format=config.is_media_type(node.name),
+            looks_like_format=app_config.is_media_type(node.name),
             child_has_media_type_cue=flags["childMedia"],
             child_has_variant_hint=flags["childVarHint"],
             child_has_format_cue=flags["childFmt"],
@@ -180,9 +179,9 @@ def extract_features_for_run(
 
 
 def extract_features_from_snapshot(
-    settings: FeatureExtractionSettings,
+    extraction_config: FeatureExtractionConfigSettings,
     manager: StorageManager,
-    config: Config,
+    app_config: Config,
     snapshot_id: int,
 ) -> int:
     """
@@ -197,5 +196,10 @@ def extract_features_from_snapshot(
         training_session.flush()
 
         return extract_features_for_run(
-            index_session, training_session, snapshot_id, config, label_run, settings
+            index_session,
+            training_session,
+            snapshot_id,
+            app_config,
+            label_run,
+            extraction_config,
         )

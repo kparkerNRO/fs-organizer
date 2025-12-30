@@ -4,7 +4,7 @@ import json
 
 import pytest
 from fine_tuning.services.feature_extraction import (
-    FeatureExtractionSettings,
+    FeatureExtractionConfigSettings,
     extract_features_for_run,
 )
 from sqlalchemy import create_engine
@@ -73,9 +73,7 @@ def label_run(training_session):
 @pytest.fixture
 def test_settings():
     """Create test settings for feature extraction"""
-    return FeatureExtractionSettings(
-        index_db="",  # Not used in tests
-        training_db="",  # Not used in tests
+    return FeatureExtractionConfigSettings(
         batch_size=1000,
         child_cap=5,
         sibling_cap=5,
@@ -301,7 +299,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -329,7 +327,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -360,7 +358,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -392,7 +390,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -424,7 +422,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -453,7 +451,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -482,7 +480,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -517,7 +515,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=test_settings,
         )
@@ -547,9 +545,7 @@ class TestExtractFeatures:
     ):
         """Test batch processing with small batch size"""
         # Override batch_size for this test
-        settings = FeatureExtractionSettings(
-            index_db="",
-            training_db="",
+        settings = FeatureExtractionConfigSettings(
             batch_size=3,  # Small batch size to test batching logic
             child_cap=test_settings.child_cap,
             sibling_cap=test_settings.sibling_cap,
@@ -559,7 +555,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=settings,
         )
@@ -619,9 +615,7 @@ class TestExtractFeatures:
         index_session.commit()
 
         # Override child_cap for this test
-        settings = FeatureExtractionSettings(
-            index_db="",
-            training_db="",
+        settings = FeatureExtractionConfigSettings(
             batch_size=test_settings.batch_size,
             child_cap=10,
             sibling_cap=test_settings.sibling_cap,
@@ -631,7 +625,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=1,
-            config=test_config,
+            app_config=test_config,
             label_run=label_run,
             settings=settings,
         )
@@ -658,7 +652,7 @@ class TestExtractFeatures:
             index_session,
             training_session,
             snapshot_id=999,  # Non-existent
-            config=test_config,
+            app_config=test_config,
             label_run=label_run_999,
             settings=test_settings,
         )

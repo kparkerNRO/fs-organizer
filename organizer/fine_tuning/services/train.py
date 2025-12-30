@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from datasets import Dataset
-from fine_tuning.settings import CommonSettings
+from fine_tuning.services.common import load_samples
 from fine_tuning.taxonomy import get_labels
-from fine_tuning.services.common import get_effective_label_run_id, load_samples
-from pydantic import BaseModel, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from setfit import SetFitModel, SetFitTrainer
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import train_test_split
@@ -17,13 +17,9 @@ from utils.text_processing import char_trigrams, jaccard_similarity
 logger = logging.getLogger(__name__)
 
 
-class TrainSettings(BaseModel):
-    """Settings for the 'train' command."""
+class TrainConfigSettings(BaseSettings):
+    """Stable training configuration (loaded from config file)."""
 
-    output_dir: Path = Field(
-        default=Path("./leaf_classifier_setfit"),
-        description="Directory to save trained model",
-    )
     model: str = Field(
         "sentence-transformers/all-MiniLM-L6-v2",
         description="Base sentence transformer model",
@@ -78,8 +74,7 @@ class TrainSettings(BaseModel):
     )
 
 
-class FullTrainingSettings(CommonSettings, TrainSettings):
-    pass
+# Runtime parameters are passed separately to functions
 
 
 def augment_with_hard_negatives(
@@ -132,13 +127,16 @@ def augment_with_hard_negatives(
 
 
 def prepare_training_data(
-    settings: FullTrainingSettings, manager: StorageManager
+    config: TrainConfigSettings,
+    manager: StorageManager,
+    taxonomy: str,
+    label_run_id: int,
 ) -> Tuple[Dataset, Dataset, Dict[int, str]]:
     """Loads, processes, and splits data into training and test datasets."""
     try:
-        labels_list = sorted(get_labels(settings.taxonomy))
+        labels_list = sorted(get_labels(taxonomy))
     except ValueError as e:
-        logger.error(f"Invalid taxonomy '{settings.taxonomy}': {e}")
+        logger.error(f"Invalid taxonomy '{taxonomy}': {e}")
         raise
 
     label2id = {label: i for i, label in enumerate(labels_list)}
@@ -146,12 +144,7 @@ def prepare_training_data(
 
     logger.info(f"Loading training data from {manager.get_training_db_path()}...")
     with manager.get_training_session() as session:
-        effective_label_run_id = get_effective_label_run_id(
-            session, settings.label_run_id
-        )
-        samples = load_samples(
-            session, labeled_only=True, label_run_id=effective_label_run_id
-        )
+        samples = load_samples(session, labeled_only=True, label_run_id=label_run_id)
 
     if not samples:
         logger.error("No labeled training samples found in database")
@@ -168,12 +161,12 @@ def prepare_training_data(
     leaf_keys = [s.name_norm for s in samples if s.label]
     labels = [label2id[s.label] for s in samples if s.label]
 
-    logger.info(f"Splitting data (test_size={settings.test_size})...")
+    logger.info(f"Splitting data (test_size={config.test_size})...")
     indices = list(range(len(labels)))
     train_idx, test_idx = train_test_split(
         indices,
-        test_size=settings.test_size,
-        random_state=settings.seed,
+        test_size=config.test_size,
+        random_state=config.seed,
         stratify=labels,
     )
 
@@ -185,10 +178,8 @@ def prepare_training_data(
         {"text": [texts[i] for i in test_idx], "label": [labels[i] for i in test_idx]}
     )
 
-    if not settings.no_hard_negatives:
-        confusable = {
-            s.strip() for s in settings.hardneg_labels.split(",") if s.strip()
-        }
+    if not config.no_hard_negatives:
+        confusable = {s.strip() for s in config.hardneg_labels.split(",") if s.strip()}
         logger.info(f"Mining hard negatives for labels: {', '.join(confusable)}...")
         extra_texts, extra_labels = augment_with_hard_negatives(
             train_texts=train_texts,
@@ -196,9 +187,9 @@ def prepare_training_data(
             train_labels=train_labels,
             id2label=id2label,
             confusable_labels=confusable,
-            k=settings.hardneg_k,
-            min_sim=settings.hardneg_min_sim,
-            factor=settings.hardneg_factor,
+            k=config.hardneg_k,
+            min_sim=config.hardneg_min_sim,
+            factor=config.hardneg_factor,
         )
 
         if extra_texts:
@@ -210,20 +201,28 @@ def prepare_training_data(
     return train_ds, test_ds, id2label
 
 
-def train_model(settings: FullTrainingSettings, manager: StorageManager) -> None:
-    train_ds, test_ds, id2label = prepare_training_data(settings, manager)
+def train_model(
+    config: TrainConfigSettings,
+    manager: StorageManager,
+    taxonomy: str,
+    label_run_id: int | None,
+    output_dir: Path,
+) -> None:
+    train_ds, test_ds, id2label = prepare_training_data(
+        config, manager, taxonomy, label_run_id
+    )
 
-    logger.info(f"Initializing model: {settings.model}")
-    model = SetFitModel.from_pretrained(settings.model)
+    logger.info(f"Initializing model: {config.model}")
+    model = SetFitModel.from_pretrained(config.model)
 
     trainer = SetFitTrainer(
         model=model,
         train_dataset=train_ds,
         eval_dataset=test_ds,
-        num_epochs=settings.num_epochs,
+        num_epochs=config.num_epochs,
         column_mapping={"text": "text", "label": "label"},
     )
-    logger.info(f"Training for {settings.num_epochs} epochs...")
+    logger.info(f"Training for {config.num_epochs} epochs...")
     trainer.train()
 
     logger.info("Evaluating on test set...")
@@ -243,6 +242,6 @@ def train_model(settings: FullTrainingSettings, manager: StorageManager) -> None
         )
     )
 
-    settings.output_dir.mkdir(parents=True, exist_ok=True)
-    trainer.model.save_pretrained(str(settings.output_dir))
-    logger.info(f"Model saved to: {settings.output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    trainer.model.save_pretrained(str(output_dir))
+    logger.info(f"Model saved to: {output_dir}")

@@ -1,7 +1,6 @@
 """Pydantic models for fine-tuning CLI settings."""
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,15 +13,12 @@ class StorageSettings(BaseModel):
         description="Path to the main storage directory containing all databases.",
     )
 
-
-class CommonSettings(StorageSettings):
-    """Common settings for all commands."""
+    model_path: Path = Field(
+        "models",
+        description="Path to the main storage directory containing all databases.",
+    )
 
     taxonomy: str = Field(
-        "legacy",
+        "v2",
         description="Label taxonomy to use: v1, v2, or legacy",
-    )
-    label_run_id: Optional[int] = Field(
-        None,
-        description="Label run ID to use for training labels (defaults to newest)",
     )

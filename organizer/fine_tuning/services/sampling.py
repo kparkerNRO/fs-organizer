@@ -1,20 +1,21 @@
 import csv
 import json
 import logging
+import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
-from fine_tuning.services.feature_extraction import (
-    extract_features_for_run,
-)
-from fine_tuning.settings import StorageSettings
-from fine_tuning.taxonomy import get_labels
 from fine_tuning.services.common import (
     extract_feature_nodes,
 )
+from fine_tuning.services.feature_extraction import (
+    extract_features_for_run,
+)
+from fine_tuning.taxonomy import get_labels
 from pydantic import Field
+from pydantic.v1 import BaseSettings
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
@@ -45,17 +46,9 @@ CSV_COLUMNS = [
 ]
 
 
-class GenerateSamplesSettings(StorageSettings):
+class GenerateSamplesSettings(BaseSettings):
     """Settings for the 'generate-samples' command."""
 
-    output_csv: Path = Field(
-        ...,
-        description="Path to output CSV file for manual labeling",
-    )
-    snapshot_id: Optional[int] = Field(
-        None,
-        description="Snapshot ID to generate samples from (defaults to highest snapshot_id if unset)",
-    )
     sample_size: int = Field(
         800,
         description="Number of samples to generate",
@@ -82,13 +75,9 @@ class GenerateSamplesSettings(StorageSettings):
     )
 
 
-class ApplyClassificationsSettings(StorageSettings):
+class ApplyClassificationsSettings(BaseSettings):
     """Settings for the 'apply-classifications' command."""
 
-    input_csv: Path = Field(
-        ...,
-        description="CSV file with manual classifications",
-    )
     labeler: str = Field(
         "manual",
         description="Name of the labeler (e.g., 'manual', 'human-v1')",
@@ -96,10 +85,6 @@ class ApplyClassificationsSettings(StorageSettings):
     split: Optional[str] = Field(
         None,
         description="Data split: 'train', 'validation', or 'test'",
-    )
-    taxonomy: str = Field(
-        "v2",
-        description="Label taxonomy to validate against: v1, v2, or legacy",
     )
     validate_only: bool = Field(
         False,
@@ -205,8 +190,6 @@ def _sample_from_clusters(clusters: List[List[Node]], num_samples: int) -> List[
     # Fill remaining from all available nodes
     remaining_nodes = [node for cluster in clusters for node in cluster]
 
-    import random
-
     random.shuffle(remaining_nodes)
 
     needed = num_samples - len(selected)
@@ -289,7 +272,10 @@ def write_sample_csv(
 
 
 def generate_sample_data(
-    settings: GenerateSamplesSettings, manager: StorageManager, snapshot_id: int
+    settings: GenerateSamplesSettings,
+    manager: StorageManager,
+    snapshot_id: int,
+    output_csv: Path,
 ) -> int:
     with manager.get_index_session(read_only=True) as session:
         samples = select_training_samples(
@@ -304,7 +290,7 @@ def generate_sample_data(
             raise ValueError("No samples found matching criteria")
 
         write_sample_csv(
-            output_path=settings.output_csv,
+            output_path=output_csv,
             nodes=samples,
             session=session,
             snapshot_id=snapshot_id,
@@ -382,11 +368,13 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
     Raises:
         ValueError: If any rows are missing labels
     """
-    unlabeled = [i + 2 for i, row in enumerate(rows) if not row["label"]]
+    unlabeled: list[int] = [i + 2 for i, row in enumerate(rows) if not row["label"]]
 
     if unlabeled:
         if len(unlabeled) <= 10:
-            rows_str = ", ".join(map(str, unlabeled))
+            rows_str = ", ".join(
+                map(str, unlabeled)
+            )  # ty:ignore[invalid-argument-type]
         else:
             rows_str = (
                 ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
@@ -448,15 +436,13 @@ def create_samples_for_runs(
     index_session: Session,
     training_session: Session,
     label_runs: Dict[int, LabelRun],
-    settings: ApplyClassificationsSettings,
 ) -> None:
     """Run feature extraction to create TrainingSample stubs for each label run."""
-    from fine_tuning.services.feature_extraction import FeatureExtractionSettings
+    from fine_tuning.services.feature_extraction import FeatureExtractionConfigSettings
 
-    config = get_config()
-    # Create a FeatureExtractionSettings object from ApplyClassificationsSettings
-    extraction_settings = FeatureExtractionSettings(
-        storage_path=settings.storage_path,
+    app_config = get_config()
+    # Create a FeatureExtractionConfigSettings object with default values
+    extraction_config = FeatureExtractionConfigSettings(
         batch_size=1000,
         child_cap=5,
         sibling_cap=5,
@@ -467,9 +453,9 @@ def create_samples_for_runs(
             index_session=index_session,
             training_session=training_session,
             snapshot_id=snapshot_id,
-            config=config,
+            app_config=app_config,
             label_run=label_run,
-            settings=extraction_settings,
+            settings=extraction_config,
         )
         logger.info(
             f"Created {num_samples} training samples for snapshot {snapshot_id}"
@@ -519,9 +505,12 @@ def apply_labels_to_samples(
 
 
 def apply_sample_classifications(
-    settings: ApplyClassificationsSettings, manager: StorageManager
+    settings: ApplyClassificationsSettings,
+    manager: StorageManager,
+    input_csv: Path,
+    taxonomy: str,
 ) -> None:
-    rows = validate_input_csv(settings.input_csv, settings.taxonomy)
+    rows = validate_input_csv(input_csv, taxonomy)
 
     with (
         manager.get_training_session() as training_session,
@@ -531,9 +520,7 @@ def apply_sample_classifications(
         label_runs = create_label_runs(training_session, snapshot_ids)
 
         with manager.get_index_session(read_only=True) as index_session:
-            create_samples_for_runs(
-                index_session, training_session, label_runs, settings
-            )
+            create_samples_for_runs(index_session, training_session, label_runs)
 
         labeled_count = apply_labels_to_samples(
             training_session, rows, label_runs, settings.split

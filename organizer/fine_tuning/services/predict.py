@@ -2,16 +2,15 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 
 from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
-from fine_tuning.services.evaluation import evaluate_predictions
-from fine_tuning.settings import CommonSettings
 from fine_tuning.services.common import (
-    get_effective_label_run_id,
     load_samples,
 )
-from pydantic import BaseModel, Field
+from fine_tuning.services.evaluation import evaluate_predictions
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 from storage.manager import StorageManager
 from storage.training_models import ModelRun, SamplePrediction, TrainingSample
@@ -19,46 +18,22 @@ from storage.training_models import ModelRun, SamplePrediction, TrainingSample
 logger = logging.getLogger(__name__)
 
 
-class PredictSettings(BaseModel):
-    """Settings for the 'predict' command."""
+class ZeroShotConfigSettings(BaseSettings):
+    """Stable zero-shot configuration (loaded from config file)."""
 
-    model_path: Optional[Path] = Field(
-        None,
-        description="Path to fine-tuned SetFit model (required unless --use-baseline)",
+    labeled_only: bool = Field(
+        False,
+        description="Only run on samples with labels (for evaluation)",
     )
+
+
+class PredictConfigSettings(ZeroShotConfigSettings):
+    """Stable prediction configuration (loaded from config file)."""
+
     use_baseline: bool = Field(
         False,
         description="Use baseline pre-trained model without fine-tuning",
     )
-    split: Optional[str] = Field(
-        None,
-        description="Only evaluate on specific split: train, validation, or test",
-    )
-    labeled_only: bool = Field(
-        False,
-        description="Only run on samples with labels (for evaluation)",
-    )
-
-
-class ZeroShotSettings(BaseModel):
-    """Settings for the 'zero-shot' command."""
-
-    split: Optional[str] = Field(
-        None,
-        description="Only evaluate on specific split: train, validation, or test",
-    )
-    labeled_only: bool = Field(
-        False,
-        description="Only run on samples with labels (for evaluation)",
-    )
-
-
-class FullPredictSettings(CommonSettings, PredictSettings):
-    pass
-
-
-class FullZeroShotSettings(CommonSettings, ZeroShotSettings):
-    pass
 
 
 def save_predictions_to_db(
@@ -174,33 +149,36 @@ def create_model_run(
 
 def create_and_save_run_results(
     session: Session,
-    settings: Union[FullPredictSettings, FullZeroShotSettings],
+    config_dict: Dict[str, Any],
     classifier: Union[SetFitClassifier, ZeroShotClassifier],
     samples: List[TrainingSample],
     predictions: List[str],
     confidences: List[float],
     probabilities: List[Union[List[float], Dict[str, float]]],
     metrics: Dict[str, Any],
+    taxonomy: str,
+    model_path: Path | None,
+    use_baseline: bool,
+    split: str | None,
 ) -> None:
     """Creates a ModelRun and saves all results to the database."""
     run_type_label = (
         "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
     )
-    if isinstance(settings, FullPredictSettings) and settings.use_baseline:
+    if use_baseline:
         run_type_label = "baseline"
 
     logger.info("Saving results to database...")
-    config = settings.model_dump()
+    config_dict_with_metrics = config_dict.copy()
     if metrics:
-        config["metrics"] = metrics
+        config_dict_with_metrics["metrics"] = metrics
 
-    model_path = getattr(settings, "model_path", None)
     run = create_model_run(
         session,
         model_path=str(model_path) if model_path else None,
-        taxonomy=settings.taxonomy,
-        use_baseline=getattr(settings, "use_baseline", False),
-        config=config,
+        taxonomy=taxonomy,
+        use_baseline=use_baseline,
+        config=config_dict_with_metrics,
         run_type=run_type_label,
     )
 
@@ -220,8 +198,8 @@ def create_and_save_run_results(
     else:
         metrics_summary = ""
     run.notes = (
-        f"Run type: {run_type_label}, Taxonomy: {settings.taxonomy}, "
-        f"Split: {settings.split or 'all'}{metrics_summary}"
+        f"Run type: {run_type_label}, Taxonomy: {taxonomy}, "
+        f"Split: {split or 'all'}{metrics_summary}"
     )
 
     session.commit()
@@ -235,27 +213,29 @@ def create_and_save_run_results(
         confidences,
         probabilities,
         run_id=run.run_id,
-        prediction_type=settings.split or "all",
+        prediction_type=split or "all",
     )
     logger.info(f"Saved {num_saved} predictions to database")
 
 
 def predict_and_evaluate(
-    settings: Union[FullPredictSettings, FullZeroShotSettings],
+    config_dict: Dict[str, Any],
     classifier: Union[SetFitClassifier, ZeroShotClassifier],
     manager: StorageManager,
+    taxonomy: str,
+    label_run_id: int,
+    split: str | None,
+    labeled_only: bool,
+    model_path: Path | None,
+    use_baseline: bool = False,
 ) -> None:
     """Shared logic for prediction, evaluation, and saving results."""
     with manager.get_training_session() as session:
-        effective_label_run_id = get_effective_label_run_id(
-            session, settings.label_run_id
-        )
-
         samples = load_samples(
             session,
-            split=settings.split,
-            labeled_only=settings.labeled_only,
-            label_run_id=effective_label_run_id,
+            split=split,
+            labeled_only=labeled_only,
+            label_run_id=label_run_id,
         )
         logger.info(
             f"Loaded {len(samples)} samples from {manager.get_training_db_path()}"
@@ -284,32 +264,63 @@ def predict_and_evaluate(
 
         create_and_save_run_results(
             session,
-            settings,
+            config_dict,
             classifier,
             samples,
             predictions,
             confidences,
             probabilities,
             metrics,
+            taxonomy,
+            model_path,
+            use_baseline,
+            split,
         )
 
 
-def predict_setfit(settings: FullPredictSettings, manager: StorageManager) -> None:
+def predict_setfit(
+    settings: PredictConfigSettings,
+    manager: StorageManager,
+    taxonomy: str,
+    label_run_id: int,
+    split: str | None,
+    model_path: Path | None,
+) -> None:
     if settings.use_baseline:
-        logger.info(
-            f"Initializing baseline SetFit model (taxonomy={settings.taxonomy})..."
-        )
-        classifier = SetFitClassifier(taxonomy=settings.taxonomy, use_baseline=True)
+        logger.info(f"Initializing baseline SetFit model (taxonomy={taxonomy})...")
+        classifier = SetFitClassifier(taxonomy=taxonomy, use_baseline=True)
     else:
-        logger.info(f"Loading fine-tuned model from {settings.model_path}...")
-        classifier = SetFitClassifier(
-            model_path=str(settings.model_path), taxonomy=settings.taxonomy
-        )
+        logger.info(f"Loading fine-tuned model from {model_path}...")
+        classifier = SetFitClassifier(model_path=str(model_path), taxonomy=taxonomy)
 
-    predict_and_evaluate(settings, classifier, manager)
+    predict_and_evaluate(
+        config_dict=settings.model_dump(),
+        classifier=classifier,
+        manager=manager,
+        taxonomy=taxonomy,
+        label_run_id=label_run_id,
+        split=split,
+        labeled_only=settings.labeled_only,
+        model_path=model_path,
+        use_baseline=settings.use_baseline,
+    )
 
 
-def predict_zero_shot(settings: FullZeroShotSettings, manager: StorageManager) -> None:
-    logger.info(f"Initializing zero-shot classifier (taxonomy={settings.taxonomy})...")
-    classifier = ZeroShotClassifier(taxonomy=settings.taxonomy)
-    predict_and_evaluate(settings, classifier, manager)
+def predict_zero_shot(
+    settings: ZeroShotConfigSettings,
+    manager: StorageManager,
+    taxonomy: str,
+    label_run_id: int,
+    split: str | None,
+) -> None:
+    logger.info(f"Initializing zero-shot classifier (taxonomy={taxonomy})...")
+    classifier = ZeroShotClassifier(taxonomy=taxonomy)
+    predict_and_evaluate(
+        config_dict=settings.model_dump(),
+        classifier=classifier,
+        manager=manager,
+        taxonomy=taxonomy,
+        label_run_id=label_run_id,
+        split=split,
+        labeled_only=settings.labeled_only,
+    )

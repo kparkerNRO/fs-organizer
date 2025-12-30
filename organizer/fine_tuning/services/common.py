@@ -8,12 +8,11 @@ import logging
 from typing import Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from storage.index_models import Node, Snapshot
-from storage.manager import NodeKind, StorageManager
+from storage.index_models import Node
+from storage.manager import NodeKind
 from storage.training_models import (
-    LabelRun,
     TrainingSample,
 )
 from utils.filename_processing import clean_filename
@@ -53,30 +52,6 @@ def load_samples(
 
     samples = session.execute(query).scalars().all()
     return list(samples)
-
-
-def get_highest_snapshot_id(manager: StorageManager) -> int:
-    """Get the highest snapshot_id from the index database."""
-    with manager.get_index_session(read_only=True) as session:
-        result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
-        if result is None:
-            raise ValueError(f"No snapshots found in {manager.get_index_db_path()}")
-        return result
-
-
-def get_effective_label_run_id(session: Session, label_run_id: int | None) -> int:
-    """Get the effective label run ID, defaulting to the newest if not specified."""
-    if label_run_id is not None:
-        logger.info(f"Using specified label run: {label_run_id}")
-        return label_run_id
-
-    effective_label_run_id = session.execute(
-        select(LabelRun.id).order_by(LabelRun.id.desc()).limit(1)
-    ).scalar()
-    if effective_label_run_id is None:
-        raise ValueError("No label runs found in database")
-    logger.info(f"Using newest label run: {effective_label_run_id}")
-    return effective_label_run_id
 
 
 def _load_and_index_nodes(
@@ -119,6 +94,8 @@ def _precompute_descendant_extensions(
 
 
 class FeatureNodeCore(BaseModel):
+    model_config = {"arbitrary_types_allowed": True}
+
     snapshot_id: int
     node: Node
     parent: Node | None
@@ -179,7 +156,7 @@ def extract_feature_nodes(
         child_nodes = [
             nodes_by_id[cid]
             for cid in children_by_parent.get(node.node_id, [])
-            if cid in nodes_by_id and nodes_by_id[cid].kind == NodeKind.DIR
+            if cid in nodes_by_id
         ][:max_children]
 
         if parent:
@@ -190,6 +167,8 @@ def extract_feature_nodes(
                 and sid in nodes_by_id
                 and nodes_by_id[sid].kind == NodeKind.DIR
             ][:max_siblings]
+        else:
+            sibling_nodes = []
 
         extensions = sorted(descendant_exts.get(node.node_id, set()))[:max_descendents]
         core_node = FeatureNodeCore(
@@ -206,3 +185,5 @@ def extract_feature_nodes(
         )
 
         feature_nodes.append(core_node)
+
+    return feature_nodes
