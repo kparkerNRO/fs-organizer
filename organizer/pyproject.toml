@@ -20,6 +20,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "factory-boy>=3.3.0",
     "pre-commit>=4.0.1",
     "pyright>=1.1.407",
 ]
