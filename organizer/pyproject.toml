@@ -31,3 +31,8 @@ classifier = [
     "sentence-transformers>=4.1.0",
     "setfit>=1.1.3",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "ml: marks tests that require large ML dependencies (sentence-transformers, setfit, datasets)",
+]

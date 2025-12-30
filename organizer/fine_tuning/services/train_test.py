@@ -12,6 +12,7 @@ from storage.training_models import TrainingBase
 from .factories import TrainingSampleFactory
 
 
+@pytest.mark.ml
 class TestAugmentWithHardNegatives:
     """Test augment_with_hard_negatives function"""
 
@@ -203,6 +204,7 @@ class TestAugmentWithHardNegatives:
         assert len(extra_texts) == len(extra_labels)
 
 
+@pytest.mark.ml
 class TestPrepareTrainingData:
     """Test prepare_training_data function"""
 
