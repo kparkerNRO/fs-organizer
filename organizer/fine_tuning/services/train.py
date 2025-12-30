@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 from datasets import Dataset
 from fine_tuning.services.common import load_samples
@@ -131,6 +131,10 @@ def prepare_training_data(
     manager: StorageManager,
     taxonomy: str,
     label_run_id: int,
+    augment_fn: Callable[
+        ..., Tuple[List[str], List[int]]
+    ] = augment_with_hard_negatives,
+    get_labels_fn: Callable[[str], list[str]] = get_labels,
 ) -> Tuple[Dataset, Dataset, Dict[int, str]]:
     """Loads, processes, and splits data into training and test datasets."""
     try:
@@ -181,7 +185,7 @@ def prepare_training_data(
     if not config.no_hard_negatives:
         confusable = {s.strip() for s in config.hardneg_labels.split(",") if s.strip()}
         logger.info(f"Mining hard negatives for labels: {', '.join(confusable)}...")
-        extra_texts, extra_labels = augment_with_hard_negatives(
+        extra_texts, extra_labels = augment_fn(
             train_texts=train_texts,
             train_leaf_keys=train_leaf_keys,
             train_labels=train_labels,
