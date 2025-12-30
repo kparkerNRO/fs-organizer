@@ -68,7 +68,7 @@ class TestSavePredictionsToDb:
         assert pred2.is_correct is False
 
     def test_save_predictions_with_list_probabilities(
-        self, training_session, label_run
+        self, training_session, label_run, model_run
     ):
         """Test saving predictions with list-format probabilities"""
         sample = TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
@@ -118,7 +118,7 @@ class TestSavePredictionsToDb:
         ["train", "validation", "test", "all"],
     )
     def test_prediction_type_parameter(
-        self, training_session, label_run, prediction_type
+        self, training_session, label_run, model_run, prediction_type
     ):
         """Test different prediction type values"""
         sample = TrainingSampleFactory(label_run_id=label_run.id)
