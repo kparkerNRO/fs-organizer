@@ -17,6 +17,10 @@ pytest fine_tuning/services/
 
 Run only tests that **don't** require ML dependencies:
 ```bash
+# Option 1: Ignore ML test files (faster, avoids import errors)
+pytest --ignore=fine_tuning/services/train_test.py --ignore=fine_tuning/services/predict_test.py
+
+# Option 2: Use markers (requires ML deps to be importable)
 pytest fine_tuning/services/ -m "not ml"
 ```
 
@@ -41,11 +45,13 @@ The following test files do **not** require ML dependencies:
 
 For faster CI pipelines, you can run non-ML tests first:
 ```bash
-# Fast tests (no ML dependencies needed)
-pytest fine_tuning/services/ -m "not ml"
+# Fast tests (no ML dependencies needed) - ignore ML test files to avoid imports
+pytest --ignore=fine_tuning/services/train_test.py --ignore=fine_tuning/services/predict_test.py
 
 # Slower tests (requires ML dependencies)
-pytest fine_tuning/services/ -m "ml"
+pytest -m "ml"
 ```
+
+**Note**: Using `--ignore` is recommended over `-m "not ml"` for the non-ML tests because pytest imports all test files during collection, even if they're marked to skip. The `--ignore` flag prevents pytest from importing ML test files entirely, avoiding import errors when ML dependencies aren't installed.
 
 This allows you to get quick feedback on most tests while deferring the slower ML-dependent tests to a separate job or later stage.

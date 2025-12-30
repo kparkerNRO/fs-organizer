@@ -30,7 +30,7 @@ jobs:
       - name: Run non-ML tests
         run: |
           cd organizer
-          uv run pytest -m "not ml"
+          uv run pytest --ignore=fine_tuning/services/train_test.py --ignore=fine_tuning/services/predict_test.py
 
       - name: Install ML dependencies
         run: |
