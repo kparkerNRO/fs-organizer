@@ -261,7 +261,11 @@ def pre_process_groups(session: Session, config: Config | None = None) -> None:
     config = config or get_config()
 
     for category in uncertain_categories:
-        split_name = category["processed_name"].split("-")  # type: ignore[union-attr]  # ty bug: SQLAlchemy ORM attribute should be str
+        # Use processed_name if available, otherwise fall back to pre_processed_name
+        name_to_process = category["processed_name"] or category["pre_processed_name"]
+        if not name_to_process:
+            continue  # Skip entries with no name
+        split_name = name_to_process.split("-")
         categories = []
         for name in split_name:
             cleaned_name = clean_filename(name, config=config)
@@ -402,8 +406,6 @@ def group_folders(
             * this creates sub-clusters where all entries in the cluster start with the same string
             * Calculated groups are stored in GroupCategory, and the confidence is set to the
                 lowest confidence score of the grouped entries
-
-
     """
 
     # setup the database

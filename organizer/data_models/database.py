@@ -279,13 +279,14 @@ def setup_gather(db_path: Path):
 
 def setup_group(db_path: Path):
     """Create or open the SQLite database for grouping functionality."""
-    reset_tables(db_path, [GroupingIteration, GroupCategoryEntry])
+    # Drop tables in reverse dependency order: most dependent first
+    reset_tables(db_path, [GroupCategoryEntry, GroupCategory, GroupingIteration])
 
 
 def setup_folder_categories(db_path: Path):
     """Create or open the SQLite database for categories."""
     reset_tables(
         db_path,
-        [PartialNameCategory, GroupCategory],
+        [PartialNameCategory],
         legacy_tables=["folder_category", "group_record"],
     )

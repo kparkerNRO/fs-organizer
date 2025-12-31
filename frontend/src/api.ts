@@ -158,8 +158,48 @@ export const getGroupStructure = async (): Promise<FolderV2 | null> => {
 };
 
 export const getFoldersStructure = async (): Promise<FolderV2 | null> => {
-  // TODO: Implement fetching folders structure from backend
-  return null;
+  if (isMockMode) {
+    return null; // Mock mode doesn't support existing structures
+  }
+
+  try {
+    const response = await fetch(`${env.apiUrl}/api/folders/structure`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No structure found
+      }
+      throw new Error(`Failed to get folders structure: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.folder_structure;
+  } catch (error) {
+    console.error("Error fetching folders structure:", error);
+    return null;
+  }
+};
+
+export interface PipelineStatus {
+  has_gather: boolean;
+  has_group: boolean;
+  has_folders: boolean;
+  db_path: string;
+}
+
+export const getPipelineStatus = async (): Promise<PipelineStatus | null> => {
+  if (isMockMode) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${env.apiUrl}/api/status`);
+    if (!response.ok) {
+      throw new Error(`Failed to get pipeline status: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching pipeline status:", error);
+    return null;
+  }
 };
 
 // Task polling utilities

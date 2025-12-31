@@ -1,6 +1,7 @@
 import typer
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from api.api import StructureType
 from stages.folder_reconstruction import (
@@ -14,12 +15,47 @@ from utils.export_structure import export_snapshot_structure
 
 from fine_tuning.cli import app as fine_tuning_app
 
-# Configure root logger to output to stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
+# Configure root logger to output to both stdout and log file
+log_dir = Path("./logs")
+log_dir.mkdir(exist_ok=True)
+log_file = log_dir / f"organizer_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+# Create handlers with explicit configuration
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
+
+file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+
+# Configure root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(console_handler)
+root_logger.addHandler(file_handler)
+
+# Also redirect stderr to logging
+class StderrToLogger:
+    def __init__(self, logger, level=logging.ERROR):
+        self.logger = logger
+        self.level = level
+        self.linebuf = ''
+
+    def write(self, buf):
+        for line in buf.rstrip().splitlines():
+            self.logger.log(self.level, line.rstrip())
+        # Also write to original stderr
+        sys.__stderr__.write(buf)
+
+    def flush(self):
+        pass
+
+sys.stderr = StderrToLogger(logging.getLogger('stderr'))
 
 logger = logging.getLogger(__name__)
 
