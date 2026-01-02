@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import List, Any, Optional
 from sqlalchemy import (
-    TypeDecorator,
     create_engine,
     String,
     Float,
@@ -16,7 +15,6 @@ from sqlalchemy.orm import (
     Mapped,
     mapped_column,
 )
-import json
 from datetime import datetime, timezone
 from storage.db_helpers import JsonDict, JsonList
 

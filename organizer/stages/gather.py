@@ -16,7 +16,7 @@ from utils.config import get_config
 from utils.filename_processing import clean_filename
 import os
 from utils.folder_structure import insert_file_in_structure
-from storage.manager import StorageManager, NodeKind, FileSource
+from storage.manager import NodeKind, FileSource
 from storage.index_models import Node, NodeFeatures
 
 logger = logging.getLogger(__name__)

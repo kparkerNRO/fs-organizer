@@ -1,12 +1,6 @@
-import os
-import tempfile
-from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from storage.factories import NodeFactory
-from storage.index_models import Node
 from storage.manager import NodeKind
 from storage.work_models import (
     GroupCategory,
@@ -15,10 +9,8 @@ from storage.work_models import (
 from storage.work_models import (
     GroupIteration as GroupingIteration,
 )
-from utils.config import get_minimal_config
 
 from stages.grouping.group import (
-    group_folders,
     process_folders_to_groups,
     refine_groups,
 )
@@ -29,15 +21,12 @@ def test_process_folders_to_groups(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Set up test data
-
-    folders = [
-        NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR
-        ),
-        NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR
-        ),
-    ]
+    NodeFactory(
+        snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR
+    )
+    NodeFactory(
+        snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR
+    )
 
     # Run the function (it will create iteration 0)
     # Pass None for group_id since we don't have a group yet
@@ -88,22 +77,6 @@ def test_refine_groups_singletons(
     )
     work_session.add_all([iteration0, iteration1])
     work_session.commit()
-
-    # Set up test folders
-    folders = [
-        NodeFactory(
-            node_id=1,
-            name="apple",
-            kind=NodeKind.DIR,
-            abs_path="/test/apple",
-        ),
-        NodeFactory(
-            node_id=2,
-            name="banana",
-            kind=NodeKind.DIR,
-            abs_path="/test/banana",
-        ),
-    ]
 
     # Set up entries with different cluster IDs (singletons)
     entries = [
@@ -164,25 +137,6 @@ def test_refine_groups_clusters(
     )
     work_session.add_all([iteration0, iteration1])
     work_session.commit()
-
-    # Set up test folders
-    folders = [
-        NodeFactory(
-            node_id=1,
-            name="apple pie",
-            abs_path="/test/apple pie",
-        ),
-        NodeFactory(
-            node_id=2,
-            name="apple tart",
-            abs_path="/test/apple tart",
-        ),
-        NodeFactory(
-            node_id=3,
-            name="banana",
-            abs_path="/test/banana",
-        ),
-    ]
 
     # Set up entries with same cluster ID for apple items
     entries = [

@@ -8,14 +8,10 @@ from datetime import datetime
 from typing import Dict
 
 from sqlalchemy import Cast, String, select
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import func
+from fastapi.middleware.cors import CORSMiddleware
 
-# Configure logging to INFO level
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
 from api.models import GatherRequest, AsyncTaskResponse
 from api.tasks import TaskInfo, tasks, update_task, TaskStatus, create_task
 from data_models.database import (
@@ -25,7 +21,6 @@ from data_models.database import (
     GroupCategoryEntry,
     setup_gather,
 )
-
 from api.api import (
     Category as CategoryAPI,
     CategoryResponse,
@@ -35,13 +30,17 @@ from api.api import (
     StructureType,
     FolderViewResponse,
 )
-from sqlalchemy.orm import aliased
-from sqlalchemy.sql import func
-from fastapi.middleware.cors import CORSMiddleware
-
 from stages.gather import gather_folder_structure_and_store
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+
+# Configure logging to INFO level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 app.add_middleware(
