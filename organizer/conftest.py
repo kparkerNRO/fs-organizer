@@ -91,7 +91,6 @@ def model_run(training_session):
     return ModelRunFactory(run_id=1)
 
 
-
 @pytest.fixture
 def work_session():
     """Create an in-memory test database for work data (runs, iterations, etc.)
@@ -108,14 +107,10 @@ def work_session():
 
 @pytest.fixture
 def sample_run(work_session):
-    """Create a sample Run for testing.
-    """
+    """Create a sample Run for testing."""
 
     run = Run(
-        id=1,
-        snapshot_id=1,
-        started_at=datetime.now().isoformat(),
-        status="running"
+        id=1, snapshot_id=1, started_at=datetime.now().isoformat(), status="running"
     )
     work_session.add(run)
     work_session.commit()
@@ -132,7 +127,7 @@ def sample_iteration(work_session, sample_run):
         id=1,
         run_id=sample_run.id,
         snapshot_id=sample_run.snapshot_id,
-        description="test iteration"
+        description="test iteration",
     )
     work_session.add(iteration)
     work_session.commit()

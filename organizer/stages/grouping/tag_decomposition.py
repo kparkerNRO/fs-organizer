@@ -1553,13 +1553,15 @@ def decompose_compound_tags(session: Session) -> None:
     last_iteration = session.scalars(stmt).first()
 
     if not last_iteration:
-        raise ValueError("No existing iterations found. Cannot create decomposition iteration.")
+        raise ValueError(
+            "No existing iterations found. Cannot create decomposition iteration."
+        )
 
     iteration = GroupingIteration(
         id=iteration_id,
         run_id=last_iteration.run_id,
         snapshot_id=last_iteration.snapshot_id,
-        description="Tag decomposition"
+        description="Tag decomposition",
     )
     session.add(iteration)
     session.commit()

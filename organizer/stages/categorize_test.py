@@ -16,7 +16,7 @@ from data_models.database import (
     File,
     FolderStructure,
     GroupCategoryEntry,
-    GroupingIteration
+    GroupingIteration,
 )
 
 from api.api import StructureType

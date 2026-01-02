@@ -20,7 +20,7 @@ from data_models.database import (
     get_sessionmaker,
     File as dbFile,
     FolderStructure,
-    GroupCategoryEntry
+    GroupCategoryEntry,
 )
 
 from sqlalchemy import select

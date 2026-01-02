@@ -21,12 +21,14 @@ log = getLogger(__name__)
 
 def get_next_iteration_id(session: Session):
     # Check both GroupCategory and GroupIteration to get the true max iteration_id
-    category_max = session.execute(select(func.max(GroupCategory.iteration_id))).scalar_one()
+    category_max = session.execute(
+        select(func.max(GroupCategory.iteration_id))
+    ).scalar_one()
     iteration_max = session.execute(select(func.max(GroupIteration.id))).scalar_one()
 
     max_id = max(
         category_max if category_max is not None else -1,
-        iteration_max if iteration_max is not None else -1
+        iteration_max if iteration_max is not None else -1,
     )
 
     if max_id == -1:
@@ -34,8 +36,9 @@ def get_next_iteration_id(session: Session):
     return max_id + 1
 
 
-def process_folders_to_groups(index_session, work_session, group_id: int | None,
-                              run_id: int, snapshot_id: int):
+def process_folders_to_groups(
+    index_session, work_session, group_id: int | None, run_id: int, snapshot_id: int
+):
     """
     Process the folders to groups
     """
@@ -46,7 +49,7 @@ def process_folders_to_groups(index_session, work_session, group_id: int | None,
         id=iteration_id,
         run_id=run_id,
         snapshot_id=snapshot_id,
-        description="Initial folder processing"
+        description="Initial folder processing",
     )
     work_session.add(iteration)
     work_session.commit()
@@ -234,14 +237,19 @@ def refine_groups(
     return current_group_id
 
 
-def pre_process_groups(session: Session, config: Config | None = None,
-                       run_id: int | None = None, snapshot_id: int | None = None) -> None:
+def pre_process_groups(
+    session: Session,
+    config: Config | None = None,
+    run_id: int | None = None,
+    snapshot_id: int | None = None,
+) -> None:
     """
     Clean up compound entries - split out hyphen-delineated values
     """
     # Get run_id and snapshot_id if not provided
     if run_id is None or snapshot_id is None:
         from storage.work_models import Run
+
         run = session.query(Run).first()
         if run is None:
             raise ValueError("No run found in database. Please create a run first.")
@@ -256,7 +264,7 @@ def pre_process_groups(session: Session, config: Config | None = None,
         id=iteration_id,
         run_id=run_id,
         snapshot_id=snapshot_id,
-        description="Pre-process groups"
+        description="Pre-process groups",
     )
     session.add(iteration)
     session.commit()
@@ -312,14 +320,19 @@ def pre_process_groups(session: Session, config: Config | None = None,
     session.commit()
 
 
-def compact_groups(index_session: Session, work_session: Session,
-                  run_id: int | None = None, snapshot_id: int | None = None):
+def compact_groups(
+    index_session: Session,
+    work_session: Session,
+    run_id: int | None = None,
+    snapshot_id: int | None = None,
+):
     """
     Compact groups for each folder, making sure that folders don't have duplicate category entries
     """
     # Get run_id and snapshot_id if not provided
     if run_id is None or snapshot_id is None:
         from storage.work_models import Run
+
         run = work_session.query(Run).first()
         if run is None:
             raise ValueError("No run found in database. Please create a run first.")
@@ -333,7 +346,7 @@ def compact_groups(index_session: Session, work_session: Session,
         id=iteration_id,
         run_id=run_id,
         snapshot_id=snapshot_id,
-        description="Compact groups"
+        description="Compact groups",
     )
     work_session.add(iteration)
     work_session.commit()
@@ -457,6 +470,7 @@ def group_folders(
         # Get run_id and snapshot_id if not provided
         if run_id is None or snapshot_id is None:
             from storage.work_models import Run
+
             run = work_session.query(Run).first()
             if run is None:
                 raise ValueError("No run found in database. Please create a run first.")
@@ -469,9 +483,11 @@ def group_folders(
             index_session=index_session,
             group_id=None,
             run_id=run_id,
-            snapshot_id=snapshot_id
+            snapshot_id=snapshot_id,
         )
-        pre_process_groups(work_session, config=config, run_id=run_id, snapshot_id=snapshot_id)
+        pre_process_groups(
+            work_session, config=config, run_id=run_id, snapshot_id=snapshot_id
+        )
 
         # New tag decomposition stage
         from stages.grouping.tag_decomposition import decompose_compound_tags
@@ -482,6 +498,6 @@ def group_folders(
             work_session=work_session,
             index_session=index_session,
             run_id=run_id,
-            snapshot_id=snapshot_id
+            snapshot_id=snapshot_id,
         )
         _create_exact_groups(work_session)

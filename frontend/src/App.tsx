@@ -27,13 +27,19 @@ function App() {
         if (status) {
           // Navigate to the most advanced stage that has data
           if (status.has_folders) {
-            console.log("Found existing folders structure, navigating to Folder Structure view");
+            console.log(
+              "Found existing folders structure, navigating to Folder Structure view",
+            );
             setActiveView("folders");
           } else if (status.has_group) {
-            console.log("Found existing group structure, navigating to Import Wizard");
+            console.log(
+              "Found existing group structure, navigating to Import Wizard",
+            );
             setActiveView("import");
           } else if (status.has_gather) {
-            console.log("Found existing gather structure, navigating to Import Wizard");
+            console.log(
+              "Found existing gather structure, navigating to Import Wizard",
+            );
             setActiveView("import");
           }
         }

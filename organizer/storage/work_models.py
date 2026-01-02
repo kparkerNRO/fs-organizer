@@ -111,9 +111,7 @@ class GroupEntry(WorkBase):
     __tablename__ = "stg_group_entry"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    iteration_id: Mapped[int] = mapped_column(
-        ForeignKey("stg_group_iteration.id")
-    )
+    iteration_id: Mapped[int] = mapped_column(ForeignKey("stg_group_iteration.id"))
     node_id: Mapped[int]  # FK to index.db node
     cluster_id: Mapped[Optional[int]]
     pre_processed_name: Mapped[Optional[str]]
@@ -137,9 +135,7 @@ class GroupCategory(WorkBase):
     __tablename__ = "stg_group_category"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    iteration_id: Mapped[int] = mapped_column(
-        ForeignKey("stg_group_iteration.id")
-    )
+    iteration_id: Mapped[int] = mapped_column(ForeignKey("stg_group_iteration.id"))
     name: Mapped[str] = mapped_column(String)
     count: Mapped[Optional[int]]
     group_confidence: Mapped[Optional[float]] = mapped_column(Float)

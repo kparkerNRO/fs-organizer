@@ -168,7 +168,9 @@ export const getFoldersStructure = async (): Promise<FolderV2 | null> => {
       if (response.status === 404) {
         return null; // No structure found
       }
-      throw new Error(`Failed to get folders structure: ${response.statusText}`);
+      throw new Error(
+        `Failed to get folders structure: ${response.statusText}`,
+      );
     }
     const data = await response.json();
     return data.folder_structure;

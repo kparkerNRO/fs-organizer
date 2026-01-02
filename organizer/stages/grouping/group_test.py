@@ -31,8 +31,12 @@ def test_process_folders_to_groups(
     # Set up test data
 
     folders = [
-        NodeFactory(snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR),
-        NodeFactory(snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR),
+        NodeFactory(
+            snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR
+        ),
+        NodeFactory(
+            snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR
+        ),
     ]
 
     # Run the function (it will create iteration 0)
@@ -42,7 +46,7 @@ def test_process_folders_to_groups(
         work_session=work_session,
         group_id=None,
         run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id
+        snapshot_id=sample_snapshot.snapshot_id,
     )
 
     # Verify results
