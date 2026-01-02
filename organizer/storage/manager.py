@@ -443,7 +443,7 @@ class StorageManager:
             True if snapshot_id matches run's snapshot_id, False otherwise
         """
         with self.get_work_session() as session:
-            run = session.query(Run).filter_by(run_id=run_id).first()
+            run = session.query(Run).filter_by(id=run_id).first()
             if not run:
                 return False
             return run.snapshot_id == snapshot_id
@@ -484,7 +484,7 @@ class StorageManager:
             run_id: Run ID to delete
         """
         with self.get_work_session() as session:
-            run = session.query(Run).filter_by(run_id=run_id).first()
+            run = session.query(Run).filter_by(id=run_id).first()
             if run:
                 # SQLAlchemy cascade deletes stages, group_iterations, etc.
                 session.delete(run)
@@ -494,7 +494,7 @@ class StorageManager:
         """Mark a run as finished with a status and timestamp."""
         finished_at = datetime.now(timezone.utc).isoformat()
         with self.get_work_session() as session:
-            run = session.query(Run).filter_by(run_id=run_id).first()
+            run = session.query(Run).filter_by(id=run_id).first()
             if run:
                 run.status = status.value
                 run.finished_at = finished_at
@@ -548,7 +548,7 @@ class StorageManager:
             )
             work_session.add(run)
             work_session.commit()
-            run_id = run.run_id
+            run_id = run.id
 
         job = IngestionJob(storage=self, snapshot_id=snapshot_id, run_id=run_id)
 

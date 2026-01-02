@@ -18,44 +18,11 @@ from sqlalchemy.orm import (
 )
 import json
 from datetime import datetime, timezone
+from storage.db_helpers import JsonDict, JsonList
 
 
 class Base(DeclarativeBase):
     pass
-
-
-class JsonList(TypeDecorator):
-    """Custom type for handling lists stored as JSON strings"""
-
-    impl = String
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        if value is not None:
-            return json.dumps(value)
-        return None
-
-    def process_result_value(self, value, dialect):
-        if value is not None:
-            return json.loads(value)
-        return []
-
-
-class JsonDict(TypeDecorator):
-    """Custom type for handling dictionaries stored as JSON strings"""
-
-    impl = String
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        if value is not None:
-            return json.dumps(value)
-        return None
-
-    def process_result_value(self, value, dialect):
-        if value is not None:
-            return json.loads(value)
-        return {}
 
 
 class Folder(Base):
@@ -243,7 +210,9 @@ def get_sessionmaker(db_path: Path):
 
 
 def reset_tables(
-    db_path: Path, tables: List[Any] | None = None, legacy_tables: List[str] | None = None
+    db_path: Path,
+    tables: List[Any] | None = None,
+    legacy_tables: List[str] | None = None,
 ):
     """Reset specified tables in the database."""
     if tables is None:

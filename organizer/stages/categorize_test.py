@@ -14,10 +14,11 @@ from data_models.database import (
     Base,
     Folder,
     File,
-    GroupCategoryEntry,
-    GroupingIteration,
     FolderStructure,
+    GroupCategoryEntry,
+    GroupingIteration
 )
+
 from api.api import StructureType
 
 

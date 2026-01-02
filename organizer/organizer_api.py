@@ -136,7 +136,9 @@ async def get_groups(
     """
     Get the pre-calculated grouping with pagination
     """
-    logger.info(f"GET /groups - page: {page}, page_size: {page_size}, sort: {sort_column}:{sort_order}")
+    logger.info(
+        f"GET /groups - page: {page}, page_size: {page_size}, sort: {sort_column}:{sort_order}"
+    )
     CategoryEntry = aliased(GroupCategoryEntry)
 
     offset = (page - 1) * page_size
@@ -288,9 +290,13 @@ async def get_pipeline_status():
     """Check which pipeline stages have available data"""
     logger.info("GET /api/status - checking pipeline stages")
 
-    has_gather = get_folder_structure_from_db(db_path, StructureType.original) is not None
+    has_gather = (
+        get_folder_structure_from_db(db_path, StructureType.original) is not None
+    )
     has_group = get_folder_structure_from_db(db_path, StructureType.grouped) is not None
-    has_folders = get_folder_structure_from_db(db_path, StructureType.organized) is not None
+    has_folders = (
+        get_folder_structure_from_db(db_path, StructureType.organized) is not None
+    )
 
     return {
         "has_gather": has_gather,

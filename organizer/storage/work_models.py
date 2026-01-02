@@ -9,6 +9,7 @@ validated at the application level, not by database constraints.
 
 from typing import List, Optional
 from sqlalchemy import String, Float, ForeignKey, Index
+from storage.db_helpers import JsonDict, JsonList
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 # Schema version (increment on breaking changes)
@@ -29,7 +30,7 @@ class Run(WorkBase):
 
     __tablename__ = "run"
 
-    run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
     started_at: Mapped[str] = mapped_column(String)
     finished_at: Mapped[Optional[str]]
@@ -63,7 +64,7 @@ class StageState(WorkBase):
     snapshot_id: Mapped[int] = mapped_column(
         primary_key=True
     )  # Redundant with run.snapshot_id for query performance
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"), primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"), primary_key=True)
     completed_at: Mapped[Optional[str]]
     input_fingerprint: Mapped[Optional[str]]
     output_fingerprint: Mapped[Optional[str]]
@@ -84,12 +85,12 @@ class GroupIteration(WorkBase):
 
     __tablename__ = "stg_group_iteration"
 
-    iteration_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     snapshot_id: Mapped[int]  # Redundant with run.snapshot_id for queries
     timestamp: Mapped[Optional[str]]
     description: Mapped[Optional[str]]
-    parameters_json: Mapped[Optional[str]]
+    parameters: Mapped[Optional[dict]] = mapped_column(JsonDict)
 
     # Relationships
     run: Mapped["Run"] = relationship(back_populates="group_iterations")
@@ -109,9 +110,9 @@ class GroupEntry(WorkBase):
 
     __tablename__ = "stg_group_entry"
 
-    entry_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     iteration_id: Mapped[int] = mapped_column(
-        ForeignKey("stg_group_iteration.iteration_id")
+        ForeignKey("stg_group_iteration.id")
     )
     node_id: Mapped[int]  # FK to index.db node
     cluster_id: Mapped[Optional[int]]
@@ -135,9 +136,9 @@ class GroupCategory(WorkBase):
 
     __tablename__ = "stg_group_category"
 
-    group_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     iteration_id: Mapped[int] = mapped_column(
-        ForeignKey("stg_group_iteration.iteration_id")
+        ForeignKey("stg_group_iteration.id")
     )
     name: Mapped[str] = mapped_column(String)
     count: Mapped[Optional[int]]
@@ -151,6 +152,60 @@ class GroupCategory(WorkBase):
     __table_args__ = (Index("idx_group_category_iter", "iteration_id"),)
 
 
+class GroupCategoryEntry(WorkBase):
+    """Maps folders to groups through their partial name categories"""
+
+    __tablename__ = "stg_group_category_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    folder_id: Mapped[int]
+    partial_category_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("partial_name_categories.id"), index=True
+    )
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stg_group_category.id"), index=True
+    )
+    iteration_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stg_group_iteration.id"), index=True
+    )
+    cluster_id: Mapped[Optional[int]]
+    processed_name: Mapped[Optional[str]]
+    pre_processed_name: Mapped[Optional[str]]
+    derived_names: Mapped[Optional[List]] = mapped_column(JsonList)
+    path: Mapped[Optional[str]]
+    confidence: Mapped[float] = mapped_column(Float, default=0)
+    processed: Mapped[bool] = mapped_column(default=False)
+
+    # Relationships
+    # folder: Mapped["Folder"] = relationship(back_populates="group_entries")
+    # partial_category: Mapped[Optional["PartialNameCategory"]] = relationship(back_populates="group_entries")
+    # group: Mapped[Optional["GroupCategory"]] = relationship(back_populates="entries")
+
+    def __repr__(self):
+        return f"GroupCategoryEntry(id={self.id}, original={self.pre_processed_name}, processed={self.processed_name})"
+
+
+class PartialNameCategory(WorkBase):
+    """
+    Represents a part of a folder name, once the string has been broken
+    down into best-guess categories.
+    (i.e. "garden indoor" -> "garden" and "indoor")
+    """
+
+    __tablename__ = "partial_name_categories"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    name: Mapped[Optional[str]] = mapped_column(String, index=True)
+    original_name: Mapped[Optional[str]]
+    classification: Mapped[Optional[str]]
+    node_id: Mapped[int]
+    hidden: Mapped[bool] = mapped_column(default=False)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+
+    def __repr__(self):
+        return f"PartialNameCategory(id={self.id}, name={self.name})"
+
+
 class Classification(WorkBase):
     """Classification result for a node (variant/collection/subject/uncertain).
 
@@ -159,8 +214,8 @@ class Classification(WorkBase):
 
     __tablename__ = "stg_classification"
 
-    classification_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     node_id: Mapped[int]
     classification: Mapped[
         Optional[str]
@@ -176,16 +231,19 @@ class Classification(WorkBase):
 
 
 class FolderStructure(WorkBase):
-    """Output folder structure generated for a run."""
+    """
+    Represents the most-recently calculated folder structure
+    for the old and new structures. This should be serializable into
+    data_models.api.FolderV2 and data_models.api.File objects via
+    pydantic
+    """
 
     __tablename__ = "out_folder_structure"
 
-    structure_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
-    structure_type: Mapped[str] = mapped_column(
-        String
-    )  # 'original' | 'organized' | 'grouped'
-    structure_json: Mapped[str] = mapped_column(String)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
+    structure_type: Mapped[str] = mapped_column(String)
+    structure: Mapped[dict] = mapped_column(JsonDict)
     created_at: Mapped[Optional[str]]
 
 
@@ -197,12 +255,12 @@ class FileMapping(WorkBase):
 
     __tablename__ = "out_file_mapping"
 
-    mapping_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     node_id: Mapped[int]
     original_path: Mapped[str] = mapped_column(String)
     new_path: Mapped[Optional[str]]
-    groups_json: Mapped[Optional[str]]
+    groups: Mapped[Optional[dict]] = mapped_column(JsonDict)
 
     __table_args__ = (
         Index("idx_file_mapping_run", "run_id"),

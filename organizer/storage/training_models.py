@@ -251,6 +251,7 @@ class SamplePrediction(TrainingBase):
     prediction_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
     sample_id: Mapped[int]  # FK to training_sample (same database)
+    sample_name: Mapped[str | None]
     epoch_number: Mapped[Optional[int]] = mapped_column(
         Integer
     )  # Which epoch (None = final)

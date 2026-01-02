@@ -468,9 +468,7 @@ def _create_node(
     return node
 
 
-def ingest_filesystem(base_path: Path, storage_path: Path | None):
-    storage_manager = StorageManager(storage_path)
-    base_path = base_path.resolve()
+def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
 
     with storage_manager.ingestion_job(root_path=base_path) as job:
         snapshot_id = job.snapshot_id

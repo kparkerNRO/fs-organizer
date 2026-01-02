@@ -60,18 +60,7 @@ class Snapshot(IndexBase):
 
 
 class Node(IndexBase):
-    """Filesystem node (file or directory) within a snapshot.
-
-    CRITICAL Path Namespace:
-    - file_source distinguishes between filesystem paths and ZIP content paths
-    - Unique constraint on (snapshot_id, rel_path, file_source) prevents collisions
-    - Example: real directory "a.zip/" and ZIP file "a.zip" can coexist
-
-    CRITICAL ZIP Parent Modeling:
-    - ZIP files (file_source='zip_file', kind='file') act as virtual directories
-    - ZIP content nodes have parent_node_id pointing to the ZIP file node
-    - Traversal code must treat file_source='zip_file' nodes as containers
-    """
+    """Filesystem node (file or directory) within a snapshot."""
 
     __tablename__ = "node"
 
@@ -119,8 +108,7 @@ class Node(IndexBase):
         Index("idx_node_snapshot", "snapshot_id"),
         Index("idx_node_parent", "snapshot_id", "parent_node_id"),
         Index("idx_node_kind", "snapshot_id", "kind"),
-        # CRITICAL: Composite unique key prevents path collisions between
-        # filesystem and ZIP content
+        # Composite unique key prevents path collisions between ilesystem and ZIP content
         Index("idx_node_path", "snapshot_id", "rel_path", "file_source", unique=True),
     )
 

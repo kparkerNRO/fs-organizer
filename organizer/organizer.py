@@ -11,6 +11,7 @@ from stages.folder_reconstruction import (
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from storage.manager import StorageManager
 from utils.export_structure import export_snapshot_structure
 
 from fine_tuning.cli import app as fine_tuning_app
@@ -27,7 +28,7 @@ console_handler.setFormatter(
     logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
 
-file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(
     logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -38,24 +39,6 @@ root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 root_logger.addHandler(console_handler)
 root_logger.addHandler(file_handler)
-
-# Also redirect stderr to logging
-class StderrToLogger:
-    def __init__(self, logger, level=logging.ERROR):
-        self.logger = logger
-        self.level = level
-        self.linebuf = ''
-
-    def write(self, buf):
-        for line in buf.rstrip().splitlines():
-            self.logger.log(self.level, line.rstrip())
-        # Also write to original stderr
-        sys.__stderr__.write(buf)
-
-    def flush(self):
-        pass
-
-sys.stderr = StderrToLogger(logging.getLogger('stderr'))
 
 logger = logging.getLogger(__name__)
 
@@ -85,21 +68,31 @@ def gather(
     Scan filesystem and create immutable snapshot in index.db.
     """
     typer.echo(f"Gathering from: {base_path}")
+    storage_manager = StorageManager(storage_path)
+    base_path = base_path.resolve()
 
-    snapshot_id = ingest_filesystem(base_path, storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
     typer.echo("Gather complete.")
 
 
 @app.command()
-def group(db_path: str = typer.Argument(...)):
+def group(
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
+    ),
+):
     """
     Classify folders in the given run_data.db
     using known variant detection + structural heuristics.
     """
-    typer.echo(f"Grouping folders in: {db_path}")
-    group_folders(Path(db_path))
-    calculate_folder_structure(db_path)
+    typer.echo(f"Grouping folders in: {storage_path}")
+    storage_manager = StorageManager(storage_path)
+    group_folders(storage_manager)
+    # calculate_folder_structure(db_path)
     typer.echo("Grouping complete.")
 
 

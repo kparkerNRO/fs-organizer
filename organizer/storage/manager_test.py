@@ -1,4 +1,5 @@
 """Unit tests for StorageManager."""
+from sqlalchemy.orm import Session
 
 import tempfile
 from pathlib import Path
@@ -220,7 +221,7 @@ class TestReferentialIntegrity:
         assert storage_manager._check_snapshot_has_runs(snapshot.snapshot_id)
 
     def test_validate_snapshot_id_matches_run(
-        self, storage_manager: StorageManager, work_session
+        self, storage_manager: StorageManager, work_session: Session
     ):
         """Test _validate_snapshot_id_matches_run method."""
         # Create run with snapshot_id=1
@@ -233,10 +234,10 @@ class TestReferentialIntegrity:
         work_session.commit()
 
         # Should match
-        assert storage_manager._validate_snapshot_id_matches_run(1, run.run_id)
+        assert storage_manager._validate_snapshot_id_matches_run(1, run.id)
 
         # Should not match
-        assert not storage_manager._validate_snapshot_id_matches_run(2, run.run_id)
+        assert not storage_manager._validate_snapshot_id_matches_run(2, run.id)
 
         # Non-existent run
         assert not storage_manager._validate_snapshot_id_matches_run(1, 999)
@@ -246,7 +247,7 @@ class TestDeletion:
     """Test deletion methods with referential integrity."""
 
     def test_delete_snapshot_with_runs_fails(
-        self, storage_manager: StorageManager, snapshot, run
+        self, storage_manager: StorageManager, snapshot, run: Run
     ):
         """Test that snapshots with runs cannot be deleted."""
         # Should fail to delete
@@ -254,11 +255,11 @@ class TestDeletion:
             storage_manager.delete_snapshot(snapshot.snapshot_id)
 
     def test_delete_run_allows_snapshot_deletion(
-        self, storage_manager: StorageManager, snapshot, run
+        self, storage_manager: StorageManager, snapshot, run: Run
     ):
         """Test that after deleting runs, snapshot can be deleted."""
         # Delete the run
-        storage_manager.delete_run(run.run_id)
+        storage_manager.delete_run(run.id)
 
         # Now should be able to delete snapshot
         storage_manager.delete_snapshot(snapshot.snapshot_id)

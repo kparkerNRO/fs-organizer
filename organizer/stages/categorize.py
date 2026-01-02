@@ -20,11 +20,11 @@ from data_models.database import (
     get_sessionmaker,
     File as dbFile,
     FolderStructure,
+    GroupCategoryEntry
 )
 
 from sqlalchemy import select
 
-from stages.grouping.group import GroupCategoryEntry
 from utils.folder_structure import insert_file_in_structure
 
 logger = logging.getLogger(__name__)

@@ -27,7 +27,7 @@ from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from data_models.database import GroupCategoryEntry
+from storage.work_models import GroupCategoryEntry
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
@@ -1542,12 +1542,25 @@ def decompose_compound_tags(session: Session) -> None:
 
     # Get the next iteration ID
     from stages.grouping.group import get_next_iteration_id
-    from data_models.database import GroupingIteration
+    from storage.work_models import GroupIteration as GroupingIteration
 
     iteration_id = get_next_iteration_id(session)
 
     # Create the iteration record
-    iteration = GroupingIteration(id=iteration_id, description="Tag decomposition")
+    # Note: We need to get run_id and snapshot_id from existing iterations
+    # Get the most recent iteration to retrieve run_id and snapshot_id
+    stmt = select(GroupingIteration).order_by(GroupingIteration.id.desc()).limit(1)
+    last_iteration = session.scalars(stmt).first()
+
+    if not last_iteration:
+        raise ValueError("No existing iterations found. Cannot create decomposition iteration.")
+
+    iteration = GroupingIteration(
+        id=iteration_id,
+        run_id=last_iteration.run_id,
+        snapshot_id=last_iteration.snapshot_id,
+        description="Tag decomposition"
+    )
     session.add(iteration)
     session.commit()
 
@@ -1623,14 +1636,15 @@ if __name__ == "__main__":
     # Example usage for testing
     import sys
     from pathlib import Path
-    from data_models.database import get_sessionmaker
+    from storage.manager import StorageManager
 
     if len(sys.argv) != 2:
-        logger.error("Usage: python tag_decomposition.py <db_path>")
+        logger.error("Usage: python tag_decomposition.py <database_dir_path>")
+        logger.error("The database_dir_path should contain index.db and work.db")
         sys.exit(1)
 
     db_path = Path(sys.argv[1])
-    sessionmaker = get_sessionmaker(db_path)
+    storage_manager = StorageManager(database_path=db_path)
 
-    with sessionmaker() as session:
+    with storage_manager.get_work_session() as session:
         decompose_compound_tags(session)

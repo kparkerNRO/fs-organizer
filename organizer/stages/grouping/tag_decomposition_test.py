@@ -2,52 +2,62 @@
 Tests for tag decomposition functionality
 """
 
-import tempfile
-from pathlib import Path
-from sqlalchemy.orm import Session
+import pytest
+from sqlalchemy import select
 
-from data_models.database import (
-    get_sessionmaker,
-    setup_gather,
-    setup_group,
-    setup_folder_categories,
+from storage.factories import NodeFactory
+from storage.manager import NodeKind
+from storage.work_models import (
     GroupCategoryEntry,
-    GroupingIteration,
-    Folder,
+    GroupIteration as GroupingIteration,
 )
 from stages.grouping.tag_decomposition import decompose_compound_tags
 
 
-def create_test_database():
-    """Create a temporary database for testing"""
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-    db_path = Path(temp_file.name)
-    temp_file.close()
+@pytest.fixture
+def test_nodes(index_session, sample_snapshot):
+    """Create test nodes in the index database"""
+    nodes = [
+        NodeFactory(
+            snapshot_id=sample_snapshot.snapshot_id,
+            node_id=1,
+            name="test1",
+            abs_path="/test1",
+            rel_path="test1",
+            kind=NodeKind.DIR,
+        ),
+        NodeFactory(
+            snapshot_id=sample_snapshot.snapshot_id,
+            node_id=2,
+            name="test2",
+            abs_path="/test2",
+            rel_path="test2",
+            kind=NodeKind.DIR,
+        ),
+        NodeFactory(
+            snapshot_id=sample_snapshot.snapshot_id,
+            node_id=3,
+            name="test3",
+            abs_path="/test3",
+            rel_path="test3",
+            kind=NodeKind.DIR,
+        ),
+    ]
+    return nodes
 
-    # Setup database tables
-    setup_gather(db_path)
-    setup_folder_categories(db_path)
-    setup_group(db_path)
 
-    return db_path
-
-
-def create_test_entries(session: Session):
+@pytest.fixture
+def test_entries(work_session, sample_run, test_nodes):
     """Create test GroupCategoryEntry records for decomposition testing"""
     # Create iteration record
-    iteration = GroupingIteration(id=0, description="test iteration")
-    session.add(iteration)
-    session.commit()
-
-    # Create some test folders
-    folders = [
-        Folder(id=1, folder_name="test1", folder_path="/test1"),
-        Folder(id=2, folder_name="test2", folder_path="/test2"),
-        Folder(id=3, folder_name="test3", folder_path="/test3"),
-    ]
-    for folder in folders:
-        session.add(folder)
-    session.commit()
+    iteration = GroupingIteration(
+        id=0,
+        run_id=sample_run.id,
+        snapshot_id=sample_run.snapshot_id,
+        description="test iteration",
+    )
+    work_session.add(iteration)
+    work_session.commit()
 
     # Create test entries with compound tags
     test_entries = [
@@ -130,58 +140,42 @@ def create_test_entries(session: Session):
     ]
 
     for entry in test_entries:
-        session.add(entry)
+        work_session.add(entry)
 
-    session.commit()
+    work_session.commit()
     return test_entries
 
 
-def test_full_decomposition_pipeline():
+def test_full_decomposition_pipeline(work_session, test_entries):
     """Test the complete decomposition pipeline"""
-    db_path = create_test_database()
-    sessionmaker = get_sessionmaker(db_path)
+    # Count original entries
+    original_count = len(test_entries)
 
-    with sessionmaker() as session:
-        entries = create_test_entries(session)
+    # Run decomposition
+    decompose_compound_tags(work_session)
 
-        # Count original entries
-        original_count = len(entries)
+    # Check new iteration was created
+    from stages.grouping.group import get_next_iteration_id
 
-        # Run decomposition
-        decompose_compound_tags(session)
+    new_iteration_id = get_next_iteration_id(work_session) - 1
 
-        # Check new iteration was created
-        from stages.grouping.group import get_next_iteration_id
+    # Get new entries
+    stmt = select(GroupCategoryEntry).where(
+        GroupCategoryEntry.iteration_id == new_iteration_id
+    )
+    new_entries = work_session.scalars(stmt).all()
 
-        new_iteration_id = get_next_iteration_id(session) - 1
+    # Should have more entries due to decomposition
+    assert len(new_entries) >= original_count
 
-        # Get new entries
-        from sqlalchemy import select
+    # Check that some decomposed entries exist
+    decomposed_entries = [e for e in new_entries if e.derived_names]
 
-        stmt = select(GroupCategoryEntry).where(
-            GroupCategoryEntry.iteration_id == new_iteration_id
-        )
-        new_entries = session.scalars(stmt).all()
+    print(f"Original entries: {original_count}")
+    print(f"New entries: {len(new_entries)}")
+    print(f"Decomposed entries: {len(decomposed_entries)}")
 
-        # Should have more entries due to decomposition
-        assert len(new_entries) >= original_count
-
-        # Check that some decomposed entries exist
-        decomposed_entries = [e for e in new_entries if e.derived_names]
-
-        print(f"Original entries: {original_count}")
-        print(f"New entries: {len(new_entries)}")
-        print(f"Decomposed entries: {len(decomposed_entries)}")
-
-        if decomposed_entries:
-            print("Sample decomposed entries:")
-            for entry in decomposed_entries[:3]:
-                print(f"  {entry.processed_name} (from {entry.derived_names})")
-
-
-if __name__ == "__main__":
-    # Run tests manually
-    print("Testing full decomposition pipeline...")
-    test_full_decomposition_pipeline()
-
-#     print("\nAll tests completed!")
+    if decomposed_entries:
+        print("Sample decomposed entries:")
+        for entry in decomposed_entries[:3]:
+            print(f"  {entry.processed_name} (from {entry.derived_names})")

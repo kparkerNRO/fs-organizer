@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from stages.gather import process_zip, ingest_filesystem
 from storage.index_models import IndexBase, Snapshot, Node, NodeFeatures
-from storage.manager import NodeKind, FileSource
+from storage.manager import NodeKind, FileSource, StorageManager
 import zipfile
 import io
 
@@ -34,6 +34,12 @@ def snapshot_id(index_session):
     index_session.add(snapshot)
     index_session.commit()
     return snapshot.snapshot_id
+
+
+@pytest.fixture
+def storage_manager(tmp_path: Path) -> StorageManager:
+    """Create a StorageManager with temporary databases"""
+    return StorageManager(database_path=tmp_path)
 
 
 def create_test_zip(entries):
@@ -93,7 +99,7 @@ def test_process_zip_basic(index_session, snapshot_id):
 
 
 @pytest.mark.skip(reason="Pre-existing test failure - assert 1 == 0")
-def test_process_zip_with_module_json(session):
+def test_process_zip_with_module_json(index_session, snapshot_id):
     zip_entries = ["module.json", "file1.txt"]
     zip_buffer = create_test_zip(zip_entries)
 
@@ -325,7 +331,8 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
         zf.writestr("inside.txt", "content")
     zip_path.write_bytes(buffer.getvalue())
 
-    snapshot_id = ingest_filesystem(base_path, tmp_path)
+    storage_manager = StorageManager(database_path=tmp_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)
@@ -391,7 +398,8 @@ def test_ingest_filesystem_zip_nodes(tmp_path: Path):
         zf.writestr("root.txt", "content")
     zip_path.write_bytes(buffer.getvalue())
 
-    snapshot_id = ingest_filesystem(base_path, tmp_path)
+    storage_manager = StorageManager(database_path=tmp_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)
