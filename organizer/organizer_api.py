@@ -33,6 +33,7 @@ from api.api import (
 from stages.gather import gather_folder_structure_and_store
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from storage.manager import StorageManager
 
 # Configure logging to INFO level
 logging.basicConfig(
@@ -55,7 +56,7 @@ db_path = "outputs/latest/latest.db"
 output_dir = "outputs"
 
 
-@app.on_event("startup")
+@app.on_event("startup")  # type: ignore[deprecated]
 async def startup_event():
     """Log when the API server starts"""
     logger.info("FS-Organizer API server starting up")
@@ -179,7 +180,7 @@ async def get_groups(
                 )
             ).label("children"),
         )
-        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
         .group_by(GroupCategory.id)
         .order_by(sort_attr)
@@ -191,7 +192,7 @@ async def get_groups(
 
     total_items_query = (
         db.query(func.count(func.distinct(GroupCategory.id)))
-        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
     )
     total_items = db.execute(total_items_query).scalar()
@@ -431,7 +432,8 @@ def run_group_task(task_id: str):
         # update_task(task_id, message="Grouping folders", progress=0.5)
 
         # Run grouping
-        group_folders(db_path_obj)
+        storage_manager = StorageManager(db_path_obj.parent)
+        group_folders(storage_manager)
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 

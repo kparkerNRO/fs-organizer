@@ -296,7 +296,7 @@ def pre_process_groups(
         name_to_process = category["processed_name"] or category["pre_processed_name"]
         if not name_to_process:
             continue  # Skip entries with no name
-        split_name = name_to_process.split("-")
+        split_name = name_to_process.split("-")  # type: ignore[union-attr]
         categories = []
         for name in split_name:
             cleaned_name = clean_filename(name, config=config)

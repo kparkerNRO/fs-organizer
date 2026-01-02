@@ -13,6 +13,7 @@ from fine_tuning.services.train import (
 from fine_tuning.taxonomy import LABELS_V2  # Added import for LABELS_V2
 
 
+@pytest.mark.ml
 class TestAugmentWithHardNegatives:
     """Tests for the augment_with_hard_negatives function."""
 
@@ -159,6 +160,7 @@ def populated_training_session(training_session, label_run):
     return training_session
 
 
+@pytest.mark.ml
 class TestPrepareTrainingData:
     """Tests for the prepare_training_data function."""
 

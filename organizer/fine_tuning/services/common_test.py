@@ -71,7 +71,7 @@ class TestLoadSamples:
         label_run2 = LabelRunFactory(snapshot_id=2)
 
         TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
-        TrainingSampleFactory(label_run_id=label_run2.id, label="content_subject")
+        TrainingSampleFactory(label_run_id=label_run2.id, label="content_subject")  # type: ignore[attr-defined]
 
         loaded = load_samples(training_session, label_run_id=label_run.id)
         assert len(loaded) == 1
@@ -277,7 +277,7 @@ class TestExtractFeatureNodes:
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
             snapshot_id=1,
-            nodes=[target],
+            nodes=[target],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
             max_children=5,
@@ -309,7 +309,7 @@ class TestExtractFeatureNodes:
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
             snapshot_id=1,
-            nodes=[target],
+            nodes=[target],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
             max_children=5,
@@ -343,7 +343,7 @@ class TestExtractFeatureNodes:
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
             snapshot_id=1,
-            nodes=[target],
+            nodes=[target],  # type: ignore[list-item]
             max_siblings=3,
             max_descendents=10,
             max_children=5,
@@ -368,7 +368,7 @@ class TestExtractFeatureNodes:
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
             snapshot_id=1,
-            nodes=[zip_node],
+            nodes=[zip_node],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
             max_children=5,
@@ -391,7 +391,7 @@ class TestExtractFeatureNodes:
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
             snapshot_id=1,
-            nodes=[regular_file],
+            nodes=[regular_file],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
             max_children=5,

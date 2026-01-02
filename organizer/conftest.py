@@ -53,8 +53,8 @@ def index_session():
 
     with Session(engine) as session:
         # Configure factories to use this session
-        NodeFactory._meta.sqlalchemy_session = session
-        SnapshotFactory._meta.sqlalchemy_session = session
+        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 
@@ -66,10 +66,10 @@ def training_session():
 
     with Session(engine) as session:
         # Configure factories to use this session
-        LabelRunFactory._meta.sqlalchemy_session = session
-        TrainingSampleFactory._meta.sqlalchemy_session = session
-        ModelRunFactory._meta.sqlalchemy_session = session
-        SamplePredictionFactory._meta.sqlalchemy_session = session
+        LabelRunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        TrainingSampleFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        ModelRunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        SamplePredictionFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 

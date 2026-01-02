@@ -111,7 +111,7 @@ def folders(
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
     if structure_type != StructureType.original:
-        calculate_folder_structure(db_path, structure_type=structure_type)
+        calculate_folder_structure(Path(db_path), structure_type=structure_type)
     recalculate_cleaned_paths_for_structure(db_path, structure_type=structure_type)
     get_folder_heirarchy(db_path, type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
@@ -179,7 +179,8 @@ def pipeline(
     Group and folders commands need to be migrated to work with snapshots.
     """
     # Run gather
-    snapshot_id = ingest_filesystem(base_path, storage_path)
+    storage_manager = StorageManager(storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
     # TODO: Update group and folders commands to work with snapshot_id

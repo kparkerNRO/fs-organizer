@@ -6,6 +6,7 @@ from fine_tuning.services.evaluation import evaluate_predictions
 from fine_tuning.taxonomy import LABELS_LEGACY, LABELS_V1, LABELS_V2
 
 
+@pytest.mark.ml
 class TestEvaluatePredictions:
     """Test evaluate_predictions function"""
 
@@ -53,6 +54,7 @@ class TestEvaluatePredictions:
         assert metrics["accuracy"] == 0.0
 
 
+@pytest.mark.ml
 class TestLabelTaxonomies:
     """Test label taxonomy definitions from evaluation context"""
 

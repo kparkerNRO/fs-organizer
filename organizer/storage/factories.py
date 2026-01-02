@@ -53,8 +53,8 @@ class NodeFactory(BaseFactory):
 
         if obj.parent_node_id and hasattr(obj, "_parent"):
             parent = obj._parent
-            obj.rel_path = f"{parent.rel_path}/{obj.name}"
-            obj.abs_path = f"{parent.abs_path}/{obj.name}"
+            obj.rel_path = f"{parent.rel_path}/{obj.name}"  # type: ignore[attr-defined]
+            obj.abs_path = f"{parent.abs_path}/{obj.name}"  # type: ignore[attr-defined]
 
 
 class FileNodeFactory(NodeFactory):

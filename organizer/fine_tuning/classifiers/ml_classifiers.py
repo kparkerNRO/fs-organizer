@@ -151,7 +151,7 @@ class SetFitClassifier:
             ):
                 # Check if classes are string labels (not integers)
                 try:
-                    first_class = self.model.model_head.classes_[0]
+                    first_class = self.model.model_head.classes_[0]  # type: ignore[index]
                     # If it's an integer or can be converted to int, use taxonomy labels
                     int(first_class)
                     has_string_classes = False
@@ -161,7 +161,7 @@ class SetFitClassifier:
                 if has_string_classes:
                     label_mapping = {
                         i: str(label)
-                        for i, label in enumerate(self.model.model_head.classes_)
+                        for i, label in enumerate(self.model.model_head.classes_)  # type: ignore[arg-type]
                     }
                 else:
                     # Model has integer classes, use sorted taxonomy labels

@@ -1,4 +1,3 @@
-
 import pytest
 from storage.factories import NodeFactory
 from storage.manager import NodeKind

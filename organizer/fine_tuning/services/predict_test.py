@@ -39,7 +39,7 @@ class TestSavePredictionsToDb:
 
         num_saved = save_predictions_to_db(
             session=training_session,
-            samples=samples,
+            samples=samples,  # type: ignore[arg-type]
             predictions=predictions,
             confidences=confidences,
             probabilities=probabilities,
@@ -82,10 +82,10 @@ class TestSavePredictionsToDb:
 
         num_saved = save_predictions_to_db(
             session=training_session,
-            samples=[sample],
+            samples=[sample],  # type: ignore[list-item]
             predictions=["asset_type"],
             confidences=[0.95],
-            probabilities=[[0.95, 0.03, 0.02]],  # List format
+            probabilities=[[0.95, 0.03, 0.02]],  # type: ignore[list-item]  # List format
             run_id=model_run.run_id,
         )
 
@@ -106,7 +106,7 @@ class TestSavePredictionsToDb:
 
         num_saved = save_predictions_to_db(
             session=training_session,
-            samples=[sample],
+            samples=[sample],  # type: ignore[list-item]
             predictions=["asset_type"],
             confidences=[0.8],
             probabilities=[{"asset_type": 0.8, "content_subject": 0.2}],
@@ -132,7 +132,7 @@ class TestSavePredictionsToDb:
 
         save_predictions_to_db(
             session=training_session,
-            samples=[sample],
+            samples=[sample],  # type: ignore[list-item]
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[{"asset_type": 0.95}],
@@ -170,7 +170,7 @@ class TestCreateModelRun:
         assert run.started_at is not None
 
         # Check config was saved
-        saved_config = json.loads(run.hyperparameters_json)
+        saved_config = json.loads(run.hyperparameters_json)  # type: ignore[arg-type]
         assert saved_config["model"] == "test-model"
         assert saved_config["batch_size"] == 32
 
@@ -198,7 +198,7 @@ class TestCreateModelRun:
 
         run = create_model_run(
             session=training_session,
-            model_path="/path/to/model",
+            model_path="/path/to/model",  # type: ignore[arg-type]
             taxonomy="v2",
             use_baseline=False,
             config=config,
@@ -241,7 +241,7 @@ class TestCreateModelRun:
         # Non-baseline should auto-detect to "evaluation"
         run_eval = create_model_run(
             session=training_session,
-            model_path="/path",
+            model_path="/path",  # type: ignore[arg-type]
             taxonomy="v2",
             use_baseline=False,
             config=config,
@@ -283,7 +283,7 @@ class TestCreateAndSaveRunResults:
         create_and_save_run_results(
             session=training_session,
             config_dict=config_dict,
-            classifier=classifier,
+            classifier=classifier,  # type: ignore[arg-type]
             samples=samples,
             predictions=predictions,
             confidences=confidences,
@@ -333,14 +333,14 @@ class TestCreateAndSaveRunResults:
         create_and_save_run_results(
             session=training_session,
             config_dict=config_dict,
-            classifier=classifier,
-            samples=[sample],
+            classifier=classifier,  # type: ignore[arg-type]
+            samples=[sample],  # type: ignore[list-item]
             predictions=["asset_type"],
             confidences=[0.8],
             probabilities=[{"asset_type": 0.8}],
             metrics={},  # No metrics
             taxonomy="v1",
-            model_path="/path/to/model",
+            model_path="/path/to/model",  # type: ignore[arg-type]
             use_baseline=False,
             split=None,
         )
@@ -365,8 +365,8 @@ class TestCreateAndSaveRunResults:
         create_and_save_run_results(
             session=training_session,
             config_dict={},
-            classifier=MockClassifier(),
-            samples=[sample],
+            classifier=MockClassifier(),  # type: ignore[arg-type]
+            samples=[sample],  # type: ignore[list-item]
             predictions=["asset_type"],
             confidences=[0.9],
             probabilities=[{"asset_type": 0.9}],

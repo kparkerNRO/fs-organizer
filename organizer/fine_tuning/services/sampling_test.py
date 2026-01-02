@@ -223,7 +223,7 @@ class TestWriteSampleCsv:
 
         write_sample_csv(
             output_path=output_path,
-            nodes=[node],
+            nodes=[node],  # type: ignore[list-item]
             session=index_session,
             snapshot_id=1,
             use_heuristic=False,
@@ -263,7 +263,7 @@ class TestWriteSampleCsv:
 
         write_sample_csv(
             output_path=output_path,
-            nodes=[target],
+            nodes=[target],  # type: ignore[list-item]
             session=index_session,
             snapshot_id=1,
             use_heuristic=False,
@@ -545,7 +545,7 @@ class TestApplyLabelsToSamples:
         training_session.refresh(s1)
         training_session.refresh(s2)
         assert s1.label == "variant"
-        assert s1.label_confidence == 1.0
+        assert s1.label_confidence == 1.0  # type: ignore[attr-defined]
         assert s2.label == "subject"
 
     def test_apply_labels_with_split(self, training_session, label_run):
