@@ -1,15 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+import hashlib
 import re
+from pydantic import BaseModel
 
 import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
+
+
+def compute_reference_hash() -> str:
+    """Compute hash of all YAML config files.
+
+    Returns a SHA-256 hash of all YAML config files in the config directory.
+    This is used to track config version per snapshot.
+
+    Returns:
+        Hexadecimal hash string
+    """
+    config_files = sorted(CONFIG_DIR.glob("*.yaml"))
+    hasher = hashlib.sha256()
+    for f in config_files:
+        hasher.update(f.read_bytes())
+    return hasher.hexdigest()
 
 
 class VariantGroup(Enum):
@@ -113,14 +130,14 @@ def _build_creator_remove_cache(creators: dict[str, dict[str, Any]]) -> dict[str
     }
 
 
-@dataclass(frozen=True)
-class Config:
+class Config(BaseModel):
     creators: dict[str, dict[str, Any]]
     creator_removes: dict[str, list[str]]
     creator_strings: set[str]
     file_name_exceptions: dict[str, str]
     replace_exceptions: dict[str, str]
     clean_exceptions: set[str]
+    should_ignore: set[str]
     grouping_exceptions: tuple[str, ...]
     variants: dict[str, dict[str, Any]]
     known_variant_tokens: set[str]
@@ -128,6 +145,7 @@ class Config:
     variant_grouping_by_string: dict[str, str]
     variant_types: set[str]
     media_types: set[str]
+    format_types: set[str]
     relational_cache: dict[str, Any]
 
     def is_variant(self, value: str) -> bool:
@@ -154,6 +172,7 @@ def get_config() -> Config:
     file_name_exceptions = filename_config.get("file_name_exceptions", {})
     replace_exceptions = filename_config.get("replace_exceptions", {})
     clean_exceptions = set(filename_config.get("clean_exceptions", []))
+    should_ignore = set(filename_config.get("should_ignore", []))
 
     grouping_exceptions = tuple(grouping_config.get("grouping_exceptions", []))
 
@@ -161,8 +180,15 @@ def get_config() -> Config:
     variant_cache = _build_variant_cache(variants)
     creator_cache = _build_creator_remove_cache(creators)
 
-    variant_types = {name for name in variant_cache["types"].get("variant", set())}
-    media_types = {name for name in variant_cache["types"].get("media_type", set())}
+    variant_types = {
+        name.lower() for name in variant_cache["types"].get("variant", set())
+    }
+    media_types = {
+        name.lower() for name in variant_cache["types"].get("media_type", set())
+    }
+    format_types = {
+        name.lower() for name in variant_cache["types"].get("media_format", set())
+    }
 
     relational_cache = {
         "variant_tokens": variant_cache,
@@ -176,6 +202,7 @@ def get_config() -> Config:
         file_name_exceptions=file_name_exceptions,
         replace_exceptions=replace_exceptions,
         clean_exceptions=clean_exceptions,
+        should_ignore=should_ignore,
         grouping_exceptions=grouping_exceptions,
         variants=variants,
         known_variant_tokens=variant_cache["known_tokens"],
@@ -183,6 +210,39 @@ def get_config() -> Config:
         variant_grouping_by_string=variant_cache["grouping_by_token"],
         variant_types=variant_types,
         media_types=media_types,
+        format_types=format_types,
+        relational_cache=relational_cache,
+    )
+
+
+def get_minimal_config() -> Config:
+    creators: dict[str, dict[str, Any]] = {}
+    variants: dict[str, dict[str, Any]] = {}
+
+    variant_cache = _build_variant_cache(variants)
+    creator_cache = _build_creator_remove_cache(creators)
+
+    relational_cache = {
+        "variant_tokens": variant_cache,
+        "creator_removes": creator_cache,
+    }
+
+    return Config(
+        creators=creators,
+        creator_removes=creator_cache["creator_to_removes"],
+        creator_strings=creator_cache["creator_strings"],
+        file_name_exceptions={},
+        replace_exceptions={},
+        clean_exceptions=set(),
+        should_ignore=set(),
+        grouping_exceptions=tuple(),
+        variants=variants,
+        known_variant_tokens=variant_cache["known_tokens"],
+        variant_type_by_string=variant_cache["type_by_token"],
+        variant_grouping_by_string=variant_cache["grouping_by_token"],
+        variant_types=set(),
+        media_types=set(),
+        format_types=set(),
         relational_cache=relational_cache,
     )
 

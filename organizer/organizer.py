@@ -3,24 +3,48 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-import shutil
 from api.api import StructureType
-from data_models.database import setup_gather
-from pipeline.folder_reconstruction import get_folder_heirarchy
-from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
-from grouping.group import group_folders
-from pipeline.categorize import calculate_folder_structure
-
-# Configure root logger to output to stdout
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
+from stages.folder_reconstruction import (
+    get_folder_heirarchy,
+    recalculate_cleaned_paths_for_structure,
 )
+from stages.gather import ingest_filesystem
+from stages.grouping.group import group_folders
+from stages.categorize import calculate_folder_structure
+from storage.manager import StorageManager
+from utils.export_structure import export_snapshot_structure
+
+from fine_tuning.cli import app as fine_tuning_app
+
+# Configure root logger to output to both stdout and log file
+log_dir = Path("./logs")
+log_dir.mkdir(exist_ok=True)
+log_file = log_dir / f"organizer_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+# Create handlers with explicit configuration
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+
+file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+
+# Configure root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(console_handler)
+root_logger.addHandler(file_handler)
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
+
+app.add_typer(fine_tuning_app, name="model")
 
 
 @app.command()
@@ -33,69 +57,102 @@ def gather(
         readable=True,
         resolve_path=True,
     ),
-    output_dir: Path = typer.Argument(
-        ..., file_okay=False, dir_okay=True, writable=True, resolve_path=True
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
     """
-    1) Create a timestamped subfolder in output_dir,
-    2) Create a run_data.db,
-    3) Gather folder/file data,
-    4) Insert freq counts.
+    Scan filesystem and create immutable snapshot in index.db.
     """
-    base_output = output_dir
-    base_output.mkdir(parents=True, exist_ok=True)
-
-    timestamp_str = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    run_dir = base_output / timestamp_str
-    run_dir.mkdir()
-
-    db_path = run_dir / "run_data.db"
-    setup_gather(db_path)
     typer.echo(f"Gathering from: {base_path}")
-    typer.echo(f"DB path: {db_path}")
+    storage_manager = StorageManager(storage_path)
+    base_path = base_path.resolve()
 
-    gather_folder_structure_and_store(base_path, db_path)
-    clean_file_name_post(Path(db_path))
-
-    # Set up latest directory and file
-    latest_dir = base_output / "latest"
-    latest_db = latest_dir / "latest.db"
-
-    # Remove existing latest directory if it exists
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
-
-    # Create new latest directory
-    latest_dir.mkdir()
-
-    # Copy the current run's database to latest.db
-    shutil.copy2(db_path, latest_db)
-    typer.echo(f"Copied latest run to: {latest_db}")
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
     typer.echo("Gather complete.")
 
 
 @app.command()
-def group(db_path: str = typer.Argument(...)):
+def group(
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
+    ),
+):
     """
     Classify folders in the given run_data.db
     using known variant detection + structural heuristics.
     """
-    typer.echo(f"Grouping folders in: {db_path}")
-    group_folders(Path(db_path))
-    calculate_folder_structure(db_path)
+    typer.echo(f"Grouping folders in: {storage_path}")
+    storage_manager = StorageManager(storage_path)
+    group_folders(storage_manager)
+    # calculate_folder_structure(db_path)
     typer.echo("Grouping complete.")
 
 
 @app.command()
-def folders(db_path: str = typer.Argument(...)):
+def folders(
+    db_path: str = typer.Argument(...),
+    structure_type: StructureType = typer.Option(
+        StructureType.organized,
+        "--structure-type",
+        "-s",
+        help="Folder structure type to generate and use for cleaned paths.",
+    ),
+):
     """
     Generate a folder hierarchy from the cleaned paths in the database.
     """
     typer.echo(f"Generating folder hierarchy from: {db_path}")
-    calculate_folder_structure(db_path)
-    get_folder_heirarchy(db_path, type=StructureType.organized)
+    if structure_type != StructureType.original:
+        calculate_folder_structure(Path(db_path), structure_type=structure_type)
+    recalculate_cleaned_paths_for_structure(db_path, structure_type=structure_type)
+    get_folder_heirarchy(db_path, type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
+
+
+@app.command()
+def export_structure(
+    output_path: Path = typer.Argument(..., help="Output JSON file path"),
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
+    ),
+    include_files: bool = typer.Option(
+        False,
+        "--include-files",
+        "-f",
+        help="Include files in the directory structure (default: directories only)",
+    ),
+):
+    """
+    Export the most recent snapshot's directory structure to a JSON file.
+    """
+    try:
+        result = export_snapshot_structure(
+            output_path=output_path,
+            storage_path=storage_path,
+            include_files=include_files,
+        )
+
+        typer.echo(
+            f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}"
+        )
+        typer.echo(f"Root path: {result['root_path']}")
+        typer.echo(f"Found {result['total_nodes']} nodes")
+        typer.echo(f"✓ Exported directory structure to {result['output_path']}")
+
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -108,21 +165,31 @@ def pipeline(
         readable=True,
         resolve_path=True,
     ),
-    output_dir: Path = typer.Argument(
-        ..., file_okay=False, dir_okay=True, writable=True, resolve_path=True
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
+    """
+    Run full pipeline: gather, group, and folders.
+
+    NOTE: Currently only gather is implemented with new storage.
+    Group and folders commands need to be migrated to work with snapshots.
+    """
     # Run gather
-    gather(base_path, output_dir)
+    storage_manager = StorageManager(storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
-    # Get the path to the latest db
-    latest_db = output_dir / "latest" / "latest.db"
-
-    # Run group
-    group(str(latest_db))
-
-    # Run folders
-    folders(str(latest_db))
+    # TODO: Update group and folders commands to work with snapshot_id
+    typer.echo(
+        "⚠ Pipeline incomplete: group and folders commands not yet migrated to new storage"
+    )
+    typer.echo(
+        f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}"
+    )
 
 
 # FastAPI endpoints

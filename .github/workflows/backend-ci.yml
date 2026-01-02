@@ -27,10 +27,20 @@ jobs:
           cd organizer
           uv sync
 
-      - name: Run tests
+      - name: Run non-ML tests
         run: |
           cd organizer
-          uv run pytest
+          uv run pytest --ignore=fine_tuning/services/train_test.py --ignore=fine_tuning/services/predict_test.py
+
+      - name: Install ML dependencies
+        run: |
+          cd organizer
+          uv sync --group classifier
+
+      - name: Run ML tests
+        run: |
+          cd organizer
+          uv run pytest -m "ml"
 
       - name: Check code formatting
         run: |
@@ -45,4 +55,4 @@ jobs:
       - name: Run type checker
         run: |
           cd organizer
-          uv run pyright
+          uv run ty check .

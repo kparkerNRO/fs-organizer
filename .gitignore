@@ -64,6 +64,7 @@ cover/
 
 # Django stuff:
 *.log
+logs/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -161,7 +162,8 @@ cython_debug/
 
 # working docs
 outputs/
- outputs/
+organizer/data/
+data/
 
 # vscode files
 *.vscode

@@ -1,11 +1,17 @@
 from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from pathlib import Path
 import json
+import logging
 import shutil
+import sys
 from datetime import datetime
 from typing import Dict
 
 from sqlalchemy import Cast, String, select
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import func
+from fastapi.middleware.cors import CORSMiddleware
+
 from api.models import GatherRequest, AsyncTaskResponse
 from api.tasks import TaskInfo, tasks, update_task, TaskStatus, create_task
 from data_models.database import (
@@ -15,7 +21,6 @@ from data_models.database import (
     GroupCategoryEntry,
     setup_gather,
 )
-
 from api.api import (
     Category as CategoryAPI,
     CategoryResponse,
@@ -25,13 +30,18 @@ from api.api import (
     StructureType,
     FolderViewResponse,
 )
-from sqlalchemy.orm import aliased
-from sqlalchemy.sql import func
-from fastapi.middleware.cors import CORSMiddleware
+from stages.gather import gather_folder_structure_and_store
+from stages.grouping.group import group_folders
+from stages.categorize import calculate_folder_structure
+from storage.manager import StorageManager
 
-from pipeline.gather import gather_folder_structure_and_store
-from grouping.group import group_folders
-from pipeline.categorize import calculate_folder_structure
+# Configure logging to INFO level
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 app.add_middleware(
@@ -44,6 +54,14 @@ app.add_middleware(
 
 db_path = "outputs/latest/latest.db"
 output_dir = "outputs"
+
+
+@app.on_event("startup")  # type: ignore[deprecated]
+async def startup_event():
+    """Log when the API server starts"""
+    logger.info("FS-Organizer API server starting up")
+    logger.info(f"Database path: {db_path}")
+    logger.info(f"Output directory: {output_dir}")
 
 
 def get_db_session():
@@ -118,6 +136,9 @@ async def get_groups(
     """
     Get the pre-calculated grouping with pagination
     """
+    logger.info(
+        f"GET /groups - page: {page}, page_size: {page_size}, sort: {sort_column}:{sort_order}"
+    )
     CategoryEntry = aliased(GroupCategoryEntry)
 
     offset = (page - 1) * page_size
@@ -159,7 +180,7 @@ async def get_groups(
                 )
             ).label("children"),
         )
-        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
         .group_by(GroupCategory.id)
         .order_by(sort_attr)
@@ -171,7 +192,7 @@ async def get_groups(
 
     total_items_query = (
         db.query(func.count(func.distinct(GroupCategory.id)))
-        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
     )
     total_items = db.execute(total_items_query).scalar()
@@ -194,6 +215,7 @@ async def get_groups(
 async def get_folders(
     session=Depends(get_db_session),
 ):
+    logger.info("GET /folders")
     newest_entry = session.execute(
         select(FolderStructure)
         .where(FolderStructure.structure_type == StructureType.organized)
@@ -261,6 +283,27 @@ async def get_folders_structure():
     if structure is None:
         raise HTTPException(status_code=404, detail="No organized structure found")
     return {"folder_structure": structure}
+
+
+@app.get("/api/status")
+async def get_pipeline_status():
+    """Check which pipeline stages have available data"""
+    logger.info("GET /api/status - checking pipeline stages")
+
+    has_gather = (
+        get_folder_structure_from_db(db_path, StructureType.original) is not None
+    )
+    has_group = get_folder_structure_from_db(db_path, StructureType.grouped) is not None
+    has_folders = (
+        get_folder_structure_from_db(db_path, StructureType.organized) is not None
+    )
+
+    return {
+        "has_gather": has_gather,
+        "has_group": has_group,
+        "has_folders": has_folders,
+        "db_path": db_path,
+    }
 
 
 def run_gather_task(task_id: str, base_path_str: str):
@@ -351,11 +394,13 @@ async def api_gather(
     API endpoint version of the gather command (async).
     Returns a task ID that can be used to track progress.
     """
+    logger.info(f"POST /api/gather - base_path: {request.base_path}")
     task_id = create_task("Gather task created")
 
     # Start the background task
     background_tasks.add_task(run_gather_task, task_id, request.base_path)
 
+    logger.info(f"Gather task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Gather task started", status=TaskStatus.PENDING
     )
@@ -387,7 +432,8 @@ def run_group_task(task_id: str):
         # update_task(task_id, message="Grouping folders", progress=0.5)
 
         # Run grouping
-        group_folders(db_path_obj)
+        storage_manager = StorageManager(db_path_obj.parent)
+        group_folders(storage_manager)
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 
@@ -420,11 +466,13 @@ async def api_group(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     API endpoint version of the group command (async).
     Returns a task ID that can be used to track progress.
     """
+    logger.info("POST /api/group")
     task_id = create_task("Group task created")
 
     # Start the background task
     background_tasks.add_task(run_group_task, task_id)
 
+    logger.info(f"Group task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Group task started", status=TaskStatus.PENDING
     )
@@ -490,11 +538,13 @@ async def api_folders(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     API endpoint version of the folders command (async).
     Returns a task ID that can be used to track progress.
     """
+    logger.info("POST /api/folders")
     task_id = create_task("Folders task created")
 
     # Start the background task
     background_tasks.add_task(run_folders_task, task_id)
 
+    logger.info(f"Folders task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Folders task started", status=TaskStatus.PENDING
     )

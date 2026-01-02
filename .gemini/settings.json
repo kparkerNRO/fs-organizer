@@ -1,0 +1,17 @@
+{
+  "tools": {
+    "shell": {
+      "bypassConfirmation": [
+        "git status",
+        "git add .",
+        "git commit",
+        "git pull",
+        "git diff",
+        "git branch",
+        "uv run pytest",
+        "uv run organizer",
+        "just"
+      ]
+    }
+  }
+}

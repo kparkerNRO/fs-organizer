@@ -105,8 +105,17 @@ lint-backend:
 format-backend:
     cd organizer && uv run ruff format .
 
+# run the type checker on the backend code
+type-backend:
+    cd organizer && uv run ty check .
+
 # Lint and format backend code
 fix-backend: lint-backend format-backend
+
+# Run pre-commit checks (same as pre-commit hooks)
+pre-commit:
+    cd organizer && uv run ruff check --fix .
+    cd organizer && uv run ruff format .
 
 # ============================================
 # Frontend - Electron App (frontend/)
