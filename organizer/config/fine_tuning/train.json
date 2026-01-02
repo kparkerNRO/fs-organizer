@@ -1,7 +1,7 @@
 {
   "model": "sentence-transformers/all-MiniLM-L6-v2",
   "batch_size": 32,
-  "num_epochs": 4,
+  "num_epochs": 3,
   "learning_rate": 2e-05,
   "samples_per_label": 2,
   "hardneg_k": 2,

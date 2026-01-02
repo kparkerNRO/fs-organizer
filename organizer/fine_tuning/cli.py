@@ -134,6 +134,12 @@ def train(
         "-l",
         help="Label run ID to use for training labels (defaults to newest).",
     ),
+    resume_from: Path | None = typer.Option(
+        None,
+        "--resume-from",
+        "-r",
+        help="Path to a checkpoint to resume training from (instead of starting fresh).",
+    ),
 ) -> None:
     """Train a SetFit classifier using hyperparameters from a config file."""
     setup_logging()
@@ -153,6 +159,7 @@ def train(
             base_settings.taxonomy,
             label_run_id,
             effective_model_path,
+            resume_from=resume_from,
         )
     except Exception as e:
         typer.echo(f"Error: {e}", err=True)

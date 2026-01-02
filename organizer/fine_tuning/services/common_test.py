@@ -10,7 +10,7 @@ from fine_tuning.services.common import (
 )
 from storage.index_models import Node
 from storage.manager import NodeKind
-from fine_tuning.services.factories import (
+from storage.factories import (
     LabelRunFactory,
     NodeFactory,
     TrainingSampleFactory,

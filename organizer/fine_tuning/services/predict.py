@@ -77,6 +77,7 @@ def save_predictions_to_db(
         prediction_obj = SamplePrediction(
             run_id=run_id,
             sample_id=sample.sample_id,
+            sample_name=sample.name_raw,
             predicted_label=pred,
             confidence=conf,
             probabilities_json=json.dumps(probs_dict),

@@ -5,7 +5,7 @@ import csv
 import pytest
 from storage.manager import NodeKind
 
-from fine_tuning.services.factories import NodeFactory, TrainingSampleFactory
+from storage.factories import NodeFactory, TrainingSampleFactory
 from fine_tuning.services.sampling import (
     _cluster_by_similarity,
     _sample_from_clusters,

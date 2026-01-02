@@ -14,7 +14,7 @@ from fine_tuning.services.predict import (
 )
 from storage.training_models import ModelRun, SamplePrediction
 
-from .factories import TrainingSampleFactory
+from storage.factories import TrainingSampleFactory
 
 
 @pytest.mark.ml

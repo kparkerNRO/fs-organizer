@@ -210,13 +210,18 @@ def train_model(
     taxonomy: str,
     label_run_id: int,
     output_dir: Path,
+    resume_from: Path | None = None,
 ) -> None:
     train_ds, test_ds, id2label = prepare_training_data(
         config, manager, taxonomy, label_run_id
     )
 
-    logger.info(f"Initializing model: {config.model}")
-    model = SetFitModel.from_pretrained(config.model)
+    if resume_from:
+        logger.info(f"Resuming training from checkpoint: {resume_from}")
+        model = SetFitModel.from_pretrained(str(resume_from))
+    else:
+        logger.info(f"Initializing model: {config.model}")
+        model = SetFitModel.from_pretrained(config.model)
 
     trainer = SetFitTrainer(
         model=model,
@@ -242,9 +247,12 @@ def train_model(
             y_pred,
             target_names=[id2label[i] for i in range(len(id2label))],
             digits=4,
+            labels=list(range(len(id2label))),
         )
     )
 
+    logger.info(f"Saving model to: {output_dir}")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     trainer.model.save_pretrained(str(output_dir))
-    logger.info(f"Model saved to: {output_dir}")
+    logger.info("Model saved")

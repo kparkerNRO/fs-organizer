@@ -1,5 +1,6 @@
 """Shared test fixtures for fine_tuning services tests"""
 
+from datetime import datetime
 import os
 import random
 
@@ -7,9 +8,7 @@ import pytest
 from faker import Faker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from storage.index_models import IndexBase
-from storage.training_models import TrainingBase
-from fine_tuning.services.factories import (
+from storage.factories import (
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
@@ -17,6 +16,9 @@ from fine_tuning.services.factories import (
     SnapshotFactory,
     TrainingSampleFactory,
 )
+from storage.index_models import IndexBase
+from storage.training_models import TrainingBase
+from storage.work_models import GroupIteration, Run, WorkBase
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -87,3 +89,51 @@ def sample_snapshot(index_session):
 def model_run(training_session):
     """Create a test model run using factory"""
     return ModelRunFactory(run_id=1)
+
+
+
+@pytest.fixture
+def work_session():
+    """Create an in-memory test database for work data (runs, iterations, etc.)
+
+    Note: Some tests may have their own session fixture that includes both
+    Base and WorkBase tables. In those cases, use that session instead.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    WorkBase.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        yield session
+
+
+@pytest.fixture
+def sample_run(work_session):
+    """Create a sample Run for testing.
+    """
+
+    run = Run(
+        id=1,
+        snapshot_id=1,
+        started_at=datetime.now().isoformat(),
+        status="running"
+    )
+    work_session.add(run)
+    work_session.commit()
+    return run
+
+
+@pytest.fixture
+def sample_iteration(work_session, sample_run):
+    """Create a sample GroupIteration for testing.
+
+    Returns a GroupIteration with id=1, run_id=1, snapshot_id=1.
+    """
+    iteration = GroupIteration(
+        id=1,
+        run_id=sample_run.id,
+        snapshot_id=sample_run.snapshot_id,
+        description="test iteration"
+    )
+    work_session.add(iteration)
+    work_session.commit()
+    return iteration

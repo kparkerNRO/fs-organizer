@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock
 from contextlib import contextmanager
 
-from fine_tuning.services.factories import TrainingSampleFactory
+from storage.factories import TrainingSampleFactory
 from fine_tuning.services.train import (
     TrainConfigSettings,
     augment_with_hard_negatives,

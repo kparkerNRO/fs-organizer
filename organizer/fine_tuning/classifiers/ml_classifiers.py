@@ -132,6 +132,50 @@ class SetFitClassifier:
         except AttributeError:
             predictions_list = list(predictions)  # type: ignore[arg-type]
 
+        # Convert integer predictions to string labels
+        # SetFit models return integer indices, need to map to string labels
+        # Check if we have integer predictions
+        try:
+            # Try to convert first prediction to int - if it works, they're integers
+            int(predictions_list[0])
+            is_integer = True
+        except (ValueError, TypeError):
+            is_integer = False
+
+        if predictions_list and is_integer:
+            # Get the label mapping from the model
+            # Check if model.classes_ contains actual string labels or just indices
+            has_string_classes = False
+            if hasattr(self.model, "model_head") and hasattr(
+                self.model.model_head, "classes_"
+            ):
+                # Check if classes are string labels (not integers)
+                try:
+                    first_class = self.model.model_head.classes_[0]
+                    # If it's an integer or can be converted to int, use taxonomy labels
+                    int(first_class)
+                    has_string_classes = False
+                except (ValueError, TypeError):
+                    has_string_classes = True
+
+                if has_string_classes:
+                    label_mapping = {
+                        i: str(label)
+                        for i, label in enumerate(self.model.model_head.classes_)
+                    }
+                else:
+                    # Model has integer classes, use sorted taxonomy labels
+                    label_list = sorted(self.labels)
+                    label_mapping = {i: label for i, label in enumerate(label_list)}
+
+                predictions_list = [
+                    label_mapping[int(pred)] for pred in predictions_list
+                ]
+            else:
+                # Fallback: use sorted labels if no mapping available
+                label_list = sorted(self.labels)
+                predictions_list = [label_list[int(pred)] for pred in predictions_list]
+
         try:
             probs = self.model.predict_proba(texts)
             confidences = np.max(probs, axis=1).tolist()
