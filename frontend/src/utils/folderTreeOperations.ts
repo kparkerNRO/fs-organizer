@@ -1,5 +1,5 @@
 import { FolderV2, File } from "../types/types";
-import { findLongestCommonPrefix } from "../api";
+import { findSharedWordSequence } from "../api"; // Changed from findLongestCommonPrefix
 
 // Types for folder tree operations
 export type FolderTreeNode = FolderV2 | File;
@@ -557,7 +557,7 @@ export const mergeFolders = async (
 
   // Get the common string for all folders
   const pathNames = pathNamesToRootPath(sourcePaths);
-  const commonString = await findLongestCommonPrefix(pathNames);
+  const commonString = await findSharedWordSequence(pathNames);
   if (commonString === "") {
     return {
       success: false,
