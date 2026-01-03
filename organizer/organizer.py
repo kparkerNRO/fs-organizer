@@ -8,10 +8,10 @@ from stages.folder_reconstruction import (
     get_folder_heirarchy,
     recalculate_cleaned_paths_for_structure,
 )
-from stages.gather import gather_folder_structure_and_store
+from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
-from data_models.database import setup_gather, setup_group, setup_folder_categories
+from storage.manager import StorageManager
 from utils.export_structure import export_snapshot_structure
 
 from fine_tuning.cli import app as fine_tuning_app
@@ -57,48 +57,41 @@ def gather(
         readable=True,
         resolve_path=True,
     ),
-    db_path: Path = typer.Option(
-        Path("run_data.db"),
-        "--db-path",
-        "-d",
-        help="Database path. If not specified, uses run_data.db in current directory.",
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
     """
-    Scan filesystem and gather folder structure into database.
+    Scan filesystem and create immutable snapshot in index.db.
     """
     typer.echo(f"Gathering from: {base_path}")
+    storage_manager = StorageManager(storage_path)
     base_path = base_path.resolve()
 
-    # Setup database tables
-    setup_gather(db_path)
-
-    # Gather folder structure
-    gather_folder_structure_and_store(base_path, db_path)
-    typer.echo(f"✓ Gathered folder structure to {db_path}")
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
     typer.echo("Gather complete.")
 
 
 @app.command()
 def group(
-    db_path: Path = typer.Option(
-        Path("run_data.db"),
-        "--db-path",
-        "-d",
-        help="Database path. If not specified, uses run_data.db in current directory.",
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
     """
-    Classify folders in the given database
+    Classify folders in the given run_data.db
     using known variant detection + structural heuristics.
     """
-    typer.echo(f"Grouping folders in: {db_path}")
-
-    # Setup database tables for grouping
-    setup_folder_categories(db_path)
-    setup_group(db_path)
-
-    group_folders(db_path)
+    typer.echo(f"Grouping folders in: {storage_path}")
+    storage_manager = StorageManager(storage_path)
+    group_folders(storage_manager)
     typer.echo("Grouping complete.")
 
 
@@ -171,46 +164,31 @@ def pipeline(
         readable=True,
         resolve_path=True,
     ),
-    db_path: Path = typer.Option(
-        Path("run_data.db"),
-        "--db-path",
-        "-d",
-        help="Database path. If not specified, uses run_data.db in current directory.",
-    ),
-    structure_type: StructureType = typer.Option(
-        StructureType.organized,
-        "--structure-type",
-        "-t",
-        help="Folder structure type to generate.",
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
 ):
     """
-    Run full pipeline: gather, group, and generate folder structure.
+    Run full pipeline: gather, group, and folders.
+
+    NOTE: Currently only gather is implemented with new storage.
+    Group and folders commands need to be migrated to work with snapshots.
     """
-    base_path = base_path.resolve()
-    typer.echo(f"Running pipeline for: {base_path}")
+    # Run gather
+    storage_manager = StorageManager(storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
-    # Step 1: Gather
-    typer.echo("\n1. Gathering folder structure...")
-    setup_gather(db_path)
-    gather_folder_structure_and_store(base_path, db_path)
-    typer.echo(f"✓ Gathered to {db_path}")
-
-    # Step 2: Group
-    typer.echo("\n2. Grouping folders...")
-    setup_folder_categories(db_path)
-    setup_group(db_path)
-    group_folders(db_path)
-    typer.echo("✓ Grouping complete")
-
-    # Step 3: Generate folder structure
-    typer.echo("\n3. Generating folder structure...")
-    if structure_type != StructureType.original:
-        calculate_folder_structure(db_path, structure_type=structure_type)
-    recalculate_cleaned_paths_for_structure(str(db_path), structure_type=structure_type)
-    typer.echo("✓ Folder structure generated")
-
-    typer.echo("\n✓ Pipeline complete!")
+    # TODO: Update group and folders commands to work with snapshot_id
+    typer.echo(
+        "⚠ Pipeline incomplete: group and folders commands not yet migrated to new storage"
+    )
+    typer.echo(
+        f"  Run 'group' and 'folders' commands manually with snapshot_id={snapshot_id}"
+    )
 
 
 # FastAPI endpoints
