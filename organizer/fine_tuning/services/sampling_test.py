@@ -25,12 +25,13 @@ class TestSelectTrainingSamples:
 
     def test_basic_selection(self, index_session, sample_snapshot):
         """Test basic sample selection"""
+        snapshot_id = sample_snapshot.snapshot_id
         # Create 20 nodes using factory
-        nodes = NodeFactory.create_batch(20, snapshot_id=1, depth=1)
+        nodes = NodeFactory.create_batch(20, snapshot_id=snapshot_id, depth=1)
 
         samples = select_training_samples(
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             sample_size=10,
             min_depth=1,
             max_depth=5,
@@ -44,13 +45,26 @@ class TestSelectTrainingSamples:
 
     def test_depth_filtering(self, index_session, sample_snapshot):
         """Test that depth filtering works correctly"""
-        NodeFactory(node_id=1, snapshot_id=1, name="depth0", depth=0)
-        NodeFactory(node_id=2, snapshot_id=1, name="depth2", parent_node_id=1, depth=2)
-        NodeFactory(node_id=3, snapshot_id=1, name="depth5", parent_node_id=2, depth=5)
+        snapshot_id = sample_snapshot.snapshot_id
+        NodeFactory(node_id=1, snapshot_id=snapshot_id, name="depth0", depth=0)
+        NodeFactory(
+            node_id=2,
+            snapshot_id=snapshot_id,
+            name="depth2",
+            parent_node_id=1,
+            depth=2,
+        )
+        NodeFactory(
+            node_id=3,
+            snapshot_id=snapshot_id,
+            name="depth5",
+            parent_node_id=2,
+            depth=5,
+        )
 
         samples = select_training_samples(
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             sample_size=10,
             min_depth=2,
             max_depth=5,
@@ -61,9 +75,10 @@ class TestSelectTrainingSamples:
 
     def test_empty_result(self, index_session, sample_snapshot):
         """Test selection with no matching nodes"""
+        snapshot_id = sample_snapshot.snapshot_id
         samples = select_training_samples(
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             sample_size=10,
             min_depth=1,
             max_depth=5,
@@ -73,12 +88,13 @@ class TestSelectTrainingSamples:
 
     def test_sample_size_cap(self, index_session, sample_snapshot):
         """Test that sample size is respected"""
+        snapshot_id = sample_snapshot.snapshot_id
         # Create 100 nodes using factory
-        NodeFactory.create_batch(100, snapshot_id=1, depth=1)
+        NodeFactory.create_batch(100, snapshot_id=snapshot_id, depth=1)
 
         samples = select_training_samples(
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             sample_size=20,
             min_depth=1,
             max_depth=5,
@@ -216,7 +232,10 @@ class TestWriteSampleCsv:
 
     def test_basic_csv_writing(self, index_session, sample_snapshot, tmp_path):
         """Test basic CSV writing without heuristic"""
-        node = NodeFactory(node_id=1, snapshot_id=1, name="TestFolder", depth=1)
+        snapshot_id = sample_snapshot.snapshot_id
+        node = NodeFactory(
+            node_id=1, snapshot_id=snapshot_id, name="TestFolder", depth=1
+        )
         index_session.flush()
 
         output_path = tmp_path / "test.csv"
@@ -225,7 +244,7 @@ class TestWriteSampleCsv:
             output_path=output_path,
             nodes=[node],  # type: ignore[list-item]
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             use_heuristic=False,
         )
 
@@ -239,7 +258,7 @@ class TestWriteSampleCsv:
         # A more robust test might not check every single field.
         assert len(rows) == 1
         expected_row = {
-            "snapshot_id": "1",
+            "snapshot_id": str(snapshot_id),
             "node_id": "1",
             "name": "TestFolder",
             "grandparent_name": "",
@@ -252,10 +271,21 @@ class TestWriteSampleCsv:
         self, index_session, sample_snapshot, tmp_path
     ):
         """Test CSV includes parent and grandparent information"""
-        NodeFactory(node_id=1, snapshot_id=1, name="Grandparent", depth=0)
-        NodeFactory(node_id=2, snapshot_id=1, name="Parent", parent_node_id=1, depth=1)
+        snapshot_id = sample_snapshot.snapshot_id
+        NodeFactory(node_id=1, snapshot_id=snapshot_id, name="Grandparent", depth=0)
+        NodeFactory(
+            node_id=2,
+            snapshot_id=snapshot_id,
+            name="Parent",
+            parent_node_id=1,
+            depth=1,
+        )
         target = NodeFactory(
-            node_id=3, snapshot_id=1, name="Target", parent_node_id=2, depth=2
+            node_id=3,
+            snapshot_id=snapshot_id,
+            name="Target",
+            parent_node_id=2,
+            depth=2,
         )
         index_session.flush()
 
@@ -265,7 +295,7 @@ class TestWriteSampleCsv:
             output_path=output_path,
             nodes=[target],  # type: ignore[list-item]
             session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             use_heuristic=False,
         )
 
@@ -516,14 +546,14 @@ class TestApplyLabelsToSamples:
         # Create samples with known IDs and without labels to start
         s1 = TrainingSampleFactory(
             label_run=label_run,
-            snapshot_id=1,
+            snapshot_id=label_run.snapshot_id,
             node_id=100,
             name_raw="test1",
             label=None,
         )
         s2 = TrainingSampleFactory(
             label_run=label_run,
-            snapshot_id=1,
+            snapshot_id=label_run.snapshot_id,
             node_id=101,
             name_raw="test2",
             label=None,
@@ -531,10 +561,10 @@ class TestApplyLabelsToSamples:
         training_session.flush()
 
         rows = [
-            {"snapshot_id": 1, "node_id": 100, "label": "variant"},
-            {"snapshot_id": 1, "node_id": 101, "label": "subject"},
+            {"snapshot_id": label_run.snapshot_id, "node_id": 100, "label": "variant"},
+            {"snapshot_id": label_run.snapshot_id, "node_id": 101, "label": "subject"},
         ]
-        label_runs_dict = {1: label_run}
+        label_runs_dict = {label_run.snapshot_id: label_run}
 
         labeled_count = apply_labels_to_samples(
             training_session, rows, label_runs_dict, split=None
@@ -552,15 +582,21 @@ class TestApplyLabelsToSamples:
         """Test applying labels with split assignment"""
         sample = TrainingSampleFactory(
             label_run=label_run,
-            snapshot_id=1,
+            snapshot_id=label_run.snapshot_id,
             node_id=100,
             name_raw="test",
             label=None,
         )
         training_session.flush()
 
-        rows = [{"snapshot_id": 1, "node_id": 100, "label": "variant"}]
-        label_runs_dict = {1: label_run}
+        rows = [
+            {
+                "snapshot_id": label_run.snapshot_id,
+                "node_id": 100,
+                "label": "variant",
+            }
+        ]
+        label_runs_dict = {label_run.snapshot_id: label_run}
 
         apply_labels_to_samples(training_session, rows, label_runs_dict, split="train")
 
@@ -570,8 +606,14 @@ class TestApplyLabelsToSamples:
 
     def test_apply_labels_missing_sample(self, training_session, label_run):
         """Test that missing samples are skipped"""
-        rows = [{"snapshot_id": 1, "node_id": 999, "label": "variant"}]
-        label_runs_dict = {1: label_run}
+        rows = [
+            {
+                "snapshot_id": label_run.snapshot_id,
+                "node_id": 999,
+                "label": "variant",
+            }
+        ]
+        label_runs_dict = {label_run.snapshot_id: label_run}
 
         labeled_count = apply_labels_to_samples(
             training_session, rows, label_runs_dict, split=None

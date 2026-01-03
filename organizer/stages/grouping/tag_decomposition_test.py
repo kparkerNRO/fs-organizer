@@ -65,7 +65,7 @@ def test_entries(work_session, sample_run, test_nodes):
         # Tower examples
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Castle Tower",
             pre_processed_name="Castle Tower",
             path="/test1",
@@ -73,7 +73,7 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
         GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Wizard Tower",
             pre_processed_name="Wizard Tower",
             path="/test2",
@@ -81,7 +81,7 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
         GroupCategoryEntryFactory(
             folder_id=3,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Tower Interior",
             pre_processed_name="Tower Interior",
             path="/test3",
@@ -90,7 +90,7 @@ def test_entries(work_session, sample_run, test_nodes):
         # Location type examples
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Village Tavern",
             pre_processed_name="Village Tavern",
             path="/test1",
@@ -98,7 +98,7 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
         GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="City Tavern",
             pre_processed_name="City Tavern",
             path="/test2",
@@ -107,7 +107,7 @@ def test_entries(work_session, sample_run, test_nodes):
         # Collaboration examples
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Collaboration with Fantasy Atlas",
             pre_processed_name="Collaboration with Fantasy Atlas",
             path="/test1",
@@ -115,7 +115,7 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
         GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Collaboration with Cze Peku",
             pre_processed_name="Collaboration with Cze Peku",
             path="/test2",
@@ -124,7 +124,7 @@ def test_entries(work_session, sample_run, test_nodes):
         # Single word tags (should not be decomposed)
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Interior",
             pre_processed_name="Interior",
             path="/test1",
@@ -132,7 +132,7 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
         GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=iteration.id,
+            iteration=iteration,
             processed_name="Maps",
             pre_processed_name="Maps",
             path="/test2",

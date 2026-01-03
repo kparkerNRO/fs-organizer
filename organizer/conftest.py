@@ -149,25 +149,25 @@ def training_session():
 @pytest.fixture
 def label_run(training_session):
     """Create a test label run using factory"""
-    return LabelRunFactory(snapshot_id=1)
+    return LabelRunFactory()
 
 
 @pytest.fixture
 def sample_snapshot(index_session):
     """Create a test snapshot using factory"""
-    return SnapshotFactory(snapshot_id=1)
+    return SnapshotFactory()
 
 
 @pytest.fixture
 def model_run(training_session):
     """Create a test model run using factory"""
-    return ModelRunFactory(run_id=1)
+    return ModelRunFactory()
 
 
 @pytest.fixture
 def storage_snapshot(storage_index_session):
     """Create a snapshot using StorageManager-backed session."""
-    return SnapshotFactory(snapshot_id=1)
+    return SnapshotFactory()
 
 
 @pytest.fixture
@@ -190,14 +190,14 @@ def storage_iteration(storage_work_session, storage_run):
 @pytest.fixture
 def sample_run(work_session):
     """Create a sample Run for testing."""
-    return RunFactory(snapshot_id=1, started_at=datetime.now().isoformat())
+    return RunFactory(started_at=datetime.now().isoformat())
 
 
 @pytest.fixture
 def sample_iteration(work_session, sample_run):
     """Create a sample GroupIteration for testing.
 
-    Returns a GroupIteration with id=1, run_id=1, snapshot_id=1.
+    Returns a GroupIteration tied to the sample run.
     """
     return GroupIterationFactory(
         run=sample_run,

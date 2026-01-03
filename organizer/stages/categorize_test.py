@@ -54,19 +54,19 @@ def sample_group_entries(work_session, sample_iteration, sample_folders):
     entries = [
         GroupCategoryEntryFactory(
             folder_id=sample_folders[0].node_id,
-            iteration_id=sample_iteration.id,
+            iteration=sample_iteration,
             processed_name="art_category",
             confidence=0.8,
         ),
         GroupCategoryEntryFactory(
             folder_id=sample_folders[1].node_id,
-            iteration_id=sample_iteration.id,
+            iteration=sample_iteration,
             processed_name="digital_art",
             confidence=0.9,
         ),
         GroupCategoryEntryFactory(
             folder_id=sample_folders[2].node_id,
-            iteration_id=sample_iteration.id,
+            iteration=sample_iteration,
             processed_name="zip_category",
             confidence=0.7,
         ),
@@ -125,12 +125,17 @@ class TestGetCategoriesForPath:
     """Test cases for get_categories_for_path function"""
 
     def test_get_categories_for_path_string_input(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test with string path input"""
         path = "/test/parent_folder/child_folder/file.txt"
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
 
         assert [category.processed_name for category in result] == [
@@ -139,12 +144,17 @@ class TestGetCategoriesForPath:
         ]
 
     def test_get_categories_for_path_path_input(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test with Path object input"""
         path = Path("/test/parent_folder/child_folder/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
 
         assert [category.processed_name for category in result] == [
@@ -153,40 +163,60 @@ class TestGetCategoriesForPath:
         ]
 
     def test_get_categories_for_path_no_parent(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test when parent folder doesn't exist"""
         path = Path("/nonexistent/path/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
 
         assert result == []
 
     def test_get_categories_for_path_with_groups(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test when parent folder has associated groups"""
         path = Path("/test/parent_folder/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
 
         assert [category.processed_name for category in result] == ["art_category"]
 
     def test_get_categories_for_path_zip_matching(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test with zip file path matching"""
         path = Path("/test/content.zip/zip_content/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
 
         assert [category.processed_name for category in result] == ["zip_category"]
 
     def test_get_categories_for_path_recursive(
-        self, index_session, work_session, sample_folders, sample_group_entries
+        self,
+        index_session,
+        work_session,
+        sample_folders,
+        sample_group_entries,
+        sample_iteration,
     ):
         """Test recursive category collection"""
         # This test verifies that categories are collected recursively up the path
@@ -203,7 +233,7 @@ class TestGetCategoriesForPath:
         )
 
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
         assert [category.processed_name for category in result] == [
             "art_category",
@@ -233,7 +263,7 @@ class TestCalculateCategories:
         )
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=storage_iteration.id,
+            iteration=storage_iteration,
             processed_name="category",
             confidence=0.9,
         )
@@ -284,7 +314,7 @@ class TestCalculateCategories:
         )
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=storage_iteration.id,
+            iteration=storage_iteration,
             processed_name="category",
             confidence=0.9,
         )
@@ -324,7 +354,7 @@ class TestCalculateCategories:
         )
         GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=storage_iteration.id,
+            iteration=storage_iteration,
             processed_name="ignored",
             confidence=0.5,
         )
@@ -361,7 +391,7 @@ class TestCalculateCategories:
     ):
         """Test calculate_categories with no files in database"""
         GroupCategoryEntryFactory(
-            iteration_id=storage_iteration.id,
+            iteration=storage_iteration,
             folder_id=1,
             processed_name="test",
         )
@@ -395,7 +425,7 @@ class TestCalculateCategories:
             depth=1,
         )
         GroupCategoryEntryFactory(
-            iteration_id=storage_iteration.id,
+            iteration=storage_iteration,
             folder_id=1,
             processed_name="test",
         )
@@ -425,11 +455,13 @@ class TestEdgeCases:
         result = get_parent_folder(index_session, parent_path)
         assert result is None
 
-    def test_get_categories_for_path_root_path(self, index_session, work_session):
+    def test_get_categories_for_path_root_path(
+        self, index_session, work_session, sample_iteration
+    ):
         """Test get_categories_for_path with root path"""
         path = Path("/")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=1
+            index_session, work_session, path, iteration_id=sample_iteration.id
         )
         assert result == []
 

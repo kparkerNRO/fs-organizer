@@ -88,7 +88,7 @@ def test_refine_groups_singletons(
                 processed_name="apple",
                 path="/test/apple",
                 confidence=1.0,
-                iteration_id=iteration0.id,
+                iteration=iteration0,
             ),
         ),
         cast(
@@ -100,7 +100,7 @@ def test_refine_groups_singletons(
                 processed_name="banana",
                 path="/test/banana",
                 confidence=1.0,
-                iteration_id=iteration0.id,
+                iteration=iteration0,
             ),
         ),
     ]
@@ -151,7 +151,7 @@ def test_refine_groups_clusters(
                 processed_name="apple pie",
                 path="/test/apple pie",
                 confidence=1.0,
-                iteration_id=iteration0.id,
+                iteration=iteration0,
             ),
         ),
         cast(
@@ -163,7 +163,7 @@ def test_refine_groups_clusters(
                 processed_name="apple tart",
                 path="/test/apple tart",
                 confidence=1.0,
-                iteration_id=iteration0.id,
+                iteration=iteration0,
             ),
         ),
         cast(
@@ -175,7 +175,7 @@ def test_refine_groups_clusters(
                 processed_name="banana",
                 path="/test/banana",
                 confidence=1.0,
-                iteration_id=iteration0.id,
+                iteration=iteration0,
             ),
         ),
     ]
