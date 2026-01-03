@@ -27,7 +27,7 @@ from sentence_transformers import SentenceTransformer
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from storage.work_models import GroupCategoryEntry
+from data_models.database import GroupCategoryEntry
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
