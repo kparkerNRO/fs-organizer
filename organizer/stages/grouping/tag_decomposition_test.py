@@ -3,6 +3,7 @@ Tests for tag decomposition functionality
 """
 
 import pytest
+from typing import cast
 from sqlalchemy import select
 
 from storage.factories import (
@@ -11,7 +12,7 @@ from storage.factories import (
     NodeFactory,
 )
 from storage.manager import NodeKind
-from storage.work_models import GroupCategoryEntry
+from storage.work_models import GroupCategoryEntry, GroupIteration
 from stages.grouping.tag_decomposition import decompose_compound_tags
 
 
@@ -51,10 +52,13 @@ def test_nodes(index_session, sample_snapshot):
 def test_entries(work_session, sample_run, test_nodes):
     """Create test GroupCategoryEntry records for decomposition testing"""
     # Create iteration record
-    iteration = GroupIterationFactory(
-        id=0,
-        run=sample_run,
-        description="test iteration",
+    iteration = cast(
+        GroupIteration,
+        GroupIterationFactory(
+            id=0,
+            run=sample_run,
+            description="test iteration",
+        ),
     )
 
     # Create test entries with compound tags

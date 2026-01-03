@@ -62,18 +62,11 @@ def group_by_tokens(
             filename_to_group_map[name].confidence = confidence_value
 
 
-def unify_category_spelling(group_to_entries: dict[str, list[GroupEntry] | GroupEntry]):
+def unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
     # normalize category names to use the same spelling
     def merge_groups(group1: str, group2: str, group_to_entries):
         group2_entries = group_to_entries.get(group2, [])
-        if isinstance(group2_entries, GroupEntry):
-            group2_entries = [group2_entries]
-            group_to_entries[group2] = group2_entries
-
         group1_entries = group_to_entries.get(group1, [])
-        if isinstance(group1_entries, GroupEntry):
-            group1_entries = [group1_entries]
-            group_to_entries[group1] = group1_entries
 
         for entry in group2_entries:
             entry.grouped_name = group1

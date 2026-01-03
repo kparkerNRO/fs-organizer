@@ -38,5 +38,5 @@ markers = [
     "ml: marks tests that require large ML dependencies (sentence-transformers, setfit, datasets)",
 ]
 
-[tool.ty]
+[tool.ty.src]
 exclude = ["conftest.py"]

@@ -1,11 +1,12 @@
 import pytest
+from typing import cast
 from storage.factories import (
     GroupCategoryEntryFactory,
     GroupIterationFactory,
     NodeFactory,
 )
 from storage.manager import NodeKind
-from storage.work_models import GroupCategory, GroupCategoryEntry
+from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
 
 from stages.grouping.group import (
     group_folders,
@@ -62,10 +63,13 @@ def test_refine_groups_singletons(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupIterationFactory(
-        id=0,
-        description="test iteration 0",
-        run=sample_run,
+    iteration0 = cast(
+        GroupIteration,
+        GroupIterationFactory(
+            id=0,
+            description="test iteration 0",
+            run=sample_run,
+        ),
     )
     GroupIterationFactory(
         id=1,
@@ -74,24 +78,30 @@ def test_refine_groups_singletons(
     )
 
     # Set up entries with different cluster IDs (singletons)
-    entries = [
-        GroupCategoryEntryFactory(
-            folder_id=1,
-            cluster_id=1,
-            pre_processed_name="apple",
-            processed_name="apple",
-            path="/test/apple",
-            confidence=1.0,
-            iteration_id=iteration0.id,
+    entries: list[GroupCategoryEntry] = [
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=1,
+                cluster_id=1,
+                pre_processed_name="apple",
+                processed_name="apple",
+                path="/test/apple",
+                confidence=1.0,
+                iteration_id=iteration0.id,
+            ),
         ),
-        GroupCategoryEntryFactory(
-            folder_id=2,
-            cluster_id=2,
-            pre_processed_name="banana",
-            processed_name="banana",
-            path="/test/banana",
-            confidence=1.0,
-            iteration_id=iteration0.id,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=2,
+                cluster_id=2,
+                pre_processed_name="banana",
+                processed_name="banana",
+                path="/test/banana",
+                confidence=1.0,
+                iteration_id=iteration0.id,
+            ),
         ),
     ]
 
@@ -116,10 +126,13 @@ def test_refine_groups_clusters(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupIterationFactory(
-        id=0,
-        description="test iteration 0",
-        run=sample_run,
+    iteration0 = cast(
+        GroupIteration,
+        GroupIterationFactory(
+            id=0,
+            description="test iteration 0",
+            run=sample_run,
+        ),
     )
     GroupIterationFactory(
         id=1,
@@ -128,33 +141,42 @@ def test_refine_groups_clusters(
     )
 
     # Set up entries with same cluster ID for apple items
-    entries = [
-        GroupCategoryEntryFactory(
-            folder_id=1,
-            cluster_id=1,
-            pre_processed_name="apple pie",
-            processed_name="apple pie",
-            path="/test/apple pie",
-            confidence=1.0,
-            iteration_id=iteration0.id,
+    entries: list[GroupCategoryEntry] = [
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=1,
+                cluster_id=1,
+                pre_processed_name="apple pie",
+                processed_name="apple pie",
+                path="/test/apple pie",
+                confidence=1.0,
+                iteration_id=iteration0.id,
+            ),
         ),
-        GroupCategoryEntryFactory(
-            folder_id=2,
-            cluster_id=1,
-            pre_processed_name="apple tart",
-            processed_name="apple tart",
-            path="/test/apple tart",
-            confidence=1.0,
-            iteration_id=iteration0.id,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=2,
+                cluster_id=1,
+                pre_processed_name="apple tart",
+                processed_name="apple tart",
+                path="/test/apple tart",
+                confidence=1.0,
+                iteration_id=iteration0.id,
+            ),
         ),
-        GroupCategoryEntryFactory(
-            folder_id=3,
-            cluster_id=2,
-            pre_processed_name="banana",
-            processed_name="banana",
-            path="/test/banana",
-            confidence=1.0,
-            iteration_id=iteration0.id,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=3,
+                cluster_id=2,
+                pre_processed_name="banana",
+                processed_name="banana",
+                path="/test/banana",
+                confidence=1.0,
+                iteration_id=iteration0.id,
+            ),
         ),
     ]
 

@@ -1,6 +1,7 @@
 """Unit tests for StorageManager."""
 
 from sqlalchemy.orm import Session
+from typing import cast
 
 import tempfile
 from pathlib import Path
@@ -70,10 +71,13 @@ def node(index_session, snapshot):
 
 @pytest.fixture
 def run(work_session, snapshot):
-    new_run = RunFactory(
-        snapshot_id=snapshot.snapshot_id,
-        started_at="2024-01-01T00:00:00",
-        status=RunStatus.RUNNING.value,
+    new_run = cast(
+        Run,
+        RunFactory(
+            snapshot_id=snapshot.snapshot_id,
+            started_at="2024-01-01T00:00:00",
+            status=RunStatus.RUNNING.value,
+        ),
     )
     return new_run
 
@@ -221,10 +225,13 @@ class TestReferentialIntegrity:
     ):
         """Test _validate_snapshot_id_matches_run method."""
         # Create run with snapshot_id=1
-        run = RunFactory(
-            snapshot_id=1,
-            started_at="2024-01-01T00:00:00",
-            status=RunStatus.RUNNING.value,
+        run = cast(
+            Run,
+            RunFactory(
+                snapshot_id=1,
+                started_at="2024-01-01T00:00:00",
+                status=RunStatus.RUNNING.value,
+            ),
         )
 
         # Should match

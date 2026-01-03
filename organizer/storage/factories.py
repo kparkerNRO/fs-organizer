@@ -1,6 +1,7 @@
 """Test data factories using factory_boy"""
 
 import factory
+from typing import cast
 from factory import Faker, LazyAttribute, SelfAttribute, Sequence
 from sqlalchemy.orm import object_session
 from factory.alchemy import SQLAlchemyModelFactory
@@ -254,9 +255,9 @@ class GroupCategoryEntryFactory(BaseFactory):
     @factory.post_generation
     def iteration(self, create, extracted, **kwargs):
         if extracted is not None:
-            self.iteration_id = extracted.id
+            self.iteration_id = cast(GroupIteration, extracted).id
         elif self.iteration_id is None and create:
-            iteration = GroupIterationFactory()
+            iteration = cast(GroupIteration, GroupIterationFactory())
             self.iteration_id = iteration.id
 
         if create:
