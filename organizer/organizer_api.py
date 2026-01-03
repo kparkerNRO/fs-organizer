@@ -36,6 +36,9 @@ from pipeline.classify import classify_folders
 from grouping.group import group_folders
 from pipeline.categorize import calculate_folder_structure
 from pipeline.folder_reconstruction import get_folder_heirarchy
+from utils.filename_utils import find_shared_word_sequence, find_longest_common_prefix
+from pydantic import BaseModel
+
 
 app = FastAPI()
 app.add_middleware(
@@ -48,6 +51,26 @@ app.add_middleware(
 
 db_path = "outputs/latest/latest.db"
 output_dir = "outputs"
+
+
+class FindSharedStringRequest(BaseModel):
+    names: list[str]
+
+
+@app.post("/api/find_shared_word_sequence")
+async def api_find_shared_word_sequence(request: FindSharedStringRequest) -> dict:
+    """
+    Find the longest shared sequence of whole words amongst a list of strings
+    """
+    return {"shared_string": find_shared_word_sequence(request.names)}
+
+
+@app.post("/api/find_longest_common_prefix")
+async def api_find_longest_common_prefix(request: FindSharedStringRequest) -> dict:
+    """
+    Find the longest common prefix amongst a list of strings
+    """
+    return {"shared_string": find_longest_common_prefix(request.names)}
 
 
 def get_db_session():

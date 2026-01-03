@@ -1,7 +1,7 @@
 import re
 import logging
 
-from utils.common import VIEW_TYPES
+from .common import VIEW_TYPES
 from pathlib import Path
 from utils.config import (
     CLEAN_EXCEPTIONS,
@@ -65,6 +65,44 @@ def get_max_common_words(tokens, name_to_comp):
 
     shared_tokens = " ".join(tokens[: len(working_token)])
     return shared_tokens
+
+
+def find_longest_common_prefix(strs: list[str]) -> str:
+    if not strs:
+        return ""
+    for i, char_group in enumerate(zip(*strs)):
+        if len(set(char_group)) > 1:
+            return strs[0][:i]
+    return min(strs, key=len)
+
+
+def find_shared_word_sequence(path_names: list[str]) -> str:
+    if len(path_names) < 2:
+        return ""
+
+    def get_all_word_sequences(name: str) -> list[str]:
+        words = [word for word in name.split(" ") if word]
+        sequences = []
+        for start in range(len(words)):
+            for end in range(start + 1, len(words) + 1):
+                sequences.append(" ".join(words[start:end]))
+        return sequences
+
+    all_sequences_from_first_name = get_all_word_sequences(path_names[0])
+    common_sequences = []
+
+    for sequence in all_sequences_from_first_name:
+        appears_in_all = all(
+            re.search(r"\b" + re.escape(sequence) + r"\b", name)
+            for name in path_names[1:]
+        )
+        if appears_in_all:
+            common_sequences.append(sequence)
+
+    if common_sequences:
+        return max(common_sequences, key=len)
+
+    return ""
 
 
 def split_view_type(base_name, view_types=VIEW_TYPES):
