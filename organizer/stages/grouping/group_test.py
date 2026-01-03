@@ -1,9 +1,12 @@
 import pytest
-from data_models.database import (
-    Folder,
+from storage.factories import NodeFactory
+from storage.manager import NodeKind
+from storage.work_models import (
     GroupCategory,
     GroupCategoryEntry,
-    GroupingIteration,
+)
+from storage.work_models import (
+    GroupIteration as GroupingIteration,
 )
 
 from stages.grouping.group import (
@@ -13,31 +16,29 @@ from stages.grouping.group import (
 from stages.grouping.helpers import common_token_grouping
 
 
-def test_process_folders_to_groups(db_session):
-    # Set up test data - create folders
-    folder1 = Folder(
-        folder_name="apple doc",
-        folder_path="/test/apple doc",
-        parent_path="/test",
-        depth=1,
+def test_process_folders_to_groups(
+    index_session, work_session, sample_run, sample_snapshot
+):
+    # Set up test data
+    NodeFactory(
+        snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR
     )
-    folder2 = Folder(
-        folder_name="banana v2",
-        folder_path="/test/banana v2",
-        parent_path="/test",
-        depth=1,
+    NodeFactory(
+        snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR
     )
-    db_session.add_all([folder1, folder2])
-    db_session.commit()
 
     # Run the function (it will create iteration 0)
+    # Pass None for group_id since we don't have a group yet
     process_folders_to_groups(
-        session=db_session,
+        index_session=index_session,
+        work_session=work_session,
         group_id=None,
+        run_id=sample_run.id,
+        snapshot_id=sample_snapshot.snapshot_id,
     )
 
     # Verify results
-    entries = db_session.query(GroupCategoryEntry).all()
+    entries = work_session.query(GroupCategoryEntry).all()
 
     assert len(entries) == 2
 
@@ -57,18 +58,24 @@ def test_process_folders_to_groups(db_session):
 
 
 # Test refine_groups with singleton clusters
-def test_refine_groups_singletons(db_session):
+def test_refine_groups_singletons(
+    index_session, work_session, sample_run, sample_snapshot
+):
     # Create iteration records
     iteration0 = GroupingIteration(
         id=0,
         description="test iteration 0",
+        run_id=sample_run.id,
+        snapshot_id=sample_snapshot.snapshot_id,
     )
     iteration1 = GroupingIteration(
         id=1,
         description="test iteration 1",
+        run_id=sample_run.id,
+        snapshot_id=sample_snapshot.snapshot_id,
     )
-    db_session.add_all([iteration0, iteration1])
-    db_session.commit()
+    work_session.add_all([iteration0, iteration1])
+    work_session.commit()
 
     # Set up entries with different cluster IDs (singletons)
     entries = [
