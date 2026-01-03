@@ -18,6 +18,7 @@ from storage.work_models import (
     FolderStructure,
     GroupCategory,
     GroupCategoryEntry,
+    Run,
 )
 from api.api import (
     Category as CategoryAPI,
@@ -67,6 +68,16 @@ def get_db_session():
     storage = StorageManager(Path(db_path).parent)
     with storage.get_work_session() as session:
         yield session
+
+
+def get_latest_run(storage: StorageManager) -> Run | None:
+    """Return the most recent run in work.db."""
+    with storage.get_work_session() as session:
+        return (
+            session.execute(select(Run).order_by(Run.id.desc()).limit(1))
+            .scalars()
+            .first()
+        )
 
 
 def get_folder_structure_from_db(
@@ -438,7 +449,21 @@ def run_group_task(task_id: str):
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 
-        calculate_folder_structure(Path(db_path), structure_type=StructureType.grouped)
+        latest_run = get_latest_run(storage_manager)
+        if latest_run is None:
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="No runs found for grouping.",
+            )
+            return
+
+        calculate_folder_structure(
+            storage_manager,
+            latest_run.snapshot_id,
+            latest_run.id,
+            structure_type=StructureType.grouped,
+        )
 
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
@@ -507,8 +532,21 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
+        storage_manager = StorageManager(Path(db_path).parent)
+        latest_run = get_latest_run(storage_manager)
+        if latest_run is None:
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="No runs found for folder calculation.",
+            )
+            return
+
         calculate_folder_structure(
-            Path(db_path), structure_type=StructureType.organized
+            storage_manager,
+            latest_run.snapshot_id,
+            latest_run.id,
+            structure_type=StructureType.organized,
         )
 
         # Get the newly generated folder structure

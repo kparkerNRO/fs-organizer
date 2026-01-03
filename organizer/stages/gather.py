@@ -3,7 +3,6 @@ import zipfile
 import logging
 from pathlib import Path
 from typing import List, Tuple
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from utils.config import get_config
 from utils.filename_processing import clean_filename
@@ -419,5 +418,3 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
             index_session.commit()
 
     return snapshot_id
-
-

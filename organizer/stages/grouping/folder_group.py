@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 from typing import Dict, List
 
-from storage.index_models import Node, NodeFeatures
+from storage.index_models import Node
 from stages.grouping.helpers import common_token_grouping
 
 
@@ -16,8 +16,10 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     """
     # First find parent nodes that have multiple folder children
     parent_counts = (
-        session.query(Node.parent_node_id, func.count(Node.node_id).label("folder_count"))
-        .filter(Node.kind == 'dir')
+        session.query(
+            Node.parent_node_id, func.count(Node.node_id).label("folder_count")
+        )
+        .filter(Node.kind == "dir")
         .group_by(Node.parent_node_id)
         .having(func.count(Node.node_id) > 1)
         .subquery()
@@ -27,7 +29,7 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     folders = (
         session.query(Node)
         .options(joinedload(Node.features))
-        .filter(Node.kind == 'dir')
+        .filter(Node.kind == "dir")
         .join(parent_counts, Node.parent_node_id == parent_counts.c.parent_node_id)
         .order_by(Node.parent_node_id, Node.name)
         .all()
@@ -62,12 +64,15 @@ def process_folders(session: Session):
     node_categories = {}
 
     for parent_id, folders in grouped_folders.items():
-        folder_id_to_folder = {folder.node_id: folder for folder in folders}
         # Use normalized_name from features if available, otherwise use clean_filename
         from utils.filename_processing import clean_filename
+
         cleaned_name_to_id = {
-            (folder.features.normalized_name if folder.features and folder.features.normalized_name
-             else clean_filename(folder.name)): folder.node_id
+            (
+                folder.features.normalized_name
+                if folder.features and folder.features.normalized_name
+                else clean_filename(folder.name)
+            ): folder.node_id
             for folder in folders
         }
         token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))

@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 from typing import Dict, Optional
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 from api.api import StructureType
 from stages.categorize import get_categories_for_path
 from storage.manager import StorageManager
@@ -37,9 +36,11 @@ def generate_folder_heirarchy_from_path(
     return working_representation
 
 
-def get_folder_heirarchy(manager: StorageManager, run_id: int, structure_type: StructureType):
+def get_folder_heirarchy(
+    manager: StorageManager, run_id: int, structure_type: StructureType
+):
     logger.debug(f"Current working directory: {os.getcwd()}")
-    
+
     with manager.get_work_session() as session:
         newest_entry = session.execute(
             select(FolderStructure)
@@ -51,7 +52,9 @@ def get_folder_heirarchy(manager: StorageManager, run_id: int, structure_type: S
 
         if newest_entry:
             entry = newest_entry.structure
-            pretty_entry = json.dumps(json.loads(entry), indent=4)
+            if isinstance(entry, str):
+                entry = json.loads(entry)
+            pretty_entry = json.dumps(entry, indent=4)
             logger.info(pretty_entry)
             return newest_entry.structure
         return None
@@ -93,19 +96,32 @@ def _build_cleaned_path(
     return cleaned_path
 
 
-def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id: int) -> int:
-    with manager.get_index_session(read_only=True) as index_session, manager.get_work_session() as work_session:
-        nodes = index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == 'dir')).scalars().all()
+def recalculate_cleaned_paths(
+    manager: StorageManager, snapshot_id: int, run_id: int
+) -> int:
+    with (
+        manager.get_index_session(read_only=True) as index_session,
+        manager.get_work_session() as work_session,
+    ):
+        nodes = (
+            index_session.execute(
+                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "dir")
+            )
+            .scalars()
+            .all()
+        )
         node_by_abs_path = {node.abs_path: node for node in nodes}
         cache: Dict[int, str] = {}
-        
+
         mappings = []
         for node in nodes:
             cleaned_path = _build_cleaned_path(node, node_by_abs_path, cache)
-            
+
             # Check if a mapping already exists
             existing_mapping = work_session.execute(
-                select(FileMapping).where(FileMapping.run_id == run_id, FileMapping.node_id == node.node_id)
+                select(FileMapping).where(
+                    FileMapping.run_id == run_id, FileMapping.node_id == node.node_id
+                )
             ).scalar_one_or_none()
 
             if existing_mapping:
@@ -119,7 +135,7 @@ def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id:
                         new_path=cleaned_path,
                     )
                 )
-        
+
         if mappings:
             work_session.add_all(mappings)
         work_session.commit()
@@ -128,19 +144,31 @@ def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id:
 
 
 def recalculate_cleaned_paths_for_structure(
-    manager: StorageManager, snapshot_id: int, run_id: int, structure_type: StructureType
+    manager: StorageManager,
+    snapshot_id: int,
+    run_id: int,
+    structure_type: StructureType,
 ) -> int:
     if structure_type == StructureType.original:
         return recalculate_cleaned_paths(manager, snapshot_id, run_id)
 
-    with manager.get_index_session(read_only=True) as index_session, manager.get_work_session() as work_session:
+    with (
+        manager.get_index_session(read_only=True) as index_session,
+        manager.get_work_session() as work_session,
+    ):
         # This assumes that `get_categories_for_path` is adapted to the new storage system
         # and can be called with the new session management.
         iteration_id = work_session.execute(
             select(func.max(GroupCategoryEntry.iteration_id))
         ).scalar_one()
-        
-        nodes = index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == 'dir')).scalars().all()
+
+        nodes = (
+            index_session.execute(
+                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "dir")
+            )
+            .scalars()
+            .all()
+        )
 
         for node in nodes:
             categories = get_categories_for_path(
@@ -152,9 +180,11 @@ def recalculate_cleaned_paths_for_structure(
             cleaned_path = "/".join(
                 [str(category.processed_name) for category in categories]
             )
-            
+
             existing_mapping = work_session.execute(
-                select(FileMapping).where(FileMapping.run_id == run_id, FileMapping.node_id == node.node_id)
+                select(FileMapping).where(
+                    FileMapping.run_id == run_id, FileMapping.node_id == node.node_id
+                )
             ).scalar_one_or_none()
 
             if existing_mapping:

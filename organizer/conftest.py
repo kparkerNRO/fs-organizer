@@ -12,11 +12,13 @@ from storage.factories import (
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
+    FileNodeFactory,
     SamplePredictionFactory,
     SnapshotFactory,
     TrainingSampleFactory,
 )
 from storage.index_models import IndexBase
+from storage.manager import StorageManager
 from storage.training_models import TrainingBase
 from storage.work_models import GroupIteration, Run, WorkBase
 
@@ -103,6 +105,63 @@ def work_session():
 
     with Session(engine) as session:
         yield session
+
+
+@pytest.fixture
+def storage_manager(tmp_path):
+    """Create a StorageManager with temporary databases."""
+    return StorageManager(database_path=tmp_path)
+
+
+@pytest.fixture
+def storage_index_session(storage_manager):
+    """Create an index session backed by StorageManager."""
+    with storage_manager.get_index_session() as session:
+        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FileNodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        yield session
+
+
+@pytest.fixture
+def storage_work_session(storage_manager):
+    """Create a work session backed by StorageManager."""
+    with storage_manager.get_work_session() as session:
+        yield session
+
+
+@pytest.fixture
+def storage_snapshot(storage_index_session):
+    """Create a snapshot using StorageManager-backed session."""
+    return SnapshotFactory(snapshot_id=1)
+
+
+@pytest.fixture
+def storage_run(storage_work_session, storage_snapshot):
+    """Create a Run tied to the storage snapshot."""
+    run = Run(
+        id=1,
+        snapshot_id=storage_snapshot.snapshot_id,
+        started_at=datetime.now().isoformat(),
+        status="running",
+    )
+    storage_work_session.add(run)
+    storage_work_session.commit()
+    return run
+
+
+@pytest.fixture
+def storage_iteration(storage_work_session, storage_run):
+    """Create a GroupIteration for storage-backed tests."""
+    iteration = GroupIteration(
+        id=1,
+        run_id=storage_run.id,
+        snapshot_id=storage_run.snapshot_id,
+        description="test iteration",
+    )
+    storage_work_session.add(iteration)
+    storage_work_session.commit()
+    return iteration
 
 
 @pytest.fixture
