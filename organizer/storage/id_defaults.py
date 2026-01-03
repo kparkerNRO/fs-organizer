@@ -38,8 +38,6 @@ def get_latest_run_for_snapshot(
             .scalars()
             .first()
         )
-        if run is not None:
-            session.expunge(run)
         return run
 
 

@@ -2,7 +2,6 @@ from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from pathlib import Path
 import json
 import logging
-import shutil
 import sys
 from datetime import datetime
 from typing import Dict
@@ -351,20 +350,6 @@ def run_gather_task(task_id: str, base_path_str: str):
         snapshot_id = ingest_filesystem(storage_manager, base_path, run_dir)
 
         update_task(task_id, message="Post-processing filenames", progress=0.7)
-
-        # Update latest symlinks
-        latest_dir = output_dir_path / "latest"
-
-        # Remove existing latest directory if it exists
-        if latest_dir.exists():
-            shutil.rmtree(latest_dir)
-
-        # Create new latest directory
-        latest_dir.mkdir()
-
-        # Copy the current run's databases to latest directory
-        shutil.copy2(run_dir / "index.db", latest_dir / "index.db")
-        shutil.copy2(run_dir / "work.db", latest_dir / "work.db")
 
         result = {
             "message": "Gather complete",

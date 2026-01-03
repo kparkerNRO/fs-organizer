@@ -1,8 +1,9 @@
-from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
 from typing import Dict, List
 
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 from storage.index_models import Node
+
 from stages.grouping.helpers import common_token_grouping
 
 
@@ -28,7 +29,6 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     # Then get all folders that belong to these parent nodes
     folders = (
         session.query(Node)
-        .options(joinedload(Node.features))
         .filter(Node.kind == "dir")
         .join(parent_counts, Node.parent_node_id == parent_counts.c.parent_node_id)
         .order_by(Node.parent_node_id, Node.name)
@@ -63,17 +63,12 @@ def process_folders(session: Session):
     grouped_folders = get_folder_groups(session)
     node_categories = {}
 
-    for parent_id, folders in grouped_folders.items():
+    for _, folders in grouped_folders.items():
         # Use normalized_name from features if available, otherwise use clean_filename
         from utils.filename_processing import clean_filename
 
         cleaned_name_to_id = {
-            (
-                folder.features.normalized_name
-                if folder.features and folder.features.normalized_name
-                else clean_filename(folder.name)
-            ): folder.node_id
-            for folder in folders
+            clean_filename(folder.name): folder.node_id for folder in folders
         }
         token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))
         if token_grouping:

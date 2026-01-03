@@ -25,15 +25,6 @@ from utils.folder_structure import insert_file_in_structure
 logger = logging.getLogger(__name__)
 
 
-def _insert_file_in_structure(
-    folder_structure: FolderV2,
-    file: Node,
-    parts: list[tuple[str, float]],
-    new_path: str | None,
-) -> None:
-    insert_file_in_structure(folder_structure, file, parts, new_path)
-
-
 def get_parent_folder(
     session: Session, parent_path: Path, zip_content: bool = False
 ) -> Node | None:
@@ -116,7 +107,7 @@ def calculate_folder_structure(
     | None = None,
     insert_file: Callable[
         [FolderV2, Node, list[tuple[str, float]], str | None], None
-    ] = _insert_file_in_structure,
+    ] = insert_file_in_structure,
 ):
     with (
         manager.get_index_session(read_only=True) as index_session,
