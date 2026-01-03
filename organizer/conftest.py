@@ -6,8 +6,6 @@ import random
 
 import pytest
 from faker import Faker
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from storage.factories import (
     ClassificationFactory,
     FileMappingFactory,
@@ -28,10 +26,7 @@ from storage.factories import (
     WorkMetaFactory,
     PartialNameCategoryFactory,
 )
-from storage.index_models import IndexBase
 from storage.manager import StorageManager
-from storage.training_models import TrainingBase
-from storage.work_models import WorkBase
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -94,56 +89,31 @@ def storage_work_session(storage_manager):
 
 @pytest.fixture
 def work_session(storage_work_session):
-    """Create an in-memory test database for work data (runs, iterations, etc.)
-
-    Note: Some tests may have their own session fixture that includes both
-    Base and WorkBase tables. In those cases, use that session instead.
-    """
-    engine = create_engine("sqlite:///:memory:")
-    WorkBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        RunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        StageStateFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        GroupIterationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        GroupEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        GroupCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        GroupCategoryEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        PartialNameCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        ClassificationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        FolderStructureFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        FileMappingFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        WorkMetaFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        yield session
+    """Alias for StorageManager-backed work session."""
+    return storage_work_session
 
 
 @pytest.fixture
-def index_session():
-    """Create in-memory test database for index data."""
-    engine = create_engine("sqlite:///:memory:")
-    IndexBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        FileNodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        yield session
+def index_session(storage_index_session):
+    """Alias for StorageManager-backed index session."""
+    return storage_index_session
 
 
 @pytest.fixture
-def training_session():
-    """Create in-memory test database for training data"""
-
-    engine = create_engine("sqlite:///:memory:")
-    TrainingBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        # Configure factories to use this session
+def storage_training_session(storage_manager):
+    """Create a training session backed by StorageManager."""
+    with storage_manager.get_training_session() as session:
         LabelRunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         TrainingSampleFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         ModelRunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         SamplePredictionFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
+
+
+@pytest.fixture
+def training_session(storage_training_session):
+    """Alias for StorageManager-backed training session."""
+    return storage_training_session
 
 
 @pytest.fixture
