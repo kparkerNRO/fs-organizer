@@ -146,6 +146,7 @@ def test_entries(work_session, sample_run, test_nodes):
     return test_entries
 
 
+@pytest.mark.ml
 def test_full_decomposition_pipeline(work_session, test_entries):
     """Test the complete decomposition pipeline"""
     # Count original entries
