@@ -10,10 +10,12 @@ from storage.work_models import (
 )
 
 from stages.grouping.group import (
+    group_folders,
     process_folders_to_groups,
     refine_groups,
 )
 from stages.grouping.helpers import common_token_grouping
+from utils.config import get_minimal_config
 
 
 def test_process_folders_to_groups(
@@ -299,55 +301,58 @@ def test_common_token_grouping(name, input_list, expected):
     assert result == expected
 
 
-# # Integration test for the full group_folders function
-# @pytest.mark.skip(reason="Pre-existing test failure - assert 0 == 3")
-# def test_group_folders():
-#     # Create a temporary database file
-#     with tempfile.TemporaryDirectory() as temp_dir:
-#         db_path = Path(os.path.join(temp_dir, "test.db"))
+def test_group_folders(
+    storage_manager,
+    storage_index_session,
+    storage_work_session,
+    storage_snapshot,
+    storage_run,
+):
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="apple pie",
+        kind=NodeKind.DIR,
+    )
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="apple tart",
+        kind=NodeKind.DIR,
+    )
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="banana bread",
+        kind=NodeKind.DIR,
+    )
+    storage_index_session.commit()
 
-#         # Create DB engine and tables
-#         engine = create_engine(f"sqlite:///{db_path}")
-#         Base.metadata.create_all(engine)
+    group_folders(
+        storage_manager,
+        max_iterations=1,
+        config=get_minimal_config(),
+        run_id=storage_run.id,
+        snapshot_id=storage_snapshot.snapshot_id,
+    )
 
-#         # Set up test data
-#         with Session(engine) as session:
-#             folders = [
-#                 Folder(
-#                     folder_name="apple pie",
-#                     folder_path="/test/apple pie",
-#                     cleaned_name="apple pie",
-#                 ),
-#                 Folder(
-#                     folder_name="apple tart",
-#                     folder_path="/test/apple tart",
-#                     cleaned_name="apple tart",
-#                 ),
-#                 Folder(
-#                     folder_name="banana bread",
-#                     folder_path="/test/banana bread",
-#                     cleaned_name="banana bread",
-#                 ),
-#             ]
-#             session.add_all(folders)
-#             session.commit()
+    entries_iter0 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 0)
+        .all()
+    )
+    assert len(entries_iter0) == 3
 
-#         # Run the function with a single iteration
-#         group_folders(db_path, max_iterations=1, config=get_minimal_config())
+    entries_iter1 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 1)
+        .all()
+    )
+    assert len(entries_iter1) == 3
 
-#         # Verify results
-#         with Session(engine) as session:
-#             # Check that GroupCategoryEntry entries were created
-#             entries = (
-#                 session.query(GroupCategoryEntry).filter(GroupCategoryEntry.iteration_id == 0).all()
-#             )
-#             assert len(entries) == 3
+    entries_iter2 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 2)
+        .all()
+    )
+    assert len(entries_iter2) == 3
 
-#             entries = (
-#                 session.query(GroupCategoryEntry).filter(GroupCategoryEntry.iteration_id == 1).all()
-#             )
-#             assert len(entries) == 3
-
-#             # Check that GroupCategory entries were created
-#             groups = session.query(GroupCategory).all()
-#             assert len(groups) == 3
+    groups = storage_work_session.query(GroupCategory).all()
+    assert len(groups) == 3

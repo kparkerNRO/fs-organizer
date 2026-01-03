@@ -98,7 +98,6 @@ def test_process_zip_basic(index_session, snapshot_id):
     assert file_names == ["file1.txt", "file2.txt", "file3.txt"]
 
 
-@pytest.mark.skip(reason="Pre-existing test failure - assert 1 == 0")
 def test_process_zip_with_module_json(index_session, snapshot_id):
     zip_entries = ["module.json", "file1.txt"]
     zip_buffer = create_test_zip(zip_entries)
