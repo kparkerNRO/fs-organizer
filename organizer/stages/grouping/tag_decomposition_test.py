@@ -5,12 +5,13 @@ Tests for tag decomposition functionality
 import pytest
 from sqlalchemy import select
 
-from storage.factories import NodeFactory
-from storage.manager import NodeKind
-from storage.work_models import (
-    GroupCategoryEntry,
-    GroupIteration as GroupingIteration,
+from storage.factories import (
+    GroupCategoryEntryFactory,
+    GroupIterationFactory,
+    NodeFactory,
 )
+from storage.manager import NodeKind
+from storage.work_models import GroupCategoryEntry
 from stages.grouping.tag_decomposition import decompose_compound_tags
 
 
@@ -50,88 +51,85 @@ def test_nodes(index_session, sample_snapshot):
 def test_entries(work_session, sample_run, test_nodes):
     """Create test GroupCategoryEntry records for decomposition testing"""
     # Create iteration record
-    iteration = GroupingIteration(
+    iteration = GroupIterationFactory(
         id=0,
-        run_id=sample_run.id,
-        snapshot_id=sample_run.snapshot_id,
+        run=sample_run,
         description="test iteration",
     )
-    work_session.add(iteration)
-    work_session.commit()
 
     # Create test entries with compound tags
     test_entries = [
         # Tower examples
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Castle Tower",
             pre_processed_name="Castle Tower",
             path="/test1",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Wizard Tower",
             pre_processed_name="Wizard Tower",
             path="/test2",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=3,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Tower Interior",
             pre_processed_name="Tower Interior",
             path="/test3",
             confidence=0.8,
         ),
         # Location type examples
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Village Tavern",
             pre_processed_name="Village Tavern",
             path="/test1",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="City Tavern",
             pre_processed_name="City Tavern",
             path="/test2",
             confidence=0.8,
         ),
         # Collaboration examples
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Collaboration with Fantasy Atlas",
             pre_processed_name="Collaboration with Fantasy Atlas",
             path="/test1",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Collaboration with Cze Peku",
             pre_processed_name="Collaboration with Cze Peku",
             path="/test2",
             confidence=0.8,
         ),
         # Single word tags (should not be decomposed)
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Interior",
             pre_processed_name="Interior",
             path="/test1",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
-            iteration_id=0,
+            iteration_id=iteration.id,
             processed_name="Maps",
             pre_processed_name="Maps",
             path="/test2",
@@ -139,10 +137,6 @@ def test_entries(work_session, sample_run, test_nodes):
         ),
     ]
 
-    for entry in test_entries:
-        work_session.add(entry)
-
-    work_session.commit()
     return test_entries
 
 

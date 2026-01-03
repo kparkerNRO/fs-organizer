@@ -7,13 +7,12 @@ from stages.categorize import (
     get_categories_for_path,
     calculate_folder_structure,
 )
-from storage.factories import FileNodeFactory, NodeFactory
+from storage.factories import FileNodeFactory, GroupCategoryEntryFactory, NodeFactory
 from storage.manager import FileSource, NodeKind
 from storage.index_models import Node
 from storage.work_models import (
     FileMapping,
     FolderStructure,
-    GroupCategoryEntry,
 )
 
 
@@ -55,28 +54,25 @@ def sample_folders(index_session, sample_snapshot):
 @pytest.fixture
 def sample_group_entries(work_session, sample_iteration, sample_folders):
     entries = [
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=sample_folders[0].node_id,
             iteration_id=sample_iteration.id,
             processed_name="art_category",
             confidence=0.8,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=sample_folders[1].node_id,
             iteration_id=sample_iteration.id,
             processed_name="digital_art",
             confidence=0.9,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=sample_folders[2].node_id,
             iteration_id=sample_iteration.id,
             processed_name="zip_category",
             confidence=0.7,
         ),
     ]
-
-    work_session.add_all(entries)
-    work_session.commit()
     return entries
 
 
@@ -239,15 +235,12 @@ class TestCalculateCategories:
             depth=1,
             file_source=FileSource.FILESYSTEM.value,
         )
-        storage_work_session.add(
-            GroupCategoryEntry(
-                folder_id=1,
-                iteration_id=storage_iteration.id,
-                processed_name="category",
-                confidence=0.9,
-            )
+        GroupCategoryEntryFactory(
+            folder_id=1,
+            iteration_id=storage_iteration.id,
+            processed_name="category",
+            confidence=0.9,
         )
-        storage_work_session.commit()
 
         calculate_folder_structure(
             storage_manager, storage_snapshot.snapshot_id, storage_run.id
@@ -294,15 +287,12 @@ class TestCalculateCategories:
             depth=1,
             file_source=FileSource.ZIP_FILE.value,
         )
-        storage_work_session.add(
-            GroupCategoryEntry(
-                folder_id=1,
-                iteration_id=storage_iteration.id,
-                processed_name="category",
-                confidence=0.9,
-            )
+        GroupCategoryEntryFactory(
+            folder_id=1,
+            iteration_id=storage_iteration.id,
+            processed_name="category",
+            confidence=0.9,
         )
-        storage_work_session.commit()
 
         calculate_folder_structure(
             storage_manager, storage_snapshot.snapshot_id, storage_run.id
@@ -338,22 +328,19 @@ class TestCalculateCategories:
             depth=1,
             file_source=FileSource.FILESYSTEM.value,
         )
-        storage_work_session.add(
-            GroupCategoryEntry(
-                folder_id=1,
-                iteration_id=storage_iteration.id,
-                processed_name="ignored",
-                confidence=0.5,
-            )
+        GroupCategoryEntryFactory(
+            folder_id=1,
+            iteration_id=storage_iteration.id,
+            processed_name="ignored",
+            confidence=0.5,
         )
-        storage_work_session.commit()
 
         def resolve_categories(_index_session, _work_session, _path, _iteration_id):
             return [
-                GroupCategoryEntry(
+                GroupCategoryEntryFactory.build(
                     folder_id=1, processed_name="category1", confidence=0.8
                 ),
-                GroupCategoryEntry(
+                GroupCategoryEntryFactory.build(
                     folder_id=1, processed_name="category2", confidence=0.9
                 ),
             ]
@@ -379,14 +366,11 @@ class TestCalculateCategories:
         storage_iteration,
     ):
         """Test calculate_categories with no files in database"""
-        storage_work_session.add(
-            GroupCategoryEntry(
-                iteration_id=storage_iteration.id,
-                folder_id=1,
-                processed_name="test",
-            )
+        GroupCategoryEntryFactory(
+            iteration_id=storage_iteration.id,
+            folder_id=1,
+            processed_name="test",
         )
-        storage_work_session.commit()
 
         calculate_folder_structure(
             storage_manager, storage_snapshot.snapshot_id, storage_run.id
@@ -417,14 +401,11 @@ class TestCalculateCategories:
             depth=1,
             file_source=FileSource.FILESYSTEM.value,
         )
-        storage_work_session.add(
-            GroupCategoryEntry(
-                iteration_id=storage_iteration.id,
-                folder_id=1,
-                processed_name="test",
-            )
+        GroupCategoryEntryFactory(
+            iteration_id=storage_iteration.id,
+            folder_id=1,
+            processed_name="test",
         )
-        storage_work_session.commit()
 
         def resolve_categories(_index_session, _work_session, _path, _iteration_id):
             return []

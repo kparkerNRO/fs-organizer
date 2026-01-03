@@ -483,7 +483,7 @@ def apply_labels_to_samples(
     samples_by_node_id: Dict[Tuple[int, int], TrainingSample] = {}
     for snapshot_id, label_run in label_runs.items():
         samples_for_run = (
-            session.query(TrainingSample).filter_by(label_run_id=label_run.id).all()
+            session.query(TrainingSample).filter_by(label_run=label_run).all()
         )
         for sample in samples_for_run:
             if sample.node_id is not None:

@@ -151,10 +151,10 @@ def fake_storage_manager(training_session):
 def populated_training_session(training_session, label_run):
     # Use real v2 labels
     TrainingSampleFactory.create_batch(
-        10, label_run_id=label_run.id, label="asset_type"
+        10, label_run=label_run, label="asset_type"
     )
     TrainingSampleFactory.create_batch(
-        10, label_run_id=label_run.id, label="content_subject"
+        10, label_run=label_run, label="content_subject"
     )
     training_session.commit()
     return training_session
@@ -205,7 +205,7 @@ class TestPrepareTrainingData:
         """Test ValueError when samples have labels not in the taxonomy."""
         # Use a label not in v2 taxonomy
         TrainingSampleFactory(
-            label_run_id=label_run.id, label="unknown_label_not_in_v2"
+            label_run=label_run, label="unknown_label_not_in_v2"
         )
         training_session.commit()
 
@@ -242,10 +242,10 @@ class TestPrepareTrainingData:
         """Test that hard negative mining is called when enabled, using the v2 taxonomy."""
         # Use valid v2 labels for the samples
         TrainingSampleFactory.create_batch(
-            5, label_run_id=label_run.id, label="asset_type"
+            5, label_run=label_run, label="asset_type"
         )
         TrainingSampleFactory.create_batch(
-            5, label_run_id=label_run.id, label="content_subject"
+            5, label_run=label_run, label="content_subject"
         )
         training_session.commit()
 

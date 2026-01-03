@@ -9,18 +9,29 @@ from faker import Faker
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from storage.factories import (
+    ClassificationFactory,
+    FileMappingFactory,
+    FolderStructureFactory,
+    GroupCategoryEntryFactory,
+    GroupCategoryFactory,
+    GroupEntryFactory,
+    GroupIterationFactory,
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
     FileNodeFactory,
+    RunFactory,
     SamplePredictionFactory,
     SnapshotFactory,
+    StageStateFactory,
     TrainingSampleFactory,
+    WorkMetaFactory,
+    PartialNameCategoryFactory,
 )
 from storage.index_models import IndexBase
 from storage.manager import StorageManager
 from storage.training_models import TrainingBase
-from storage.work_models import GroupIteration, Run, WorkBase
+from storage.work_models import WorkBase
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -67,6 +78,17 @@ def storage_index_session(storage_manager):
 def storage_work_session(storage_manager):
     """Create a work session backed by StorageManager."""
     with storage_manager.get_work_session() as session:
+        RunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        StageStateFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupIterationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupCategoryEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        PartialNameCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        ClassificationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FolderStructureFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FileMappingFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        WorkMetaFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 
@@ -81,6 +103,17 @@ def work_session(storage_work_session):
     WorkBase.metadata.create_all(engine)
 
     with Session(engine) as session:
+        RunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        StageStateFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupIterationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        GroupCategoryEntryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        PartialNameCategoryFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        ClassificationFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FolderStructureFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FileMappingFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        WorkMetaFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 
@@ -92,6 +125,7 @@ def index_session():
 
     with Session(engine) as session:
         NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FileNodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
@@ -139,41 +173,25 @@ def storage_snapshot(storage_index_session):
 @pytest.fixture
 def storage_run(storage_work_session, storage_snapshot):
     """Create a Run tied to the storage snapshot."""
-    run = Run(
-        id=1,
+    return RunFactory(
         snapshot_id=storage_snapshot.snapshot_id,
         started_at=datetime.now().isoformat(),
-        status="running",
     )
-    storage_work_session.add(run)
-    storage_work_session.commit()
-    return run
 
 
 @pytest.fixture
 def storage_iteration(storage_work_session, storage_run):
     """Create a GroupIteration for storage-backed tests."""
-    iteration = GroupIteration(
-        id=1,
-        run_id=storage_run.id,
-        snapshot_id=storage_run.snapshot_id,
+    return GroupIterationFactory(
         description="test iteration",
+        run=storage_run,
     )
-    storage_work_session.add(iteration)
-    storage_work_session.commit()
-    return iteration
 
 
 @pytest.fixture
 def sample_run(work_session):
     """Create a sample Run for testing."""
-
-    run = Run(
-        id=1, snapshot_id=1, started_at=datetime.now().isoformat(), status="running"
-    )
-    work_session.add(run)
-    work_session.commit()
-    return run
+    return RunFactory(snapshot_id=1, started_at=datetime.now().isoformat())
 
 
 @pytest.fixture
@@ -182,12 +200,7 @@ def sample_iteration(work_session, sample_run):
 
     Returns a GroupIteration with id=1, run_id=1, snapshot_id=1.
     """
-    iteration = GroupIteration(
-        id=1,
-        run_id=sample_run.id,
-        snapshot_id=sample_run.snapshot_id,
+    return GroupIterationFactory(
+        run=sample_run,
         description="test iteration",
     )
-    work_session.add(iteration)
-    work_session.commit()
-    return iteration

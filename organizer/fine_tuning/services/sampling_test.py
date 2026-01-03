@@ -515,14 +515,14 @@ class TestApplyLabelsToSamples:
         """Test applying labels to samples"""
         # Create samples with known IDs and without labels to start
         s1 = TrainingSampleFactory(
-            label_run_id=label_run.id,
+            label_run=label_run,
             snapshot_id=1,
             node_id=100,
             name_raw="test1",
             label=None,
         )
         s2 = TrainingSampleFactory(
-            label_run_id=label_run.id,
+            label_run=label_run,
             snapshot_id=1,
             node_id=101,
             name_raw="test2",
@@ -551,7 +551,7 @@ class TestApplyLabelsToSamples:
     def test_apply_labels_with_split(self, training_session, label_run):
         """Test applying labels with split assignment"""
         sample = TrainingSampleFactory(
-            label_run_id=label_run.id,
+            label_run=label_run,
             snapshot_id=1,
             node_id=100,
             name_raw="test",

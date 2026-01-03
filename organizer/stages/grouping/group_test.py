@@ -1,13 +1,11 @@
 import pytest
-from storage.factories import NodeFactory
+from storage.factories import (
+    GroupCategoryEntryFactory,
+    GroupIterationFactory,
+    NodeFactory,
+)
 from storage.manager import NodeKind
-from storage.work_models import (
-    GroupCategory,
-    GroupCategoryEntry,
-)
-from storage.work_models import (
-    GroupIteration as GroupingIteration,
-)
+from storage.work_models import GroupCategory, GroupCategoryEntry
 
 from stages.grouping.group import (
     group_folders,
@@ -64,44 +62,38 @@ def test_refine_groups_singletons(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupingIteration(
+    iteration0 = GroupIterationFactory(
         id=0,
         description="test iteration 0",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    iteration1 = GroupingIteration(
+    GroupIterationFactory(
         id=1,
         description="test iteration 1",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    work_session.add_all([iteration0, iteration1])
-    work_session.commit()
 
     # Set up entries with different cluster IDs (singletons)
     entries = [
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
             cluster_id=1,
             pre_processed_name="apple",
             processed_name="apple",
             path="/test/apple",
             confidence=1.0,
-            iteration_id=0,
+            iteration_id=iteration0.id,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
             cluster_id=2,
             pre_processed_name="banana",
             processed_name="banana",
             path="/test/banana",
             confidence=1.0,
-            iteration_id=0,
+            iteration_id=iteration0.id,
         ),
     ]
-    work_session.add_all(entries)
-    work_session.commit()
 
     # Run the function
     next_group_id = 1
@@ -124,53 +116,47 @@ def test_refine_groups_clusters(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupingIteration(
+    iteration0 = GroupIterationFactory(
         id=0,
         description="test iteration 0",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    iteration1 = GroupingIteration(
+    GroupIterationFactory(
         id=1,
         description="test iteration 1",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    work_session.add_all([iteration0, iteration1])
-    work_session.commit()
 
     # Set up entries with same cluster ID for apple items
     entries = [
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=1,
             cluster_id=1,
             pre_processed_name="apple pie",
             processed_name="apple pie",
             path="/test/apple pie",
             confidence=1.0,
-            iteration_id=0,
+            iteration_id=iteration0.id,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=2,
             cluster_id=1,
             pre_processed_name="apple tart",
             processed_name="apple tart",
             path="/test/apple tart",
             confidence=1.0,
-            iteration_id=0,
+            iteration_id=iteration0.id,
         ),
-        GroupCategoryEntry(
+        GroupCategoryEntryFactory(
             folder_id=3,
             cluster_id=2,
             pre_processed_name="banana",
             processed_name="banana",
             path="/test/banana",
             confidence=1.0,
-            iteration_id=0,
+            iteration_id=iteration0.id,
         ),
     ]
-    work_session.add_all(entries)
-    work_session.commit()
 
     # Run the function
     next_group_id = 1

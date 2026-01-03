@@ -23,10 +23,10 @@ class TestLoadSamples:
     def test_load_all_samples(self, training_session, label_run):
         """Test loading all samples without filters"""
         created_samples = TrainingSampleFactory.create_batch(
-            2, label_run_id=label_run.id
+            2, label_run=label_run
         )
         created_samples.append(
-            TrainingSampleFactory(label_run_id=label_run.id, label=None)
+            TrainingSampleFactory(label_run=label_run, label=None)
         )
 
         loaded = load_samples(training_session)
@@ -47,9 +47,9 @@ class TestLoadSamples:
         self, training_session, label_run, split, expected_count
     ):
         """Test loading samples filtered by split"""
-        TrainingSampleFactory(label_run_id=label_run.id, split="train")
-        TrainingSampleFactory(label_run_id=label_run.id, split="validation")
-        TrainingSampleFactory(label_run_id=label_run.id, split="test")
+        TrainingSampleFactory(label_run=label_run, split="train")
+        TrainingSampleFactory(label_run=label_run, split="validation")
+        TrainingSampleFactory(label_run=label_run, split="test")
 
         loaded = load_samples(training_session, split=split)
         assert len(loaded) == expected_count
@@ -58,9 +58,9 @@ class TestLoadSamples:
 
     def test_load_labeled_only(self, training_session, label_run):
         """Test loading only labeled samples"""
-        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
-        TrainingSampleFactory(label_run_id=label_run.id, label=None)
-        TrainingSampleFactory(label_run_id=label_run.id, label="")
+        TrainingSampleFactory(label_run=label_run, label="asset_type")
+        TrainingSampleFactory(label_run=label_run, label=None)
+        TrainingSampleFactory(label_run=label_run, label="")
 
         loaded = load_samples(training_session, labeled_only=True)
         assert len(loaded) == 1
@@ -70,8 +70,8 @@ class TestLoadSamples:
         """Test loading samples filtered by label run ID"""
         label_run2 = LabelRunFactory(snapshot_id=2)
 
-        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
-        TrainingSampleFactory(label_run_id=label_run2.id, label="content_subject")  # type: ignore[attr-defined]
+        TrainingSampleFactory(label_run=label_run, label="asset_type")
+        TrainingSampleFactory(label_run=label_run2, label="content_subject")  # type: ignore[attr-defined]
 
         loaded = load_samples(training_session, label_run_id=label_run.id)
         assert len(loaded) == 1
@@ -80,12 +80,12 @@ class TestLoadSamples:
     def test_load_combined_filters(self, training_session, label_run):
         """Test loading samples with multiple filters combined"""
         TrainingSampleFactory(
-            label_run_id=label_run.id, label="asset_type", split="train"
+            label_run=label_run, label="asset_type", split="train"
         )
         TrainingSampleFactory(
-            label_run_id=label_run.id, label="content_subject", split="validation"
+            label_run=label_run, label="content_subject", split="validation"
         )
-        TrainingSampleFactory(label_run_id=label_run.id, label=None, split="train")
+        TrainingSampleFactory(label_run=label_run, label=None, split="train")
 
         loaded = load_samples(
             training_session,
