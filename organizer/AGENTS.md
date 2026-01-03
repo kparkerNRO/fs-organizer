@@ -4,6 +4,7 @@
 * Use `type | None` instead of `Optional[type]`, and prefer python primitives rather than importing from typing
 * always run tests and `just pre-commit` before declaring a refactoring task done
 * Use enums instead of string literals when there are fixed categories to chose between
+* always put imports at the top of files
 
 ## Testing conventions
 * Use pytest with fixtures and parameterized tests for test cases

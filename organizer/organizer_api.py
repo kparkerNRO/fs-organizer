@@ -18,7 +18,6 @@ from storage.work_models import (
     FolderStructure,
     GroupCategory,
     GroupCategoryEntry,
-    Run,
 )
 from api.api import (
     Category as CategoryAPI,
@@ -32,6 +31,7 @@ from api.api import (
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from storage.id_defaults import get_latest_run
 from storage.manager import StorageManager
 
 # Configure logging to INFO level
@@ -68,16 +68,6 @@ def get_db_session():
     storage = StorageManager(Path(db_path).parent)
     with storage.get_work_session() as session:
         yield session
-
-
-def get_latest_run(storage: StorageManager) -> Run | None:
-    """Return the most recent run in work.db."""
-    with storage.get_work_session() as session:
-        return (
-            session.execute(select(Run).order_by(Run.id.desc()).limit(1))
-            .scalars()
-            .first()
-        )
 
 
 def get_folder_structure_from_db(

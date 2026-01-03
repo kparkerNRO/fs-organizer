@@ -11,6 +11,7 @@ from stages.folder_reconstruction import (
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from storage.id_defaults import get_latest_run_for_snapshot
 from storage.manager import StorageManager
 from storage.work_models import Run
 from utils.export_structure import export_snapshot_structure
@@ -49,18 +50,11 @@ app.add_typer(fine_tuning_app, name="model")
 
 
 def _get_latest_run(storage_manager: StorageManager, snapshot_id: int) -> Run:
-    with storage_manager.get_work_session() as session:
-        run = (
-            session.query(Run)
-            .filter(Run.snapshot_id == snapshot_id)
-            .order_by(Run.id.desc())
-            .first()
-        )
-        if run is None:
-            typer.echo("Error: no run found for snapshot.", err=True)
-            raise typer.Exit(1)
-        session.expunge(run)
-        return run
+    run = get_latest_run_for_snapshot(storage_manager, snapshot_id)
+    if run is None:
+        typer.echo("Error: no run found for snapshot.", err=True)
+        raise typer.Exit(1)
+    return run
 
 
 @app.command()
