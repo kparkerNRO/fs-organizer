@@ -1,17 +1,14 @@
 from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from pathlib import Path
 import json
-import logging
 import shutil
-import sys
+import uuid
+import asyncio
 from datetime import datetime
-from typing import Dict
+from enum import Enum
+from typing import Dict, Any
 
 from sqlalchemy import Cast, String, select
-from sqlalchemy.orm import aliased
-from sqlalchemy.sql import func
-from fastapi.middleware.cors import CORSMiddleware
-
 from api.models import GatherRequest, AsyncTaskResponse
 from api.tasks import TaskInfo, tasks, update_task, TaskStatus, create_task
 from data_models.database import (
@@ -21,31 +18,31 @@ from data_models.database import (
     GroupCategoryEntry,
     setup_gather,
 )
+
 from api.api import (
     Category as CategoryAPI,
     CategoryResponse,
-    FolderV2,
     SortColumn,
     SortOrder,
     StructureType,
     FolderViewResponse,
 )
-from stages.gather import gather_folder_structure_and_store
-from stages.grouping.group import group_folders
-from stages.categorize import calculate_folder_structure
-from storage.manager import StorageManager
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import func
+from fastapi.middleware.cors import CORSMiddleware
 
-# Configure logging to INFO level
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger(__name__)
+from pipeline.gather import gather_folder_structure_and_store, clean_file_name_post
+from pipeline.classify import classify_folders
+from grouping.group import group_folders
+from pipeline.categorize import calculate_folder_structure
+from pipeline.folder_reconstruction import get_folder_heirarchy
+from utils.filename_utils import find_shared_word_sequence, find_longest_common_prefix
+from pydantic import BaseModel
+
 
 app = FastAPI()
 app.add_middleware(
-    CORSMiddleware,  # type: ignore[arg-type]  # ty bug: FastAPI accepts middleware classes directly
+    CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -56,12 +53,24 @@ db_path = "outputs/latest/latest.db"
 output_dir = "outputs"
 
 
-@app.on_event("startup")  # type: ignore[deprecated]
-async def startup_event():
-    """Log when the API server starts"""
-    logger.info("FS-Organizer API server starting up")
-    logger.info(f"Database path: {db_path}")
-    logger.info(f"Output directory: {output_dir}")
+class FindSharedStringRequest(BaseModel):
+    names: list[str]
+
+
+@app.post("/api/find_shared_word_sequence")
+async def api_find_shared_word_sequence(request: FindSharedStringRequest) -> dict:
+    """
+    Find the longest shared sequence of whole words amongst a list of strings
+    """
+    return {"shared_string": find_shared_word_sequence(request.names)}
+
+
+@app.post("/api/find_longest_common_prefix")
+async def api_find_longest_common_prefix(request: FindSharedStringRequest) -> dict:
+    """
+    Find the longest common prefix amongst a list of strings
+    """
+    return {"shared_string": find_longest_common_prefix(request.names)}
 
 
 def get_db_session():
@@ -129,25 +138,22 @@ def sort_folder_structure(folder_data: dict) -> dict:
 async def get_groups(
     page: int = 1,
     page_size: int = 10,
-    sort_column: SortColumn = SortColumn.NAME,
+    sort_column: SortColumn = SortColumn.name,
     sort_order: SortOrder = SortOrder.asc,
     db=Depends(get_db_session),
 ) -> CategoryResponse:
     """
     Get the pre-calculated grouping with pagination
     """
-    logger.info(
-        f"GET /groups - page: {page}, page_size: {page_size}, sort: {sort_column}:{sort_order}"
-    )
     CategoryEntry = aliased(GroupCategoryEntry)
 
     offset = (page - 1) * page_size
 
     sort_column_to_attr = {
-        SortColumn.NAME: GroupCategory.name,
-        SortColumn.COUNT: GroupCategory.count,
-        SortColumn.CONFIDENCE: GroupCategory.group_confidence,
-        SortColumn.ID: GroupCategory.id,
+        SortColumn.name: GroupCategory.name,
+        SortColumn.count: GroupCategory.count,
+        SortColumn.confidence: GroupCategory.group_confidence,
+        SortColumn.id: GroupCategory.id,
     }
 
     sort_attr = sort_column_to_attr[sort_column]
@@ -180,7 +186,7 @@ async def get_groups(
                 )
             ).label("children"),
         )
-        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
         .group_by(GroupCategory.id)
         .order_by(sort_attr)
@@ -192,7 +198,7 @@ async def get_groups(
 
     total_items_query = (
         db.query(func.count(func.distinct(GroupCategory.id)))
-        .join(CategoryEntry, CategoryEntry.group_id == GroupCategory.id)
+        .join(CategoryEntry, CategoryEntry.new_group_id == GroupCategory.id)
         .filter(GroupCategory.group_confidence < 1.0)
     )
     total_items = db.execute(total_items_query).scalar()
@@ -215,7 +221,6 @@ async def get_groups(
 async def get_folders(
     session=Depends(get_db_session),
 ):
-    logger.info("GET /folders")
     newest_entry = session.execute(
         select(FolderStructure)
         .where(FolderStructure.structure_type == StructureType.organized)
@@ -237,10 +242,7 @@ async def get_folders(
     sorted_original = sort_folder_structure(parsed_old_entry)
     sorted_new = sort_folder_structure(parsed_new_entry)
 
-    return FolderViewResponse(
-        original=FolderV2.model_validate(sorted_original),
-        new=FolderV2.model_validate(sorted_new),
-    )
+    return FolderViewResponse(original=sorted_original, new=sorted_new)
 
 
 @app.get("/api/tasks/{task_id}")
@@ -283,27 +285,6 @@ async def get_folders_structure():
     if structure is None:
         raise HTTPException(status_code=404, detail="No organized structure found")
     return {"folder_structure": structure}
-
-
-@app.get("/api/status")
-async def get_pipeline_status():
-    """Check which pipeline stages have available data"""
-    logger.info("GET /api/status - checking pipeline stages")
-
-    has_gather = (
-        get_folder_structure_from_db(db_path, StructureType.original) is not None
-    )
-    has_group = get_folder_structure_from_db(db_path, StructureType.grouped) is not None
-    has_folders = (
-        get_folder_structure_from_db(db_path, StructureType.organized) is not None
-    )
-
-    return {
-        "has_gather": has_gather,
-        "has_group": has_group,
-        "has_folders": has_folders,
-        "db_path": db_path,
-    }
 
 
 def run_gather_task(task_id: str, base_path_str: str):
@@ -370,7 +351,7 @@ def run_gather_task(task_id: str, base_path_str: str):
             "db_path": str(db_path),
             "run_dir": str(run_dir),
             "folder_structure": get_folder_structure_from_db(
-                str(db_path), StructureType.original
+                db_path, StructureType.original
             ),
         }
 
@@ -394,13 +375,11 @@ async def api_gather(
     API endpoint version of the gather command (async).
     Returns a task ID that can be used to track progress.
     """
-    logger.info(f"POST /api/gather - base_path: {request.base_path}")
     task_id = create_task("Gather task created")
 
     # Start the background task
     background_tasks.add_task(run_gather_task, task_id, request.base_path)
 
-    logger.info(f"Gather task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Gather task started", status=TaskStatus.PENDING
     )
@@ -429,22 +408,22 @@ def run_group_task(task_id: str):
 
         update_task(task_id, message="Classifying folders", progress=0.2)
 
+        # Run classification first
+        # classify_folders(db_path_obj)
+
         # update_task(task_id, message="Grouping folders", progress=0.5)
 
         # Run grouping
-        storage_manager = StorageManager(db_path_obj.parent)
-        group_folders(storage_manager)
+        group_folders(db_path_obj)
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 
-        calculate_folder_structure(Path(db_path), structure_type=StructureType.grouped)
+        calculate_folder_structure(db_path, structure_type=StructureType.grouped)
 
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
         # Get folder structure if available
-        folder_structure = get_folder_structure_from_db(
-            db_path, stage=StructureType.grouped
-        )
+        folder_structure = get_folder_structure_from_db(db_path, stage=StructureType.grouped)
 
         result = {"message": "Grouping complete", "folder_structure": folder_structure}
 
@@ -466,13 +445,11 @@ async def api_group(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     API endpoint version of the group command (async).
     Returns a task ID that can be used to track progress.
     """
-    logger.info("POST /api/group")
     task_id = create_task("Group task created")
 
     # Start the background task
     background_tasks.add_task(run_group_task, task_id)
 
-    logger.info(f"Group task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Group task started", status=TaskStatus.PENDING
     )
@@ -506,9 +483,7 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
-        calculate_folder_structure(
-            Path(db_path), structure_type=StructureType.organized
-        )
+        calculate_folder_structure(db_path, structure_type=StructureType.organized)
 
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(
@@ -538,13 +513,11 @@ async def api_folders(background_tasks: BackgroundTasks) -> AsyncTaskResponse:
     API endpoint version of the folders command (async).
     Returns a task ID that can be used to track progress.
     """
-    logger.info("POST /api/folders")
     task_id = create_task("Folders task created")
 
     # Start the background task
     background_tasks.add_task(run_folders_task, task_id)
 
-    logger.info(f"Folders task created with ID: {task_id}")
     return AsyncTaskResponse(
         task_id=task_id, message="Folders task started", status=TaskStatus.PENDING
     )

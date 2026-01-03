@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { FolderV2 } from "../types/types";
+import { FolderV2, File, FolderViewResponse } from "../types/types";
 import {
   FolderTreeNode,
   FolderTreePath,
@@ -10,10 +10,9 @@ import {
   moveNode,
   findNodeByPath,
   findParentByPath,
+  isFileNode,
   flattenFolders,
   invertFolder,
-  deleteFolders,
-  createFolder,
 } from "../utils/folderTreeOperations";
 
 export interface FolderTreeState {
@@ -35,35 +34,45 @@ export interface FolderTreeState {
 
 export interface FolderTreeActions {
   // Tree management
-  setTreeData: (tree: FolderV2 | null) => void;
+  setTreeData: (
+    folderViewResponse: FolderViewResponse | null,
+    viewType: "ORIGINAL" | "NEW"
+  ) => void;
   resetToOriginal: () => void;
 
   // Node operations
   renameItem: (
     targetPath: FolderTreePath,
-    newName: string,
-  ) => Promise<FolderTreeOperationResult>;
-  createFolder: (
-    parentPath: FolderTreePath,
-    folderName: string,
-  ) => Promise<FolderTreeOperationResult>;
-  mergeItems: (
-    sourcePaths: FolderTreePath[],
-    targetName: string,
+    newName: string
   ) => Promise<FolderTreeOperationResult>;
   moveItem: (
     sourcePath: FolderTreePath,
-    targetPath: FolderTreePath,
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
-  deleteItems: (
-    targetPaths: FolderTreePath[],
+  mergeItems: (
+    sourcePaths: FolderTreePath[]
+  ) => Promise<FolderTreeOperationResult>;
+  deleteItem: (
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
   flattenItems: (
-    sourcePaths: FolderTreePath[],
+    sourcePaths: FolderTreePath[]
   ) => Promise<FolderTreeOperationResult>;
   invertItems: (
-    targetPath: FolderTreePath,
+    targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
+
+  // Selection management
+  selectFile: (fileId: number | null) => void;
+  selectFolder: (folderPath: string | null) => void;
+  selectMultipleFolders: (folderPaths: string[]) => void;
+  clearSelection: () => void;
+
+  // Tree navigation
+  expandFolder: (folderPath: string) => void;
+  collapseFolder: (folderPath: string) => void;
+  toggleFolder: (folderPath: string) => void;
+  expandToFile: (fileId: number) => void;
 
   // Utility functions
   findNode: (targetPath: FolderTreePath) => FolderTreeNode | null;
@@ -71,9 +80,28 @@ export interface FolderTreeActions {
     parent: FolderV2 | null;
     parentPath: string;
   };
+  isNodeSelected: (node: FolderTreeNode, nodePath: string) => boolean;
 }
 
 export type UseFolderTreeReturn = FolderTreeState & FolderTreeActions;
+
+// Helper function to get file path in tree
+const getFilePathInTree = (
+  tree: FolderV2 | File,
+  fileId: number,
+  path: string[] = []
+): string[] | null => {
+  if (isFileNode(tree) && tree.id === fileId) {
+    return path;
+  }
+  if (!isFileNode(tree) && tree.children) {
+    for (const child of tree.children) {
+      const childPath = getFilePathInTree(child, fileId, [...path, tree.name]);
+      if (childPath) return childPath;
+    }
+  }
+  return null;
+};
 
 export const useFolderTree = (): UseFolderTreeReturn => {
   // State management
@@ -95,17 +123,28 @@ export const useFolderTree = (): UseFolderTreeReturn => {
   }, [state.modifiedTree, state.originalTree]);
 
   // Tree management actions
-  const setTreeData = useCallback((tree: FolderV2 | null) => {
-    setState((prev) => ({
-      ...prev,
-      originalTree: tree,
-      modifiedTree: null,
-      hasModifications: false,
-      selectedFileId: null,
-      selectedFolderPaths: [],
-      operationHistory: [],
-    }));
-  }, []);
+  const setTreeData = useCallback(
+    (
+      folderViewResponse: FolderViewResponse | null,
+      viewType: "ORIGINAL" | "NEW"
+    ) => {
+      const tree =
+        folderViewResponse &&
+        (viewType === "NEW"
+          ? folderViewResponse.new
+          : folderViewResponse.original);
+      setState((prev) => ({
+        ...prev,
+        originalTree: tree,
+        modifiedTree: null,
+        hasModifications: false,
+        selectedFileId: null,
+        selectedFolderPaths: [],
+        operationHistory: [],
+      }));
+    },
+    []
+  );
 
   const resetToOriginal = useCallback(() => {
     setState((prev) => ({
@@ -120,7 +159,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
   const renameItem = useCallback(
     async (
       targetPath: FolderTreePath,
-      newName: string,
+      newName: string
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -158,13 +197,12 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to rename item" };
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
   const mergeItems = useCallback(
     async (
-      sourcePaths: FolderTreePath[],
-      targetName: string,
+      sourcePaths: FolderTreePath[]
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -173,7 +211,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
       setState((prev) => ({ ...prev, isOperationInProgress: true }));
 
       try {
-        const result = mergeFolders(activeTree, sourcePaths);
+        const result = await mergeFolders(activeTree, sourcePaths);
 
         if (result.success && result.newTree) {
           const operation: FolderTreeOperation = {
@@ -182,7 +220,6 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             targetNodes: sourcePaths
               .map((path) => findNodeByPath(activeTree, path))
               .filter(Boolean) as FolderTreeNode[],
-            newName: targetName,
           };
 
           setState((prev) => ({
@@ -205,13 +242,13 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to merge items" };
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
   const moveItem = useCallback(
     async (
       sourcePath: FolderTreePath,
-      targetPath: FolderTreePath,
+      targetPath: FolderTreePath
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -249,12 +286,12 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to move item" };
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
   const flattenItems = useCallback(
     async (
-      sourcePaths: FolderTreePath[],
+      sourcePaths: FolderTreePath[]
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -294,53 +331,21 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to flatten items" };
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
-  const deleteItems = useCallback(
-    async (
-      targetPaths: FolderTreePath[],
-    ): Promise<FolderTreeOperationResult> => {
-      if (!activeTree) {
-        return { success: false, error: "No tree data available" };
-      }
-
-      setState((prev) => ({ ...prev, isOperationInProgress: true }));
-
-      try {
-        const result = deleteFolders(activeTree, targetPaths);
-
-        if (result.success && result.newTree) {
-          const operation: FolderTreeOperation = {
-            type: "delete",
-            sourcePath: targetPaths[0], // Use first path as primary
-          };
-
-          setState((prev) => ({
-            ...prev,
-            modifiedTree: result.newTree!,
-            hasModifications: true,
-            lastOperation: operation,
-            operationHistory: [...prev.operationHistory, operation],
-            isOperationInProgress: false,
-            selectedFolderPaths: [], // Clear selection after tree modification
-            selectedFileId: null, // Clear file selection too
-          }));
-        } else {
-          setState((prev) => ({ ...prev, isOperationInProgress: false }));
-        }
-
-        return result;
-      } catch {
-        setState((prev) => ({ ...prev, isOperationInProgress: false }));
-        return { success: false, error: "Failed to delete item" };
-      }
+  const deleteItem = useCallback(
+    async (): Promise<FolderTreeOperationResult> => {
+      // Placeholder for delete operation
+      return { success: false, error: "Delete operation not implemented yet" };
     },
-    [activeTree],
+    []
   );
 
   const invertItems = useCallback(
-    async (targetPath: FolderTreePath): Promise<FolderTreeOperationResult> => {
+    async (
+      targetPath: FolderTreePath
+    ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
       }
@@ -376,51 +381,88 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         return { success: false, error: "Failed to invert folder" };
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
-  const createFolderMethod = useCallback(
-    async (
-      parentPath: FolderTreePath,
-      folderName: string,
-    ): Promise<FolderTreeOperationResult> => {
-      if (!activeTree) {
-        return { success: false, error: "No tree data available" };
+  // Selection management
+  const selectFile = useCallback((fileId: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFileId: fileId,
+      selectedFolderPaths: fileId ? [] : prev.selectedFolderPaths, // Clear folder selection when file is selected
+    }));
+  }, []);
+
+  const selectFolder = useCallback((folderPath: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFolderPaths: folderPath ? [folderPath] : [],
+      selectedFileId: folderPath ? null : prev.selectedFileId, // Clear file selection when folder is selected
+    }));
+  }, []);
+
+  const selectMultipleFolders = useCallback((folderPaths: string[]) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFolderPaths: folderPaths,
+      selectedFileId: folderPaths.length > 0 ? null : prev.selectedFileId,
+    }));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      selectedFileId: null,
+      selectedFolderPaths: [],
+    }));
+  }, []);
+
+  // Tree navigation
+  const expandFolder = useCallback((folderPath: string) => {
+    setState((prev) => ({
+      ...prev,
+      expandedFolders: new Set([...prev.expandedFolders, folderPath]),
+    }));
+  }, []);
+
+  const collapseFolder = useCallback((folderPath: string) => {
+    setState((prev) => {
+      const newSet = new Set(prev.expandedFolders);
+      newSet.delete(folderPath);
+      return { ...prev, expandedFolders: newSet };
+    });
+  }, []);
+
+  const toggleFolder = useCallback((folderPath: string) => {
+    setState((prev) => {
+      const newSet = new Set(prev.expandedFolders);
+      if (newSet.has(folderPath)) {
+        newSet.delete(folderPath);
+      } else {
+        newSet.add(folderPath);
       }
+      return { ...prev, expandedFolders: newSet };
+    });
+  }, []);
 
-      setState((prev) => ({ ...prev, isOperationInProgress: true }));
+  const expandToFile = useCallback(
+    (fileId: number) => {
+      if (!activeTree) return;
 
-      try {
-        const result = createFolder(activeTree, parentPath, folderName);
-
-        if (result.success && result.newTree) {
-          const operation: FolderTreeOperation = {
-            type: "create",
-            sourcePath: parentPath,
-            newName: folderName,
-          };
-
-          setState((prev) => ({
-            ...prev,
-            modifiedTree: result.newTree!,
-            hasModifications: true,
-            lastOperation: operation,
-            operationHistory: [...prev.operationHistory, operation],
-            isOperationInProgress: false,
-            selectedFolderPaths: [], // Clear selection after tree modification
-            selectedFileId: null, // Clear file selection too
-          }));
-        } else {
-          setState((prev) => ({ ...prev, isOperationInProgress: false }));
-        }
-
-        return result;
-      } catch {
-        setState((prev) => ({ ...prev, isOperationInProgress: false }));
-        return { success: false, error: "Failed to create folder" };
+      const path = getFilePathInTree(activeTree, fileId);
+      if (path) {
+        setState((prev) => {
+          const newSet = new Set(prev.expandedFolders);
+          let currentPath = "";
+          for (const segment of path) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            newSet.add(currentPath);
+          }
+          return { ...prev, expandedFolders: newSet };
+        });
       }
     },
-    [activeTree],
+    [activeTree]
   );
 
   // Utility functions
@@ -428,7 +470,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     (targetPath: FolderTreePath): FolderTreeNode | null => {
       return activeTree ? findNodeByPath(activeTree, targetPath) : null;
     },
-    [activeTree],
+    [activeTree]
   );
 
   const getNodeParent = useCallback(
@@ -437,7 +479,18 @@ export const useFolderTree = (): UseFolderTreeReturn => {
         ? findParentByPath(activeTree, targetPath)
         : { parent: null, parentPath: "" };
     },
-    [activeTree],
+    [activeTree]
+  );
+
+  const isNodeSelected = useCallback(
+    (node: FolderTreeNode, nodePath: string): boolean => {
+      if (isFileNode(node)) {
+        return state.selectedFileId === node.id;
+      } else {
+        return state.selectedFolderPaths.includes(nodePath);
+      }
+    },
+    [state.selectedFileId, state.selectedFolderPaths]
   );
 
   return {
@@ -448,13 +501,21 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     setTreeData,
     resetToOriginal,
     renameItem,
-    createFolder: createFolderMethod,
     moveItem,
     mergeItems,
-    deleteItems,
+    deleteItem,
     flattenItems,
     invertItems,
+    selectFile,
+    selectFolder,
+    selectMultipleFolders,
+    clearSelection,
+    expandFolder,
+    collapseFolder,
+    toggleFolder,
+    expandToFile,
     findNode,
     getNodeParent,
+    isNodeSelected,
   };
 };
