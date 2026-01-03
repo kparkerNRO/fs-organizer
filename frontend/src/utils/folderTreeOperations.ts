@@ -140,16 +140,19 @@ export const renameNode = (
     setConfidenceToMax(node);
   }
 
-  // Sort the parent folder's children since renaming might affect alphabetical order
-  const { parent } = findParentByPath(newTree, targetPath);
-  if (parent && parent.children) {
-    sortFolderChildren(parent);
-  }
-
   // Calculate new path for the renamed node
   const pathParts = targetPath.split("/");
   pathParts[pathParts.length - 1] = newName.trim();
   const newPath = pathParts.join("/");
+
+  // Sort the parent folder's children since renaming might affect alphabetical order
+  const { parent } = findParentByPath(newTree, newPath);
+  if (parent && parent.children) {
+    sortFolderChildren(parent);
+  } else if (newPath === newTree.name) {
+    // If the root node was renamed, sort its children
+    sortFolderChildren(newTree);
+  }
 
   return {
     success: true,
