@@ -54,7 +54,7 @@ def process_folders_to_groups(
     work_session.add(iteration)
     work_session.commit()
 
-    folders = index_session.query(Node).all()
+    folders = index_session.query(Node).filter(Node.kind == "dir").all()
     for folder in folders:
         # Clean the folder name for processing
         cleaned_name = clean_filename(folder.name)
@@ -351,7 +351,7 @@ def compact_groups(
     work_session.add(iteration)
     work_session.commit()
 
-    folders = index_session.execute(select(Node)).scalars().all()
+    folders = index_session.execute(select(Node).where(Node.kind == "dir")).scalars().all()
     for folder in folders:
         groups = (
             work_session.execute(
