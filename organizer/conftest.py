@@ -183,7 +183,6 @@ def storage_run(storage_work_session, storage_snapshot):
 def storage_iteration(storage_work_session, storage_run):
     """Create a GroupIteration for storage-backed tests."""
     return GroupIterationFactory(
-        description="test iteration",
         run=storage_run,
     )
 
@@ -202,5 +201,4 @@ def sample_iteration(work_session, sample_run):
     """
     return GroupIterationFactory(
         run=sample_run,
-        description="test iteration",
     )

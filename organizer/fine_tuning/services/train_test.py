@@ -150,12 +150,8 @@ def fake_storage_manager(training_session):
 @pytest.fixture
 def populated_training_session(training_session, label_run):
     # Use real v2 labels
-    TrainingSampleFactory.create_batch(
-        10, label_run=label_run, label="asset_type"
-    )
-    TrainingSampleFactory.create_batch(
-        10, label_run=label_run, label="content_subject"
-    )
+    TrainingSampleFactory.create_batch(10, label_run=label_run, label="asset_type")
+    TrainingSampleFactory.create_batch(10, label_run=label_run, label="content_subject")
     training_session.commit()
     return training_session
 
@@ -204,9 +200,7 @@ class TestPrepareTrainingData:
     def test_unknown_labels(self, fake_storage_manager, training_session, label_run):
         """Test ValueError when samples have labels not in the taxonomy."""
         # Use a label not in v2 taxonomy
-        TrainingSampleFactory(
-            label_run=label_run, label="unknown_label_not_in_v2"
-        )
+        TrainingSampleFactory(label_run=label_run, label="unknown_label_not_in_v2")
         training_session.commit()
 
         config = TrainConfigSettings()
@@ -241,9 +235,7 @@ class TestPrepareTrainingData:
     ):
         """Test that hard negative mining is called when enabled, using the v2 taxonomy."""
         # Use valid v2 labels for the samples
-        TrainingSampleFactory.create_batch(
-            5, label_run=label_run, label="asset_type"
-        )
+        TrainingSampleFactory.create_batch(5, label_run=label_run, label="asset_type")
         TrainingSampleFactory.create_batch(
             5, label_run=label_run, label="content_subject"
         )

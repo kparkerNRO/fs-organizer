@@ -26,7 +26,6 @@ def sample_folders(index_session, sample_snapshot):
             rel_path="parent_folder",
             abs_path="/test/parent_folder",
             depth=1,
-            file_source=FileSource.FILESYSTEM.value,
         ),
         NodeFactory(
             snapshot_id=sample_snapshot.snapshot_id,
@@ -35,7 +34,6 @@ def sample_folders(index_session, sample_snapshot):
             rel_path="parent_folder/child_folder",
             abs_path="/test/parent_folder/child_folder",
             depth=2,
-            file_source=FileSource.FILESYSTEM.value,
         ),
         NodeFactory(
             snapshot_id=sample_snapshot.snapshot_id,
@@ -202,7 +200,6 @@ class TestGetCategoriesForPath:
             rel_path="parent_folder/child_folder/deep",
             abs_path="/test/parent_folder/child_folder/deep",
             depth=3,
-            file_source=FileSource.FILESYSTEM.value,
         )
 
         result = get_categories_for_path(
@@ -233,7 +230,6 @@ class TestCalculateCategories:
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
             depth=1,
-            file_source=FileSource.FILESYSTEM.value,
         )
         GroupCategoryEntryFactory(
             folder_id=1,
@@ -277,7 +273,6 @@ class TestCalculateCategories:
             rel_path="first.txt",
             abs_path="/test/first.txt",
             depth=1,
-            file_source=FileSource.FILESYSTEM.value,
         )
         FileNodeFactory(
             snapshot_id=storage_snapshot.snapshot_id,
@@ -326,7 +321,6 @@ class TestCalculateCategories:
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
             depth=1,
-            file_source=FileSource.FILESYSTEM.value,
         )
         GroupCategoryEntryFactory(
             folder_id=1,
@@ -399,7 +393,6 @@ class TestCalculateCategories:
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
             depth=1,
-            file_source=FileSource.FILESYSTEM.value,
         )
         GroupCategoryEntryFactory(
             iteration_id=storage_iteration.id,

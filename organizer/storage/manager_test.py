@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from storage.factories import NodeFactory, RunFactory, SnapshotFactory
-from storage.manager import StorageManager, NodeKind, FileSource, RunStatus
+from storage.manager import StorageManager, NodeKind
 from storage.index_models import (
     IndexBase,
     Snapshot,
@@ -47,11 +47,7 @@ def work_session(storage_manager: StorageManager):
 
 @pytest.fixture
 def snapshot(index_session):
-    new_snapshot = SnapshotFactory(
-        created_at="2024-01-01T00:00:00",
-        root_path="/test",
-        root_abs_path="/test",
-    )
+    new_snapshot = SnapshotFactory()
     return new_snapshot
 
 
@@ -64,7 +60,6 @@ def node(index_session, snapshot):
         rel_path="test.txt",
         abs_path="/test/test.txt",
         depth=1,
-        file_source=FileSource.FILESYSTEM.value,
     )
     return new_node
 
@@ -75,8 +70,6 @@ def run(work_session, snapshot):
         Run,
         RunFactory(
             snapshot_id=snapshot.snapshot_id,
-            started_at="2024-01-01T00:00:00",
-            status=RunStatus.RUNNING.value,
         ),
     )
     return new_run
@@ -213,8 +206,6 @@ class TestReferentialIntegrity:
         # Create a run
         RunFactory(
             snapshot_id=snapshot.snapshot_id,
-            started_at="2024-01-01T00:00:00",
-            status=RunStatus.RUNNING.value,
         )
 
         # Now has runs
@@ -229,8 +220,6 @@ class TestReferentialIntegrity:
             Run,
             RunFactory(
                 snapshot_id=1,
-                started_at="2024-01-01T00:00:00",
-                status=RunStatus.RUNNING.value,
             ),
         )
 

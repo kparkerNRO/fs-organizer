@@ -57,7 +57,6 @@ def test_entries(work_session, sample_run, test_nodes):
         GroupIterationFactory(
             id=0,
             run=sample_run,
-            description="test iteration",
         ),
     )
 
