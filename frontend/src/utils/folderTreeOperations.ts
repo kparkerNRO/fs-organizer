@@ -1,4 +1,5 @@
 import { FolderV2, File } from "../types/types";
+import { findLongestCommonPrefix } from "../api";
 
 // Types for folder tree operations
 export type FolderTreeNode = FolderV2 | File;
@@ -376,56 +377,6 @@ export const flattenFolders = (
   };
 };
 
-/**
- * Calculate the longest string shared between all values in sourcePaths
- * @param sourcePaths
- * @returns
- */
-export const findSharedString = (sourcePaths: FolderTreePath[]): string => {
-  if (sourcePaths.length < 2) return "";
-
-  const pathNames = pathNamesToRootPath(sourcePaths);
-
-  // Helper function to find all possible contiguous word sequences in a name
-  const getAllWordSequences = (name: string): string[] => {
-    const words = name.split(/[\s]+/).filter(word => word.length > 0);
-    const sequences: string[] = [];
-    
-    // Generate all contiguous subsequences
-    for (let start = 0; start < words.length; start++) {
-      for (let end = start + 1; end <= words.length; end++) {
-        sequences.push(words.slice(start, end).join(" "));
-      }
-    }
-    
-    return sequences;
-  };
-
-  // Get all possible sequences from the first name
-  const allSequencesFromFirstName = getAllWordSequences(pathNames[0]);
-  const commonSequences: string[] = [];
-
-  for (const sequence of allSequencesFromFirstName) {
-    // Check if this sequence appears in all other names
-    const appearsInAll = pathNames.slice(1).every(name => {
-      // Check if the sequence appears as complete words (word boundaries)
-      const regex = new RegExp(`\\b${sequence.replace(/\s+/g, '\\s+')}\\b`);
-      return regex.test(name);
-    });
-    
-    if (appearsInAll) {
-      commonSequences.push(sequence);
-    }
-  }
-
-  if (commonSequences.length > 0) {
-    // Return the longest common sequence
-    return commonSequences.sort((a, b) => b.length - a.length)[0];
-  }
-
-  return "";
-};
-
 // Helper function to set confidence to 100% for impacted folders
 export const setConfidenceToMax = (node: FolderTreeNode): void => {
   if (!isFileNode(node)) {
@@ -593,10 +544,10 @@ export const moveNode = (
   };
 };
 
-export const mergeFolders = (
+export const mergeFolders = async (
   tree: FolderV2,
   sourcePaths: FolderTreePath[]
-): FolderTreeOperationResult => {
+): Promise<FolderTreeOperationResult> => {
 
   const newTree = cloneTreeNode(tree) as FolderV2;
 
@@ -605,7 +556,8 @@ export const mergeFolders = (
   }
 
   // Get the common string for all folders
-  const commonString = findSharedString(sourcePaths);
+  const pathNames = pathNamesToRootPath(sourcePaths);
+  const commonString = await findLongestCommonPrefix(pathNames);
   if (commonString === "") {
     return {
       success: false,
@@ -664,6 +616,7 @@ export const mergeFolders = (
     affectedPaths: sourcePaths,
   };
 };
+
 
 // Helper function to check if folder can be inverted with children
 export const canInvertFolder = (

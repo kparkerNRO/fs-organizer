@@ -50,8 +50,7 @@ export interface FolderTreeActions {
     targetPath: FolderTreePath
   ) => Promise<FolderTreeOperationResult>;
   mergeItems: (
-    sourcePaths: FolderTreePath[],
-    targetName: string
+    sourcePaths: FolderTreePath[]
   ) => Promise<FolderTreeOperationResult>;
   deleteItem: (
     targetPath: FolderTreePath
@@ -203,8 +202,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
 
   const mergeItems = useCallback(
     async (
-      sourcePaths: FolderTreePath[],
-      targetName: string
+      sourcePaths: FolderTreePath[]
     ): Promise<FolderTreeOperationResult> => {
       if (!activeTree) {
         return { success: false, error: "No tree data available" };
@@ -213,7 +211,7 @@ export const useFolderTree = (): UseFolderTreeReturn => {
       setState((prev) => ({ ...prev, isOperationInProgress: true }));
 
       try {
-        const result = mergeFolders(activeTree, sourcePaths);
+        const result = await mergeFolders(activeTree, sourcePaths);
 
         if (result.success && result.newTree) {
           const operation: FolderTreeOperation = {
@@ -222,7 +220,6 @@ export const useFolderTree = (): UseFolderTreeReturn => {
             targetNodes: sourcePaths
               .map((path) => findNodeByPath(activeTree, path))
               .filter(Boolean) as FolderTreeNode[],
-            newName: targetName,
           };
 
           setState((prev) => ({

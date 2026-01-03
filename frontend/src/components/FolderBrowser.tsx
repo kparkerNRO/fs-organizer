@@ -343,7 +343,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               closeContextMenu();
               setTimeout(async () => {
                 try {
-                  const result = await folderTreeHook.mergeItems(selectedFolderPaths, "Merged Folder");
+                  const result = await folderTreeHook.mergeItems(selectedFolderPaths);
                   if (result.success) {
                     console.log("Successfully merged folders");
                   } else {

@@ -281,3 +281,25 @@ export const fetchFolderStructureComparison = async (): Promise<FolderViewRespon
     };
   }
 };
+
+export const findLongestCommonPrefix = async (names: string[]): Promise<string> => {
+  try {
+    const response = await fetch(`${env.apiUrl}/api/find_longest_common_prefix`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ names }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to find longest common prefix: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.shared_string;
+  } catch (error) {
+    console.error('Error finding longest common prefix:', error);
+    return '';
+  }
+};
