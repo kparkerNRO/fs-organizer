@@ -1,10 +1,8 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from data_models.database import (
-    Folder,
-    GroupCategoryEntry,
-)
+from storage.work_models import GroupCategoryEntry
+from storage.index_models import Node
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
@@ -87,7 +85,7 @@ def compute_custom_distance_matrix(
 
 
 def prepare_records(
-    previous_round_groups: list[tuple[GroupCategoryEntry, Folder]],
+    previous_round_groups: list[tuple[GroupCategoryEntry, Node]],
 ):
     corpus = [category[0].processed_name for category in previous_round_groups]
 
@@ -96,13 +94,13 @@ def prepare_records(
 
     items = [
         ClusterItem(
-            folder_id=pair[1].id,
+            folder_id=pair[1].node_id,
             partial_category_id=pair[0].id,
             name=pair[0].processed_name or "",
             original_name=pair[0].pre_processed_name or "",
             text_vec=vectorizer.transform([pair[0].processed_name or ""]).toarray()[0],
             depth=pair[1].depth or 1,
-            path=Path(pair[1].folder_path) if pair[1] else Path(),
+            path=Path(pair[1].abs_path) if pair[1] else Path(),
         )
         for pair in previous_round_groups
     ]

@@ -1,39 +1,45 @@
-from sqlalchemy import func
-from sqlalchemy.orm import Session
 from typing import Dict, List
 
-from data_models.database import Folder
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from storage.index_models import Node
+
 from stages.grouping.helpers import common_token_grouping
 
 
-def get_folder_groups(session: Session) -> Dict[str, List[Folder]]:
+def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     """
-    Retrieve folders grouped by parent path where there is more than one folder
+    Retrieve folders grouped by parent node where there is more than one folder
     in the group.
 
     Returns:
-        Dict[str, List[Folder]]: Dictionary with parent paths as keys and lists of folders as values
+        Dict[int, List[Node]]: Dictionary with parent node IDs as keys and lists of folders as values
     """
-    # First find parent paths that have multiple folders
+    # First find parent nodes that have multiple folder children
     parent_counts = (
-        session.query(Folder.parent_path, func.count(Folder.id).label("folder_count"))
-        .group_by(Folder.parent_path)
-        .having(func.count(Folder.id) > 1)
+        session.query(
+            Node.parent_node_id, func.count(Node.node_id).label("folder_count")
+        )
+        .filter(Node.kind == "dir")
+        .group_by(Node.parent_node_id)
+        .having(func.count(Node.node_id) > 1)
         .subquery()
     )
 
-    # Then get all folders that belong to these parent paths
+    # Then get all folders that belong to these parent nodes
     folders = (
-        session.query(Folder)
-        .join(parent_counts, Folder.parent_path == parent_counts.c.parent_path)
-        .order_by(Folder.parent_path, Folder.folder_name)
+        session.query(Node)
+        .filter(Node.kind == "dir")
+        .join(parent_counts, Node.parent_node_id == parent_counts.c.parent_node_id)
+        .order_by(Node.parent_node_id, Node.name)
         .all()
     )
 
-    # Group the folders by parent path
+    # Group the folders by parent node ID
     grouped_folders = {}
     for folder in folders:
-        grouped_folders.setdefault(folder.parent_path, []).append(folder)
+        parent_id = folder.parent_node_id if folder.parent_node_id else 0
+        grouped_folders.setdefault(parent_id, []).append(folder)
 
     return grouped_folders
 
@@ -42,24 +48,34 @@ def process_folders(session: Session):
     """
     Process groups of folders and update the classification in the database.
 
+    NOTE: This function has been updated to work with the new storage system.
+    However, Node is immutable and doesn't have a 'categories' field.
+    Categories should be stored in the work database if this functionality is needed.
+    This function now only returns the categorization without storing it.
+
     Args:
-        session (Session): SQLAlchemy session
+        session (Session): SQLAlchemy session for index database
+
+    Returns:
+        Dict mapping node_id to categories
     """
 
     grouped_folders = get_folder_groups(session)
-    session.query(Folder).update({Folder.categories: []})
+    node_categories = {}
 
-    for parent_path, folders in grouped_folders.items():
-        folder_id_to_folder = {folder.id: folder for folder in folders}
-        cleaned_name_to_id = {folder.cleaned_name: folder.id for folder in folders}
+    for _, folders in grouped_folders.items():
+        # Use normalized_name from features if available, otherwise use clean_filename
+        from utils.filename_processing import clean_filename
+
+        cleaned_name_to_id = {
+            clean_filename(folder.name): folder.node_id for folder in folders
+        }
         token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))
         if token_grouping:
             for name, category in token_grouping.items():
-                id = cleaned_name_to_id[name]
+                node_id = cleaned_name_to_id[name]
+                node_categories[node_id] = category
 
-                folder_id_to_folder[id].categories = category
-                # session.add(folder_id_to_folder[id])
-
-    session.add_all(folder_id_to_folder.values())
-
-    session.commit()
+    # Note: Can't commit changes to Node as it's immutable
+    # Categories would need to be stored in work database
+    return node_categories

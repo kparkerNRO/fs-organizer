@@ -13,10 +13,8 @@ from typing import TypeVar
 
 import typer
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, select
-from storage.index_models import Snapshot
+from storage.id_defaults import get_effective_label_run_id, get_effective_snapshot_id
 from storage.manager import StorageManager
-from storage.training_models import LabelRun
 from utils.config import get_config
 
 from fine_tuning.services.common import logger
@@ -47,36 +45,6 @@ DEFAULT_CONFIG_DIR = Path(__file__).resolve().parents[1] / "config" / "fine_tuni
 def default_config_path(filename: str) -> Path:
     """Return the default config path for a fine-tuning command."""
     return DEFAULT_CONFIG_DIR / filename
-
-
-def get_effective_label_run_id(
-    manager: StorageManager, label_run_id: int | None
-) -> int:
-    """Get the effective label run ID, defaulting to the newest if not specified."""
-
-    if label_run_id is not None:
-        logger.info(f"Using specified label run: {label_run_id}")
-        return label_run_id
-
-    with manager.get_training_session() as session:
-        result = session.execute(select(func.max(LabelRun.id))).scalar()
-        if result is None:
-            raise ValueError(f"No label runs found in {manager.training_path}")
-        return result
-
-
-def get_effective_snapshot_id(manager: StorageManager, snapshot_id: int | None) -> int:
-    """Get the effective snapshot ID, defaulting to the newest if not specified."""
-
-    if snapshot_id is not None:
-        logger.info(f"Using specified snapshot: {snapshot_id}")
-        return snapshot_id
-
-    with manager.get_index_session(read_only=True) as session:
-        result = session.execute(select(func.max(Snapshot.snapshot_id))).scalar()
-        if result is None:
-            raise ValueError(f"No snapshots found in {manager.index_path}")
-        return result
 
 
 def setup_logging() -> None:

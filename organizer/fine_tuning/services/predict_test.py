@@ -25,8 +25,8 @@ class TestSavePredictionsToDb:
         """Test saving predictions to database"""
         # Create samples using factory - only specify what matters
         samples = [
-            TrainingSampleFactory(label_run_id=label_run.id, label="asset_type"),
-            TrainingSampleFactory(label_run_id=label_run.id, label="content_subject"),
+            TrainingSampleFactory(label_run=label_run, label="asset_type"),
+            TrainingSampleFactory(label_run=label_run, label="content_subject"),
         ]
         training_session.flush()
 
@@ -77,7 +77,7 @@ class TestSavePredictionsToDb:
         self, training_session, label_run, model_run
     ):
         """Test saving predictions with list-format probabilities"""
-        sample = TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
+        sample = TrainingSampleFactory(label_run=label_run, label="asset_type")
         training_session.flush()
 
         num_saved = save_predictions_to_db(
@@ -101,7 +101,7 @@ class TestSavePredictionsToDb:
         self, training_session, label_run, model_run
     ):
         """Test saving predictions for unlabeled samples"""
-        sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        sample = TrainingSampleFactory(label_run=label_run, label=None)
         training_session.flush()
 
         num_saved = save_predictions_to_db(
@@ -127,7 +127,7 @@ class TestSavePredictionsToDb:
         self, training_session, label_run, model_run, prediction_type
     ):
         """Test different prediction type values"""
-        sample = TrainingSampleFactory(label_run_id=label_run.id)
+        sample = TrainingSampleFactory(label_run=label_run)
         training_session.flush()
 
         save_predictions_to_db(
@@ -327,7 +327,7 @@ class TestCreateAndSaveRunResults:
         classifier = MockClassifier()
 
         # Factory creates unlabeled sample by default or we can specify
-        sample = TrainingSampleFactory(label_run_id=label_run.id, label=None)
+        sample = TrainingSampleFactory(label_run=label_run, label=None)
         training_session.flush()
 
         create_and_save_run_results(
@@ -358,7 +358,7 @@ class TestCreateAndSaveRunResults:
             labels = ["asset_type"]
 
         sample = TrainingSampleFactory(
-            label_run_id=label_run.id,
+            label_run=label_run,
         )
         training_session.flush()
 

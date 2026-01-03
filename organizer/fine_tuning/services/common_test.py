@@ -22,12 +22,8 @@ class TestLoadSamples:
 
     def test_load_all_samples(self, training_session, label_run):
         """Test loading all samples without filters"""
-        created_samples = TrainingSampleFactory.create_batch(
-            2, label_run_id=label_run.id
-        )
-        created_samples.append(
-            TrainingSampleFactory(label_run_id=label_run.id, label=None)
-        )
+        created_samples = TrainingSampleFactory.create_batch(2, label_run=label_run)
+        created_samples.append(TrainingSampleFactory(label_run=label_run, label=None))
 
         loaded = load_samples(training_session)
 
@@ -47,9 +43,9 @@ class TestLoadSamples:
         self, training_session, label_run, split, expected_count
     ):
         """Test loading samples filtered by split"""
-        TrainingSampleFactory(label_run_id=label_run.id, split="train")
-        TrainingSampleFactory(label_run_id=label_run.id, split="validation")
-        TrainingSampleFactory(label_run_id=label_run.id, split="test")
+        TrainingSampleFactory(label_run=label_run)
+        TrainingSampleFactory(label_run=label_run, split="validation")
+        TrainingSampleFactory(label_run=label_run, split="test")
 
         loaded = load_samples(training_session, split=split)
         assert len(loaded) == expected_count
@@ -58,9 +54,9 @@ class TestLoadSamples:
 
     def test_load_labeled_only(self, training_session, label_run):
         """Test loading only labeled samples"""
-        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
-        TrainingSampleFactory(label_run_id=label_run.id, label=None)
-        TrainingSampleFactory(label_run_id=label_run.id, label="")
+        TrainingSampleFactory(label_run=label_run, label="asset_type")
+        TrainingSampleFactory(label_run=label_run, label=None)
+        TrainingSampleFactory(label_run=label_run, label="")
 
         loaded = load_samples(training_session, labeled_only=True)
         assert len(loaded) == 1
@@ -70,8 +66,8 @@ class TestLoadSamples:
         """Test loading samples filtered by label run ID"""
         label_run2 = LabelRunFactory(snapshot_id=2)
 
-        TrainingSampleFactory(label_run_id=label_run.id, label="asset_type")
-        TrainingSampleFactory(label_run_id=label_run2.id, label="content_subject")  # type: ignore[attr-defined]
+        TrainingSampleFactory(label_run=label_run, label="asset_type")
+        TrainingSampleFactory(label_run=label_run2, label="content_subject")  # type: ignore[attr-defined]
 
         loaded = load_samples(training_session, label_run_id=label_run.id)
         assert len(loaded) == 1
@@ -79,13 +75,11 @@ class TestLoadSamples:
 
     def test_load_combined_filters(self, training_session, label_run):
         """Test loading samples with multiple filters combined"""
+        TrainingSampleFactory(label_run=label_run, label="asset_type", split="train")
         TrainingSampleFactory(
-            label_run_id=label_run.id, label="asset_type", split="train"
+            label_run=label_run, label="content_subject", split="validation"
         )
-        TrainingSampleFactory(
-            label_run_id=label_run.id, label="content_subject", split="validation"
-        )
-        TrainingSampleFactory(label_run_id=label_run.id, label=None, split="train")
+        TrainingSampleFactory(label_run=label_run, label=None)
 
         loaded = load_samples(
             training_session,
@@ -102,9 +96,10 @@ class TestLoadAndIndexNodes:
 
     def test_load_basic_hierarchy(self, index_session, sample_snapshot):
         """Test loading nodes and building indexes"""
+        snapshot_id = sample_snapshot.snapshot_id
         NodeFactory(
             node_id=1,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="root",
             rel_path="root",
             abs_path="/test/root",
@@ -113,7 +108,7 @@ class TestLoadAndIndexNodes:
         )
         NodeFactory(
             node_id=2,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="child",
             rel_path="root/child",
             abs_path="/test/root/child",
@@ -122,7 +117,7 @@ class TestLoadAndIndexNodes:
         )
         NodeFactory(
             node_id=3,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="file.txt",
             rel_path="root/child/file.txt",
             abs_path="/test/root/child/file.txt",
@@ -133,7 +128,7 @@ class TestLoadAndIndexNodes:
         )
 
         nodes_by_id, processed_name_by_id, children_by_parent = _load_and_index_nodes(
-            index_session, 1
+            index_session, snapshot_id
         )
 
         assert set(nodes_by_id.keys()) == {1, 2, 3}
@@ -245,9 +240,10 @@ class TestExtractFeatureNodes:
 
     def test_basic_extraction(self, index_session, sample_snapshot):
         """Test basic feature node extraction"""
+        snapshot_id = sample_snapshot.snapshot_id
         _parent = NodeFactory(
             node_id=1,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="Parent",
             rel_path="Parent",
             abs_path="/test/Parent",
@@ -255,7 +251,7 @@ class TestExtractFeatureNodes:
         )
         target = NodeFactory(
             node_id=2,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="Target",
             rel_path="Parent/Target",
             abs_path="/test/Parent/Target",
@@ -264,7 +260,7 @@ class TestExtractFeatureNodes:
         )
         NodeFactory(
             node_id=3,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="file.txt",
             rel_path="Parent/Target/file.txt",
             abs_path="/test/Parent/Target/file.txt",
@@ -276,7 +272,7 @@ class TestExtractFeatureNodes:
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             nodes=[target],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
@@ -295,20 +291,35 @@ class TestExtractFeatureNodes:
 
     def test_with_siblings(self, index_session, sample_snapshot):
         """Test extraction with sibling nodes"""
-        _parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
+        snapshot_id = sample_snapshot.snapshot_id
+        _parent = NodeFactory(
+            node_id=1, snapshot_id=snapshot_id, name="Parent", depth=0
+        )
         target = NodeFactory(
-            node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1
+            node_id=2,
+            snapshot_id=snapshot_id,
+            name="Target",
+            parent_node_id=1,
+            depth=1,
         )
         NodeFactory(
-            node_id=3, snapshot_id=1, name="Sibling1", parent_node_id=1, depth=1
+            node_id=3,
+            snapshot_id=snapshot_id,
+            name="Sibling1",
+            parent_node_id=1,
+            depth=1,
         )
         NodeFactory(
-            node_id=4, snapshot_id=1, name="Sibling2", parent_node_id=1, depth=1
+            node_id=4,
+            snapshot_id=snapshot_id,
+            name="Sibling2",
+            parent_node_id=1,
+            depth=1,
         )
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             nodes=[target],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
@@ -325,16 +336,23 @@ class TestExtractFeatureNodes:
 
     def test_max_siblings_cap(self, index_session, sample_snapshot):
         """Test that max_siblings limits sibling count"""
-        _parent = NodeFactory(node_id=1, snapshot_id=1, name="Parent", depth=0)
+        snapshot_id = sample_snapshot.snapshot_id
+        _parent = NodeFactory(
+            node_id=1, snapshot_id=snapshot_id, name="Parent", depth=0
+        )
         target = NodeFactory(
-            node_id=2, snapshot_id=1, name="Target", parent_node_id=1, depth=1
+            node_id=2,
+            snapshot_id=snapshot_id,
+            name="Target",
+            parent_node_id=1,
+            depth=1,
         )
 
         # Add 10 siblings using factory
         for i in range(10):
             NodeFactory(
                 node_id=100 + i,
-                snapshot_id=1,
+                snapshot_id=snapshot_id,
                 name=f"Sibling{i}",
                 parent_node_id=1,
                 depth=1,
@@ -342,7 +360,7 @@ class TestExtractFeatureNodes:
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             nodes=[target],  # type: ignore[list-item]
             max_siblings=3,
             max_descendents=10,
@@ -355,9 +373,10 @@ class TestExtractFeatureNodes:
 
     def test_zip_file_extraction(self, index_session, sample_snapshot):
         """Test extraction for ZIP files"""
+        snapshot_id = sample_snapshot.snapshot_id
         zip_node = NodeFactory(
             node_id=1,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="archive.zip",
             kind=NodeKind.FILE,
             ext=".zip",
@@ -367,7 +386,7 @@ class TestExtractFeatureNodes:
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             nodes=[zip_node],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,
@@ -379,9 +398,10 @@ class TestExtractFeatureNodes:
 
     def test_skip_regular_files(self, index_session, sample_snapshot):
         """Test that regular files are skipped"""
+        snapshot_id = sample_snapshot.snapshot_id
         regular_file = NodeFactory(
             node_id=1,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             name="file.txt",
             kind=NodeKind.FILE,
             ext=".txt",
@@ -390,7 +410,7 @@ class TestExtractFeatureNodes:
 
         feature_nodes = extract_feature_nodes(
             index_session=index_session,
-            snapshot_id=1,
+            snapshot_id=snapshot_id,
             nodes=[regular_file],  # type: ignore[list-item]
             max_siblings=5,
             max_descendents=10,

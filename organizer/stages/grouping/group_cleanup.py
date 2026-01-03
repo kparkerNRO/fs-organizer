@@ -65,13 +65,20 @@ def group_by_tokens(
 def unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
     # normalize category names to use the same spelling
     def merge_groups(group1: str, group2: str, group_to_entries):
-        for entry in group_to_entries[group2]:
-            entry.grouped_name = group1
-            entry.categories = [group1] + entry.categories[1:]
-            group_to_entries[group1].append(entry)
+        group2_entries = group_to_entries.get(group2, [])
+        group1_entries = group_to_entries.get(group1, [])
 
-    for group_name in group_to_entries.keys():
-        for compare_group in group_to_entries.keys():
+        for entry in group2_entries:
+            entry.grouped_name = group1
+            if entry.categories:
+                entry.categories = [group1] + entry.categories[1:]
+            else:
+                entry.categories = [group1]
+            group1_entries.append(entry)
+
+    group_keys = list(group_to_entries.keys())
+    for group_name in group_keys:
+        for compare_group in group_keys:
             if group_name == compare_group:
                 continue
 

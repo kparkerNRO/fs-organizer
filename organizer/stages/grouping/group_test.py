@@ -1,19 +1,20 @@
 import pytest
-from storage.factories import NodeFactory
+from typing import cast
+from storage.factories import (
+    GroupCategoryEntryFactory,
+    GroupIterationFactory,
+    NodeFactory,
+)
 from storage.manager import NodeKind
-from storage.work_models import (
-    GroupCategory,
-    GroupCategoryEntry,
-)
-from storage.work_models import (
-    GroupIteration as GroupingIteration,
-)
+from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
 
 from stages.grouping.group import (
+    group_folders,
     process_folders_to_groups,
     refine_groups,
 )
 from stages.grouping.helpers import common_token_grouping
+from utils.config import get_minimal_config
 
 
 def test_process_folders_to_groups(
@@ -62,44 +63,47 @@ def test_refine_groups_singletons(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupingIteration(
-        id=0,
-        description="test iteration 0",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+    iteration0 = cast(
+        GroupIteration,
+        GroupIterationFactory(
+            id=0,
+            description="test iteration 0",
+            run=sample_run,
+        ),
     )
-    iteration1 = GroupingIteration(
+    GroupIterationFactory(
         id=1,
         description="test iteration 1",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    work_session.add_all([iteration0, iteration1])
-    work_session.commit()
 
     # Set up entries with different cluster IDs (singletons)
-    entries = [
-        GroupCategoryEntry(
-            folder_id=1,
-            cluster_id=1,
-            pre_processed_name="apple",
-            processed_name="apple",
-            path="/test/apple",
-            confidence=1.0,
-            iteration_id=0,
+    entries: list[GroupCategoryEntry] = [
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=1,
+                cluster_id=1,
+                pre_processed_name="apple",
+                processed_name="apple",
+                path="/test/apple",
+                confidence=1.0,
+                iteration=iteration0,
+            ),
         ),
-        GroupCategoryEntry(
-            folder_id=2,
-            cluster_id=2,
-            pre_processed_name="banana",
-            processed_name="banana",
-            path="/test/banana",
-            confidence=1.0,
-            iteration_id=0,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=2,
+                cluster_id=2,
+                pre_processed_name="banana",
+                processed_name="banana",
+                path="/test/banana",
+                confidence=1.0,
+                iteration=iteration0,
+            ),
         ),
     ]
-    work_session.add_all(entries)
-    work_session.commit()
 
     # Run the function
     next_group_id = 1
@@ -122,53 +126,59 @@ def test_refine_groups_clusters(
     index_session, work_session, sample_run, sample_snapshot
 ):
     # Create iteration records
-    iteration0 = GroupingIteration(
-        id=0,
-        description="test iteration 0",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+    iteration0 = cast(
+        GroupIteration,
+        GroupIterationFactory(
+            id=0,
+            description="test iteration 0",
+            run=sample_run,
+        ),
     )
-    iteration1 = GroupingIteration(
+    GroupIterationFactory(
         id=1,
         description="test iteration 1",
-        run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        run=sample_run,
     )
-    work_session.add_all([iteration0, iteration1])
-    work_session.commit()
 
     # Set up entries with same cluster ID for apple items
-    entries = [
-        GroupCategoryEntry(
-            folder_id=1,
-            cluster_id=1,
-            pre_processed_name="apple pie",
-            processed_name="apple pie",
-            path="/test/apple pie",
-            confidence=1.0,
-            iteration_id=0,
+    entries: list[GroupCategoryEntry] = [
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=1,
+                cluster_id=1,
+                pre_processed_name="apple pie",
+                processed_name="apple pie",
+                path="/test/apple pie",
+                confidence=1.0,
+                iteration=iteration0,
+            ),
         ),
-        GroupCategoryEntry(
-            folder_id=2,
-            cluster_id=1,
-            pre_processed_name="apple tart",
-            processed_name="apple tart",
-            path="/test/apple tart",
-            confidence=1.0,
-            iteration_id=0,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=2,
+                cluster_id=1,
+                pre_processed_name="apple tart",
+                processed_name="apple tart",
+                path="/test/apple tart",
+                confidence=1.0,
+                iteration=iteration0,
+            ),
         ),
-        GroupCategoryEntry(
-            folder_id=3,
-            cluster_id=2,
-            pre_processed_name="banana",
-            processed_name="banana",
-            path="/test/banana",
-            confidence=1.0,
-            iteration_id=0,
+        cast(
+            GroupCategoryEntry,
+            GroupCategoryEntryFactory(
+                folder_id=3,
+                cluster_id=2,
+                pre_processed_name="banana",
+                processed_name="banana",
+                path="/test/banana",
+                confidence=1.0,
+                iteration=iteration0,
+            ),
         ),
     ]
-    work_session.add_all(entries)
-    work_session.commit()
 
     # Run the function
     next_group_id = 1
@@ -299,55 +309,58 @@ def test_common_token_grouping(name, input_list, expected):
     assert result == expected
 
 
-# # Integration test for the full group_folders function
-# @pytest.mark.skip(reason="Pre-existing test failure - assert 0 == 3")
-# def test_group_folders():
-#     # Create a temporary database file
-#     with tempfile.TemporaryDirectory() as temp_dir:
-#         db_path = Path(os.path.join(temp_dir, "test.db"))
+def test_group_folders(
+    storage_manager,
+    storage_index_session,
+    storage_work_session,
+    storage_snapshot,
+    storage_run,
+):
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="apple pie",
+        kind=NodeKind.DIR,
+    )
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="apple tart",
+        kind=NodeKind.DIR,
+    )
+    NodeFactory(
+        snapshot_id=storage_snapshot.snapshot_id,
+        name="banana bread",
+        kind=NodeKind.DIR,
+    )
+    storage_index_session.commit()
 
-#         # Create DB engine and tables
-#         engine = create_engine(f"sqlite:///{db_path}")
-#         Base.metadata.create_all(engine)
+    group_folders(
+        storage_manager,
+        max_iterations=1,
+        config=get_minimal_config(),
+        run_id=storage_run.id,
+        snapshot_id=storage_snapshot.snapshot_id,
+    )
 
-#         # Set up test data
-#         with Session(engine) as session:
-#             folders = [
-#                 Folder(
-#                     folder_name="apple pie",
-#                     folder_path="/test/apple pie",
-#                     cleaned_name="apple pie",
-#                 ),
-#                 Folder(
-#                     folder_name="apple tart",
-#                     folder_path="/test/apple tart",
-#                     cleaned_name="apple tart",
-#                 ),
-#                 Folder(
-#                     folder_name="banana bread",
-#                     folder_path="/test/banana bread",
-#                     cleaned_name="banana bread",
-#                 ),
-#             ]
-#             session.add_all(folders)
-#             session.commit()
+    entries_iter0 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 0)
+        .all()
+    )
+    assert len(entries_iter0) == 3
 
-#         # Run the function with a single iteration
-#         group_folders(db_path, max_iterations=1, config=get_minimal_config())
+    entries_iter1 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 1)
+        .all()
+    )
+    assert len(entries_iter1) == 3
 
-#         # Verify results
-#         with Session(engine) as session:
-#             # Check that GroupCategoryEntry entries were created
-#             entries = (
-#                 session.query(GroupCategoryEntry).filter(GroupCategoryEntry.iteration_id == 0).all()
-#             )
-#             assert len(entries) == 3
+    entries_iter2 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 2)
+        .all()
+    )
+    assert len(entries_iter2) == 3
 
-#             entries = (
-#                 session.query(GroupCategoryEntry).filter(GroupCategoryEntry.iteration_id == 1).all()
-#             )
-#             assert len(entries) == 3
-
-#             # Check that GroupCategory entries were created
-#             groups = session.query(GroupCategory).all()
-#             assert len(groups) == 3
+    groups = storage_work_session.query(GroupCategory).all()
+    assert len(groups) == 3

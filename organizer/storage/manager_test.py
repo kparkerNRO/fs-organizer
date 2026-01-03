@@ -1,6 +1,7 @@
 """Unit tests for StorageManager."""
 
 from sqlalchemy.orm import Session
+from typing import cast
 
 import tempfile
 from pathlib import Path
@@ -8,11 +9,11 @@ from pathlib import Path
 import pytest
 from sqlalchemy import create_engine
 
-from storage.manager import StorageManager, NodeKind, FileSource, RunStatus
+from storage.factories import NodeFactory, RunFactory, SnapshotFactory
+from storage.manager import StorageManager, NodeKind
 from storage.index_models import (
     IndexBase,
     Snapshot,
-    Node,
     Meta as IndexMeta,
     INDEX_SCHEMA_VERSION,
 )
@@ -32,52 +33,45 @@ def storage_manager(tmp_path: Path) -> StorageManager:
 @pytest.fixture
 def index_session(storage_manager: StorageManager):
     with storage_manager.get_index_session() as session:
+        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 
 @pytest.fixture
 def work_session(storage_manager: StorageManager):
     with storage_manager.get_work_session() as session:
+        RunFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 
 @pytest.fixture
 def snapshot(index_session):
-    new_snapshot = Snapshot(
-        created_at="2024-01-01T00:00:00",
-        root_path="/test",
-        root_abs_path="/test",
-    )
-    index_session.add(new_snapshot)
-    index_session.commit()
+    new_snapshot = SnapshotFactory()
     return new_snapshot
 
 
 @pytest.fixture
 def node(index_session, snapshot):
-    new_node = Node(
+    new_node = NodeFactory(
         snapshot_id=snapshot.snapshot_id,
-        kind=NodeKind.FILE.value,
+        kind=NodeKind.FILE,
         name="test.txt",
         rel_path="test.txt",
         abs_path="/test/test.txt",
         depth=1,
-        file_source=FileSource.FILESYSTEM.value,
     )
-    index_session.add(new_node)
-    index_session.commit()
     return new_node
 
 
 @pytest.fixture
 def run(work_session, snapshot):
-    new_run = Run(
-        snapshot_id=snapshot.snapshot_id,
-        started_at="2024-01-01T00:00:00",
-        status=RunStatus.RUNNING.value,
+    new_run = cast(
+        Run,
+        RunFactory(
+            snapshot_id=snapshot.snapshot_id,
+        ),
     )
-    work_session.add(new_run)
-    work_session.commit()
     return new_run
 
 
@@ -210,13 +204,9 @@ class TestReferentialIntegrity:
         assert not storage_manager._check_snapshot_has_runs(snapshot.snapshot_id)
 
         # Create a run
-        run = Run(
+        RunFactory(
             snapshot_id=snapshot.snapshot_id,
-            started_at="2024-01-01T00:00:00",
-            status=RunStatus.RUNNING.value,
         )
-        work_session.add(run)
-        work_session.commit()
 
         # Now has runs
         assert storage_manager._check_snapshot_has_runs(snapshot.snapshot_id)
@@ -226,13 +216,12 @@ class TestReferentialIntegrity:
     ):
         """Test _validate_snapshot_id_matches_run method."""
         # Create run with snapshot_id=1
-        run = Run(
-            snapshot_id=1,
-            started_at="2024-01-01T00:00:00",
-            status=RunStatus.RUNNING.value,
+        run = cast(
+            Run,
+            RunFactory(
+                snapshot_id=1,
+            ),
         )
-        work_session.add(run)
-        work_session.commit()
 
         # Should match
         assert storage_manager._validate_snapshot_id_matches_run(1, run.id)
@@ -299,7 +288,7 @@ class TestImmutability:
         # Get read-only session
         with storage_manager.get_index_session(read_only=True) as session:
             # Try to add something
-            new_snapshot = Snapshot(
+            new_snapshot = SnapshotFactory.build(
                 created_at="2024-01-01T00:00:00",
                 root_path="/test",
                 root_abs_path="/test",

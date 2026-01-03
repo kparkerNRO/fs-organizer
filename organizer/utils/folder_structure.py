@@ -1,12 +1,12 @@
+from collections.abc import Sequence
 from api.api import FolderV2, File
-
-from data_models.database import File as dbFile
+from storage.index_models import Node
 
 
 def insert_file_in_structure(
     folder_structure: FolderV2,
-    file: dbFile,
-    parts: list[str | tuple] | tuple[str, ...],
+    file: Node,
+    parts: Sequence[str | tuple[str, float]],
     new_path: str | None = None,
 ):
     current_representation = folder_structure
@@ -24,9 +24,9 @@ def insert_file_in_structure(
 
     current_representation.children.append(
         File(
-            id=file.id,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be int
-            name=file.file_name,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be str
-            originalPath=file.file_path,  # type: ignore[arg-type]  # ty bug: SQLAlchemy ORM attribute should be str
+            id=file.node_id,
+            name=file.name,
+            originalPath=file.abs_path,
             newPath=new_path,
         )
     )

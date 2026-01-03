@@ -7,7 +7,7 @@ from storage.index_models import Snapshot, Node
 
 def export_snapshot_structure(
     output_path: Path,
-    storage_path: Path | None = None,
+    storage: StorageManager,
     include_files: bool = False,
 ) -> dict:
     """
@@ -24,7 +24,6 @@ def export_snapshot_structure(
     Raises:
         ValueError: If no snapshots are found in the database
     """
-    storage = StorageManager(storage_path)
 
     with storage.get_index_session(read_only=True) as session:
         # Get most recent snapshot

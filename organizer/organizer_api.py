@@ -2,7 +2,6 @@ from fastapi import Depends, FastAPI, HTTPException, BackgroundTasks
 from pathlib import Path
 import json
 import logging
-import shutil
 import sys
 from datetime import datetime
 from typing import Dict
@@ -14,12 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.models import GatherRequest, AsyncTaskResponse
 from api.tasks import TaskInfo, tasks, update_task, TaskStatus, create_task
-from data_models.database import (
+from storage.work_models import (
     FolderStructure,
-    get_session,
     GroupCategory,
     GroupCategoryEntry,
-    setup_gather,
 )
 from api.api import (
     Category as CategoryAPI,
@@ -30,9 +27,10 @@ from api.api import (
     StructureType,
     FolderViewResponse,
 )
-from stages.gather import gather_folder_structure_and_store
+from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
+from storage.id_defaults import get_latest_run
 from storage.manager import StorageManager
 
 # Configure logging to INFO level
@@ -65,7 +63,10 @@ async def startup_event():
 
 
 def get_db_session():
-    return get_session(Path(db_path))
+    """Get a work database session using StorageManager"""
+    storage = StorageManager(Path(db_path).parent)
+    with storage.get_work_session() as session:
+        yield session
 
 
 def get_folder_structure_from_db(
@@ -73,18 +74,18 @@ def get_folder_structure_from_db(
 ) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
-        session = get_session(Path(db_path_str))
-        newest_entry = session.execute(
-            select(FolderStructure)
-            .where(FolderStructure.structure_type == stage)
-            .order_by(FolderStructure.id.desc())
-            .limit(1)
-        ).scalar_one_or_none()
+        storage = StorageManager(Path(db_path_str).parent)
+        with storage.get_work_session() as session:
+            newest_entry = session.execute(
+                select(FolderStructure)
+                .where(FolderStructure.structure_type == stage.value)
+                .order_by(FolderStructure.id.desc())
+                .limit(1)
+            ).scalar_one_or_none()
 
-        if newest_entry:
-            parsed_entry = json.loads(newest_entry.structure)
-            return sort_folder_structure(parsed_entry)
-        return None
+            if newest_entry:
+                return sort_folder_structure(newest_entry.structure)
+            return None
     except Exception:
         return None
 
@@ -340,37 +341,23 @@ def run_gather_task(task_id: str, base_path_str: str):
 
         update_task(task_id, message="Setting up database", progress=0.3)
 
-        # Set up database
-        db_path = run_dir / "run_data.db"
-        setup_gather(db_path)
+        # Set up database - StorageManager will create index.db and work.db
+        storage_manager = StorageManager(run_dir)
 
         update_task(task_id, message="Gathering folder structure", progress=0.4)
 
-        # Gather folder structure
-        gather_folder_structure_and_store(base_path, db_path)
+        # Gather folder structure using new ingest_filesystem
+        snapshot_id = ingest_filesystem(storage_manager, base_path, run_dir)
 
         update_task(task_id, message="Post-processing filenames", progress=0.7)
 
-        # Update latest symlinks
-        latest_dir = output_dir_path / "latest"
-        latest_db = latest_dir / "latest.db"
-
-        # Remove existing latest directory if it exists
-        if latest_dir.exists():
-            shutil.rmtree(latest_dir)
-
-        # Create new latest directory
-        latest_dir.mkdir()
-
-        # Copy the current run's database to latest.db
-        shutil.copy2(db_path, latest_db)
-
         result = {
             "message": "Gather complete",
-            "db_path": str(db_path),
+            "storage_path": str(run_dir),
+            "snapshot_id": snapshot_id,
             "run_dir": str(run_dir),
             "folder_structure": get_folder_structure_from_db(
-                str(db_path), StructureType.original
+                str(run_dir), StructureType.original
             ),
         }
 
@@ -437,7 +424,21 @@ def run_group_task(task_id: str):
 
         update_task(task_id, message="Calculating categories", progress=0.8)
 
-        calculate_folder_structure(Path(db_path), structure_type=StructureType.grouped)
+        latest_run = get_latest_run(storage_manager)
+        if latest_run is None:
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="No runs found for grouping.",
+            )
+            return
+
+        calculate_folder_structure(
+            storage_manager,
+            latest_run.snapshot_id,
+            latest_run.id,
+            structure_type=StructureType.grouped,
+        )
 
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
@@ -506,8 +507,21 @@ def run_folders_task(task_id: str):
         update_task(task_id, message="Calculating categories", progress=0.3)
 
         # Calculate categories and generate folder hierarchy
+        storage_manager = StorageManager(Path(db_path).parent)
+        latest_run = get_latest_run(storage_manager)
+        if latest_run is None:
+            update_task(
+                task_id,
+                status=TaskStatus.FAILED,
+                error="No runs found for folder calculation.",
+            )
+            return
+
         calculate_folder_structure(
-            Path(db_path), structure_type=StructureType.organized
+            storage_manager,
+            latest_run.snapshot_id,
+            latest_run.id,
+            structure_type=StructureType.organized,
         )
 
         # Get the newly generated folder structure

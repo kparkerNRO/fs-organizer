@@ -37,3 +37,6 @@ classifier = [
 markers = [
     "ml: marks tests that require large ML dependencies (sentence-transformers, setfit, datasets)",
 ]
+
+[tool.ty.src]
+exclude = ["conftest.py"]
