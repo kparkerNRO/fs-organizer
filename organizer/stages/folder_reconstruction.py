@@ -61,9 +61,6 @@ def get_folder_heirarchy(
 
 
 def _resolve_cleaned_name(node: Node) -> str:
-    # Assuming 'cleaned_name' is not a direct attribute of Node anymore.
-    # The name resolution logic might need to be re-evaluated based on new data models.
-    # For now, we'll use the node's name and clean it.
     base_name = str(node.name)
     return clean_filename(base_name)
 
@@ -156,8 +153,6 @@ def recalculate_cleaned_paths_for_structure(
         manager.get_index_session(read_only=True) as index_session,
         manager.get_work_session() as work_session,
     ):
-        # This assumes that `get_categories_for_path` is adapted to the new storage system
-        # and can be called with the new session management.
         iteration_id = work_session.execute(
             select(func.max(GroupCategoryEntry.iteration_id))
         ).scalar_one()

@@ -48,13 +48,49 @@ def setup_factory_seed():
 
 
 @pytest.fixture
+def storage_manager(tmp_path):
+    """Create a StorageManager with temporary databases."""
+    return StorageManager(database_path=tmp_path, initialize_training=True)
+
+
+@pytest.fixture
+def storage_index_session(storage_manager):
+    """Create an index session backed by StorageManager."""
+    with storage_manager.get_index_session() as session:
+        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        FileNodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        yield session
+
+
+@pytest.fixture
+def storage_work_session(storage_manager):
+    """Create a work session backed by StorageManager."""
+    with storage_manager.get_work_session() as session:
+        yield session
+
+
+@pytest.fixture
+def work_session(storage_work_session):
+    """Create an in-memory test database for work data (runs, iterations, etc.)
+
+    Note: Some tests may have their own session fixture that includes both
+    Base and WorkBase tables. In those cases, use that session instead.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    WorkBase.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        yield session
+
+
+@pytest.fixture
 def index_session():
-    """Create in-memory test database for index data"""
+    """Create in-memory test database for index data."""
     engine = create_engine("sqlite:///:memory:")
     IndexBase.metadata.create_all(engine)
 
     with Session(engine) as session:
-        # Configure factories to use this session
         NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
@@ -63,6 +99,7 @@ def index_session():
 @pytest.fixture
 def training_session():
     """Create in-memory test database for training data"""
+
     engine = create_engine("sqlite:///:memory:")
     TrainingBase.metadata.create_all(engine)
 
@@ -91,43 +128,6 @@ def sample_snapshot(index_session):
 def model_run(training_session):
     """Create a test model run using factory"""
     return ModelRunFactory(run_id=1)
-
-
-@pytest.fixture
-def work_session():
-    """Create an in-memory test database for work data (runs, iterations, etc.)
-
-    Note: Some tests may have their own session fixture that includes both
-    Base and WorkBase tables. In those cases, use that session instead.
-    """
-    engine = create_engine("sqlite:///:memory:")
-    WorkBase.metadata.create_all(engine)
-
-    with Session(engine) as session:
-        yield session
-
-
-@pytest.fixture
-def storage_manager(tmp_path):
-    """Create a StorageManager with temporary databases."""
-    return StorageManager(database_path=tmp_path)
-
-
-@pytest.fixture
-def storage_index_session(storage_manager):
-    """Create an index session backed by StorageManager."""
-    with storage_manager.get_index_session() as session:
-        NodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        FileNodeFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        SnapshotFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
-        yield session
-
-
-@pytest.fixture
-def storage_work_session(storage_manager):
-    """Create a work session backed by StorageManager."""
-    with storage_manager.get_work_session() as session:
-        yield session
 
 
 @pytest.fixture
