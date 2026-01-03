@@ -98,7 +98,9 @@ def group(
 
 @app.command()
 def folders(
-    db_path: str = typer.Argument(...),
+    storage_path: Path = typer.Argument(..., help="Storage directory containing index.db and work.db"),
+    snapshot_id: int = typer.Option(..., help="Snapshot ID to process"),
+    run_id: int = typer.Option(..., help="Run ID to use"),
     structure_type: StructureType = typer.Option(
         StructureType.organized,
         "--structure-type",
@@ -109,11 +111,15 @@ def folders(
     """
     Generate a folder hierarchy from the cleaned paths in the database.
     """
-    typer.echo(f"Generating folder hierarchy from: {db_path}")
+    typer.echo(f"Generating folder hierarchy from storage: {storage_path}")
+    typer.echo(f"Using snapshot_id={snapshot_id}, run_id={run_id}")
+
+    storage_manager = StorageManager(storage_path)
+
     if structure_type != StructureType.original:
-        calculate_folder_structure(Path(db_path), structure_type=structure_type)
-    recalculate_cleaned_paths_for_structure(db_path, structure_type=structure_type)
-    get_folder_heirarchy(db_path, type=structure_type)
+        calculate_folder_structure(storage_manager, snapshot_id, run_id, structure_type=structure_type)
+    recalculate_cleaned_paths_for_structure(storage_manager, snapshot_id, run_id, structure_type=structure_type)
+    get_folder_heirarchy(storage_manager, run_id, structure_type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
 
 

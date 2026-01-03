@@ -28,7 +28,7 @@ from api.api import (
     StructureType,
     FolderViewResponse,
 )
-from stages.gather import gather_folder_structure_and_store
+from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from stages.categorize import calculate_folder_structure
 from storage.manager import StorageManager
@@ -84,8 +84,7 @@ def get_folder_structure_from_db(
             ).scalar_one_or_none()
 
             if newest_entry:
-                parsed_entry = json.loads(newest_entry.structure)
-                return sort_folder_structure(parsed_entry)
+                return sort_folder_structure(newest_entry.structure)
             return None
     except Exception:
         return None
@@ -342,19 +341,18 @@ def run_gather_task(task_id: str, base_path_str: str):
 
         update_task(task_id, message="Setting up database", progress=0.3)
 
-        # Set up database - StorageManager will initialize on first use
-        db_path = run_dir / "run_data.db"
+        # Set up database - StorageManager will create index.db and work.db
+        storage_manager = StorageManager(run_dir)
 
         update_task(task_id, message="Gathering folder structure", progress=0.4)
 
-        # Gather folder structure
-        gather_folder_structure_and_store(base_path, db_path)
+        # Gather folder structure using new ingest_filesystem
+        snapshot_id = ingest_filesystem(storage_manager, base_path, run_dir)
 
         update_task(task_id, message="Post-processing filenames", progress=0.7)
 
         # Update latest symlinks
         latest_dir = output_dir_path / "latest"
-        latest_db = latest_dir / "latest.db"
 
         # Remove existing latest directory if it exists
         if latest_dir.exists():
@@ -363,15 +361,17 @@ def run_gather_task(task_id: str, base_path_str: str):
         # Create new latest directory
         latest_dir.mkdir()
 
-        # Copy the current run's database to latest.db
-        shutil.copy2(db_path, latest_db)
+        # Copy the current run's databases to latest directory
+        shutil.copy2(run_dir / "index.db", latest_dir / "index.db")
+        shutil.copy2(run_dir / "work.db", latest_dir / "work.db")
 
         result = {
             "message": "Gather complete",
-            "db_path": str(db_path),
+            "storage_path": str(run_dir),
+            "snapshot_id": snapshot_id,
             "run_dir": str(run_dir),
             "folder_structure": get_folder_structure_from_db(
-                str(db_path), StructureType.original
+                str(run_dir), StructureType.original
             ),
         }
 
