@@ -14,12 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.models import GatherRequest, AsyncTaskResponse
 from api.tasks import TaskInfo, tasks, update_task, TaskStatus, create_task
-from data_models.database import (
+from storage.work_models import (
     FolderStructure,
-    get_session,
     GroupCategory,
     GroupCategoryEntry,
-    setup_gather,
 )
 from api.api import (
     Category as CategoryAPI,
@@ -65,7 +63,10 @@ async def startup_event():
 
 
 def get_db_session():
-    return get_session(Path(db_path))
+    """Get a work database session using StorageManager"""
+    storage = StorageManager(Path(db_path).parent)
+    with storage.get_work_session() as session:
+        yield session
 
 
 def get_folder_structure_from_db(
@@ -73,18 +74,19 @@ def get_folder_structure_from_db(
 ) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
-        session = get_session(Path(db_path_str))
-        newest_entry = session.execute(
-            select(FolderStructure)
-            .where(FolderStructure.structure_type == stage)
-            .order_by(FolderStructure.id.desc())
-            .limit(1)
-        ).scalar_one_or_none()
+        storage = StorageManager(Path(db_path_str).parent)
+        with storage.get_work_session() as session:
+            newest_entry = session.execute(
+                select(FolderStructure)
+                .where(FolderStructure.structure_type == stage.value)
+                .order_by(FolderStructure.id.desc())
+                .limit(1)
+            ).scalar_one_or_none()
 
-        if newest_entry:
-            parsed_entry = json.loads(newest_entry.structure)
-            return sort_folder_structure(parsed_entry)
-        return None
+            if newest_entry:
+                parsed_entry = json.loads(newest_entry.structure)
+                return sort_folder_structure(parsed_entry)
+            return None
     except Exception:
         return None
 
@@ -340,9 +342,8 @@ def run_gather_task(task_id: str, base_path_str: str):
 
         update_task(task_id, message="Setting up database", progress=0.3)
 
-        # Set up database
+        # Set up database - StorageManager will initialize on first use
         db_path = run_dir / "run_data.db"
-        setup_gather(db_path)
 
         update_task(task_id, message="Gathering folder structure", progress=0.4)
 

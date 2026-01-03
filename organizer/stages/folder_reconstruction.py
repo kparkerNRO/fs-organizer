@@ -9,12 +9,9 @@ from sqlalchemy.orm import Session
 import typer
 from api.api import StructureType
 from stages.categorize import get_categories_for_path
-from data_models.database import FolderStructure
-from data_models.database import (
-    Folder as dbFolder,
-    GroupCategoryEntry,
-    get_sessionmaker,
-)
+from storage.work_models import FolderStructure, GroupCategoryEntry
+from storage.index_models import Node
+from storage.manager import StorageManager
 from utils.filename_processing import clean_filename
 
 logger = logging.getLogger(__name__)
@@ -23,7 +20,7 @@ Base = declarative_base()
 
 
 def generate_api_folder_structure_folder(
-    session: Session, file: dbFolder, working_representation: Optional[Dict] = None
+    session: Session, file: Node, working_representation: Optional[Dict] = None
 ):
     if working_representation is None:
         working_representation = {}
@@ -50,8 +47,8 @@ def generate_api_folder_structure_file(
         _ = (
             session.execute(
                 select(GroupCategoryEntry)
-                .join(dbFolder, GroupCategoryEntry.folder_id == dbFolder.id)
-                .where(dbFolder.folder_path == str(parent))
+                .join(Node, GroupCategoryEntry.folder_id == Node.node_id)
+                .where(Node.abs_path == str(parent))
             )
             .scalars()
             .all()
@@ -108,47 +105,50 @@ def get_folder_heirarchy(db_path: str, type: StructureType):
     if not os.path.exists(db_path):
         raise typer.BadParameter(f"Database file not found: {db_path}")
 
-    sessionmaker = get_sessionmaker(Path(db_path))
-    with sessionmaker() as session:
+    storage = StorageManager(Path(db_path).parent)
+    with storage.get_work_session() as session:
         newest_entry = session.execute(
             select(FolderStructure)
-            .where(FolderStructure.structure_type == type)
+            .where(FolderStructure.structure_type == type.value)
             .order_by(FolderStructure.id.desc())
             .limit(1)
         ).scalar_one_or_none()
-        entry = newest_entry.structure
-        entry = json.dumps(json.loads(entry), indent=4)
-        logger.info(entry)
-        return newest_entry.structure
+        if newest_entry:
+            entry = newest_entry.structure
+            entry = json.dumps(json.loads(entry), indent=4)
+            logger.info(entry)
+            return newest_entry.structure
+        return None
 
 
-def _resolve_cleaned_name(folder: dbFolder) -> str:
-    if folder.cleaned_name:
-        return str(folder.cleaned_name)
-    base_name = str(folder.folder_name)
+def _resolve_cleaned_name(folder: Node) -> str:
+    # Try to get normalized name from features if available
+    if folder.features and folder.features.normalized_name:
+        return str(folder.features.normalized_name)
+    base_name = str(folder.name)
 
     return clean_filename(base_name)
 
 
 def _build_cleaned_path(
-    folder: dbFolder,
-    folder_by_path: Dict[str, dbFolder],
+    folder: Node,
+    folder_by_id: Dict[int, Node],
     cache: Dict[int, str],
 ) -> str:
-    folder_id = int(folder.id)
+    folder_id = int(folder.node_id)
     if folder_id in cache:
         return cache[folder_id]
 
     name = _resolve_cleaned_name(folder)
-    parent_path = str(folder.parent_path) if folder.parent_path else None
-    if not parent_path:
+    parent_node_id = folder.parent_node_id
+    if not parent_node_id:
         cleaned_path = name
     else:
-        parent = folder_by_path.get(parent_path)
+        parent = folder_by_id.get(parent_node_id)
         if parent is None:
             cleaned_path = name
         else:
-            parent_cleaned = _build_cleaned_path(parent, folder_by_path, cache)
+            parent_cleaned = _build_cleaned_path(parent, folder_by_id, cache)
             if parent_cleaned:
                 cleaned_path = str(Path(parent_cleaned) / name)
             else:
@@ -159,16 +159,23 @@ def _build_cleaned_path(
 
 
 def recalculate_cleaned_paths(db_path: str) -> int:
-    sessionmaker = get_sessionmaker(Path(db_path))
-    with sessionmaker() as session:
-        folders = session.execute(select(dbFolder)).scalars().all()
-        folder_by_path = {folder.folder_path: folder for folder in folders}
+    """
+    Calculate cleaned paths for folders in the new storage system.
+    Note: The new storage system (Node) doesn't have a cleaned_path field,
+    so this function now just returns the count of folders processed.
+    Cleaned paths should be computed on-the-fly when needed.
+    """
+    storage = StorageManager(Path(db_path).parent)
+    with storage.get_index_session(read_only=True) as session:
+        folders = session.execute(
+            select(Node).where(Node.kind == 'dir')
+        ).scalars().all()
+        folder_by_id = {folder.node_id: folder for folder in folders}
         cache: Dict[int, str] = {}
 
+        # Build cleaned paths (but can't store them in Node)
         for folder in folders:
-            folder.cleaned_path = _build_cleaned_path(folder, folder_by_path, cache)
-
-        session.commit()
+            _ = _build_cleaned_path(folder, folder_by_id, cache)
 
     return len(folders)
 
@@ -176,27 +183,35 @@ def recalculate_cleaned_paths(db_path: str) -> int:
 def recalculate_cleaned_paths_for_structure(
     db_path: str, structure_type: StructureType
 ) -> int:
+    """
+    Calculate cleaned paths for folders based on structure type.
+    Note: The new storage system (Node) doesn't have a cleaned_path field,
+    so this function now just returns the count of folders processed.
+    """
     if structure_type == StructureType.original:
         return recalculate_cleaned_paths(db_path)
 
-    sessionmaker = get_sessionmaker(Path(db_path))
-    with sessionmaker() as session:
-        iteration_id = session.execute(
-            select(func.max(GroupCategoryEntry.iteration_id))
-        ).scalar_one()
-        folders = session.execute(select(dbFolder)).scalars().all()
+    storage = StorageManager(Path(db_path).parent)
+    with storage.get_index_session(read_only=True) as index_session:
+        with storage.get_work_session() as work_session:
+            iteration_id = work_session.execute(
+                select(func.max(GroupCategoryEntry.iteration_id))
+            ).scalar_one()
+            folders = index_session.execute(
+                select(Node).where(Node.kind == 'dir')
+            ).scalars().all()
 
-        for folder in folders:
-            categories = get_categories_for_path(
-                session,
-                Path(str(folder.folder_path)) / "__folder__",
-                iteration_id,
-            )
-            folder.cleaned_path = "/".join(
-                [str(category.processed_name) for category in categories]
-            )
-
-        session.commit()
+            for folder in folders:
+                categories = get_categories_for_path(
+                    index_session,
+                    work_session,
+                    Path(str(folder.abs_path)) / "__folder__",
+                    iteration_id,
+                )
+                # Build cleaned path but can't store it in Node
+                _ = "/".join(
+                    [str(category.processed_name) for category in categories]
+                )
 
     return len(folders)
 

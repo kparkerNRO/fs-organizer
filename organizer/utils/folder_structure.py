@@ -1,11 +1,10 @@
+from typing import Any
 from api.api import FolderV2, File
-
-from data_models.database import File as dbFile
 
 
 def insert_file_in_structure(
     folder_structure: FolderV2,
-    file: dbFile,
+    file: Any,  # Any object with id, file_name, and file_path attributes
     parts: list[str | tuple] | tuple[str, ...],
     new_path: str | None = None,
 ):
