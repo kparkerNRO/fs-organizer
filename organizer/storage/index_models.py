@@ -9,6 +9,7 @@ are computed atomically during creation.
 """
 
 from typing import List, Optional
+from datetime import datetime
 from sqlalchemy import (
     String,
     Integer,
@@ -17,6 +18,7 @@ from sqlalchemy import (
     CheckConstraint,
     Index,
 )
+from storage.db_helpers import DateTime
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 # Schema version (increment on breaking changes)
@@ -43,7 +45,7 @@ class Snapshot(IndexBase):
     snapshot_id: Mapped[int] = mapped_column(
         Integer, primary_key=True, autoincrement=True
     )
-    created_at: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     root_path: Mapped[str] = mapped_column(String, nullable=False)
     root_abs_path: Mapped[str] = mapped_column(String, nullable=False)
     preprocess_version: Mapped[Optional[str]] = mapped_column(String)

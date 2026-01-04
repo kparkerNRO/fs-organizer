@@ -1,10 +1,44 @@
+import json
 from collections.abc import Sequence
+from pathlib import Path
+from typing import cast
 
-from api.api import File, FolderV2
-from storage.index_models import Node
+from api.api import File, FolderV2, FSNode, StructureType
+from sqlalchemy import func, select
+from sqlalchemy import select as sql_select
+from sqlalchemy.orm import Session
+from stages.categorize import get_categories_for_path, logger
+from storage.id_defaults import get_latest_run
+from storage.index_models import Node, Snapshot
+from storage.manager import NodeKind, StorageManager
+from storage.work_models import FileMapping, FolderStructure, GroupCategoryEntry
 
 
-def insert_file_in_structure(
+def get_newest_entry_for_structure(
+    work_session: Session, structure_type: StructureType, run_id: int | None
+):
+    if not run_id and structure_type != StructureType.original:
+        run = get_latest_run(work_session)
+        if not run:
+            return None
+        run_id = run.id
+
+    query = select(FolderStructure).where(FolderStructure.structure_type == structure_type.value)
+
+    if run_id:
+        query.where(FolderStructure.run_id == run_id)
+
+    newest_entry = work_session.execute(
+        query.order_by(FolderStructure.id.desc()).limit(1)
+    ).scalar_one_or_none()
+
+    if newest_entry:
+        entry = newest_entry.structure
+        return entry
+    return None
+
+
+def _insert_file_in_structure(
     folder_structure: FolderV2,
     file: Node,
     parts: Sequence[str | tuple[str, float]],
@@ -18,9 +52,7 @@ def insert_file_in_structure(
         else:
             confidence = 1
         if component not in current_representation.children_map.keys():
-            current_representation.children.append(
-                FolderV2(name=component, confidence=confidence)
-            )
+            current_representation.children.append(FolderV2(name=component, confidence=confidence))
         current_representation = current_representation.children_map[component]
 
     current_representation.children.append(
@@ -67,3 +99,219 @@ def sort_folder_structure(folder_data: dict) -> dict:
         return {**folder_data, "children": sorted_children}
 
     return folder_data
+
+
+def _build_tree_structure(
+    nodes: list[Node],
+) -> tuple[int, FSNode]:
+    """
+    Build hierarchical tree structure from flat list of nodes.
+
+    Args:
+        nodes: Flat list of Node objects
+
+    Returns:
+        count, and FolderV2 with the tree structure
+    """
+    # Create children map
+    children_map = {}
+    root_nodes = []
+
+    for node in nodes:
+        if node.parent_node_id is None:
+            root_nodes.append(node)
+        else:
+            if node.parent_node_id not in children_map:
+                children_map[node.parent_node_id] = []
+            children_map[node.parent_node_id].append(node)
+
+    def node_to_folder(node: Node) -> FSNode:
+        """Convert a Node to a dictionary representation."""
+        if node.kind == NodeKind.FILE:
+            return File.from_node(node)
+        else:
+            folder = FolderV2.from_node(node)
+
+            # Add children recursively
+            if node.node_id in children_map:
+                folder.children = [
+                    node_to_folder(child)
+                    for child in sorted(children_map[node.node_id], key=lambda n: n.name)
+                ]
+                folder.count = len(children_map[node.node_id])
+            return folder
+
+    # Build complete tree structure
+
+    structure = [node_to_folder(root) for root in sorted(root_nodes, key=lambda n: n.name)][0]
+
+    return len(nodes), structure
+
+
+def create_folder_structure_for_snapshot(
+    index_session: Session,
+    include_files: bool = False,
+    *,
+    snapshot_id: int | None = None,
+    associated_run: int | None = None,
+) -> FolderStructure:
+    # with storage.get_index_session(read_only=True) as session:
+    # Get most recent snapshot
+    query = sql_select(Snapshot)
+    if snapshot_id:
+        query.where(Snapshot.snapshot_id == snapshot_id)
+    else:
+        query.order_by(Snapshot.created_at.desc())
+
+    snapshot = index_session.execute(query).scalars().first()
+
+    if not snapshot:
+        raise ValueError("No snapshots found in database")
+
+    # Query nodes, optionally filtering files
+    query = sql_select(Node).where(Node.snapshot_id == snapshot.snapshot_id)
+    if not include_files:
+        query = query.where(Node.kind == "dir")
+
+    nodes = list(index_session.execute(query.order_by(Node.rel_path)).scalars().all())
+
+    # Build tree structure
+    count, structure = _build_tree_structure(nodes)
+
+    processed_structure = FolderStructure(
+        snapshot_id=snapshot.snapshot_id,
+        run_id=associated_run,
+        structure_type=StructureType.original,
+        structure=structure.model_dump_json(),
+        total_nodes=count,
+    )
+    return processed_structure
+
+
+def export_snapshot_structure(
+    output_path: Path,
+    storage: StorageManager,
+    include_files: bool = False,
+) -> dict:
+    """
+    Export the most recent snapshot's directory structure to a JSON file.
+
+    Args:
+        output_path: Path where the JSON file will be written
+        storage_path: Storage directory containing index.db (None for default)
+        include_files: Whether to include files in the structure (default: directories only)
+
+    Returns:
+        Dictionary containing the exported structure metadata
+
+    Raises:
+        ValueError: If no snapshots are found in the database
+    """
+
+    with storage.get_index_session(read_only=True) as index_session:
+        file_structure = create_folder_structure_for_snapshot(index_session, include_files)
+        # Write to JSON file
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # TODO: investigate using the sqlalchemy/pydantic model for this
+        converted_structure = {
+            "run_id": file_structure.run_id,
+            "snapshot_id": file_structure.snapshot_id,
+            "total_nodes": file_structure.total_nodes,
+            "structure_type": file_structure.structure_type,
+            "structure": file_structure.structure,
+        }
+
+        with open(output_path, "w") as f:
+            json.dump(converted_structure, f, indent=2)
+
+        return {
+            "snapshot_id": file_structure.snapshot_id,
+            "created_at": file_structure.created_at,
+            "total_nodes": file_structure.total_nodes,
+            "output_path": str(output_path),
+        }
+
+
+def calculate_folder_structure_for_categories(
+    manager: StorageManager,
+    snapshot_id: int,
+    run_id: int,
+    structure_type: StructureType = StructureType.organized,
+    # category_resolver: Callable[
+    #     [Session, Session, str | Path, int | None], list[GroupCategoryEntry]
+    # ] = get_categories_for_path,
+):
+    with (
+        manager.get_index_session(read_only=True) as index_session,
+        manager.get_work_session() as work_session,
+    ):
+        # Get all file nodes from index database
+        files = (
+            index_session.execute(
+                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "file")
+            )
+            .scalars()
+            .all()
+        )
+
+        # Get latest iteration_id from work database
+        iteration_id = work_session.execute(
+            select(func.max(GroupCategoryEntry.iteration_id))
+        ).scalar_one()
+
+        if iteration_id is None:
+            logger.warning("No group categories available for categorization.")
+            return None
+
+        total_files = len(files)
+        logger.info(f"Processing {total_files} files...")
+
+        # Process each file
+        folder_structure = FolderV2(name="Root")
+        for i, file in enumerate(files, 1):
+            if i % 1000 == 0:
+                logger.info(f"Processed {i}/{total_files} files")
+
+            # Get categories using index session for node lookups and work session for groups
+            categories = get_categories_for_path(
+                index_session,
+                work_session,
+                file.abs_path,
+                iteration_id,
+            )
+            names = [cast(str, cat.processed_name) for cat in categories]
+            new_path = "/".join(names)
+
+            # Update or create FileMapping in work database
+            existing_mapping = work_session.execute(
+                select(FileMapping).where(
+                    FileMapping.run_id == run_id, FileMapping.node_id == file.node_id
+                )
+            ).scalar_one_or_none()
+
+            if existing_mapping:
+                existing_mapping.new_path = new_path
+            else:
+                work_session.add(
+                    FileMapping(
+                        run_id=run_id,
+                        node_id=file.node_id,
+                        original_path=file.abs_path,
+                        new_path=new_path,
+                    )
+                )
+
+            category_names = [
+                (category.processed_name, category.confidence) for category in categories
+            ]
+            _insert_file_in_structure(folder_structure, file, category_names, new_path)
+
+        work_session.add(
+            FolderStructure(
+                run_id=run_id,
+                structure_type=structure_type.value,
+                structure=folder_structure.model_dump_json(),
+            )
+        )
+        work_session.commit()

@@ -8,8 +8,9 @@ validated at the application level, not by database constraints.
 """
 
 from typing import List, Optional
+from datetime import datetime
 from sqlalchemy import String, Float, ForeignKey, Index
-from storage.db_helpers import JsonDict, JsonList
+from storage.db_helpers import JsonDict, JsonList, DateTime
 from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 # Schema version (increment on breaking changes)
@@ -32,8 +33,8 @@ class Run(WorkBase):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
-    started_at: Mapped[str] = mapped_column(String)
-    finished_at: Mapped[Optional[str]]
+    started_at: Mapped[datetime] = mapped_column(DateTime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(
         String, default="running"
     )  # 'running' | 'completed' | 'failed' | 'cancelled'
@@ -65,7 +66,7 @@ class StageState(WorkBase):
         primary_key=True
     )  # Redundant with run.snapshot_id for query performance
     run_id: Mapped[int] = mapped_column(ForeignKey("run.id"), primary_key=True)
-    completed_at: Mapped[Optional[str]]
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     input_fingerprint: Mapped[Optional[str]]
     output_fingerprint: Mapped[Optional[str]]
 
@@ -88,7 +89,7 @@ class GroupIteration(WorkBase):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     snapshot_id: Mapped[int]  # Redundant with run.snapshot_id for queries
-    timestamp: Mapped[Optional[str]]
+    timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime)
     description: Mapped[Optional[str]]
     parameters: Mapped[Optional[dict]] = mapped_column(JsonDict)
 
@@ -237,10 +238,12 @@ class FolderStructure(WorkBase):
     __tablename__ = "out_folder_structure"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("run.run_id"))
+    snapshot_id: Mapped[int]  # FK to index.db (cross-database)
+    total_nodes: Mapped[int]
     structure_type: Mapped[str] = mapped_column(String)
     structure: Mapped[dict] = mapped_column(JsonDict)
-    created_at: Mapped[Optional[str]]
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
 class FileMapping(WorkBase):

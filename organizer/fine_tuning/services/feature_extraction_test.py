@@ -1,6 +1,7 @@
 """Tests for feature_extraction.py"""
 
 import json
+from datetime import datetime
 
 import pytest
 from fine_tuning.services.feature_extraction import (
@@ -87,7 +88,7 @@ def sample_nodes(index_session):
     # Create snapshot first (required for foreign key)
     snapshot = Snapshot(
         snapshot_id=1,
-        created_at="2024-01-01T00:00:00",
+        created_at=datetime(2024, 1, 1, 0, 0, 0),
         root_path="/test",
         root_abs_path="/test",
     )
@@ -574,7 +575,7 @@ class TestExtractFeatures:
         # Create snapshot first
         snapshot = Snapshot(
             snapshot_id=1,
-            created_at="2024-01-01T00:00:00",
+            created_at=datetime(2024, 1, 1, 0, 0, 0),
             root_path="/test",
             root_abs_path="/test",
         )

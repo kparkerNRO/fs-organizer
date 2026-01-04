@@ -1,14 +1,17 @@
 from collections import defaultdict
+from datetime import datetime
 from logging import getLogger
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from storage.id_defaults import get_effective_snapshot_id
 from storage.index_models import Node
 from storage.manager import StorageManager
 from storage.work_models import (
     GroupCategory,
     GroupCategoryEntry,
     GroupIteration,
+    Run,
 )
 from utils.config import Config, get_config
 from utils.filename_processing import clean_filename, split_view_type
@@ -447,9 +450,8 @@ def group_folders(
     max_iterations: int = 2,
     review_callback=None,
     config: Config | None = None,
-    run_id: int | None = None,
     snapshot_id: int | None = None,
-) -> None:
+) -> int:
     """
     Grouping steps:
         1. Using NLP heuristics, cluster the records in PartialNameCategory to find category names which should be grouped together
@@ -467,26 +469,27 @@ def group_folders(
         session_manager.get_work_session() as work_session,
         session_manager.get_index_session() as index_session,
     ):
+        snapshot_id = get_effective_snapshot_id(session_manager, snapshot_id)
+        
         # Get run_id and snapshot_id if not provided
-        if run_id is None or snapshot_id is None:
-            from storage.work_models import Run
-
-            run = work_session.query(Run).first()
-            if run is None:
-                raise ValueError("No run found in database. Please create a run first.")
-            run_id = run.id
-            snapshot_id = run.snapshot_id
+        run = Run(
+            snapshot_id = snapshot_id,
+            started_at = datetime.now(),
+            status="running"
+        )
+        work_session.add(run)
+        work_session.flush()
 
         config = config or get_config()
         process_folders_to_groups(
             work_session=work_session,
             index_session=index_session,
             group_id=None,
-            run_id=run_id,
+            run_id=run.id,
             snapshot_id=snapshot_id,
         )
         pre_process_groups(
-            work_session, config=config, run_id=run_id, snapshot_id=snapshot_id
+            work_session, config=config, run_id=run.id, snapshot_id=snapshot_id
         )
 
         # New tag decomposition stage
@@ -497,7 +500,8 @@ def group_folders(
         compact_groups(
             work_session=work_session,
             index_session=index_session,
-            run_id=run_id,
+            run_id=run.id,
             snapshot_id=snapshot_id,
         )
         _create_exact_groups(work_session)
+        return run.id

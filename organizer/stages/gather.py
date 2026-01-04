@@ -7,9 +7,10 @@ from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 from storage.index_models import Node, NodeFeatures
-from storage.manager import FileSource, NodeKind
+from storage.manager import FileSource, NodeKind, StorageManager
 from utils.config import get_config
 from utils.filename_processing import clean_filename
+from utils.folder_structure import create_folder_structure_for_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -307,7 +308,7 @@ def _create_node(
     return node
 
 
-def ingest_filesystem(storage_manager, base_path):
+def ingest_filesystem(storage_manager: StorageManager, base_path):
     with storage_manager.ingestion_job(root_path=base_path) as job:
         snapshot_id = job.snapshot_id
         with storage_manager.get_index_session() as index_session:
@@ -417,5 +418,10 @@ def ingest_filesystem(storage_manager, base_path):
                     )
 
             index_session.commit()
+
+        with storage_manager.get_work_session() as work_session:
+            fs = create_folder_structure_for_snapshot(index_session)
+            work_session.add(fs)
+            work_session.commit
 
     return snapshot_id

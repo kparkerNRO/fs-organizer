@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 from typing import cast
+from datetime import datetime
 
 import tempfile
 from pathlib import Path
@@ -289,7 +290,7 @@ class TestImmutability:
         with storage_manager.get_index_session(read_only=True) as session:
             # Try to add something
             new_snapshot = SnapshotFactory.build(
-                created_at="2024-01-01T00:00:00",
+                created_at=datetime(2024, 1, 1, 0, 0, 0),
                 root_path="/test",
                 root_abs_path="/test",
             )

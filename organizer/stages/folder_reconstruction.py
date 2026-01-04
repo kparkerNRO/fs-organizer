@@ -3,18 +3,21 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, Optional
-from sqlalchemy import func, select
+
 from api.api import StructureType
-from stages.categorize import get_categories_for_path
-from storage.manager import StorageManager
-from storage.work_models import FolderStructure, FileMapping, GroupCategoryEntry
+from sqlalchemy import func, select
 from storage.index_models import Node
+from storage.manager import StorageManager
+from storage.work_models import FileMapping, GroupCategoryEntry
 from utils.filename_processing import clean_filename
+from utils.folder_structure import get_newest_entry_for_structure
+
+from stages.categorize import get_categories_for_path
 
 logger = logging.getLogger(__name__)
 
 
-def generate_folder_heirarchy_from_path(
+def _generate_folder_heirarchy_from_path(
     path: str, working_representation: Optional[Dict] = None
 ) -> dict:
     if working_representation is None:
@@ -36,28 +39,16 @@ def generate_folder_heirarchy_from_path(
     return working_representation
 
 
-def get_folder_heirarchy(
-    manager: StorageManager, run_id: int, structure_type: StructureType
-):
+def get_folder_heirarchy(manager: StorageManager, run_id: int, structure_type: StructureType):
     logger.debug(f"Current working directory: {os.getcwd()}")
 
     with manager.get_work_session() as session:
-        newest_entry = session.execute(
-            select(FolderStructure)
-            .where(FolderStructure.structure_type == structure_type.value)
-            .where(FolderStructure.run_id == run_id)
-            .order_by(FolderStructure.id.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-
-        if newest_entry:
-            entry = newest_entry.structure
-            if isinstance(entry, str):
-                entry = json.loads(entry)
+        entry = get_newest_entry_for_structure(session, structure_type, run_id)
+        if entry is not None:
+            entry = json.loads(entry)
             pretty_entry = json.dumps(entry, indent=4)
             logger.info(pretty_entry)
-            return newest_entry.structure
-        return None
+        return entry
 
 
 def _resolve_cleaned_name(node: Node) -> str:
@@ -93,9 +84,7 @@ def _build_cleaned_path(
     return cleaned_path
 
 
-def recalculate_cleaned_paths(
-    manager: StorageManager, snapshot_id: int, run_id: int
-) -> int:
+def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id: int) -> int:
     with (
         manager.get_index_session(read_only=True) as index_session,
         manager.get_work_session() as work_session,
@@ -172,9 +161,7 @@ def recalculate_cleaned_paths_for_structure(
                 Path(str(node.abs_path)),
                 iteration_id,
             )
-            cleaned_path = "/".join(
-                [str(category.processed_name) for category in categories]
-            )
+            cleaned_path = "/".join([str(category.processed_name) for category in categories])
 
             existing_mapping = work_session.execute(
                 select(FileMapping).where(

@@ -130,7 +130,7 @@ def create_model_run(
         model_version = model_path if model_path else f"unknown-{taxonomy}"
 
     run = ModelRun(
-        started_at=datetime.now().isoformat(),
+        started_at=datetime.now(),
         status="running",
         run_type=run_type,
         base_model_id=base_model_id,
@@ -184,7 +184,7 @@ def create_and_save_run_results(
     )
 
     run.status = "completed"
-    run.finished_at = datetime.now().isoformat()
+    run.finished_at = datetime.now()
     run.test_samples_count = len(samples)
 
     if metrics:

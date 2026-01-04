@@ -145,7 +145,7 @@ def storage_run(storage_work_session, storage_snapshot):
     """Create a Run tied to the storage snapshot."""
     return RunFactory(
         snapshot_id=storage_snapshot.snapshot_id,
-        started_at=datetime.now().isoformat(),
+        started_at=datetime.now(),
     )
 
 
@@ -160,7 +160,7 @@ def storage_iteration(storage_work_session, storage_run):
 @pytest.fixture
 def sample_run(work_session):
     """Create a sample Run for testing."""
-    return RunFactory(started_at=datetime.now().isoformat())
+    return RunFactory(started_at=datetime.now())
 
 
 @pytest.fixture

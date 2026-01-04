@@ -492,7 +492,7 @@ class StorageManager:
 
     def _finish_run(self, run_id: int, status: RunStatus) -> None:
         """Mark a run as finished with a status and timestamp."""
-        finished_at = datetime.now(timezone.utc).isoformat()
+        finished_at = datetime.now(timezone.utc)
         with self.get_work_session() as session:
             run = session.query(Run).filter_by(id=run_id).first()
             if run:
@@ -517,7 +517,7 @@ class StorageManager:
         The ingestion code can use the returned StorageManager to add nodes,
         update stages, or write work data while the job is running.
         """
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(timezone.utc)
         root_path_value = Path(root_path)
         reference_hash_value = reference_hash or compute_reference_hash()
         config_hash_value = config_hash or reference_hash_value

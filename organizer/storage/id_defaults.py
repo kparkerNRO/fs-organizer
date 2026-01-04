@@ -10,17 +10,16 @@ from storage.training_models import LabelRun
 from storage.work_models import Run
 
 
-def get_latest_run(storage_manager: StorageManager) -> Run | None:
+def get_latest_run(session) -> Run | None:
     """Return the most recent run in work.db."""
-    with storage_manager.get_work_session() as session:
-        run = (
-            session.execute(select(Run).order_by(Run.id.desc()).limit(1))
-            .scalars()
-            .first()
-        )
-        if run is not None:
-            session.expunge(run)
-        return run
+    run = (
+        session.execute(select(Run).order_by(Run.id.desc()).limit(1))
+        .scalars()
+        .first()
+    )
+    if run is not None:
+        session.expunge(run)
+    return run
 
 
 def get_latest_run_for_snapshot(

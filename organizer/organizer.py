@@ -1,47 +1,26 @@
-import typer
 import logging
-import sys
-from datetime import datetime
 from pathlib import Path
+
+import typer
 from api.api import StructureType
+from fine_tuning.cli import app as fine_tuning_app
 from stages.folder_reconstruction import (
     get_folder_heirarchy,
     recalculate_cleaned_paths_for_structure,
 )
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
-from stages.categorize import calculate_folder_structure
 from storage.id_defaults import get_latest_run_for_snapshot
 from storage.manager import StorageManager
 from storage.work_models import Run
-from utils.export_structure import export_snapshot_structure
-
-from fine_tuning.cli import app as fine_tuning_app
-
-# Configure root logger to output to both stdout and log file
-log_dir = Path("./logs")
-log_dir.mkdir(exist_ok=True)
-log_file = log_dir / f"organizer_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-# Create handlers with explicit configuration
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+from utils.folder_structure import (
+    calculate_folder_structure_for_categories,
+    export_snapshot_structure,
 )
+from utils.logging_config import setup_logging
 
-file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-
-# Configure root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.addHandler(console_handler)
-root_logger.addHandler(file_handler)
-
+# Configure logging
+setup_logging("organizer_cli")
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
@@ -163,7 +142,7 @@ def folders(
     typer.echo(f"Using run_id={run_id}")
 
     if structure_type != StructureType.original:
-        calculate_folder_structure(
+        calculate_folder_structure_for_categories(
             storage_manager, snapshot_id, run_id, structure_type=structure_type
         )
     recalculate_cleaned_paths_for_structure(
@@ -200,10 +179,7 @@ def export_structure(
             include_files=include_files,
         )
 
-        typer.echo(
-            f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}"
-        )
-        typer.echo(f"Root path: {result['root_path']}")
+        typer.echo(f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}")
         typer.echo(f"Found {result['total_nodes']} nodes")
         typer.echo(f"✓ Exported directory structure to {result['output_path']}")
 
@@ -228,11 +204,6 @@ def pipeline(
         "-s",
         help="Storage directory (contains index.db). If not specified, uses default data directory.",
     ),
-    run_id: int | None = typer.Option(
-        None,
-        "--run-id",
-        help="Run ID to use instead of looking up the latest run.",
-    ),
 ):
     """
     Run full pipeline: gather, group, and folders.
@@ -242,36 +213,18 @@ def pipeline(
     snapshot_id = ingest_filesystem(storage_manager, base_path)
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
-    if run_id is not None:
-        with storage_manager.get_work_session() as session:
-            run = session.query(Run).filter(Run.id == run_id).first()
-            if run is None:
-                typer.echo("Error: run not found.", err=True)
-                raise typer.Exit(1)
-            if run.snapshot_id != snapshot_id:
-                typer.echo(
-                    "Error: run snapshot does not match the newly created snapshot.",
-                    err=True,
-                )
-                raise typer.Exit(1)
-            session.expunge(run)
-    else:
-        run = _get_latest_run(storage_manager, snapshot_id)
-
     typer.echo("Grouping folders...")
-    group_folders(storage_manager, run_id=run.id, snapshot_id=snapshot_id)
+    group_folders(storage_manager, snapshot_id=snapshot_id)
     typer.echo("✓ Grouping complete.")
 
     typer.echo("Calculating folder structure...")
-    calculate_folder_structure(
+    calculate_folder_structure_for_categories(
         storage_manager, snapshot_id, run.id, structure_type=StructureType.organized
     )
     recalculate_cleaned_paths_for_structure(
         storage_manager, snapshot_id, run.id, structure_type=StructureType.organized
     )
-    get_folder_heirarchy(
-        storage_manager, run.id, structure_type=StructureType.organized
-    )
+    get_folder_heirarchy(storage_manager, run.id, structure_type=StructureType.organized)
     typer.echo("✓ Folder hierarchy generation complete.")
 
 

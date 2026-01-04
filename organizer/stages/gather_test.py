@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +28,7 @@ def index_session():
 @pytest.fixture
 def snapshot_id(index_session):
     snapshot = Snapshot(
-        created_at="2024-01-01T00:00:00",
+        created_at=datetime(2024, 1, 1, 0, 0, 0),
         root_path="/test",
         root_abs_path="/test",
     )

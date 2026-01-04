@@ -83,7 +83,11 @@ folders db_path:
 
 # Start FastAPI development server
 api:
-    cd organizer && uv run fastapi dev organizer_api.py
+    cd organizer && uv run uvicorn organizer_api:app --reload \
+        --reload-exclude "*.db" \
+        --reload-exclude "*.db-shm" \
+        --reload-exclude "*.db-wal" \
+        --reload-exclude "logs/*"
 
 # Run all backend tests
 test-backend:

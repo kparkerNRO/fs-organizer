@@ -9,18 +9,11 @@ generate folder paths based on that
 
 import logging
 from pathlib import Path
-from typing import cast
-from collections.abc import Callable
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy import func, select
-
-from api.api import FolderV2, StructureType
-from storage.manager import StorageManager
 from storage.index_models import Node
-from storage.work_models import FolderStructure, GroupCategoryEntry, FileMapping
-
-from utils.folder_structure import insert_file_in_structure
+from storage.work_models import GroupCategoryEntry
 
 logger = logging.getLogger(__name__)
 
@@ -94,94 +87,3 @@ def get_categories_for_path(
             categories.append(group)
 
     return categories
-
-
-def calculate_folder_structure(
-    manager: StorageManager,
-    snapshot_id: int,
-    run_id: int,
-    structure_type: StructureType = StructureType.organized,
-    category_resolver: Callable[
-        [Session, Session, str | Path, int | None], list[GroupCategoryEntry]
-    ]
-    | None = None,
-    insert_file: Callable[
-        [FolderV2, Node, list[tuple[str, float]], str | None], None
-    ] = insert_file_in_structure,
-):
-    with (
-        manager.get_index_session(read_only=True) as index_session,
-        manager.get_work_session() as work_session,
-    ):
-        # Get all file nodes from index database
-        files = (
-            index_session.execute(
-                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "file")
-            )
-            .scalars()
-            .all()
-        )
-
-        # Get latest iteration_id from work database
-        iteration_id = work_session.execute(
-            select(func.max(GroupCategoryEntry.iteration_id))
-        ).scalar_one()
-
-        if iteration_id is None:
-            logger.warning("No group categories available for categorization.")
-            return None
-
-        resolver = category_resolver or get_categories_for_path
-
-        total_files = len(files)
-        logger.info(f"Processing {total_files} files...")
-
-        # Process each file
-        folder_structure = FolderV2(name="Root")
-        for i, file in enumerate(files, 1):
-            if i % 1000 == 0:
-                logger.info(f"Processed {i}/{total_files} files")
-
-            # Get categories using index session for node lookups and work session for groups
-            categories = resolver(
-                index_session,
-                work_session,
-                file.abs_path,
-                iteration_id,
-            )
-            names = [cast(str, cat.processed_name) for cat in categories]
-            new_path = "/".join(names)
-
-            # Update or create FileMapping in work database
-            existing_mapping = work_session.execute(
-                select(FileMapping).where(
-                    FileMapping.run_id == run_id, FileMapping.node_id == file.node_id
-                )
-            ).scalar_one_or_none()
-
-            if existing_mapping:
-                existing_mapping.new_path = new_path
-            else:
-                work_session.add(
-                    FileMapping(
-                        run_id=run_id,
-                        node_id=file.node_id,
-                        original_path=file.abs_path,
-                        new_path=new_path,
-                    )
-                )
-
-            category_names = [
-                (category.processed_name, category.confidence)
-                for category in categories
-            ]
-            insert_file(folder_structure, file, category_names, new_path)
-
-        work_session.add(
-            FolderStructure(
-                run_id=run_id,
-                structure_type=structure_type.value,
-                structure=folder_structure.model_dump_json(),
-            )
-        )
-        work_session.commit()
