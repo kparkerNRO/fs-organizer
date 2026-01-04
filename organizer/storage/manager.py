@@ -6,34 +6,35 @@ Configuration data is managed separately via YAML files loaded in-memory
 (see organizer/utils/config.py).
 """
 
-from enum import Enum
-from dataclasses import dataclass
-
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Optional, Iterator
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Iterator, Optional
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker, Session
-
+from sqlalchemy.orm import Session, sessionmaker
 from utils.config import compute_reference_hash
 
 from storage.index_models import (
-    IndexBase,
-    Snapshot,
-    Node,
-    Meta as IndexMeta,
     INDEX_SCHEMA_VERSION,
+    IndexBase,
+    Node,
+    Snapshot,
+)
+from storage.index_models import (
+    Meta as IndexMeta,
 )
 from storage.work_models import (
-    WorkBase,
-    Run,
-    Meta as WorkMeta,
     WORK_SCHEMA_VERSION,
+    Run,
+    WorkBase,
 )
-
+from storage.work_models import (
+    Meta as WorkMeta,
+)
 
 # Default paths
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -300,7 +301,7 @@ class StorageManager:
         Raises:
             RuntimeError: If schema version mismatch detected
         """
-        from storage.training_models import Meta, TRAINING_SCHEMA_VERSION
+        from storage.training_models import TRAINING_SCHEMA_VERSION, Meta
 
         Session = sessionmaker(bind=engine)
         session = Session()
@@ -368,8 +369,7 @@ class StorageManager:
         """
         if not self._initialize_work or self.work_engine is None:
             raise RuntimeError(
-                "Work database not initialized. "
-                "Create StorageManager with initialize_work=True"
+                "Work database not initialized. Create StorageManager with initialize_work=True"
             )
 
         Session = sessionmaker(bind=self.work_engine)
@@ -391,10 +391,7 @@ class StorageManager:
             True if snapshot exists, False otherwise
         """
         with self.get_index_session(read_only=True) as session:
-            return (
-                session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
-                is not None
-            )
+            return session.query(Snapshot).filter_by(id=snapshot_id).first() is not None
 
     def _validate_node_exists(self, node_id: int, snapshot_id: int) -> bool:
         """Check if node exists in index.db for given snapshot.
@@ -408,9 +405,7 @@ class StorageManager:
         """
         with self.get_index_session(read_only=True) as session:
             return (
-                session.query(Node)
-                .filter_by(node_id=node_id, snapshot_id=snapshot_id)
-                .first()
+                session.query(Node).filter_by(id=node_id, snapshot_id=snapshot_id).first()
                 is not None
             )
 
@@ -424,10 +419,7 @@ class StorageManager:
             True if runs exist that reference snapshot, False otherwise
         """
         with self.get_work_session() as session:
-            return (
-                session.query(Run).filter_by(snapshot_id=snapshot_id).first()
-                is not None
-            )
+            return session.query(Run).filter_by(id=snapshot_id).first() is not None
 
     def _validate_snapshot_id_matches_run(self, snapshot_id: int, run_id: int) -> bool:
         """Validate that provided snapshot_id matches the run's snapshot_id.
@@ -462,19 +454,14 @@ class StorageManager:
         # CRITICAL: Check for referencing runs
         if self._check_snapshot_has_runs(snapshot_id):
             raise ValueError(
-                f"Cannot delete snapshot {snapshot_id}: "
-                f"runs still reference it. Delete runs first."
+                f"Cannot delete snapshot {snapshot_id}: runs still reference it. Delete runs first."
             )
 
         # Safe to delete
         with self.get_index_session() as session:
-            snapshot = (
-                session.query(Snapshot).filter_by(snapshot_id=snapshot_id).first()
-            )
+            snapshot = session.query(Snapshot).filter_by(id=snapshot_id).first()
             if snapshot:
-                session.delete(
-                    snapshot
-                )  # Cascades to nodes, node_features via SQLAlchemy
+                session.delete(snapshot)  # Cascades to nodes, node_features via SQLAlchemy
                 session.commit()
 
     def delete_run(self, run_id: int):
@@ -534,7 +521,7 @@ class StorageManager:
             )
             index_session.add(snapshot)
             index_session.commit()
-            snapshot_id = snapshot.snapshot_id
+            snapshot_id = snapshot.id
 
         with self.get_work_session() as work_session:
             run = Run(
@@ -568,9 +555,7 @@ class StorageManager:
         Raises:
             NotImplementedError: Always, as nodes are immutable
         """
-        raise NotImplementedError(
-            "Nodes are immutable. Create a new snapshot to capture changes."
-        )
+        raise NotImplementedError("Nodes are immutable. Create a new snapshot to capture changes.")
 
     def compute_node_features(self, snapshot_id: int):
         """NOT ALLOWED: Features must be computed during snapshot creation.

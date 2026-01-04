@@ -58,16 +58,14 @@ def _load_and_index_nodes(
     session: Session, snapshot_id: int
 ) -> Tuple[Dict[int, Node], Dict[int, str], Dict[Optional[int], List[int]]]:
     """Load all nodes for a snapshot and build relationship indexes."""
-    rows = session.execute(
-        select(Node).where(Node.snapshot_id == snapshot_id)
-    ).scalars()
+    rows = session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
     nodes_by_id: Dict[int, Node] = {}
     processed_name_by_id: Dict[int, str] = {}
     children_by_parent: Dict[Optional[int], List[int]] = {}
     for r in rows:
-        nodes_by_id[r.node_id] = r
-        processed_name_by_id[r.node_id] = clean_filename(r.name)
-        children_by_parent.setdefault(r.parent_node_id, []).append(r.node_id)
+        nodes_by_id[r.id] = r
+        processed_name_by_id[r.id] = clean_filename(r.name)
+        children_by_parent.setdefault(r.parent_node_id, []).append(r.id)
     return nodes_by_id, processed_name_by_id, children_by_parent
 
 
@@ -148,29 +146,23 @@ def extract_feature_nodes(
 
         parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
         grandparent = (
-            nodes_by_id.get(parent.parent_node_id)
-            if parent and parent.parent_node_id
-            else None
+            nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id else None
         )
 
         child_nodes = [
-            nodes_by_id[cid]
-            for cid in children_by_parent.get(node.node_id, [])
-            if cid in nodes_by_id
+            nodes_by_id[cid] for cid in children_by_parent.get(node.id, []) if cid in nodes_by_id
         ][:max_children]
 
         if parent:
             sibling_nodes = [
                 nodes_by_id[sid]
-                for sid in children_by_parent.get(parent.node_id, [])
-                if sid != node.node_id
-                and sid in nodes_by_id
-                and nodes_by_id[sid].kind == NodeKind.DIR
+                for sid in children_by_parent.get(parent.id, [])
+                if sid != node.id and sid in nodes_by_id and nodes_by_id[sid].kind == NodeKind.DIR
             ][:max_siblings]
         else:
             sibling_nodes = []
 
-        extensions = sorted(descendant_exts.get(node.node_id, set()))[:max_descendents]
+        extensions = sorted(descendant_exts.get(node.id, set()))[:max_descendents]
         core_node = FeatureNodeCore(
             snapshot_id=snapshot_id,
             node=node,

@@ -3,9 +3,9 @@
 import csv
 
 import pytest
+from storage.factories import NodeFactory, TrainingSampleFactory
 from storage.manager import NodeKind
 
-from storage.factories import NodeFactory, TrainingSampleFactory
 from fine_tuning.services.sampling import (
     _cluster_by_similarity,
     _sample_from_clusters,
@@ -25,7 +25,7 @@ class TestSelectTrainingSamples:
 
     def test_basic_selection(self, index_session, sample_snapshot):
         """Test basic sample selection"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         # Create 20 nodes using factory
         nodes = NodeFactory.create_batch(20, snapshot_id=snapshot_id, depth=1)
 
@@ -41,21 +41,21 @@ class TestSelectTrainingSamples:
         # All samples should be directories
         assert all(s.kind == NodeKind.DIR for s in samples)
         # All samples should come from the created nodes
-        assert {s.node_id for s in samples}.issubset({n.node_id for n in nodes})
+        assert {s.id for s in samples}.issubset({n.id for n in nodes})
 
     def test_depth_filtering(self, index_session, sample_snapshot):
         """Test that depth filtering works correctly"""
-        snapshot_id = sample_snapshot.snapshot_id
-        NodeFactory(node_id=1, snapshot_id=snapshot_id, name="depth0", depth=0)
+        snapshot_id = sample_snapshot.id
+        NodeFactory(id=1, snapshot_id=snapshot_id, name="depth0", depth=0)
         NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="depth2",
             parent_node_id=1,
             depth=2,
         )
         NodeFactory(
-            node_id=3,
+            id=3,
             snapshot_id=snapshot_id,
             name="depth5",
             parent_node_id=2,
@@ -75,7 +75,7 @@ class TestSelectTrainingSamples:
 
     def test_empty_result(self, index_session, sample_snapshot):
         """Test selection with no matching nodes"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         samples = select_training_samples(
             session=index_session,
             snapshot_id=snapshot_id,
@@ -88,7 +88,7 @@ class TestSelectTrainingSamples:
 
     def test_sample_size_cap(self, index_session, sample_snapshot):
         """Test that sample size is respected"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         # Create 100 nodes using factory
         NodeFactory.create_batch(100, snapshot_id=snapshot_id, depth=1)
 
@@ -110,9 +110,9 @@ class TestClusterBySimilarity:
     def test_basic_clustering(self):
         """Test basic clustering of similar names"""
         nodes = [
-            NodeFactory.build(node_id=1, name="Character Art"),
-            NodeFactory.build(node_id=2, name="Character Arts"),
-            NodeFactory.build(node_id=3, name="Environment"),
+            NodeFactory.build(id=1, name="Character Art"),
+            NodeFactory.build(id=2, name="Character Arts"),
+            NodeFactory.build(id=3, name="Environment"),
         ]
 
         clusters = _cluster_by_similarity(nodes, threshold=0.4)
@@ -132,7 +132,7 @@ class TestClusterBySimilarity:
 
     def test_single_node(self):
         """Test clustering with single node"""
-        node = NodeFactory.build(node_id=1, name="Test")
+        node = NodeFactory.build(id=1, name="Test")
 
         clusters = _cluster_by_similarity([node], threshold=0.5)
         assert len(clusters) == 1
@@ -142,11 +142,11 @@ class TestClusterBySimilarity:
     def test_threshold_effect(self):
         """Test that threshold affects clustering behavior"""
         nodes = [
-            NodeFactory.build(node_id=1, name="Image Res"),
-            NodeFactory.build(node_id=2, name="Image Resolution"),
-            NodeFactory.build(node_id=3, name="Folder ABC"),
-            NodeFactory.build(node_id=4, name="Folder XYZ"),
-            NodeFactory.build(node_id=5, name="Random Data"),
+            NodeFactory.build(id=1, name="Image Res"),
+            NodeFactory.build(id=2, name="Image Resolution"),
+            NodeFactory.build(id=3, name="Folder ABC"),
+            NodeFactory.build(id=4, name="Folder XYZ"),
+            NodeFactory.build(id=5, name="Random Data"),
         ]
 
         # Low threshold (0.2): More permissive, groups more items together
@@ -177,10 +177,10 @@ class TestSampleFromClusters:
         """Test basic sampling from clusters"""
         clusters = [
             [
-                NodeFactory.build(node_id=1, name="A1"),
-                NodeFactory.build(node_id=2, name="A2"),
+                NodeFactory.build(id=1, name="A1"),
+                NodeFactory.build(id=2, name="A2"),
             ],
-            [NodeFactory.build(node_id=3, name="B1")],
+            [NodeFactory.build(id=3, name="B1")],
         ]
 
         samples = _sample_from_clusters(clusters, num_samples=2)
@@ -188,7 +188,7 @@ class TestSampleFromClusters:
         assert len(samples) == 2
         # Check that samples are from the original nodes
         original_node_ids = {1, 2, 3}
-        assert {s.node_id for s in samples}.issubset(original_node_ids)
+        assert {s.id for s in samples}.issubset(original_node_ids)
 
     def test_empty_clusters(self):
         """Test sampling from empty clusters"""
@@ -197,7 +197,7 @@ class TestSampleFromClusters:
 
     def test_sample_size_limit(self):
         """Test that sample size is exactly respected"""
-        clusters = [[NodeFactory.build(node_id=i, name=f"Node{i}") for i in range(10)]]
+        clusters = [[NodeFactory.build(id=i, name=f"Node{i}") for i in range(10)]]
 
         samples = _sample_from_clusters(clusters, num_samples=5)
 
@@ -208,9 +208,9 @@ class TestSampleFromClusters:
         """Test that sampling prefers one from each cluster"""
         # Create 3 clusters with different sizes
         clusters = [
-            [NodeFactory.build(node_id=i, name=f"A{i}") for i in range(5)],
-            [NodeFactory.build(node_id=i + 100, name=f"B{i}") for i in range(3)],
-            [NodeFactory.build(node_id=i + 200, name=f"C{i}") for i in range(2)],
+            [NodeFactory.build(id=i, name=f"A{i}") for i in range(5)],
+            [NodeFactory.build(id=i + 100, name=f"B{i}") for i in range(3)],
+            [NodeFactory.build(id=i + 200, name=f"C{i}") for i in range(2)],
         ]
 
         samples = _sample_from_clusters(clusters, num_samples=3)
@@ -219,7 +219,7 @@ class TestSampleFromClusters:
         assert len(samples) == 3
 
         # Verify samples come from different clusters based on node_id ranges
-        sample_ids = {s.node_id for s in samples}
+        sample_ids = {s.id for s in samples}
         has_from_cluster_a = any(id < 100 for id in sample_ids)
         has_from_cluster_b = any(100 <= id < 200 for id in sample_ids)
         has_from_cluster_c = any(200 <= id < 300 for id in sample_ids)
@@ -232,10 +232,8 @@ class TestWriteSampleCsv:
 
     def test_basic_csv_writing(self, index_session, sample_snapshot, tmp_path):
         """Test basic CSV writing without heuristic"""
-        snapshot_id = sample_snapshot.snapshot_id
-        node = NodeFactory(
-            node_id=1, snapshot_id=snapshot_id, name="TestFolder", depth=1
-        )
+        snapshot_id = sample_snapshot.id
+        node = NodeFactory(id=1, snapshot_id=snapshot_id, name="TestFolder", depth=1)
         index_session.flush()
 
         output_path = tmp_path / "test.csv"
@@ -267,21 +265,19 @@ class TestWriteSampleCsv:
         }
         assert all(rows[0].get(key) == value for key, value in expected_row.items())
 
-    def test_csv_with_parent_and_grandparent(
-        self, index_session, sample_snapshot, tmp_path
-    ):
+    def test_csv_with_parent_and_grandparent(self, index_session, sample_snapshot, tmp_path):
         """Test CSV includes parent and grandparent information"""
-        snapshot_id = sample_snapshot.snapshot_id
-        NodeFactory(node_id=1, snapshot_id=snapshot_id, name="Grandparent", depth=0)
+        snapshot_id = sample_snapshot.id
+        NodeFactory(id=1, snapshot_id=snapshot_id, name="Grandparent", depth=0)
         NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="Parent",
             parent_node_id=1,
             depth=1,
         )
         target = NodeFactory(
-            node_id=3,
+            id=3,
             snapshot_id=snapshot_id,
             name="Target",
             parent_node_id=2,
@@ -485,9 +481,7 @@ class TestValidateInputCsv:
         csv_path = tmp_path / "test.csv"
 
         with csv_path.open("w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["snapshot_id", "node_id", "name", "label"]
-            )
+            writer = csv.DictWriter(f, fieldnames=["snapshot_id", "node_id", "name", "label"])
             writer.writeheader()
             writer.writerow(
                 {
@@ -566,9 +560,7 @@ class TestApplyLabelsToSamples:
         ]
         label_runs_dict = {label_run.snapshot_id: label_run}
 
-        labeled_count = apply_labels_to_samples(
-            training_session, rows, label_runs_dict, split=None
-        )
+        labeled_count = apply_labels_to_samples(training_session, rows, label_runs_dict, split=None)
 
         assert labeled_count == 2
 
@@ -615,9 +607,7 @@ class TestApplyLabelsToSamples:
         ]
         label_runs_dict = {label_run.snapshot_id: label_run}
 
-        labeled_count = apply_labels_to_samples(
-            training_session, rows, label_runs_dict, split=None
-        )
+        labeled_count = apply_labels_to_samples(training_session, rows, label_runs_dict, split=None)
 
         # Should not label non-existent sample and should not raise error
         assert labeled_count == 0

@@ -8,18 +8,20 @@ ingest_filesystem(), they MUST NOT be modified. All nodes and node_features
 are computed atomically during creation.
 """
 
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
 from sqlalchemy import (
-    String,
-    Integer,
+    CheckConstraint,
     Float,
     ForeignKey,
-    CheckConstraint,
     Index,
+    Integer,
+    String,
 )
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 from storage.db_helpers import DateTime
-from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 # Schema version (increment on breaking changes)
 INDEX_SCHEMA_VERSION = "1.0.0"
@@ -42,9 +44,7 @@ class Snapshot(IndexBase):
 
     __tablename__ = "snapshot"
 
-    snapshot_id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     root_path: Mapped[str] = mapped_column(String, nullable=False)
     root_abs_path: Mapped[str] = mapped_column(String, nullable=False)
@@ -66,13 +66,9 @@ class Node(IndexBase):
 
     __tablename__ = "node"
 
-    node_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    snapshot_id: Mapped[int] = mapped_column(
-        ForeignKey("snapshot.snapshot_id"), nullable=False
-    )
-    parent_node_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("node.node_id"), nullable=True
-    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshot.id"), nullable=False)
+    parent_node_id: Mapped[Optional[int]] = mapped_column(ForeignKey("node.id"), nullable=True)
     kind: Mapped[str] = mapped_column(
         String, CheckConstraint("kind IN ('file', 'dir')"), nullable=False
     )
@@ -88,18 +84,14 @@ class Node(IndexBase):
 
     # CRITICAL: file_source must be NOT NULL to ensure unique constraint works
     # Values: 'filesystem' | 'zip_file' | 'zip_content'
-    file_source: Mapped[str] = mapped_column(
-        String, nullable=False, default="filesystem"
-    )
+    file_source: Mapped[str] = mapped_column(String, nullable=False, default="filesystem")
 
     num_folder_children: Mapped[int] = mapped_column(Integer, default=0)
     num_file_children: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships
     snapshot: Mapped["Snapshot"] = relationship(back_populates="nodes")
-    parent: Mapped[Optional["Node"]] = relationship(
-        remote_side=[node_id], backref="children"
-    )
+    parent: Mapped[Optional["Node"]] = relationship(remote_side=[id], backref="children")
     features: Mapped[Optional["NodeFeatures"]] = relationship(
         back_populates="node",
         uselist=False,
@@ -124,7 +116,7 @@ class NodeFeatures(IndexBase):
 
     __tablename__ = "node_features"
 
-    node_id: Mapped[int] = mapped_column(ForeignKey("node.node_id"), primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("node.id"), primary_key=True)
     normalized_name: Mapped[Optional[str]] = mapped_column(String)
     tokens_json: Mapped[Optional[str]] = mapped_column(String)  # JSON array
     hints_json: Mapped[Optional[str]] = mapped_column(String)  # JSON object

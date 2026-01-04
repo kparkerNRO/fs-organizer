@@ -87,7 +87,7 @@ def sample_nodes(index_session):
     """Create sample node hierarchy"""
     # Create snapshot first (required for foreign key)
     snapshot = Snapshot(
-        snapshot_id=1,
+        id=1,
         created_at=datetime(2024, 1, 1, 0, 0, 0),
         root_path="/test",
         root_abs_path="/test",
@@ -97,7 +97,7 @@ def sample_nodes(index_session):
 
     # Root
     root = Node(
-        node_id=1,
+        id=1,
         snapshot_id=1,
         name="Artist Name",
         kind=NodeKind.DIR,
@@ -111,7 +111,7 @@ def sample_nodes(index_session):
 
     # Level 1 - Collections
     collection1 = Node(
-        node_id=2,
+        id=2,
         snapshot_id=1,
         name="Character Art",
         kind=NodeKind.DIR,
@@ -124,7 +124,7 @@ def sample_nodes(index_session):
     )
 
     collection2 = Node(
-        node_id=3,
+        id=3,
         snapshot_id=1,
         name="Environment Scenes",
         kind=NodeKind.DIR,
@@ -138,7 +138,7 @@ def sample_nodes(index_session):
 
     # Level 2 - Variant folder
     high_res = Node(
-        node_id=4,
+        id=4,
         snapshot_id=1,
         name="High Resolution",
         kind=NodeKind.DIR,
@@ -151,7 +151,7 @@ def sample_nodes(index_session):
     )
 
     low_res = Node(
-        node_id=5,
+        id=5,
         snapshot_id=1,
         name="Low Res",
         kind=NodeKind.DIR,
@@ -165,7 +165,7 @@ def sample_nodes(index_session):
 
     # Level 3 - Files
     file1 = Node(
-        node_id=6,
+        id=6,
         snapshot_id=1,
         name="warrior.png",
         kind=NodeKind.FILE,
@@ -178,7 +178,7 @@ def sample_nodes(index_session):
     )
 
     file2 = Node(
-        node_id=7,
+        id=7,
         snapshot_id=1,
         name="mage.jpg",
         kind=NodeKind.FILE,
@@ -191,7 +191,7 @@ def sample_nodes(index_session):
     )
 
     file3 = Node(
-        node_id=8,
+        id=8,
         snapshot_id=1,
         name="scene01.png",
         kind=NodeKind.FILE,
@@ -205,7 +205,7 @@ def sample_nodes(index_session):
 
     # ZIP file treated as container
     zip_node = Node(
-        node_id=9,
+        id=9,
         snapshot_id=1,
         name="assets.zip",
         kind=NodeKind.FILE,
@@ -219,7 +219,7 @@ def sample_nodes(index_session):
 
     # Content inside ZIP
     zip_content = Node(
-        node_id=10,
+        id=10,
         snapshot_id=1,
         name="texture.png",
         kind=NodeKind.FILE,
@@ -574,7 +574,7 @@ class TestExtractFeatures:
         """Test that child_cap limits number of children stored"""
         # Create snapshot first
         snapshot = Snapshot(
-            snapshot_id=1,
+            id=1,
             created_at=datetime(2024, 1, 1, 0, 0, 0),
             root_path="/test",
             root_abs_path="/test",
@@ -584,7 +584,7 @@ class TestExtractFeatures:
 
         # Create a node with many children
         parent = Node(
-            node_id=100,
+            id=100,
             snapshot_id=1,
             name="Parent",
             kind=NodeKind.DIR,
@@ -600,7 +600,7 @@ class TestExtractFeatures:
         # Add 25 children
         for i in range(25):
             child = Node(
-                node_id=200 + i,
+                id=200 + i,
                 snapshot_id=1,
                 name=f"child_{i:02d}",
                 kind=NodeKind.FILE,

@@ -98,7 +98,7 @@ def group(
                     typer.echo("Error: run not found.", err=True)
                     raise typer.Exit(1)
                 snapshot_id = run.snapshot_id
-        group_folders(storage_manager, run_id=run_id, snapshot_id=snapshot_id)
+        run_id = group_folders(storage_manager, snapshot_id=snapshot_id)
         typer.echo("Grouping complete.")
         return
 
@@ -110,7 +110,7 @@ def group(
         raise typer.Exit(1)
 
     run = _get_latest_run(storage_manager, snapshot_id)
-    group_folders(storage_manager, run_id=run.id, snapshot_id=snapshot_id)
+    group_folders(storage_manager, snapshot_id=snapshot_id)
     # calculate_folder_structure(db_path)
     typer.echo("Grouping complete.")
 
@@ -214,17 +214,17 @@ def pipeline(
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
     typer.echo("Grouping folders...")
-    group_folders(storage_manager, snapshot_id=snapshot_id)
+    run_id =group_folders(storage_manager, snapshot_id=snapshot_id)
     typer.echo("✓ Grouping complete.")
 
     typer.echo("Calculating folder structure...")
     calculate_folder_structure_for_categories(
-        storage_manager, snapshot_id, run.id, structure_type=StructureType.organized
+        storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
     )
     recalculate_cleaned_paths_for_structure(
-        storage_manager, snapshot_id, run.id, structure_type=StructureType.organized
+        storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
     )
-    get_folder_heirarchy(storage_manager, run.id, structure_type=StructureType.organized)
+    get_folder_heirarchy(storage_manager, run_id, structure_type=StructureType.organized)
     typer.echo("✓ Folder hierarchy generation complete.")
 
 

@@ -1,5 +1,6 @@
-import pytest
 from typing import cast
+
+import pytest
 from storage.factories import (
     GroupCategoryEntryFactory,
     GroupIterationFactory,
@@ -7,6 +8,7 @@ from storage.factories import (
 )
 from storage.manager import NodeKind
 from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
+from utils.config import get_minimal_config
 
 from stages.grouping.group import (
     group_folders,
@@ -14,19 +16,12 @@ from stages.grouping.group import (
     refine_groups,
 )
 from stages.grouping.helpers import common_token_grouping
-from utils.config import get_minimal_config
 
 
-def test_process_folders_to_groups(
-    index_session, work_session, sample_run, sample_snapshot
-):
+def test_process_folders_to_groups(index_session, work_session, sample_run, sample_snapshot):
     # Set up test data
-    NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id, name="apple doc", kind=NodeKind.DIR
-    )
-    NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id, name="banana v2", kind=NodeKind.DIR
-    )
+    NodeFactory(snapshot_id=sample_snapshot.id, name="apple doc", kind=NodeKind.DIR)
+    NodeFactory(snapshot_id=sample_snapshot.id, name="banana v2", kind=NodeKind.DIR)
 
     # Run the function (it will create iteration 0)
     # Pass None for group_id since we don't have a group yet
@@ -35,7 +30,7 @@ def test_process_folders_to_groups(
         work_session=work_session,
         group_id=None,
         run_id=sample_run.id,
-        snapshot_id=sample_snapshot.snapshot_id,
+        snapshot_id=sample_snapshot.id,
     )
 
     # Verify results
@@ -59,9 +54,7 @@ def test_process_folders_to_groups(
 
 
 # Test refine_groups with singleton clusters
-def test_refine_groups_singletons(
-    index_session, work_session, sample_run, sample_snapshot
-):
+def test_refine_groups_singletons(index_session, work_session, sample_run, sample_snapshot):
     # Create iteration records
     iteration0 = cast(
         GroupIteration,
@@ -122,9 +115,7 @@ def test_refine_groups_singletons(
 
 
 # Test refine_groups with clustered items
-def test_refine_groups_clusters(
-    index_session, work_session, sample_run, sample_snapshot
-):
+def test_refine_groups_clusters(index_session, work_session, sample_run, sample_snapshot):
     # Create iteration records
     iteration0 = cast(
         GroupIteration,
@@ -314,20 +305,19 @@ def test_group_folders(
     storage_index_session,
     storage_work_session,
     storage_snapshot,
-    storage_run,
 ):
     NodeFactory(
-        snapshot_id=storage_snapshot.snapshot_id,
+        snapshot_id=storage_snapshot.id,
         name="apple pie",
         kind=NodeKind.DIR,
     )
     NodeFactory(
-        snapshot_id=storage_snapshot.snapshot_id,
+        snapshot_id=storage_snapshot.id,
         name="apple tart",
         kind=NodeKind.DIR,
     )
     NodeFactory(
-        snapshot_id=storage_snapshot.snapshot_id,
+        snapshot_id=storage_snapshot.id,
         name="banana bread",
         kind=NodeKind.DIR,
     )
@@ -337,8 +327,7 @@ def test_group_folders(
         storage_manager,
         max_iterations=1,
         config=get_minimal_config(),
-        run_id=storage_run.id,
-        snapshot_id=storage_snapshot.snapshot_id,
+        snapshot_id=storage_snapshot.id,
     )
 
     entries_iter0 = (

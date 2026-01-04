@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel
 
+from pydantic import BaseModel
 from storage.index_models import Node
 
 
@@ -18,17 +18,14 @@ class FSNode(BaseModel):
     possibleClassifications: list[str] = []
     originalPath: str | None = None
 
+
 class File(FSNode):
     originalPath: str
     newPath: str | None = None
 
     @staticmethod
     def from_node(node: Node):
-        return File(
-            id = node.node_id,
-            name=node.name,
-            originalPath=node.rel_path
-        )
+        return File(id=node.id, name=node.name, originalPath=node.rel_path)
 
 
 class FolderV2(FSNode):
@@ -38,15 +35,10 @@ class FolderV2(FSNode):
     @property
     def children_map(self):
         return {child.name: child for child in self.children}
-    
+
     @staticmethod
     def from_node(node: Node):
-        return FolderV2(
-            id = node.node_id,
-            name=node.name,
-            originalPath=node.rel_path
-        )
-
+        return FolderV2(id=node.id, name=node.name, originalPath=node.rel_path)
 
 
 class FolderViewResponse(BaseModel):

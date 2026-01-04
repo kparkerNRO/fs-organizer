@@ -2,13 +2,6 @@ import json
 import logging
 from typing import Dict, List, Optional
 
-from fine_tuning.classifiers.heuristic_classifier import (
-    COLLAB_MARKERS,
-)
-from fine_tuning.services.common import (
-    FeatureNodeCore,
-    extract_feature_nodes,
-)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +10,14 @@ from storage.manager import StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
+
+from fine_tuning.classifiers.heuristic_classifier import (
+    COLLAB_MARKERS,
+)
+from fine_tuning.services.common import (
+    FeatureNodeCore,
+    extract_feature_nodes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +78,7 @@ def extract_features_for_run(
     settings: FeatureExtractionConfigSettings,
 ) -> int:
     rows = list(
-        index_session.execute(
-            select(Node).where(Node.snapshot_id == snapshot_id)
-        ).scalars()
+        index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
     )
 
     feature_nodes: list[FeatureNodeCore] = extract_feature_nodes(
@@ -101,12 +100,8 @@ def extract_features_for_run(
         name_norm = ""  # TODO
         # name_norm = processed_name_by_id[node.node_id]
 
-        child_token_bag = [
-            t for cn in feature_node.child_names for t in tokenize_string(cn)
-        ]
-        sibling_token_bag = [
-            t for sn in feature_node.sibling_names for t in tokenize_string(sn)
-        ]
+        child_token_bag = [t for cn in feature_node.child_names for t in tokenize_string(cn)]
+        sibling_token_bag = [t for sn in feature_node.sibling_names for t in tokenize_string(sn)]
 
         flags = {
             "collab": has_matching_token(tokenize_string(node.name), COLLAB_MARKERS)
@@ -115,16 +110,11 @@ def extract_features_for_run(
                 and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
             ),
             "childMedia": has_matching_token(child_token_bag, app_config.media_types),
-            "childVarHint": has_matching_token(
-                child_token_bag, app_config.variant_types
-            ),
+            "childVarHint": has_matching_token(child_token_bag, app_config.variant_types),
             "childFmt": any(
-                cn.strip(".").lower() in app_config.format_types
-                for cn in feature_node.child_names
+                cn.strip(".").lower() in app_config.format_types for cn in feature_node.child_names
             ),
-            "sibVarHint": has_matching_token(
-                sibling_token_bag, app_config.variant_types
-            ),
+            "sibVarHint": has_matching_token(sibling_token_bag, app_config.variant_types),
         }
 
         text = _build_feature_text(
@@ -140,7 +130,7 @@ def extract_features_for_run(
 
         training_sample = TrainingSample(
             snapshot_id=feature_node.snapshot_id,
-            node_id=feature_node.node.node_id,
+            node_id=feature_node.node.id,
             name_raw=feature_node.node.name,
             name_norm=name_norm,
             parent_name_norm=feature_node.parent_name,
@@ -150,9 +140,7 @@ def extract_features_for_run(
             depth=int(feature_node.node.depth),
             child_names_topk_json=json.dumps(feature_node.child_names),
             sibling_names_topk_json=json.dumps(feature_node.sibling_names),
-            descendant_file_exts_topk_json=json.dumps(
-                feature_node.descendent_extentions
-            ),
+            descendant_file_exts_topk_json=json.dumps(feature_node.descendent_extentions),
             has_collab_cue=flags["collab"],
             looks_like_format=app_config.is_media_type(node.name),
             child_has_media_type_cue=flags["childMedia"],

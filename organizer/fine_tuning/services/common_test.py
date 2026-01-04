@@ -1,19 +1,20 @@
 """Tests for common.py"""
 
 import pytest
+from storage.factories import (
+    LabelRunFactory,
+    NodeFactory,
+    TrainingSampleFactory,
+)
+from storage.index_models import Node
+from storage.manager import NodeKind
+
 from fine_tuning.services.common import (
     FeatureNodeCore,
     _load_and_index_nodes,
     _precompute_descendant_extensions,
     extract_feature_nodes,
     load_samples,
-)
-from storage.index_models import Node
-from storage.manager import NodeKind
-from storage.factories import (
-    LabelRunFactory,
-    NodeFactory,
-    TrainingSampleFactory,
 )
 
 
@@ -29,7 +30,7 @@ class TestLoadSamples:
 
         # Verify count and that all created samples are present
         assert len(loaded) == 3
-        assert {s.sample_id for s in loaded} == {s.sample_id for s in created_samples}
+        assert {s.id for s in loaded} == {s.id for s in created_samples}
 
     @pytest.mark.parametrize(
         "split,expected_count",
@@ -39,9 +40,7 @@ class TestLoadSamples:
             ("test", 1),
         ],
     )
-    def test_load_samples_by_split(
-        self, training_session, label_run, split, expected_count
-    ):
+    def test_load_samples_by_split(self, training_session, label_run, split, expected_count):
         """Test loading samples filtered by split"""
         TrainingSampleFactory(label_run=label_run)
         TrainingSampleFactory(label_run=label_run, split="validation")
@@ -76,9 +75,7 @@ class TestLoadSamples:
     def test_load_combined_filters(self, training_session, label_run):
         """Test loading samples with multiple filters combined"""
         TrainingSampleFactory(label_run=label_run, label="asset_type", split="train")
-        TrainingSampleFactory(
-            label_run=label_run, label="content_subject", split="validation"
-        )
+        TrainingSampleFactory(label_run=label_run, label="content_subject", split="validation")
         TrainingSampleFactory(label_run=label_run, label=None)
 
         loaded = load_samples(
@@ -96,9 +93,9 @@ class TestLoadAndIndexNodes:
 
     def test_load_basic_hierarchy(self, index_session, sample_snapshot):
         """Test loading nodes and building indexes"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         NodeFactory(
-            node_id=1,
+            id=1,
             snapshot_id=snapshot_id,
             name="root",
             rel_path="root",
@@ -107,7 +104,7 @@ class TestLoadAndIndexNodes:
             depth=0,
         )
         NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="child",
             rel_path="root/child",
@@ -116,7 +113,7 @@ class TestLoadAndIndexNodes:
             depth=1,
         )
         NodeFactory(
-            node_id=3,
+            id=3,
             snapshot_id=snapshot_id,
             name="file.txt",
             rel_path="root/child/file.txt",
@@ -159,21 +156,21 @@ class TestPrecomputeDescendantExtensions:
         # Use factory.build() to create nodes without persisting to DB
         nodes_by_id = {
             1: NodeFactory.build(
-                node_id=1,
+                id=1,
                 kind=NodeKind.DIR,
                 parent_node_id=None,
                 ext=None,
                 depth=0,
             ),
             2: NodeFactory.build(
-                node_id=2,
+                id=2,
                 kind=NodeKind.FILE,
                 parent_node_id=1,
                 ext=".txt",
                 depth=1,
             ),
             3: NodeFactory.build(
-                node_id=3,
+                id=3,
                 kind=NodeKind.FILE,
                 parent_node_id=1,
                 ext=".png",
@@ -197,21 +194,21 @@ class TestPrecomputeDescendantExtensions:
         """Test extension computation with nested folders"""
         nodes_by_id = {
             1: NodeFactory.build(
-                node_id=1,
+                id=1,
                 kind=NodeKind.DIR,
                 parent_node_id=None,
                 ext=None,
                 depth=0,
             ),
             2: NodeFactory.build(
-                node_id=2,
+                id=2,
                 kind=NodeKind.DIR,
                 parent_node_id=1,
                 ext=None,
                 depth=1,
             ),
             3: NodeFactory.build(
-                node_id=3,
+                id=3,
                 kind=NodeKind.FILE,
                 parent_node_id=2,
                 ext=".jpg",
@@ -240,9 +237,9 @@ class TestExtractFeatureNodes:
 
     def test_basic_extraction(self, index_session, sample_snapshot):
         """Test basic feature node extraction"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         _parent = NodeFactory(
-            node_id=1,
+            id=1,
             snapshot_id=snapshot_id,
             name="Parent",
             rel_path="Parent",
@@ -250,7 +247,7 @@ class TestExtractFeatureNodes:
             depth=0,
         )
         target = NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="Target",
             rel_path="Parent/Target",
@@ -259,7 +256,7 @@ class TestExtractFeatureNodes:
             depth=1,
         )
         NodeFactory(
-            node_id=3,
+            id=3,
             snapshot_id=snapshot_id,
             name="file.txt",
             rel_path="Parent/Target/file.txt",
@@ -282,8 +279,8 @@ class TestExtractFeatureNodes:
         assert len(feature_nodes) == 1
         feature_node = feature_nodes[0]
 
-        assert feature_node.node.node_id == 2
-        assert feature_node.parent.node_id == 1
+        assert feature_node.node.id == 2
+        assert feature_node.parent.id == 1
         assert feature_node.grandparent is None
         assert len(feature_node.child_nodes) == 1
         assert len(feature_node.sibling_nodes) == 0
@@ -291,26 +288,24 @@ class TestExtractFeatureNodes:
 
     def test_with_siblings(self, index_session, sample_snapshot):
         """Test extraction with sibling nodes"""
-        snapshot_id = sample_snapshot.snapshot_id
-        _parent = NodeFactory(
-            node_id=1, snapshot_id=snapshot_id, name="Parent", depth=0
-        )
+        snapshot_id = sample_snapshot.id
+        _parent = NodeFactory(id=1, snapshot_id=snapshot_id, name="Parent", depth=0)
         target = NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="Target",
             parent_node_id=1,
             depth=1,
         )
         NodeFactory(
-            node_id=3,
+            id=3,
             snapshot_id=snapshot_id,
             name="Sibling1",
             parent_node_id=1,
             depth=1,
         )
         NodeFactory(
-            node_id=4,
+            id=4,
             snapshot_id=snapshot_id,
             name="Sibling2",
             parent_node_id=1,
@@ -336,12 +331,10 @@ class TestExtractFeatureNodes:
 
     def test_max_siblings_cap(self, index_session, sample_snapshot):
         """Test that max_siblings limits sibling count"""
-        snapshot_id = sample_snapshot.snapshot_id
-        _parent = NodeFactory(
-            node_id=1, snapshot_id=snapshot_id, name="Parent", depth=0
-        )
+        snapshot_id = sample_snapshot.id
+        _parent = NodeFactory(id=1, snapshot_id=snapshot_id, name="Parent", depth=0)
         target = NodeFactory(
-            node_id=2,
+            id=2,
             snapshot_id=snapshot_id,
             name="Target",
             parent_node_id=1,
@@ -351,7 +344,7 @@ class TestExtractFeatureNodes:
         # Add 10 siblings using factory
         for i in range(10):
             NodeFactory(
-                node_id=100 + i,
+                id=100 + i,
                 snapshot_id=snapshot_id,
                 name=f"Sibling{i}",
                 parent_node_id=1,
@@ -373,9 +366,9 @@ class TestExtractFeatureNodes:
 
     def test_zip_file_extraction(self, index_session, sample_snapshot):
         """Test extraction for ZIP files"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         zip_node = NodeFactory(
-            node_id=1,
+            id=1,
             snapshot_id=snapshot_id,
             name="archive.zip",
             kind=NodeKind.FILE,
@@ -398,9 +391,9 @@ class TestExtractFeatureNodes:
 
     def test_skip_regular_files(self, index_session, sample_snapshot):
         """Test that regular files are skipped"""
-        snapshot_id = sample_snapshot.snapshot_id
+        snapshot_id = sample_snapshot.id
         regular_file = NodeFactory(
-            node_id=1,
+            id=1,
             snapshot_id=snapshot_id,
             name="file.txt",
             kind=NodeKind.FILE,
@@ -428,7 +421,7 @@ class TestFeatureNodeCore:
         """Test that property accessors work correctly"""
         # Use factories to create nodes
         grandparent = Node(
-            node_id=1,
+            id=1,
             snapshot_id=1,
             name="Grandparent",
             kind=NodeKind.DIR,
@@ -440,7 +433,7 @@ class TestFeatureNodeCore:
             file_source="filesystem",
         )
         parent = Node(
-            node_id=2,
+            id=2,
             snapshot_id=1,
             name="Parent",
             kind=NodeKind.DIR,
@@ -452,7 +445,7 @@ class TestFeatureNodeCore:
             file_source="filesystem",
         )
         node = Node(
-            node_id=3,
+            id=3,
             snapshot_id=1,
             name="Target",
             kind=NodeKind.DIR,
@@ -464,7 +457,7 @@ class TestFeatureNodeCore:
             file_source="filesystem",
         )
         child = Node(
-            node_id=4,
+            id=4,
             snapshot_id=1,
             name="Child",
             kind=NodeKind.DIR,
@@ -476,7 +469,7 @@ class TestFeatureNodeCore:
             file_source="filesystem",
         )
         sibling = Node(
-            node_id=5,
+            id=5,
             snapshot_id=1,
             name="Sibling",
             kind=NodeKind.DIR,
@@ -509,7 +502,7 @@ class TestFeatureNodeCore:
     def test_none_parent_grandparent(self):
         """Test properties when parent/grandparent are None"""
         node = Node(
-            node_id=1,
+            id=1,
             snapshot_id=1,
             name="Root",
             kind=NodeKind.DIR,

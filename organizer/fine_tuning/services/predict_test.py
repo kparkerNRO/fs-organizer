@@ -7,14 +7,14 @@ Compare with predict_test.py to see the improvements.
 import json
 
 import pytest
+from storage.factories import TrainingSampleFactory
+from storage.training_models import ModelRun, SamplePrediction
+
 from fine_tuning.services.predict import (
     create_and_save_run_results,
     create_model_run,
     save_predictions_to_db,
 )
-from storage.training_models import ModelRun, SamplePrediction
-
-from storage.factories import TrainingSampleFactory
 
 
 @pytest.mark.ml
@@ -43,7 +43,7 @@ class TestSavePredictionsToDb:
             predictions=predictions,
             confidences=confidences,
             probabilities=probabilities,
-            run_id=model_run.run_id,
+            run_id=model_run.id,
             prediction_type="test",
         )
 
@@ -51,9 +51,7 @@ class TestSavePredictionsToDb:
 
         # Verify predictions were saved
         saved_predictions = (
-            training_session.query(SamplePrediction)
-            .order_by(SamplePrediction.sample_id)
-            .all()
+            training_session.query(SamplePrediction).order_by(SamplePrediction.sample_id).all()
         )
 
         assert len(saved_predictions) == 2
@@ -65,7 +63,7 @@ class TestSavePredictionsToDb:
         assert pred1.true_label == "asset_type"
         assert pred1.is_correct is True
         assert pred1.prediction_type == "test"
-        assert pred1.run_id == model_run.run_id
+        assert pred1.run_id == model_run.id
 
         # Check second prediction
         assert pred2.predicted_label == "other"
@@ -73,9 +71,7 @@ class TestSavePredictionsToDb:
         assert pred2.true_label == "content_subject"
         assert pred2.is_correct is False
 
-    def test_save_predictions_with_list_probabilities(
-        self, training_session, label_run, model_run
-    ):
+    def test_save_predictions_with_list_probabilities(self, training_session, label_run, model_run):
         """Test saving predictions with list-format probabilities"""
         sample = TrainingSampleFactory(label_run=label_run, label="asset_type")
         training_session.flush()
@@ -86,7 +82,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[[0.95, 0.03, 0.02]],  # type: ignore[list-item]  # List format
-            run_id=model_run.run_id,
+            run_id=model_run.id,
         )
 
         assert num_saved == 1
@@ -97,9 +93,7 @@ class TestSavePredictionsToDb:
         assert set(probs_dict.keys()) == {"label_0", "label_1", "label_2"}
         assert probs_dict["label_0"] == 0.95
 
-    def test_save_predictions_unlabeled_samples(
-        self, training_session, label_run, model_run
-    ):
+    def test_save_predictions_unlabeled_samples(self, training_session, label_run, model_run):
         """Test saving predictions for unlabeled samples"""
         sample = TrainingSampleFactory(label_run=label_run, label=None)
         training_session.flush()
@@ -110,7 +104,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.8],
             probabilities=[{"asset_type": 0.8, "content_subject": 0.2}],
-            run_id=model_run.run_id,
+            run_id=model_run.id,
         )
 
         assert num_saved == 1
@@ -136,7 +130,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[{"asset_type": 0.95}],
-            run_id=model_run.run_id,
+            run_id=model_run.id,
             prediction_type=prediction_type,
         )
 
@@ -160,7 +154,7 @@ class TestCreateModelRun:
             config=config,
         )
 
-        assert run.run_id is not None
+        assert run.id is not None
         assert run.status == "running"
         assert run.run_type == "baseline"
         assert run.base_model_id == "setfit-baseline-v2"
@@ -307,9 +301,7 @@ class TestCreateAndSaveRunResults:
 
         # Check predictions were saved
         predictions_saved = (
-            training_session.query(SamplePrediction)
-            .filter_by(run_id=model_run.run_id)
-            .all()
+            training_session.query(SamplePrediction).filter_by(run_id=model_run.id).all()
         )
         assert len(predictions_saved) == 2
         assert {p.predicted_label for p in predictions_saved} == {

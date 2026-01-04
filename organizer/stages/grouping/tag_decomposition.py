@@ -1497,7 +1497,7 @@ def create_decomposed_entries(
             new_entry = GroupCategoryEntry(
                 folder_id=original_entry.folder_id,
                 partial_category_id=original_entry.partial_category_id,
-                group_id=original_entry.group_id,
+                id=original_entry.id,
                 iteration_id=iteration_id,
                 cluster_id=original_entry.cluster_id,
                 processed_name=formatted_component,
@@ -1590,7 +1590,7 @@ def decompose_compound_tags(session: Session) -> None:
             new_entry = GroupCategoryEntry(
                 folder_id=entry.folder_id,
                 partial_category_id=entry.partial_category_id,
-                group_id=entry.group_id,
+                id=entry.id,
                 iteration_id=iteration_id,
                 cluster_id=entry.cluster_id,
                 processed_name=entry.processed_name,
@@ -1612,7 +1612,7 @@ def decompose_compound_tags(session: Session) -> None:
                 new_entry = GroupCategoryEntry(
                     folder_id=entry.folder_id,
                     partial_category_id=entry.partial_category_id,
-                    group_id=entry.group_id,
+                    id=entry.id,
                     iteration_id=iteration_id,
                     cluster_id=entry.cluster_id,
                     processed_name=entry.processed_name,

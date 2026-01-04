@@ -109,9 +109,7 @@ def process_zip(
     try:
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
-            zip_rel_path = (
-                parent_rel_path / zip_name if parent_rel_path else Path(zip_name)
-            )
+            zip_rel_path = parent_rel_path / zip_name if parent_rel_path else Path(zip_name)
             zip_abs_path = base_path / zip_rel_path
 
             # Shortcut if it's a Foundry module: i.e., if module.json exists at the root level
@@ -124,9 +122,7 @@ def process_zip(
                 # HACK: this creates an artificial folder to tag foundry modules
                 folder_name = "Foundry Module " + zip_name
                 folder_rel_path = (
-                    parent_rel_path / folder_name
-                    if parent_rel_path
-                    else Path(folder_name)
+                    parent_rel_path / folder_name if parent_rel_path else Path(folder_name)
                 )
                 folder_depth = len(folder_rel_path.parts)
                 folder_node = _create_node(
@@ -150,7 +146,7 @@ def process_zip(
                     rel_path=folder_rel_path / zip_name,
                     abs_path=base_path / folder_rel_path / zip_name,
                     depth=folder_depth + 1,
-                    parent_node_id=folder_node.node_id,
+                    parent_node_id=folder_node.id,
                     file_source=zip_file_source,
                 )
                 session.commit()
@@ -181,7 +177,7 @@ def process_zip(
 
                 # Process directory structure
                 current_rel_path = zip_rel_path
-                current_parent_id = zip_node.node_id
+                current_parent_id = zip_node.id
                 for part in entry_path.parts[:-1]:  # Exclude the file name itself
                     new_rel_path = current_rel_path / part
                     if new_rel_path in zip_dir_nodes:
@@ -207,8 +203,8 @@ def process_zip(
                             num_folder_children=folder_children,
                             num_file_children=file_children,
                         )
-                        current_parent_id = new_folder.node_id
-                        zip_dir_nodes[new_rel_path] = new_folder.node_id
+                        current_parent_id = new_folder.id
+                        zip_dir_nodes[new_rel_path] = new_folder.id
 
                     current_rel_path = new_rel_path
 
@@ -233,14 +229,10 @@ def process_zip(
                                         FileSource.ZIP_CONTENT,
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
-                                logger.error(
-                                    f"Error processing nested zip {entry}: {e}"
-                                )
+                                logger.error(f"Error processing nested zip {entry}: {e}")
                         else:
                             info = zf.getinfo(entry)
-                            mtime = datetime(
-                                *info.date_time, tzinfo=timezone.utc
-                            ).timestamp()
+                            mtime = datetime(*info.date_time, tzinfo=timezone.utc).timestamp()
                             _create_node(
                                 session,
                                 snapshot_id=snapshot_id,
@@ -301,7 +293,7 @@ def _create_node(
     session.flush()
 
     features = NodeFeatures(
-        node_id=node.node_id,
+        node_id=node.id,
         normalized_name=clean_filename(name),
     )
     session.add(features)
@@ -335,14 +327,12 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
                     child_dirs = [
                         child_dir
                         for child_dir in os.listdir(folder_path)
-                        if (folder_path / child_dir).is_dir()
-                        and not should_ignore(child_dir)
+                        if (folder_path / child_dir).is_dir() and not should_ignore(child_dir)
                     ]
                     child_files = [
                         child_file
                         for child_file in os.listdir(folder_path)
-                        if (folder_path / child_file).is_file()
-                        and not should_ignore(child_file)
+                        if (folder_path / child_file).is_file() and not should_ignore(child_file)
                     ]
 
                     stat = folder_path.stat()
@@ -363,7 +353,7 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
                         ctime=stat.st_ctime,
                         inode=stat.st_ino,
                     )
-                    dir_nodes[str(rel_path)] = node.node_id
+                    dir_nodes[str(rel_path)] = node.id
 
                 for f in files:
                     file_path = root_path / f
@@ -387,9 +377,7 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
                             process_zip(
                                 file_path,
                                 base_path,
-                                Path("")
-                                if parent_rel_path == Path(".")
-                                else parent_rel_path,
+                                Path("") if parent_rel_path == Path(".") else parent_rel_path,
                                 parent_node_id,
                                 f,
                                 index_session,

@@ -24,9 +24,7 @@ log = getLogger(__name__)
 
 def get_next_iteration_id(session: Session):
     # Check both GroupCategory and GroupIteration to get the true max iteration_id
-    category_max = session.execute(
-        select(func.max(GroupCategory.iteration_id))
-    ).scalar_one()
+    category_max = session.execute(select(func.max(GroupCategory.iteration_id))).scalar_one()
     iteration_max = session.execute(select(func.max(GroupIteration.id))).scalar_one()
 
     max_id = max(
@@ -63,8 +61,8 @@ def process_folders_to_groups(
         cleaned_name = clean_filename(folder.name)
 
         group_entry = GroupCategoryEntry(
-            folder_id=folder.node_id,
-            group_id=group_id if group_id is not None else None,
+            folder_id=folder.id,
+            id=group_id if group_id is not None else None,
             iteration_id=iteration_id,
             pre_processed_name=folder.name,
             processed_name=cleaned_name,
@@ -148,12 +146,8 @@ def refine_groups(
                 iteration_id=iteration_id,
             )
             subgroups = {
-                subcategory: GroupCategory(
-                    id=sub_id, name=subcategory, iteration_id=iteration_id
-                )
-                for sub_id, subcategory in enumerate(
-                    subcategories, start=current_group_id + 1
-                )
+                subcategory: GroupCategory(id=sub_id, name=subcategory, iteration_id=iteration_id)
+                for sub_id, subcategory in enumerate(subcategories, start=current_group_id + 1)
             }
             subcategory_to_entry = {subcategory: [] for subcategory in subcategories}
 
@@ -167,9 +161,7 @@ def refine_groups(
             group_members = []
             for group_entry in entries_by_name:
                 matching_entries = [
-                    e
-                    for e in cluster_entries
-                    if e.pre_processed_name == group_entry.original_name
+                    e for e in cluster_entries if e.pre_processed_name == group_entry.original_name
                 ]
 
                 for entry in matching_entries:
@@ -190,7 +182,7 @@ def refine_groups(
                         subgroup_entry = GroupCategoryEntry(
                             folder_id=entry.folder_id,
                             partial_category_id=entry.partial_category_id,
-                            group_id=subgroups[subgroup].id,
+                            id=subgroups[subgroup].id,
                             pre_processed_name=entry.pre_processed_name,
                             processed_name=subgroup,
                             path=entry.path,
@@ -218,9 +210,7 @@ def refine_groups(
             session.add(group_category)
 
             for _, subgroup in subgroups.items():
-                sub_member_confidences = [
-                    e.confidence for e in subcategory_to_entry[subgroup.name]
-                ]
+                sub_member_confidences = [e.confidence for e in subcategory_to_entry[subgroup.name]]
                 subgroup.overall_confidence = (  # type: ignore[attr-defined]
                     min(sub_member_confidences) if sub_member_confidences else 0.5
                 )
@@ -272,9 +262,7 @@ def pre_process_groups(
     session.add(iteration)
     session.commit()
 
-    stmt = select(GroupCategoryEntry).where(
-        GroupCategoryEntry.iteration_id == iteration_id - 1
-    )
+    stmt = select(GroupCategoryEntry).where(GroupCategoryEntry.iteration_id == iteration_id - 1)
     uncertain_entries = session.scalars(stmt).all()
     uncertain_categories = [
         {
@@ -305,9 +293,7 @@ def pre_process_groups(
             cleaned_name = clean_filename(name, config=config)
             category_current = cleaned_name
             while category_current:
-                entry, variant = split_view_type(
-                    category_current, config.known_variant_tokens
-                )
+                entry, variant = split_view_type(category_current, config.known_variant_tokens)
                 if entry and entry not in categories:
                     categories.append(entry)
                 if variant:
@@ -359,7 +345,7 @@ def compact_groups(
         groups = (
             work_session.execute(
                 select(GroupCategoryEntry)
-                .where(GroupCategoryEntry.folder_id == folder.node_id)
+                .where(GroupCategoryEntry.folder_id == folder.id)
                 .where(GroupCategoryEntry.iteration_id == iteration_id - 1)
             )
             .scalars()
@@ -370,21 +356,17 @@ def compact_groups(
             processed_name = group.processed_name  # type: ignore[assignment]  # ty bug: SQLAlchemy ORM attribute should be str
             if processed_name in new_group_name_map:
                 existing_group = new_group_name_map[processed_name]  # type: ignore[index]  # ty bug: processed_name is str at runtime
-                existing_group.confidence = min(
-                    existing_group.confidence, group.confidence
-                )
+                existing_group.confidence = min(existing_group.confidence, group.confidence)
                 if existing_group.pre_processed_name != group.pre_processed_name:
                     if existing_group.pre_processed_name and group.pre_processed_name:
                         existing_group.pre_processed_name = (
-                            existing_group.pre_processed_name
-                            + ";"
-                            + group.pre_processed_name
+                            existing_group.pre_processed_name + ";" + group.pre_processed_name
                         )
 
             else:
                 new_entry = GroupCategoryEntry(
-                    folder_id=folder.node_id,
-                    group_id=group.group_id,
+                    folder_id=folder.id,
+                    id=group.id,
                     processed_name=group.processed_name,
                     pre_processed_name=group.pre_processed_name,
                     derived_names=group.derived_names,
@@ -404,9 +386,7 @@ def _create_exact_groups(session: Session) -> None:
 
     entries = (
         session.execute(
-            select(GroupCategoryEntry).where(
-                GroupCategoryEntry.iteration_id == iteration_id
-            )
+            select(GroupCategoryEntry).where(GroupCategoryEntry.iteration_id == iteration_id)
         )
         .scalars()
         .all()
@@ -470,13 +450,9 @@ def group_folders(
         session_manager.get_index_session() as index_session,
     ):
         snapshot_id = get_effective_snapshot_id(session_manager, snapshot_id)
-        
+
         # Get run_id and snapshot_id if not provided
-        run = Run(
-            snapshot_id = snapshot_id,
-            started_at = datetime.now(),
-            status="running"
-        )
+        run = Run(snapshot_id=snapshot_id, started_at=datetime.now(), status="running")
         work_session.add(run)
         work_session.flush()
 
@@ -488,9 +464,7 @@ def group_folders(
             run_id=run.id,
             snapshot_id=snapshot_id,
         )
-        pre_process_groups(
-            work_session, config=config, run_id=run.id, snapshot_id=snapshot_id
-        )
+        pre_process_groups(work_session, config=config, run_id=run.id, snapshot_id=snapshot_id)
 
         # New tag decomposition stage
         from stages.grouping.tag_decomposition import decompose_compound_tags

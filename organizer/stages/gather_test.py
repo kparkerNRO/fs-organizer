@@ -1,13 +1,15 @@
-import pytest
+import io
+import zipfile
 from datetime import datetime
 from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from stages.gather import process_zip, ingest_filesystem
-from storage.index_models import IndexBase, Snapshot, Node, NodeFeatures
-from storage.manager import NodeKind, FileSource, StorageManager
-import zipfile
-import io
+from storage.index_models import IndexBase, Node, NodeFeatures, Snapshot
+from storage.manager import FileSource, NodeKind, StorageManager
+
+from stages.gather import ingest_filesystem, process_zip
 
 FILESYSTEM_SOURCE = "filesystem"
 ZIP_FILE_SOURCE = "zip_file"
@@ -34,7 +36,7 @@ def snapshot_id(index_session):
     )
     index_session.add(snapshot)
     index_session.commit()
-    return snapshot.snapshot_id
+    return snapshot.id
 
 
 @pytest.fixture
@@ -66,9 +68,7 @@ def test_process_zip_basic(index_session, snapshot_id):
         snapshot_id,
     )
 
-    zip_file_nodes = (
-        index_session.query(Node).filter_by(file_source=ZIP_FILE_SOURCE).all()
-    )
+    zip_file_nodes = index_session.query(Node).filter_by(file_source=ZIP_FILE_SOURCE).all()
     zip_dirs = (
         index_session.query(Node)
         .filter_by(
@@ -129,9 +129,7 @@ def test_process_zip_with_module_json(index_session, snapshot_id):
         )
         .all()
     )
-    zip_content_nodes = (
-        index_session.query(Node).filter_by(file_source=ZIP_CONTENT_SOURCE).all()
-    )
+    zip_content_nodes = index_session.query(Node).filter_by(file_source=ZIP_CONTENT_SOURCE).all()
 
     assert len(zip_dirs) == 1  # Foundry module wrapper folder
     assert len(zip_file_nodes) == 1  # Only the zip file itself should be added
@@ -377,10 +375,10 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
         )
 
         assert dir_node.file_source == FILESYSTEM_SOURCE
-        assert file_node.parent_node_id == dir_node.node_id
+        assert file_node.parent_node_id == dir_node.id
         assert zip_node.parent_node_id is None
 
-        features = session.query(NodeFeatures).filter_by(node_id=dir_node.node_id).one()
+        features = session.query(NodeFeatures).filter_by(node_id=dir_node.id).one()
         assert features.normalized_name == "dir"
     finally:
         session.close()
@@ -418,7 +416,7 @@ def test_ingest_filesystem_zip_nodes(tmp_path: Path):
             session.query(Node)
             .filter_by(
                 snapshot_id=snapshot_id,
-                parent_node_id=zip_node.node_id,
+                parent_node_id=zip_node.id,
                 file_source=ZIP_CONTENT_SOURCE,
             )
             .all()

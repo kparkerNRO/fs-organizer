@@ -1,14 +1,15 @@
 """Shared test fixtures for fine_tuning services tests"""
 
-from datetime import datetime
 import os
 import random
+from datetime import datetime
 
 import pytest
 from faker import Faker
 from storage.factories import (
     ClassificationFactory,
     FileMappingFactory,
+    FileNodeFactory,
     FolderStructureFactory,
     GroupCategoryEntryFactory,
     GroupCategoryFactory,
@@ -17,14 +18,13 @@ from storage.factories import (
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
-    FileNodeFactory,
+    PartialNameCategoryFactory,
     RunFactory,
     SamplePredictionFactory,
     SnapshotFactory,
     StageStateFactory,
     TrainingSampleFactory,
     WorkMetaFactory,
-    PartialNameCategoryFactory,
 )
 from storage.manager import StorageManager
 
@@ -144,7 +144,7 @@ def storage_snapshot(storage_index_session):
 def storage_run(storage_work_session, storage_snapshot):
     """Create a Run tied to the storage snapshot."""
     return RunFactory(
-        snapshot_id=storage_snapshot.snapshot_id,
+        snapshot_id=storage_snapshot.id,
         started_at=datetime.now(),
     )
 

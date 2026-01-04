@@ -7,11 +7,13 @@ IMPORTANT: Cross-database references (snapshot_id, node_id) to index.db are
 validated at the application level, not by database constraints.
 """
 
-from typing import List, Optional
 from datetime import datetime
-from sqlalchemy import String, Float, ForeignKey, Index
-from storage.db_helpers import JsonDict, JsonList, DateTime
-from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
+from typing import List, Optional
+
+from sqlalchemy import Float, ForeignKey, Index, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from storage.db_helpers import DateTime, JsonDict, JsonList
 
 # Schema version (increment on breaking changes)
 WORK_SCHEMA_VERSION = "1.0.0"
@@ -159,9 +161,7 @@ class GroupCategoryEntry(WorkBase):
     partial_category_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("partial_name_categories.id"), index=True
     )
-    group_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("stg_group_category.id"), index=True
-    )
+    group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stg_group_category.id"), index=True)
     iteration_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("stg_group_iteration.id"), index=True
     )
@@ -214,9 +214,7 @@ class Classification(WorkBase):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     node_id: Mapped[int]
-    classification: Mapped[
-        Optional[str]
-    ]  # 'variant' | 'collection' | 'subject' | 'uncertain'
+    classification: Mapped[Optional[str]]  # 'variant' | 'collection' | 'subject' | 'uncertain'
     confidence: Mapped[Optional[float]] = mapped_column(Float)
     method: Mapped[Optional[str]]  # 'structural' | 'llm' | 'manual'
 
@@ -238,7 +236,7 @@ class FolderStructure(WorkBase):
     __tablename__ = "out_folder_structure"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int | None] = mapped_column(ForeignKey("run.run_id"))
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("run.id"))
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
     total_nodes: Mapped[int]
     structure_type: Mapped[str] = mapped_column(String)

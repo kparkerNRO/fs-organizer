@@ -1,5 +1,4 @@
 import json
-from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
@@ -41,7 +40,7 @@ def get_newest_entry_for_structure(
 def _insert_file_in_structure(
     folder_structure: FolderV2,
     file: Node,
-    parts: Sequence[str | tuple[str, float]],
+    parts: list[tuple[str | None, int | float]],
     new_path: str | None = None,
 ):
     current_representation = folder_structure
@@ -57,7 +56,7 @@ def _insert_file_in_structure(
 
     current_representation.children.append(
         File(
-            id=file.node_id,
+            id=file.id,
             name=file.name,
             originalPath=file.abs_path,
             newPath=new_path,
@@ -133,12 +132,12 @@ def _build_tree_structure(
             folder = FolderV2.from_node(node)
 
             # Add children recursively
-            if node.node_id in children_map:
+            if node.id in children_map:
                 folder.children = [
                     node_to_folder(child)
-                    for child in sorted(children_map[node.node_id], key=lambda n: n.name)
+                    for child in sorted(children_map[node.id], key=lambda n: n.name)
                 ]
-                folder.count = len(children_map[node.node_id])
+                folder.count = len(children_map[node.id])
             return folder
 
     # Build complete tree structure
@@ -159,7 +158,7 @@ def create_folder_structure_for_snapshot(
     # Get most recent snapshot
     query = sql_select(Snapshot)
     if snapshot_id:
-        query.where(Snapshot.snapshot_id == snapshot_id)
+        query.where(Snapshot.id == snapshot_id)
     else:
         query.order_by(Snapshot.created_at.desc())
 
@@ -169,7 +168,7 @@ def create_folder_structure_for_snapshot(
         raise ValueError("No snapshots found in database")
 
     # Query nodes, optionally filtering files
-    query = sql_select(Node).where(Node.snapshot_id == snapshot.snapshot_id)
+    query = sql_select(Node).where(Node.snapshot_id == snapshot.id)
     if not include_files:
         query = query.where(Node.kind == "dir")
 
@@ -179,7 +178,7 @@ def create_folder_structure_for_snapshot(
     count, structure = _build_tree_structure(nodes)
 
     processed_structure = FolderStructure(
-        snapshot_id=snapshot.snapshot_id,
+        snapshot_id=snapshot.id,
         run_id=associated_run,
         structure_type=StructureType.original,
         structure=structure.model_dump_json(),
@@ -286,7 +285,7 @@ def calculate_folder_structure_for_categories(
             # Update or create FileMapping in work database
             existing_mapping = work_session.execute(
                 select(FileMapping).where(
-                    FileMapping.run_id == run_id, FileMapping.node_id == file.node_id
+                    FileMapping.run_id == run_id, FileMapping.node_id == file.id
                 )
             ).scalar_one_or_none()
 
@@ -296,7 +295,7 @@ def calculate_folder_structure_for_categories(
                 work_session.add(
                     FileMapping(
                         run_id=run_id,
-                        node_id=file.node_id,
+                        node_id=file.id,
                         original_path=file.abs_path,
                         new_path=new_path,
                     )
@@ -310,6 +309,8 @@ def calculate_folder_structure_for_categories(
         work_session.add(
             FolderStructure(
                 run_id=run_id,
+                snapshot_id=snapshot_id,
+                total_nodes=total_files,
                 structure_type=structure_type.value,
                 structure=folder_structure.model_dump_json(),
             )

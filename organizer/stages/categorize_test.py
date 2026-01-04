@@ -21,7 +21,7 @@ from stages.categorize import (
 def sample_folders(index_session, sample_snapshot):
     folders = [
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.DIR.value,
             name="parent_folder",
             rel_path="parent_folder",
@@ -29,7 +29,7 @@ def sample_folders(index_session, sample_snapshot):
             depth=1,
         ),
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.DIR.value,
             name="child_folder",
             rel_path="parent_folder/child_folder",
@@ -37,7 +37,7 @@ def sample_folders(index_session, sample_snapshot):
             depth=2,
         ),
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.DIR.value,
             name="zip_content",
             rel_path="content.zip/zip_content",
@@ -54,19 +54,19 @@ def sample_folders(index_session, sample_snapshot):
 def sample_group_entries(work_session, sample_iteration, sample_folders):
     entries = [
         GroupCategoryEntryFactory(
-            folder_id=sample_folders[0].node_id,
+            folder_id=sample_folders[0].id,
             iteration=sample_iteration,
             processed_name="art_category",
             confidence=0.8,
         ),
         GroupCategoryEntryFactory(
-            folder_id=sample_folders[1].node_id,
+            folder_id=sample_folders[1].id,
             iteration=sample_iteration,
             processed_name="digital_art",
             confidence=0.9,
         ),
         GroupCategoryEntryFactory(
-            folder_id=sample_folders[2].node_id,
+            folder_id=sample_folders[2].id,
             iteration=sample_iteration,
             processed_name="zip_category",
             confidence=0.7,
@@ -254,7 +254,7 @@ class TestCalculateCategories:
     ):
         """Test basic calculate_categories functionality"""
         FileNodeFactory(
-            snapshot_id=storage_snapshot.snapshot_id,
+            snapshot_id=storage_snapshot.id,
             name="test1.txt",
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
@@ -268,7 +268,7 @@ class TestCalculateCategories:
         )
 
         calculate_folder_structure_for_categories(
-            storage_manager, storage_snapshot.snapshot_id, storage_run.id
+            storage_manager, storage_snapshot.id, storage_run.id
         )
 
         storage_work_session.expire_all()
@@ -277,7 +277,7 @@ class TestCalculateCategories:
         file_nodes = storage_index_session.query(Node).filter_by(kind=NodeKind.FILE.value).all()
         mappings = storage_work_session.query(FileMapping).all()
         assert sorted(mapping.node_id for mapping in mappings) == sorted(
-            node.node_id for node in file_nodes
+            node.id for node in file_nodes
         )
 
         folder_structures = storage_work_session.query(FolderStructure).all()
@@ -295,14 +295,14 @@ class TestCalculateCategories:
     ):
         """Test that all files are processed including zip files"""
         FileNodeFactory(
-            snapshot_id=storage_snapshot.snapshot_id,
+            snapshot_id=storage_snapshot.id,
             name="first.txt",
             rel_path="first.txt",
             abs_path="/test/first.txt",
             depth=1,
         )
         FileNodeFactory(
-            snapshot_id=storage_snapshot.snapshot_id,
+            snapshot_id=storage_snapshot.id,
             name="archive.zip",
             rel_path="archive.zip",
             abs_path="/test/archive.zip",
@@ -317,7 +317,7 @@ class TestCalculateCategories:
         )
 
         calculate_folder_structure_for_categories(
-            storage_manager, storage_snapshot.snapshot_id, storage_run.id
+            storage_manager, storage_snapshot.id, storage_run.id
         )
 
         storage_work_session.expire_all()
@@ -326,7 +326,7 @@ class TestCalculateCategories:
         file_nodes = storage_index_session.query(Node).filter_by(kind=NodeKind.FILE.value).all()
         mappings = storage_work_session.query(FileMapping).all()
         mapped_nodes = sorted(mapping.node_id for mapping in mappings)
-        file_node_ids = sorted(node.node_id for node in file_nodes)
+        file_node_ids = sorted(node.id for node in file_nodes)
 
         assert file_node_ids == mapped_nodes
 
@@ -342,7 +342,7 @@ class TestCalculateCategories:
     ):
         """Test calculate_categories with mock categories"""
         FileNodeFactory(
-            snapshot_id=storage_snapshot.snapshot_id,
+            snapshot_id=storage_snapshot.id,
             name="test1.txt",
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
@@ -367,7 +367,7 @@ class TestCalculateCategories:
 
         calculate_folder_structure_for_categories(
             storage_manager,
-            storage_snapshot.snapshot_id,
+            storage_snapshot.id,
             storage_run.id,
             category_resolver=resolve_categories,
         )
@@ -393,7 +393,7 @@ class TestCalculateCategories:
         )
 
         calculate_folder_structure_for_categories(
-            storage_manager, storage_snapshot.snapshot_id, storage_run.id
+            storage_manager, storage_snapshot.id, storage_run.id
         )
 
         storage_work_session.expire_all()
@@ -415,7 +415,7 @@ class TestCalculateCategories:
     ):
         """Test calculate_categories when get_categories_for_path returns empty list"""
         FileNodeFactory(
-            snapshot_id=storage_snapshot.snapshot_id,
+            snapshot_id=storage_snapshot.id,
             name="test1.txt",
             rel_path="test1.txt",
             abs_path="/test/test1.txt",
@@ -432,7 +432,7 @@ class TestCalculateCategories:
 
         calculate_folder_structure_for_categories(
             storage_manager,
-            storage_snapshot.snapshot_id,
+            storage_snapshot.id,
             storage_run.id,
             category_resolver=resolve_categories,
         )
@@ -465,7 +465,7 @@ class TestEdgeCases:
     ):
         """Test calculate_categories when no GroupCategoryEntry exists"""
         result = calculate_folder_structure_for_categories(
-            storage_manager, storage_snapshot.snapshot_id, storage_run.id
+            storage_manager, storage_snapshot.id, storage_run.id
         )
         assert result is None
 

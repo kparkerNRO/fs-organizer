@@ -61,8 +61,8 @@ def _build_cleaned_path(
     node_by_abs_path: Dict[str, Node],
     cache: Dict[int, str],
 ) -> str:
-    if node.node_id in cache:
-        return cache[node.node_id]
+    if node.id in cache:
+        return cache[node.id]
 
     name = _resolve_cleaned_name(node)
     parent_path_str = str(node.parent) if node.parent else None
@@ -80,7 +80,7 @@ def _build_cleaned_path(
             else:
                 cleaned_path = name
 
-    cache[node.node_id] = cleaned_path
+    cache[node.id] = cleaned_path
     return cleaned_path
 
 
@@ -106,7 +106,7 @@ def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id:
             # Check if a mapping already exists
             existing_mapping = work_session.execute(
                 select(FileMapping).where(
-                    FileMapping.run_id == run_id, FileMapping.node_id == node.node_id
+                    FileMapping.run_id == run_id, FileMapping.node_id == node.id
                 )
             ).scalar_one_or_none()
 
@@ -116,7 +116,7 @@ def recalculate_cleaned_paths(manager: StorageManager, snapshot_id: int, run_id:
                 mappings.append(
                     FileMapping(
                         run_id=run_id,
-                        node_id=node.node_id,
+                        node_id=node.id,
                         original_path=node.abs_path,
                         new_path=cleaned_path,
                     )
@@ -165,7 +165,7 @@ def recalculate_cleaned_paths_for_structure(
 
             existing_mapping = work_session.execute(
                 select(FileMapping).where(
-                    FileMapping.run_id == run_id, FileMapping.node_id == node.node_id
+                    FileMapping.run_id == run_id, FileMapping.node_id == node.id
                 )
             ).scalar_one_or_none()
 
@@ -175,7 +175,7 @@ def recalculate_cleaned_paths_for_structure(
                 work_session.add(
                     FileMapping(
                         run_id=run_id,
-                        node_id=node.node_id,
+                        node_id=node.id,
                         original_path=node.abs_path,
                         new_path=cleaned_path,
                     )

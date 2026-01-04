@@ -4,16 +4,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
-from fine_tuning.services.common import (
-    load_samples,
-)
-from fine_tuning.services.evaluation import evaluate_predictions
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 from storage.manager import StorageManager
 from storage.training_models import ModelRun, SamplePrediction, TrainingSample
+
+from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
+from fine_tuning.services.common import (
+    load_samples,
+)
+from fine_tuning.services.evaluation import evaluate_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,7 @@ def save_predictions_to_db(
     """
     prediction_objects = []
 
-    for sample, pred, conf, probs in zip(
-        samples, predictions, confidences, probabilities
-    ):
+    for sample, pred, conf, probs in zip(samples, predictions, confidences, probabilities):
         is_correct = None
         if sample.label:
             is_correct = sample.label == pred
@@ -76,7 +75,7 @@ def save_predictions_to_db(
 
         prediction_obj = SamplePrediction(
             run_id=run_id,
-            sample_id=sample.sample_id,
+            sample_id=sample.id,
             sample_name=sample.name_raw,
             predicted_label=pred,
             confidence=conf,
@@ -163,9 +162,7 @@ def create_and_save_run_results(
     split: str | None,
 ) -> None:
     """Creates a ModelRun and saves all results to the database."""
-    run_type_label = (
-        "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
-    )
+    run_type_label = "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
     if use_baseline:
         run_type_label = "baseline"
 
@@ -204,7 +201,7 @@ def create_and_save_run_results(
     )
 
     session.commit()
-    logger.info(f"Saved run metadata (run_id={run.run_id})")
+    logger.info(f"Saved run metadata (run_id={run.id})")
 
     # Always save predictions to database
     num_saved = save_predictions_to_db(
@@ -213,7 +210,7 @@ def create_and_save_run_results(
         predictions,
         confidences,
         probabilities,
-        run_id=run.run_id,
+        run_id=run.id,
         prediction_type=split or "all",
     )
     logger.info(f"Saved {num_saved} predictions to database")
@@ -238,9 +235,7 @@ def predict_and_evaluate(
             labeled_only=labeled_only,
             label_run_id=label_run_id,
         )
-        logger.info(
-            f"Loaded {len(samples)} samples from {manager.get_training_db_path()}"
-        )
+        logger.info(f"Loaded {len(samples)} samples from {manager.get_training_db_path()}")
 
         if not samples:
             logger.info("No samples found.")
@@ -250,16 +245,12 @@ def predict_and_evaluate(
         predictions, confidences, probabilities = classifier.predict(samples)
 
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [
-            pred for i, pred in enumerate(predictions) if samples[i].label
-        ]
+        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
 
         metrics = {}
         if y_true and y_pred_labeled:
             logger.info(f"Evaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(
-                y_true, y_pred_labeled, classifier.labels, verbose=True
-            )
+            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
         else:
             logger.info("No labeled samples found. Skipping evaluation.")
 

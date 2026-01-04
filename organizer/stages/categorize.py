@@ -64,7 +64,7 @@ def get_categories_for_path(
         work_session.execute(
             select(GroupCategoryEntry)
             .where(GroupCategoryEntry.iteration_id == iteration_id)
-            .where(GroupCategoryEntry.folder_id == parent.node_id)
+            .where(GroupCategoryEntry.folder_id == parent.id)
         )
         .scalars()
         .all()

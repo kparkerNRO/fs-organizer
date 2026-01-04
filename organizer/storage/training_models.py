@@ -10,11 +10,13 @@ IMPORTANT: Cross-database references (snapshot_id, node_id) to index.db are
 validated at the application level, not by database constraints.
 """
 
-from typing import List, Optional
 from datetime import datetime
-from sqlalchemy import String, Float, Integer, Boolean, Index, ForeignKey
+from typing import List, Optional
+
+from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
 from storage.db_helpers import DateTime
-from sqlalchemy.orm import DeclarativeBase, relationship, Mapped, mapped_column
 
 # Schema version (increment on breaking changes)
 TRAINING_SCHEMA_VERSION = "1.0.0"
@@ -48,7 +50,7 @@ class TrainingSample(TrainingBase):
 
     __tablename__ = "training_sample"
 
-    sample_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
     node_id: Mapped[int]  # FK to index.db (cross-database)
     label_run_id: Mapped[int] = mapped_column(ForeignKey("label_run.id"))
@@ -91,9 +93,7 @@ class TrainingSample(TrainingBase):
     __table_args__ = (
         Index("idx_training_sample_snapshot", "snapshot_id"),
         Index("idx_training_sample_node", "node_id"),
-        Index(
-            "idx_training_sample_label_run_node", "label_run_id", "node_id", unique=True
-        ),
+        Index("idx_training_sample_label_run_node", "label_run_id", "node_id", unique=True),
         Index("idx_training_sample_split", "split"),
         Index("idx_training_sample_label", "label"),
     )
@@ -113,7 +113,7 @@ class ModelRun(TrainingBase):
 
     __tablename__ = "model_run"
 
-    run_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     started_at: Mapped[datetime] = mapped_column(DateTime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(
@@ -134,9 +134,7 @@ class ModelRun(TrainingBase):
     training_data_hash: Mapped[Optional[str]]  # Hash for reproducibility
 
     # Configuration
-    hyperparameters_json: Mapped[
-        Optional[str]
-    ]  # Learning rate, batch size, metrics, etc.
+    hyperparameters_json: Mapped[Optional[str]]  # Learning rate, batch size, metrics, etc.
     config_hash: Mapped[Optional[str]]
 
     # Dataset info
@@ -172,8 +170,8 @@ class TrainingEpoch(TrainingBase):
 
     __tablename__ = "training_epoch"
 
-    epoch_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.id"))
     epoch_number: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
@@ -189,9 +187,7 @@ class TrainingEpoch(TrainingBase):
     val_f1: Mapped[Optional[float]] = mapped_column(Float)
 
     # Per-class metrics (JSON)
-    class_metrics_json: Mapped[
-        Optional[str]
-    ]  # {'variant': {'precision': 0.9, ...}, ...}
+    class_metrics_json: Mapped[Optional[str]]  # {'variant': {'precision': 0.9, ...}, ...}
 
     # Training info
     learning_rate: Mapped[Optional[float]] = mapped_column(Float)
@@ -215,16 +211,14 @@ class ModelCheckpoint(TrainingBase):
 
     __tablename__ = "model_checkpoint"
 
-    checkpoint_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.id"))
     epoch_number: Mapped[int] = mapped_column(Integer)
     timestamp: Mapped[datetime] = mapped_column(DateTime)
 
     # Checkpoint info
     checkpoint_path: Mapped[str] = mapped_column(String)  # Path to saved model
-    checkpoint_type: Mapped[str] = mapped_column(
-        String
-    )  # 'best' | 'final' | 'periodic'
+    checkpoint_type: Mapped[str] = mapped_column(String)  # 'best' | 'final' | 'periodic'
     file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Metrics at checkpoint time
@@ -250,13 +244,11 @@ class SamplePrediction(TrainingBase):
 
     __tablename__ = "sample_prediction"
 
-    prediction_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.run_id"))
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("model_run.id"))
     sample_id: Mapped[int]  # FK to training_sample (same database)
     sample_name: Mapped[str | None]
-    epoch_number: Mapped[Optional[int]] = mapped_column(
-        Integer
-    )  # Which epoch (None = final)
+    epoch_number: Mapped[Optional[int]] = mapped_column(Integer)  # Which epoch (None = final)
 
     # Prediction
     predicted_label: Mapped[str] = mapped_column(String)

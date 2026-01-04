@@ -1,13 +1,12 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from storage.work_models import GroupCategoryEntry
-from storage.index_models import Node
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import TfidfVectorizer
-
+from storage.index_models import Node
+from storage.work_models import GroupCategoryEntry
 
 TEXT_DISTANCE_RATIO = 0.7
 DISTANCE_THRESHOLD = 0.55
@@ -72,9 +71,7 @@ def compute_custom_distance_matrix(
             )
 
             # structural distance = difference in depth
-            struct_dist = compute_distance_to_shared_parent(
-                folders[i].path, folders[j].path
-            )
+            struct_dist = compute_distance_to_shared_parent(folders[i].path, folders[j].path)
 
             # combine
             dist = alpha * text_dist + (1 - alpha) * (struct_dist / (1 + struct_dist))
@@ -94,7 +91,7 @@ def prepare_records(
 
     items = [
         ClusterItem(
-            folder_id=pair[1].node_id,
+            folder_id=pair[1].id,
             partial_category_id=pair[0].id,
             name=pair[0].processed_name or "",
             original_name=pair[0].pre_processed_name or "",
@@ -155,7 +152,7 @@ def cluster_with_custom_metric(
         entry = GroupCategoryEntry(
             folder_id=item.folder_id,
             partial_category_id=item.partial_category_id,
-            group_id=None,  # Will be set during refinement
+            id=None,  # Will be set during refinement
             pre_processed_name=item.name,
             # name=item.name,
             path=str(item.path),

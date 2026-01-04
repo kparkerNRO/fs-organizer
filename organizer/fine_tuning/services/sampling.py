@@ -6,14 +6,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
-from fine_tuning.services.common import (
-    extract_feature_nodes,
-)
-from fine_tuning.services.feature_extraction import (
-    extract_features_for_run,
-)
-from fine_tuning.taxonomy import get_labels
 from pydantic import Field
 from pydantic.v1 import BaseSettings
 from sqlalchemy import select
@@ -23,6 +15,15 @@ from storage.manager import NodeKind, StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
 from utils.text_processing import char_trigrams, jaccard_similarity
+
+from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
+from fine_tuning.services.common import (
+    extract_feature_nodes,
+)
+from fine_tuning.services.feature_extraction import (
+    extract_features_for_run,
+)
+from fine_tuning.taxonomy import get_labels
 
 logger = logging.getLogger(__name__)
 
@@ -135,9 +136,7 @@ def select_training_samples(
     if total_allocated > sample_size:
         scale_factor = sample_size / total_allocated
         for depth in samples_per_depth:
-            samples_per_depth[depth] = max(
-                1, int(samples_per_depth[depth] * scale_factor)
-            )
+            samples_per_depth[depth] = max(1, int(samples_per_depth[depth] * scale_factor))
 
     selected: List[Node] = []
     for depth, num_samples in samples_per_depth.items():
@@ -216,9 +215,7 @@ def write_sample_csv(
     if use_heuristic:
         try:
             config = get_config()
-            heuristic_classifier = HeuristicClassifier(
-                config, taxonomy=heuristic_taxonomy
-            )
+            heuristic_classifier = HeuristicClassifier(config, taxonomy=heuristic_taxonomy)
         except Exception as e:
             logger.warning(f"Could not initialize heuristic classifier: {e}")
 
@@ -239,7 +236,7 @@ def write_sample_csv(
         for feature_node in feature_nodes:
             row = {
                 "snapshot_id": snapshot_id,
-                "node_id": feature_node.node.node_id,
+                "node_id": feature_node.node.id,
                 "rel_path": feature_node.node.rel_path,
                 "depth": feature_node.node.depth,
                 "parent_name": feature_node.parent_name,
@@ -374,9 +371,7 @@ def validate_all_labels_present(rows: List[Dict[str, Any]]) -> None:
         if len(unlabeled) <= 10:
             rows_str = ", ".join(map(str, unlabeled))  # ty:ignore[invalid-argument-type]
         else:
-            rows_str = (
-                ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
-            )
+            rows_str = ", ".join(map(str, unlabeled[:10])) + f", ... ({len(unlabeled)} total)"
 
         raise ValueError(
             f"Found {len(unlabeled)} rows with missing labels.\n"
@@ -407,9 +402,7 @@ def validate_label_values(rows: List[Dict[str, Any]], valid_labels: set[str]) ->
             if len(row_nums) <= 5:
                 rows_str = ", ".join(map(str, row_nums))
             else:
-                rows_str = (
-                    ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
-                )
+                rows_str = ", ".join(map(str, row_nums[:5])) + f", ... ({len(row_nums)} total)"
             error_msg.append(f"  '{label}': rows {rows_str}")
 
         error_msg.append(f"\nValid labels are: {', '.join(sorted(valid_labels))}")
@@ -455,9 +448,7 @@ def create_samples_for_runs(
             label_run=label_run,
             settings=extraction_config,
         )
-        logger.info(
-            f"Created {num_samples} training samples for snapshot {snapshot_id}"
-        )
+        logger.info(f"Created {num_samples} training samples for snapshot {snapshot_id}")
 
 
 def create_label_runs(session: Session, snapshot_ids: List[int]) -> Dict[int, LabelRun]:
@@ -482,9 +473,7 @@ def apply_labels_to_samples(
     """
     samples_by_node_id: Dict[Tuple[int, int], TrainingSample] = {}
     for snapshot_id, label_run in label_runs.items():
-        samples_for_run = (
-            session.query(TrainingSample).filter_by(label_run=label_run).all()
-        )
+        samples_for_run = session.query(TrainingSample).filter_by(label_run=label_run).all()
         for sample in samples_for_run:
             if sample.node_id is not None:
                 samples_by_node_id[(snapshot_id, sample.node_id)] = sample
@@ -523,8 +512,6 @@ def apply_sample_classifications(
         with manager.get_index_session(read_only=True) as index_session:
             create_samples_for_runs(index_session, training_session, label_runs)
 
-        labeled_count = apply_labels_to_samples(
-            training_session, rows, label_runs, settings.split
-        )
+        labeled_count = apply_labels_to_samples(training_session, rows, label_runs, settings.split)
         training_session.commit()
         logger.info(f"Applied {labeled_count} labels to training database")

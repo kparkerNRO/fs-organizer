@@ -1,28 +1,31 @@
 """Unit tests for StorageManager."""
 
-from sqlalchemy.orm import Session
-from typing import cast
-from datetime import datetime
-
 import tempfile
+from datetime import datetime
 from pathlib import Path
+from typing import cast
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from storage.factories import NodeFactory, RunFactory, SnapshotFactory
-from storage.manager import StorageManager, NodeKind
 from storage.index_models import (
+    INDEX_SCHEMA_VERSION,
     IndexBase,
     Snapshot,
+)
+from storage.index_models import (
     Meta as IndexMeta,
-    INDEX_SCHEMA_VERSION,
+)
+from storage.manager import NodeKind, StorageManager
+from storage.work_models import (
+    WORK_SCHEMA_VERSION,
+    Run,
+    WorkBase,
 )
 from storage.work_models import (
-    WorkBase,
-    Run,
     Meta as WorkMeta,
-    WORK_SCHEMA_VERSION,
 )
 
 
@@ -55,7 +58,7 @@ def snapshot(index_session):
 @pytest.fixture
 def node(index_session, snapshot):
     new_node = NodeFactory(
-        snapshot_id=snapshot.snapshot_id,
+        id=snapshot.id,
         kind=NodeKind.FILE,
         name="test.txt",
         rel_path="test.txt",
@@ -70,7 +73,7 @@ def run(work_session, snapshot):
     new_run = cast(
         Run,
         RunFactory(
-            snapshot_id=snapshot.snapshot_id,
+            id=snapshot.id,
         ),
     )
     return new_run
@@ -182,35 +185,31 @@ class TestReferentialIntegrity:
         assert not storage_manager._validate_snapshot_exists(999)
 
         # Now it should exist
-        assert storage_manager._validate_snapshot_exists(snapshot.snapshot_id)
+        assert storage_manager._validate_snapshot_exists(snapshot.id)
 
-    def test_validate_node_exists(
-        self, storage_manager: StorageManager, node, snapshot
-    ):
+    def test_validate_node_exists(self, storage_manager: StorageManager, node, snapshot):
         """Test _validate_node_exists method."""
         # Should exist
-        assert storage_manager._validate_node_exists(node.node_id, snapshot.snapshot_id)
+        assert storage_manager._validate_node_exists(node.id, snapshot.id)
 
         # Should not exist with wrong snapshot
-        assert not storage_manager._validate_node_exists(node.node_id, 999)
+        assert not storage_manager._validate_node_exists(node.id, 999)
 
         # Should not exist with wrong node_id
-        assert not storage_manager._validate_node_exists(999, snapshot.snapshot_id)
+        assert not storage_manager._validate_node_exists(999, snapshot.id)
 
-    def test_check_snapshot_has_runs(
-        self, storage_manager: StorageManager, snapshot, work_session
-    ):
+    def test_check_snapshot_has_runs(self, storage_manager: StorageManager, snapshot, work_session):
         """Test _check_snapshot_has_runs method."""
         # No runs yet
-        assert not storage_manager._check_snapshot_has_runs(snapshot.snapshot_id)
+        assert not storage_manager._check_snapshot_has_runs(snapshot.id)
 
         # Create a run
         RunFactory(
-            snapshot_id=snapshot.snapshot_id,
+            id=snapshot.id,
         )
 
         # Now has runs
-        assert storage_manager._check_snapshot_has_runs(snapshot.snapshot_id)
+        assert storage_manager._check_snapshot_has_runs(snapshot.id)
 
     def test_validate_snapshot_id_matches_run(
         self, storage_manager: StorageManager, work_session: Session
@@ -243,7 +242,7 @@ class TestDeletion:
         """Test that snapshots with runs cannot be deleted."""
         # Should fail to delete
         with pytest.raises(ValueError, match="runs still reference it"):
-            storage_manager.delete_snapshot(snapshot.snapshot_id)
+            storage_manager.delete_snapshot(snapshot.id)
 
     def test_delete_run_allows_snapshot_deletion(
         self, storage_manager: StorageManager, snapshot, run: Run
@@ -253,16 +252,11 @@ class TestDeletion:
         storage_manager.delete_run(run.id)
 
         # Now should be able to delete snapshot
-        storage_manager.delete_snapshot(snapshot.snapshot_id)
+        storage_manager.delete_snapshot(snapshot.id)
 
         # Verify it's gone
         with storage_manager.get_index_session() as session:
-            assert (
-                session.query(Snapshot)
-                .filter_by(snapshot_id=snapshot.snapshot_id)
-                .first()
-                is None
-            )
+            assert session.query(Snapshot).filter_by(id=snapshot.id).first() is None
 
 
 class TestImmutability:
@@ -274,14 +268,10 @@ class TestImmutability:
         with pytest.raises(NotImplementedError, match="immutable"):
             storage_manager.update_node(1, name="new_name")
 
-    def test_compute_features_externally_not_allowed(
-        self, storage_manager: StorageManager
-    ):
+    def test_compute_features_externally_not_allowed(self, storage_manager: StorageManager):
         """Test that external call to compute_node_features raises error."""
         # Should raise error
-        with pytest.raises(
-            NotImplementedError, match="computed during ingest_filesystem"
-        ):
+        with pytest.raises(NotImplementedError, match="computed during ingest_filesystem"):
             storage_manager.compute_node_features(1)
 
     def test_read_only_session_prevents_mutation(self, storage_manager: StorageManager):

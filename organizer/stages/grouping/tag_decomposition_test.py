@@ -2,10 +2,10 @@
 Tests for tag decomposition functionality
 """
 
-import pytest
 from typing import cast
-from sqlalchemy import select
 
+import pytest
+from sqlalchemy import select
 from storage.factories import (
     GroupCategoryEntryFactory,
     GroupIterationFactory,
@@ -13,6 +13,7 @@ from storage.factories import (
 )
 from storage.manager import NodeKind
 from storage.work_models import GroupCategoryEntry, GroupIteration
+
 from stages.grouping.tag_decomposition import decompose_compound_tags
 
 
@@ -21,24 +22,24 @@ def test_nodes(index_session, sample_snapshot):
     """Create test nodes in the index database"""
     nodes = [
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
-            node_id=1,
+            snapshot_id=sample_snapshot.id,
+            id=1,
             name="test1",
             abs_path="/test1",
             rel_path="test1",
             kind=NodeKind.DIR,
         ),
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
-            node_id=2,
+            snapshot_id=sample_snapshot.id,
+            id=2,
             name="test2",
             abs_path="/test2",
             rel_path="test2",
             kind=NodeKind.DIR,
         ),
         NodeFactory(
-            snapshot_id=sample_snapshot.snapshot_id,
-            node_id=3,
+            snapshot_id=sample_snapshot.id,
+            id=3,
             name="test3",
             abs_path="/test3",
             rel_path="test3",
@@ -158,9 +159,7 @@ def test_full_decomposition_pipeline(work_session, test_entries):
     new_iteration_id = get_next_iteration_id(work_session) - 1
 
     # Get new entries
-    stmt = select(GroupCategoryEntry).where(
-        GroupCategoryEntry.iteration_id == new_iteration_id
-    )
+    stmt = select(GroupCategoryEntry).where(GroupCategoryEntry.iteration_id == new_iteration_id)
     new_entries = work_session.scalars(stmt).all()
 
     # Should have more entries due to decomposition
