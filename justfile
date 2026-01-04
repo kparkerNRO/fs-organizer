@@ -202,11 +202,3 @@ clean:
     rm -rf frontend/node_modules/.vite
     find organizer -type d -name __pycache__ -exec rm -rf {} +
     find organizer -type d -name "*.egg-info" -exec rm -rf {} +
-
-# Show project status
-status:
-    @echo "=== Git Status ==="
-    git status --short
-    @echo ""
-    @echo "=== Latest Database ==="
-    @if [ -L organizer/outputs/latest ]; then ls -lh organizer/outputs/latest/latest.db 2>/dev/null || echo "No database found"; else echo "No latest symlink found"; fi

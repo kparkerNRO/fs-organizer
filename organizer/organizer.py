@@ -81,7 +81,7 @@ def gather(
     storage_manager = StorageManager(storage_path)
     base_path = base_path.resolve()
 
-    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
     typer.echo("Gather complete.")
 
@@ -239,7 +239,7 @@ def pipeline(
     """
     # Run gather
     storage_manager = StorageManager(storage_path)
-    snapshot_id = ingest_filesystem(storage_manager, base_path, storage_path)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
     if run_id is not None:

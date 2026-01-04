@@ -8,7 +8,7 @@ class GatherRequest(BaseModel):
 
 
 class ProcessRequest(BaseModel):
-    pass  # No parameters needed - uses constant db_path
+    pass  # No parameters needed - uses default storage path
 
 
 class AsyncTaskResponse(BaseModel):
@@ -19,8 +19,7 @@ class AsyncTaskResponse(BaseModel):
 
 class GatherResponse(BaseModel):
     message: str
-    db_path: str
-    run_dir: str
+    storage_path: str
     folder_structure: dict | None = None
 
 

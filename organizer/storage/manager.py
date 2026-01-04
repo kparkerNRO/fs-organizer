@@ -118,7 +118,7 @@ class StorageManager:
 
     def __init__(
         self,
-        database_path: Path | None,
+        database_path: Path | None = None,
         initialize_work: bool = True,
         initialize_training: bool = False,
     ):

@@ -331,7 +331,7 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
     zip_path.write_bytes(buffer.getvalue())
 
     storage_manager = StorageManager(database_path=tmp_path)
-    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)
@@ -398,7 +398,7 @@ def test_ingest_filesystem_zip_nodes(tmp_path: Path):
     zip_path.write_bytes(buffer.getvalue())
 
     storage_manager = StorageManager(database_path=tmp_path)
-    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)

@@ -184,7 +184,7 @@ export interface PipelineStatus {
   has_gather: boolean;
   has_group: boolean;
   has_folders: boolean;
-  db_path: string;
+  storage_path: string;
 }
 
 export const getPipelineStatus = async (): Promise<PipelineStatus | null> => {
