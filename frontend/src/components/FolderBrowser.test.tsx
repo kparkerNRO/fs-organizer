@@ -5,30 +5,117 @@ import { TREE_TYPE } from "../types/enums";
 import { FolderV2 } from "../types/types";
 import { mockRootFolder, simpleTestTree } from "../test/folderTreeTestData";
 
-// Mock the useFolderTree hook
-const mockUseFolderTree = {
-  originalTree: null,
-  modifiedTree: null,
+// Create a stateful mock for useFolderTree
+let mockState = {
+  originalTree: null as FolderV2 | null,
+  modifiedTree: null as FolderV2 | null,
   hasModifications: false,
   expandedFolders: new Set<string>(),
-  selectedFileId: null,
-  selectedFolderPaths: [],
+  selectedFileId: null as number | null,
+  selectedFolderPaths: [] as string[],
   isOperationInProgress: false,
   lastOperation: null,
   operationHistory: [],
-  setTreeData: vi.fn(),
+};
+
+const mockUseFolderTree = {
+  get originalTree() {
+    return mockState.originalTree;
+  },
+  get modifiedTree() {
+    return mockState.modifiedTree;
+  },
+  get hasModifications() {
+    return mockState.hasModifications;
+  },
+  get expandedFolders() {
+    return mockState.expandedFolders;
+  },
+  get selectedFileId() {
+    return mockState.selectedFileId;
+  },
+  get selectedFolderPaths() {
+    return mockState.selectedFolderPaths;
+  },
+  get isOperationInProgress() {
+    return mockState.isOperationInProgress;
+  },
+  get lastOperation() {
+    return mockState.lastOperation;
+  },
+  get operationHistory() {
+    return mockState.operationHistory;
+  },
+  setTreeData: vi.fn((tree: FolderV2 | null) => {
+    mockState.originalTree = tree;
+    mockState.modifiedTree = null;
+    mockState.hasModifications = false;
+    mockState.selectedFileId = null;
+    mockState.selectedFolderPaths = [];
+    mockState.operationHistory = [];
+    // Auto-expand the root folder
+    if (tree?.name) {
+      mockState.expandedFolders = new Set([tree.name]);
+    }
+  }),
   resetToOriginal: vi.fn(),
   renameItem: vi.fn().mockResolvedValue({ success: true }),
-  createFolder: vi.fn().mockResolvedValue({ success: true }),
-  deleteItems: vi.fn().mockResolvedValue({ success: true }),
   moveItem: vi.fn().mockResolvedValue({ success: true }),
   mergeItems: vi.fn().mockResolvedValue({ success: true }),
   flattenItems: vi.fn().mockResolvedValue({ success: true }),
   invertItems: vi.fn().mockResolvedValue({ success: true }),
-  undoLastOperation: vi.fn().mockResolvedValue({ success: true }),
-  redoLastUndoneOperation: vi.fn().mockResolvedValue({ success: true }),
-  clearHistory: vi.fn(),
-  updateTreeState: vi.fn(),
+  deleteItems: vi.fn().mockResolvedValue({ success: true }),
+  createFolder: vi.fn().mockResolvedValue({ success: true }),
+  selectFile: vi.fn((fileId: number | null) => {
+    mockState.selectedFileId = fileId;
+    if (fileId !== null) {
+      mockState.selectedFolderPaths = [];
+    }
+  }),
+  selectFolder: vi.fn((folderPath: string | null) => {
+    mockState.selectedFolderPaths = folderPath ? [folderPath] : [];
+    if (folderPath !== null) {
+      mockState.selectedFileId = null;
+    }
+  }),
+  selectMultipleFolders: vi.fn((folderPaths: string[]) => {
+    mockState.selectedFolderPaths = folderPaths;
+    if (folderPaths.length > 0) {
+      mockState.selectedFileId = null;
+    }
+  }),
+  selectFolderRange: vi.fn(),
+  clearSelection: vi.fn(() => {
+    mockState.selectedFileId = null;
+    mockState.selectedFolderPaths = [];
+  }),
+  expandFolder: vi.fn((folderPath: string) => {
+    mockState.expandedFolders.add(folderPath);
+  }),
+  collapseFolder: vi.fn((folderPath: string) => {
+    mockState.expandedFolders.delete(folderPath);
+  }),
+  toggleFolder: vi.fn((folderPath: string) => {
+    if (mockState.expandedFolders.has(folderPath)) {
+      mockState.expandedFolders.delete(folderPath);
+    } else {
+      mockState.expandedFolders.add(folderPath);
+    }
+  }),
+  expandToFile: vi.fn(),
+  expandAllParents: vi.fn(),
+  findNode: vi.fn(),
+  getNodeParent: vi.fn().mockReturnValue({ parent: null, parentPath: "" }),
+  isNodeSelected: vi.fn((node: FolderV2 | File, nodePath: string) => {
+    if ("id" in node) {
+      return mockState.selectedFileId === node.id;
+    } else {
+      return mockState.selectedFolderPaths.includes(nodePath);
+    }
+  }),
+  hasLowConfidenceChildrenInPath: vi.fn().mockReturnValue(false),
+  setFolderConfidence: vi.fn(),
+  getFoldersAtLevel: vi.fn().mockReturnValue([]),
 };
 
 vi.mock("../hooks/useFolderTree", () => ({
@@ -79,6 +166,18 @@ global.DragEvent = class DragEvent extends Event {
 describe("FolderBrowser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mock state
+    mockState = {
+      originalTree: null,
+      modifiedTree: null,
+      hasModifications: false,
+      expandedFolders: new Set<string>(),
+      selectedFileId: null,
+      selectedFolderPaths: [],
+      isOperationInProgress: false,
+      lastOperation: null,
+      operationHistory: [],
+    };
     // Reset clipboard mock
     Object.assign(navigator, {
       clipboard: {

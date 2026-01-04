@@ -12,6 +12,8 @@ import {
   mergeFolders,
   flattenFolders,
   canFlattenFolders,
+  getFoldersAtSameLevel,
+  hasLowConfidenceChildren,
 } from "./folderTreeOperations";
 import {
   mockRootFolder,
@@ -1042,6 +1044,222 @@ describe("folderTreeOperations", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("Folder not found at path");
+    });
+  });
+
+  describe("getFoldersAtSameLevel", () => {
+    it("should return all folder siblings at the same level", () => {
+      // Get folders at same level as 'documents' (should include 'code')
+      const sameLevelFolders = getFoldersAtSameLevel(
+        mockRootFolder,
+        "root/documents",
+      );
+      expect(sameLevelFolders).toContain("root/documents");
+      expect(sameLevelFolders).toContain("root/code");
+      expect(sameLevelFolders).toHaveLength(2);
+    });
+
+    it("should return empty array for root folder", () => {
+      const sameLevelFolders = getFoldersAtSameLevel(mockRootFolder, "root");
+      expect(sameLevelFolders).toEqual(["root"]);
+    });
+
+    it("should return only folders, not files", () => {
+      const sameLevelFolders = getFoldersAtSameLevel(
+        mockRootFolder,
+        "root/documents/images",
+      );
+      // 'images' is the only folder at this level, document1.pdf is a file
+      expect(sameLevelFolders).toContain("root/documents/images");
+      expect(sameLevelFolders).toHaveLength(1);
+    });
+
+    it("should return empty array for non-existent path", () => {
+      const sameLevelFolders = getFoldersAtSameLevel(
+        mockRootFolder,
+        "root/nonexistent",
+      );
+      expect(sameLevelFolders).toEqual([]);
+    });
+
+    it("should handle deeply nested folders", () => {
+      const deepTree = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            name: "level1",
+            path: "root/level1",
+            confidence: 1.0,
+            children: [
+              {
+                name: "level2a",
+                path: "root/level1/level2a",
+                confidence: 1.0,
+                children: [],
+              },
+              {
+                name: "level2b",
+                path: "root/level1/level2b",
+                confidence: 1.0,
+                children: [],
+              },
+              {
+                name: "level2c",
+                path: "root/level1/level2c",
+                confidence: 1.0,
+                children: [],
+              },
+            ],
+          },
+        ],
+      };
+
+      const sameLevelFolders = getFoldersAtSameLevel(
+        deepTree,
+        "root/level1/level2b",
+      );
+      expect(sameLevelFolders).toContain("root/level1/level2a");
+      expect(sameLevelFolders).toContain("root/level1/level2b");
+      expect(sameLevelFolders).toContain("root/level1/level2c");
+      expect(sameLevelFolders).toHaveLength(3);
+    });
+  });
+
+  describe("hasLowConfidenceChildren", () => {
+    it("should return false for folders with no children", () => {
+      const emptyFolder = {
+        name: "empty",
+        path: "root/empty",
+        confidence: 1.0,
+        children: [],
+      };
+      expect(hasLowConfidenceChildren(emptyFolder)).toBe(false);
+    });
+
+    it("should return false for folders with only high-confidence children", () => {
+      const highConfidenceTree = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            name: "child1",
+            path: "root/child1",
+            confidence: 1.0,
+            children: [],
+          },
+          {
+            name: "child2",
+            path: "root/child2",
+            confidence: 0.9,
+            children: [],
+          },
+        ],
+      };
+      expect(hasLowConfidenceChildren(highConfidenceTree)).toBe(false);
+    });
+
+    it("should return true for folders with direct low-confidence children", () => {
+      const lowConfidenceTree = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            name: "child1",
+            path: "root/child1",
+            confidence: 1.0,
+            children: [],
+          },
+          {
+            name: "child2",
+            path: "root/child2",
+            confidence: 0.5, // Low confidence
+            children: [],
+          },
+        ],
+      };
+      expect(hasLowConfidenceChildren(lowConfidenceTree)).toBe(true);
+    });
+
+    it("should return true for folders with nested low-confidence children", () => {
+      const nestedLowConfidenceTree = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            name: "parent",
+            path: "root/parent",
+            confidence: 1.0,
+            children: [
+              {
+                name: "nested",
+                path: "root/parent/nested",
+                confidence: 0.3, // Low confidence nested child
+                children: [],
+              },
+            ],
+          },
+        ],
+      };
+      expect(hasLowConfidenceChildren(nestedLowConfidenceTree)).toBe(true);
+    });
+
+    it("should ignore file nodes when checking confidence", () => {
+      const treeWithFiles = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            id: 1,
+            name: "file.txt",
+            fileType: "txt",
+            size: "1 KB",
+          },
+          {
+            name: "folder",
+            path: "root/folder",
+            confidence: 1.0,
+            children: [],
+          },
+        ],
+      };
+      expect(hasLowConfidenceChildren(treeWithFiles)).toBe(false);
+    });
+
+    it("should handle deeply nested structures", () => {
+      const deepTree = {
+        name: "root",
+        path: "root",
+        confidence: 1.0,
+        children: [
+          {
+            name: "level1",
+            path: "root/level1",
+            confidence: 1.0,
+            children: [
+              {
+                name: "level2",
+                path: "root/level1/level2",
+                confidence: 1.0,
+                children: [
+                  {
+                    name: "level3",
+                    path: "root/level1/level2/level3",
+                    confidence: 0.2, // Low confidence at deep level
+                    children: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      expect(hasLowConfidenceChildren(deepTree)).toBe(true);
     });
   });
 });
