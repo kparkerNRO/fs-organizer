@@ -59,6 +59,7 @@ def snapshot(index_session):
 def node(index_session, snapshot):
     new_node = NodeFactory(
         id=snapshot.id,
+        snapshot_id=snapshot.id,
         kind=NodeKind.FILE,
         name="test.txt",
         rel_path="test.txt",

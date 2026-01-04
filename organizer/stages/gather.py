@@ -408,8 +408,10 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
             index_session.commit()
 
         with storage_manager.get_work_session() as work_session:
-            fs = create_folder_structure_for_snapshot(index_session)
+            fs = create_folder_structure_for_snapshot(
+                index_session, snapshot_id=snapshot_id, include_files=True
+            )
             work_session.add(fs)
-            work_session.commit
+            work_session.commit()
 
     return snapshot_id

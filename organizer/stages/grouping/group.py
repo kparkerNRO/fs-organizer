@@ -182,7 +182,6 @@ def refine_groups(
                         subgroup_entry = GroupCategoryEntry(
                             folder_id=entry.folder_id,
                             partial_category_id=entry.partial_category_id,
-                            id=subgroups[subgroup].id,
                             pre_processed_name=entry.pre_processed_name,
                             processed_name=subgroup,
                             path=entry.path,
@@ -366,7 +365,6 @@ def compact_groups(
             else:
                 new_entry = GroupCategoryEntry(
                     folder_id=folder.id,
-                    id=group.id,
                     processed_name=group.processed_name,
                     pre_processed_name=group.pre_processed_name,
                     derived_names=group.derived_names,

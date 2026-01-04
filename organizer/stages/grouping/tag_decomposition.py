@@ -1590,7 +1590,6 @@ def decompose_compound_tags(session: Session) -> None:
             new_entry = GroupCategoryEntry(
                 folder_id=entry.folder_id,
                 partial_category_id=entry.partial_category_id,
-                id=entry.id,
                 iteration_id=iteration_id,
                 cluster_id=entry.cluster_id,
                 processed_name=entry.processed_name,
@@ -1612,7 +1611,6 @@ def decompose_compound_tags(session: Session) -> None:
                 new_entry = GroupCategoryEntry(
                     folder_id=entry.folder_id,
                     partial_category_id=entry.partial_category_id,
-                    id=entry.id,
                     iteration_id=iteration_id,
                     cluster_id=entry.cluster_id,
                     processed_name=entry.processed_name,

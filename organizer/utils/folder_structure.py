@@ -126,13 +126,17 @@ def _build_tree_structure(
 
     def node_to_folder(node: Node) -> FSNode:
         """Convert a Node to a dictionary representation."""
-        if node.kind == NodeKind.FILE:
+        # Check if node has children (e.g., ZIP files are FILE kind but have children)
+        has_children = node.id in children_map
+
+        if node.kind == NodeKind.FILE and not has_children:
             return File.from_node(node)
         else:
+            # Treat as folder if it's a directory OR if it's a file with children (like ZIP)
             folder = FolderV2.from_node(node)
 
             # Add children recursively
-            if node.id in children_map:
+            if has_children:
                 folder.children = [
                     node_to_folder(child)
                     for child in sorted(children_map[node.id], key=lambda n: n.name)
@@ -141,6 +145,11 @@ def _build_tree_structure(
             return folder
 
     # Build complete tree structure
+    if not root_nodes:
+        raise ValueError(
+            f"No root nodes found. Total nodes: {len(nodes)}. "
+            f"All nodes have a parent_node_id set."
+        )
 
     structure = [node_to_folder(root) for root in sorted(root_nodes, key=lambda n: n.name)][0]
 
@@ -158,9 +167,9 @@ def create_folder_structure_for_snapshot(
     # Get most recent snapshot
     query = sql_select(Snapshot)
     if snapshot_id:
-        query.where(Snapshot.id == snapshot_id)
+        query = query.where(Snapshot.id == snapshot_id)
     else:
-        query.order_by(Snapshot.created_at.desc())
+        query = query.order_by(Snapshot.created_at.desc())
 
     snapshot = index_session.execute(query).scalars().first()
 
