@@ -25,13 +25,6 @@ interface FolderBrowserProps {
   treeType: TREE_TYPE;
 }
 
-interface TreeState {
-  tree: FolderV2;
-  expandedFolders: Set<string>;
-  selectedFileId: number | null;
-  selectedFolderPaths: string[];
-}
-
 class FolderBrowserErrorBoundary extends React.Component<
   React.PropsWithChildren<Record<string, never>>,
   { hasError: boolean }
@@ -80,16 +73,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   // Get the active tree from the hook or use the prop
   const folderTree = folderTreeHook.modifiedTree || propFolderTree;
 
-  const [treeState, setTreeState] = useState<TreeState>({
-    tree: folderTree || ({} as FolderV2),
-    expandedFolders: new Set<string>(folderTree ? [folderTree.name] : []), // Initialize with root folder expanded
-    selectedFileId: null,
-    selectedFolderPaths: [],
-  });
-
-  // Add a ref to track the source of selection changes to prevent circular updates
-  const selectionSource = useRef<"internal" | "external" | null>(null);
-
+  // Only UI-specific state remains
   const [creatingFolder, setCreatingFolder] = useState<{
     parentPath: string;
     folderName: string;
@@ -99,90 +83,12 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   useEffect(() => {
     if (propFolderTree) {
       folderTreeHook.setTreeData(propFolderTree);
-      // Also ensure the tree state is initialized with root expanded if not already set
-      setTreeState((prev) => {
-        if (!prev.tree || prev.tree !== propFolderTree) {
-          return {
-            ...prev,
-            tree: propFolderTree,
-            expandedFolders: new Set<string>([propFolderTree.name]),
-          };
-        }
-        return prev;
-      });
-    }
-  }, [propFolderTree]);
-
-  // Update tree state when folderTreeHook.modifiedTree changes
-  const previousTreeRef = useRef<FolderV2 | null>(null);
-  useEffect(() => {
-    const activeTree = folderTreeHook.modifiedTree || propFolderTree;
-    if (activeTree && activeTree !== previousTreeRef.current) {
-      previousTreeRef.current = activeTree;
-      setTreeState((prev) => {
-        const newExpandedFolders = new Set<string>([
-          ...prev.expandedFolders,
-          activeTree.name,
-        ]);
-        return {
-          ...prev,
-          tree: activeTree,
-          expandedFolders: newExpandedFolders, // Ensure new root is expanded
-        };
-      });
-    }
-  }, [folderTreeHook.modifiedTree, propFolderTree]);
-
-  // Helper function to get folders at the same level as the given folder path
-  const getFoldersAtSameLevel = (
-    tree: FolderV2,
-    targetPath: string,
-  ): string[] => {
-    if (!tree) return [];
-
-    // Get the parent path of the target
-    const pathParts = targetPath.split("/");
-    const parentPath =
-      pathParts.length > 1 ? pathParts.slice(0, -1).join("/") : "";
-
-    // Find the parent folder using the existing utility
-    const parentFolder = parentPath ? findNodeByPath(tree, parentPath) : tree;
-    if (!parentFolder || isFileNode(parentFolder)) return [];
-
-    // Get all folder children at this level
-    const sameLevelPaths: string[] = [];
-    if ((parentFolder as FolderV2).children) {
-      for (const child of (parentFolder as FolderV2).children!) {
-        if (!isFileNode(child)) {
-          const childPath = buildNodePath(parentPath, child.name);
-          sameLevelPaths.push(childPath);
-        }
+      // Ensure root folder is expanded
+      if (propFolderTree.name) {
+        folderTreeHook.expandFolder(propFolderTree.name);
       }
     }
-
-    return sameLevelPaths;
-  };
-
-  const synchronizeFolders = React.useCallback(
-    (folderTree: FolderV2, selectedId: number) => {
-      const path = getFilePathInTree(folderTree, selectedId);
-      if (path) {
-        setTreeState((prev) => {
-          const newExpandedFolders = new Set(prev.expandedFolders);
-          let currentPath = "";
-          for (const segment of path) {
-            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
-            newExpandedFolders.add(currentPath);
-          }
-          return {
-            ...prev,
-            expandedFolders: newExpandedFolders,
-          };
-        });
-      }
-    },
-    [],
-  );
+  }, [propFolderTree, folderTreeHook]);
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{
@@ -243,101 +149,38 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         }
       }
     }, 100); // Small delay to allow DOM updates
-  }, []);
+  }, [shouldSync]);
 
-  // Keep selectedFileId in sync with externalSelectedFile and expand parent folders
+  // Keep selectedFileId in sync with externalSelectedFile
   useEffect(() => {
-    // Only process external changes if they're not caused by our own component
-    if (
-      externalSelectedFile !== treeState.selectedFileId &&
-      selectionSource.current !== "internal"
-    ) {
-      // Mark this update as coming from external source
-      selectionSource.current = "external";
-
-      setTreeState((prev) => ({
-        ...prev,
-        selectedFileId: externalSelectedFile,
-      }));
-
+    if (externalSelectedFile !== folderTreeHook.selectedFileId) {
+      folderTreeHook.selectFile(externalSelectedFile);
       shouldScrollToSelection.current = true;
 
-      // Clear folder selection when file is selected externally
-      if (externalSelectedFile && treeState.selectedFolderPaths.length > 0) {
-        setTreeState((prev) => ({ ...prev, selectedFolderPaths: [] }));
-      }
-
       // Expand all parent folders to the selected item
-      if (externalSelectedFile && treeState.tree) {
-        synchronizeFolders(treeState.tree, externalSelectedFile);
+      if (externalSelectedFile && folderTree) {
+        folderTreeHook.expandToFile(externalSelectedFile);
         scrollToSelectedFile(externalSelectedFile);
       }
-
-      // Reset selection source after a short delay to allow state updates to complete
-      setTimeout(() => {
-        selectionSource.current = null;
-      }, 0);
     }
-  }, [
-    externalSelectedFile,
-    propFolderTree,
-    treeState.tree,
-    shouldSync,
-    treeState.selectedFileId,
-    synchronizeFolders,
-    scrollToSelectedFile,
-  ]);
+  }, [externalSelectedFile, folderTree, shouldSync, folderTreeHook, scrollToSelectedFile]);
 
   // Keep externalSelectedFile in sync if selectedFileId changes internally
   useEffect(() => {
-    // Only notify parent when the selection change originated internally
-    // and the selected file ID is different from what the parent knows
-    if (
-      treeState.selectedFileId !== externalSelectedFile &&
-      selectionSource.current !== "external"
-    ) {
-      // Mark this update as coming from internal source
-      selectionSource.current = "internal";
-
-      // Notify parent component
-      onSelectItem(treeState.selectedFileId);
-
-      // Clear folder selection when file is selected
-      if (
-        treeState.selectedFileId &&
-        treeState.selectedFolderPaths.length > 0
-      ) {
-        setTreeState((prev) => ({ ...prev, selectedFolderPaths: [] }));
-
-        if (onSelectFolder) {
-          onSelectFolder(null);
-        }
-      }
+    if (folderTreeHook.selectedFileId !== externalSelectedFile) {
+      onSelectItem(folderTreeHook.selectedFileId);
 
       // Expand all parent folders to the selected item
-      if (treeState.selectedFileId && treeState.tree) {
-        synchronizeFolders(treeState.tree, treeState.selectedFileId);
+      if (folderTreeHook.selectedFileId && folderTree) {
+        folderTreeHook.expandToFile(folderTreeHook.selectedFileId);
         // Only scroll if this change originated from external selection
         if (shouldScrollToSelection.current) {
-          scrollToSelectedFile(treeState.selectedFileId);
-          shouldScrollToSelection.current = false; // Reset the flag
+          scrollToSelectedFile(folderTreeHook.selectedFileId);
+          shouldScrollToSelection.current = false;
         }
       }
-
-      // Reset selection source after a short delay to allow state updates to complete
-      setTimeout(() => {
-        selectionSource.current = null;
-      }, 0);
     }
-  }, [
-    treeState.selectedFileId,
-    externalSelectedFile,
-    onSelectItem,
-    onSelectFolder,
-    treeState.tree,
-    shouldSync,
-    treeState.selectedFolderPaths.length,
-  ]);
+  }, [folderTreeHook.selectedFileId, externalSelectedFile, onSelectItem, folderTree, folderTreeHook, scrollToSelectedFile]);
 
   // Handle escape key to clear selection
   useEffect(() => {
@@ -348,12 +191,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           return;
         }
         // Clear all selections
-        setTreeState((prev) => ({
-          ...prev,
-          selectedFolderPaths: [],
-          selectedFileId: null,
-        }));
-
+        folderTreeHook.clearSelection();
         onSelectItem(null);
         if (onSelectFolder) {
           onSelectFolder(null);
@@ -366,26 +204,11 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onSelectItem, onSelectFolder, renamingItem]);
-
-  const toggleFolder = (folderPath: string) => {
-    setTreeState((prev) => {
-      const newExpandedFolders = new Set(prev.expandedFolders);
-      if (newExpandedFolders.has(folderPath)) {
-        newExpandedFolders.delete(folderPath);
-      } else {
-        newExpandedFolders.add(folderPath);
-      }
-      return {
-        ...prev,
-        expandedFolders: newExpandedFolders,
-      };
-    });
-  };
+  }, [onSelectItem, onSelectFolder, renamingItem, folderTreeHook]);
 
   const handleChevronClick = (event: React.MouseEvent, folderPath: string) => {
     event.stopPropagation(); // Prevent the folder row click from triggering
-    toggleFolder(folderPath);
+    folderTreeHook.toggleFolder(folderPath);
   };
 
   const handleItemClick = (
@@ -395,106 +218,43 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   ) => {
     const isFile = isFileNode(item);
 
-    // Mark this as an internal selection to prevent circular updates
-    selectionSource.current = "internal";
-
     if (isFile) {
       if (!(e.ctrlKey || e.metaKey)) {
         shouldScrollToSelection.current = true; // Allow scrolling for user-initiated selection
-        setTreeState((prev) => ({ ...prev, selectedFileId: item.id }));
+        folderTreeHook.selectFile(item.id);
       }
     } else {
-      // Clear file selection when folder is selected
-      if (treeState.selectedFileId !== null) {
-        setTreeState((prev) => ({ ...prev, selectedFileId: null }));
-        onSelectItem(null);
-      }
-
       if (e.ctrlKey || e.metaKey) {
-        setTreeState((prev) => {
-          const isAlreadySelected = prev.selectedFolderPaths.some(
-            (f) => f === itemPath,
-          );
-          if (e.ctrlKey || e.metaKey) {
-            // Multi-select folders
-            const newSelection = isAlreadySelected
-              ? prev.selectedFolderPaths.filter((f) => f !== itemPath)
-              : [...prev.selectedFolderPaths, itemPath];
+        // Multi-select folders
+        const currentSelection = folderTreeHook.selectedFolderPaths;
+        const isAlreadySelected = currentSelection.includes(itemPath);
+        const newSelection = isAlreadySelected
+          ? currentSelection.filter((f) => f !== itemPath)
+          : [...currentSelection, itemPath];
 
-            return {
-              ...prev,
-              selectedFolderPaths: newSelection,
-            };
-          }
-          return prev;
-        });
+        folderTreeHook.selectMultipleFolders(newSelection);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
       } else if (e.shiftKey) {
-        // Contiguous selection at the same level only
-        setTreeState((prev) => {
-          const lastSelectedFolder =
-            prev.selectedFolderPaths[prev.selectedFolderPaths.length - 1];
+        // Range selection
+        const lastSelected =
+          folderTreeHook.selectedFolderPaths[
+            folderTreeHook.selectedFolderPaths.length - 1
+          ];
 
-          if (!lastSelectedFolder) {
-            // No previous selection, just select current
-            return {
-              ...prev,
-              selectedFolderPaths: [itemPath],
-            };
-          }
-
-          // Get folders at the same level as the current clicked folder
-          const sameLevelFolders = getFoldersAtSameLevel(prev.tree, itemPath);
-
-          // Check if the last selected folder is at the same level
-          if (!sameLevelFolders.includes(lastSelectedFolder)) {
-            // Last selected folder is not at the same level, just select current
-            return {
-              ...prev,
-              selectedFolderPaths: [itemPath],
-            };
-          }
-
-          // Find indices of the last selected and current folders within the same level
-          const lastIndex = sameLevelFolders.indexOf(lastSelectedFolder);
-          const currentIndex = sameLevelFolders.indexOf(itemPath);
-
-          if (lastIndex === -1 || currentIndex === -1) {
-            // Fallback to single selection if we can't find the paths
-            return {
-              ...prev,
-              selectedFolderPaths: [itemPath],
-            };
-          }
-
-          // Get the range between the two folders (inclusive) at the same level only
-          const startIndex = Math.min(lastIndex, currentIndex);
-          const endIndex = Math.max(lastIndex, currentIndex);
-          const selectedRange = sameLevelFolders.slice(
-            startIndex,
-            endIndex + 1,
-          );
-
-          // Replace selection with the new range (don't combine with existing selections from other levels)
-          const newSelection = Array.from(new Set(selectedRange));
-
-          return {
-            ...prev,
-            selectedFolderPaths: newSelection,
-          };
-        });
+        if (lastSelected) {
+          folderTreeHook.selectFolderRange(lastSelected, itemPath);
+        } else {
+          folderTreeHook.selectFolder(itemPath);
+        }
 
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
       } else {
-        // Set folder selection
-        setTreeState((prev) => ({
-          ...prev,
-          selectedFolderPaths: [itemPath],
-        }));
+        // Single selection
+        folderTreeHook.selectFolder(itemPath);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
@@ -513,23 +273,15 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
 
     // Select the item if it's not already selected
     if (isFile) {
-      if (treeState.selectedFileId !== item.id) {
-        setTreeState((prev) => ({
-          ...prev,
-          selectedFileId: item.id,
-          selectedFolderPaths: [],
-        }));
+      if (folderTreeHook.selectedFileId !== item.id) {
+        folderTreeHook.selectFile(item.id);
         if (onSelectFolder) {
           onSelectFolder(null);
         }
       }
     } else {
-      if (!treeState.selectedFolderPaths.includes(itemPath)) {
-        setTreeState((prev) => ({
-          ...prev,
-          selectedFolderPaths: [itemPath],
-          selectedFileId: null,
-        }));
+      if (!folderTreeHook.selectedFolderPaths.includes(itemPath)) {
+        folderTreeHook.selectFolder(itemPath);
         if (onSelectFolder) {
           onSelectFolder(itemPath);
         }
@@ -673,7 +425,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
           folderTreeHook.originalTree ||
           propFolderTree;
 
-        if (treeState.selectedFolderPaths.length === 1) {
+        if (folderTreeHook.selectedFolderPaths.length === 1) {
           menuItems.push({
             text: "Rename folder",
             onClick: () => {
@@ -691,7 +443,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             menuItems.push({
               text: "Mark as valid",
               onClick: () => {
-                setConfidenceToMax(item);
+                folderTreeHook.setFolderConfidence(itemPath, 1);
                 closeContextMenu();
               },
             });
@@ -726,7 +478,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             }
           }
         }
-        if (treeState.selectedFolderPaths.length >= 2) {
+        if (folderTreeHook.selectedFolderPaths.length >= 2) {
           menuItems.push({
             text: "Merge Folders",
             onClick: () => {
@@ -734,7 +486,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
               setTimeout(async () => {
                 try {
                   const result = await folderTreeHook.mergeItems(
-                    treeState.selectedFolderPaths,
+                    folderTreeHook.selectedFolderPaths,
                     "Merged Folder",
                   );
                   if (result.success) {
@@ -753,7 +505,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
             // Check if the selected folders can be flattened using the validation function
             const flattenCheck = canFlattenFolders(
               currentTree,
-              treeState.selectedFolderPaths,
+              folderTreeHook.selectedFolderPaths,
             );
 
             if (flattenCheck && flattenCheck.canFlatten) {
@@ -765,7 +517,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                   setTimeout(async () => {
                     try {
                       const result = await folderTreeHook.flattenItems(
-                        treeState.selectedFolderPaths,
+                        folderTreeHook.selectedFolderPaths,
                       );
                       if (result.success) {
                         console.log("Successfully flattened folders");
@@ -796,7 +548,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
         text: "Delete",
         onClick: async () => {
           // Delete all selected folder paths at once
-          await folderTreeHook.deleteItems(treeState.selectedFolderPaths);
+          await folderTreeHook.deleteItems(folderTreeHook.selectedFolderPaths);
           closeContextMenu();
         },
       });
@@ -804,7 +556,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       return menuItems;
     },
     [
-      treeState.selectedFolderPaths,
       folderTreeHook,
       propFolderTree,
       startCreatingFolder,
@@ -908,28 +659,6 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
     });
   };
 
-  // Helper function to check if a folder has any child folders with confidence < 1
-  const hasLowConfidenceChildFolders = React.useCallback(
-    (folder: FolderV2): boolean => {
-      if (!folder.children) return false;
-
-      for (const child of folder.children) {
-        if (!isFileNode(child)) {
-          const childFolder = child as FolderV2;
-          if (childFolder.confidence < 1) {
-            return true;
-          }
-          // Recursively check child folders
-          if (hasLowConfidenceChildFolders(childFolder)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    },
-    [],
-  );
-
   const renderNode = (
     node: FolderV2 | File,
     level: number = 0,
@@ -943,17 +672,15 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
       !isFile &&
       (node as FolderV2).children &&
       (node as FolderV2).children!.length > 0;
-    const isHighlighted =
-      (isFile && treeState.selectedFileId === node.id) ||
-      (!isFile && treeState.selectedFolderPaths.includes(nodePath));
+    const isHighlighted = folderTreeHook.isNodeSelected(node, nodePath);
 
     // Check if this folder is in the path to the selected file
     const isInSelectedPath =
-      !isFile && treeState.selectedFileId && treeState.tree
+      !isFile && folderTreeHook.selectedFileId && folderTree
         ? (() => {
             const pathToFile = getFilePathInTree(
-              treeState.tree!,
-              treeState.selectedFileId,
+              folderTree!,
+              folderTreeHook.selectedFileId,
             );
             if (!pathToFile) return false;
 
@@ -1052,7 +779,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                 }}
               >
                 {node.name}
-                {!isFile && hasLowConfidenceChildFolders(node as FolderV2) && (
+                {!isFile && folderTreeHook.hasLowConfidenceChildrenInPath(nodePath) && (
                   <RedDotIndicator />
                 )}
               </span>
@@ -1126,7 +853,7 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
   return (
     <FolderBrowserErrorBoundary>
       <ContentContainer>
-        {treeState.tree ? (
+        {folderTree ? (
           <>
             <FolderTree ref={scrollContainerRef}>
               <div
@@ -1138,11 +865,11 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  {treeState.tree &&
+                  {folderTree &&
                     renderNode(
-                      treeState.tree,
+                      folderTree,
                       0,
-                      treeState.expandedFolders,
+                      folderTreeHook.expandedFolders,
                       "",
                     )}
                 </div>

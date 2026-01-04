@@ -14,6 +14,12 @@ import {
   invertFolder,
   deleteFolders,
   createFolder,
+  isFileNode,
+  getFilePathInTree,
+  getFoldersAtSameLevel,
+  hasLowConfidenceChildren,
+  setConfidenceToMax,
+  buildNodePath,
 } from "../utils/folderTreeOperations";
 
 export interface FolderTreeState {
@@ -65,12 +71,30 @@ export interface FolderTreeActions {
     targetPath: FolderTreePath,
   ) => Promise<FolderTreeOperationResult>;
 
+  // Selection management
+  selectFile: (fileId: number | null) => void;
+  selectFolder: (folderPath: string | null) => void;
+  selectMultipleFolders: (folderPaths: string[]) => void;
+  selectFolderRange: (startPath: string, endPath: string) => void;
+  clearSelection: () => void;
+
+  // Tree navigation
+  expandFolder: (folderPath: string) => void;
+  collapseFolder: (folderPath: string) => void;
+  toggleFolder: (folderPath: string) => void;
+  expandToFile: (fileId: number) => void;
+  expandAllParents: (nodePath: string) => void;
+
   // Utility functions
   findNode: (targetPath: FolderTreePath) => FolderTreeNode | null;
   getNodeParent: (targetPath: FolderTreePath) => {
     parent: FolderV2 | null;
     parentPath: string;
   };
+  isNodeSelected: (node: FolderTreeNode, nodePath: string) => boolean;
+  hasLowConfidenceChildrenInPath: (folderPath: string) => boolean;
+  setFolderConfidence: (folderPath: string, confidence: number) => void;
+  getFoldersAtLevel: (folderPath: string) => string[];
 }
 
 export type UseFolderTreeReturn = FolderTreeState & FolderTreeActions;
@@ -440,6 +464,184 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     [activeTree],
   );
 
+  // Selection management
+  const selectFile = useCallback((fileId: number | null) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFileId: fileId,
+      selectedFolderPaths: fileId ? [] : prev.selectedFolderPaths,
+    }));
+  }, []);
+
+  const selectFolder = useCallback((folderPath: string | null) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFolderPaths: folderPath ? [folderPath] : [],
+      selectedFileId: folderPath ? null : prev.selectedFileId,
+    }));
+  }, []);
+
+  const selectMultipleFolders = useCallback((folderPaths: string[]) => {
+    setState((prev) => ({
+      ...prev,
+      selectedFolderPaths: folderPaths,
+      selectedFileId: folderPaths.length > 0 ? null : prev.selectedFileId,
+    }));
+  }, []);
+
+  const selectFolderRange = useCallback(
+    (startPath: string, endPath: string) => {
+      if (!activeTree) return;
+
+      // Get folders at same level using helper
+      const sameLevelFolders = getFoldersAtSameLevel(activeTree, startPath);
+      const startIndex = sameLevelFolders.indexOf(startPath);
+      const endIndex = sameLevelFolders.indexOf(endPath);
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        const start = Math.min(startIndex, endIndex);
+        const end = Math.max(startIndex, endIndex);
+        const range = sameLevelFolders.slice(start, end + 1);
+
+        setState((prev) => ({
+          ...prev,
+          selectedFolderPaths: range,
+          selectedFileId: null,
+        }));
+      }
+    },
+    [activeTree],
+  );
+
+  const clearSelection = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      selectedFileId: null,
+      selectedFolderPaths: [],
+    }));
+  }, []);
+
+  // Tree navigation
+  const expandFolder = useCallback((folderPath: string) => {
+    setState((prev) => ({
+      ...prev,
+      expandedFolders: new Set([...prev.expandedFolders, folderPath]),
+    }));
+  }, []);
+
+  const collapseFolder = useCallback((folderPath: string) => {
+    setState((prev) => {
+      const newSet = new Set(prev.expandedFolders);
+      newSet.delete(folderPath);
+      return { ...prev, expandedFolders: newSet };
+    });
+  }, []);
+
+  const toggleFolder = useCallback((folderPath: string) => {
+    setState((prev) => {
+      const newSet = new Set(prev.expandedFolders);
+      if (newSet.has(folderPath)) {
+        newSet.delete(folderPath);
+      } else {
+        newSet.add(folderPath);
+      }
+      return { ...prev, expandedFolders: newSet };
+    });
+  }, []);
+
+  const expandToFile = useCallback(
+    (fileId: number) => {
+      if (!activeTree) return;
+
+      const path = getFilePathInTree(activeTree, fileId);
+      if (path) {
+        setState((prev) => {
+          const newSet = new Set(prev.expandedFolders);
+          let currentPath = "";
+          for (const segment of path) {
+            currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+            newSet.add(currentPath);
+          }
+          return { ...prev, expandedFolders: newSet };
+        });
+      }
+    },
+    [activeTree],
+  );
+
+  const expandAllParents = useCallback(
+    (nodePath: string) => {
+      if (!activeTree) return;
+
+      setState((prev) => {
+        const newSet = new Set(prev.expandedFolders);
+        const pathParts = nodePath.split("/");
+        let currentPath = "";
+
+        for (const part of pathParts) {
+          currentPath = currentPath ? `${currentPath}/${part}` : part;
+          newSet.add(currentPath);
+        }
+
+        return { ...prev, expandedFolders: newSet };
+      });
+    },
+    [activeTree],
+  );
+
+  // Additional utility functions
+  const isNodeSelected = useCallback(
+    (node: FolderTreeNode, nodePath: string): boolean => {
+      if (isFileNode(node)) {
+        return state.selectedFileId === node.id;
+      } else {
+        return state.selectedFolderPaths.includes(nodePath);
+      }
+    },
+    [state.selectedFileId, state.selectedFolderPaths],
+  );
+
+  const hasLowConfidenceChildrenInPath = useCallback(
+    (folderPath: string): boolean => {
+      const folder = findNode(folderPath);
+      if (!folder || isFileNode(folder)) return false;
+
+      return hasLowConfidenceChildren(folder as FolderV2);
+    },
+    [findNode],
+  );
+
+  const setFolderConfidence = useCallback(
+    (folderPath: string, confidence: number) => {
+      if (!activeTree) return;
+
+      const newTree = { ...activeTree } as FolderV2;
+      const folder = findNodeByPath(newTree, folderPath);
+      if (folder && !isFileNode(folder)) {
+        if (confidence === 1) {
+          setConfidenceToMax(folder);
+        } else {
+          (folder as FolderV2).confidence = confidence;
+        }
+
+        setState((prev) => ({
+          ...prev,
+          modifiedTree: newTree,
+          hasModifications: true,
+        }));
+      }
+    },
+    [activeTree],
+  );
+
+  const getFoldersAtLevel = useCallback(
+    (folderPath: string): string[] => {
+      if (!activeTree) return [];
+      return getFoldersAtSameLevel(activeTree, folderPath);
+    },
+    [activeTree],
+  );
+
   return {
     // State
     ...state,
@@ -454,7 +656,27 @@ export const useFolderTree = (): UseFolderTreeReturn => {
     deleteItems,
     flattenItems,
     invertItems,
+
+    // Selection management
+    selectFile,
+    selectFolder,
+    selectMultipleFolders,
+    selectFolderRange,
+    clearSelection,
+
+    // Tree navigation
+    expandFolder,
+    collapseFolder,
+    toggleFolder,
+    expandToFile,
+    expandAllParents,
+
+    // Utility functions
     findNode,
     getNodeParent,
+    isNodeSelected,
+    hasLowConfidenceChildrenInPath,
+    setFolderConfidence,
+    getFoldersAtLevel,
   };
 };

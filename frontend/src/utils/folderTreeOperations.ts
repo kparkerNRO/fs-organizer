@@ -53,6 +53,36 @@ export const getFilePathInTree = (
   return null;
 };
 
+// Helper function to get folders at the same level as the given folder path
+export const getFoldersAtSameLevel = (
+  tree: FolderV2,
+  targetPath: string,
+): string[] => {
+  if (!tree) return [];
+
+  // Get the parent path of the target
+  const pathParts = targetPath.split("/");
+  const parentPath =
+    pathParts.length > 1 ? pathParts.slice(0, -1).join("/") : "";
+
+  // Find the parent folder using the existing utility
+  const parentFolder = parentPath ? findNodeByPath(tree, parentPath) : tree;
+  if (!parentFolder || isFileNode(parentFolder)) return [];
+
+  // Get all folder children at this level
+  const sameLevelPaths: string[] = [];
+  if ((parentFolder as FolderV2).children) {
+    for (const child of (parentFolder as FolderV2).children!) {
+      if (!isFileNode(child)) {
+        const childPath = buildNodePath(parentPath, child.name);
+        sameLevelPaths.push(childPath);
+      }
+    }
+  }
+
+  return sameLevelPaths;
+};
+
 // Find a node by path in the tree
 export const findNodeByPath = (
   tree: FolderV2,
@@ -496,6 +526,25 @@ export const setConfidenceToMax = (node: FolderTreeNode): void => {
       });
     }
   }
+};
+
+// Helper function to check if a folder has any child folders with confidence < 1
+export const hasLowConfidenceChildren = (folder: FolderV2): boolean => {
+  if (!folder.children) return false;
+
+  for (const child of folder.children) {
+    if (!isFileNode(child)) {
+      const childFolder = child as FolderV2;
+      if (childFolder.confidence < 1) {
+        return true;
+      }
+      // Recursively check child folders
+      if (hasLowConfidenceChildren(childFolder)) {
+        return true;
+      }
+    }
+  }
+  return false;
 };
 
 // Helper function to sort children alphabetically (folders first, then files)
