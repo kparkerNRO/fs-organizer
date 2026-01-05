@@ -43,6 +43,7 @@ def create_task(message: str) -> str:
     )
 
     tasks[task_id] = task
+    logger.info(task)
     return task_id
 
 

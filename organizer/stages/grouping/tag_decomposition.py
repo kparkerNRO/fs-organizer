@@ -15,33 +15,31 @@ component tags, maintaining confidence scores and derivation tracking.
 
 import logging
 import sys
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Set, Tuple
 from pathlib import Path
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
+from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
-from sqlalchemy.orm import Session
 from sqlalchemy import select
-
+from sqlalchemy.orm import Session
 from storage.work_models import GroupCategoryEntry
+from storage.work_models import GroupIteration as GroupingIteration
+
+
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
 
 # Configuration constants
 MIN_COMPOUND_LENGTH = 2  # Minimum words for compound analysis
-MIN_COMPONENT_FREQUENCY = (
-    2  # Minimum frequency for component to be considered significant
-)
+MIN_COMPONENT_FREQUENCY = 2  # Minimum frequency for component to be considered significant
 MIN_DECOMPOSITION_CONFIDENCE = 0.55  # Minimum confidence to create decomposed tags
 SEMANTIC_SIMILARITY_THRESHOLD = 0.3  # Threshold for semantic similarity
-MIN_COMPONENT_LENGTH = (
-    1  # Minimum character length for components (excluding stop words)
-)
+MIN_COMPONENT_LENGTH = 1  # Minimum character length for components (excluding stop words)
 
 # Title case configuration
 STOP_WORDS = {
@@ -136,9 +134,7 @@ COMMON_ACRONYMS = {
     "tar",
     "gz",
 }
-HIGH_FREQUENCY_THRESHOLD = (
-    10  # Words appearing this many times are considered significant
-)
+HIGH_FREQUENCY_THRESHOLD = 10  # Words appearing this many times are considered significant
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # Sentence transformer model
 MIN_HIERARCHICAL_GROUP_SIZE = 2  # Minimum tags needed for hierarchical analysis
 MAX_NGAM_SIZE = 4
@@ -250,9 +246,7 @@ class ComponentStatistics:
 
     vocabulary: list[str]
     tag_to_idx: dict[str, int]
-    original_id_to_normalized: dict[
-        int, str
-    ]  # Mapping from entry IDs to normalized versions
+    original_id_to_normalized: dict[int, str]  # Mapping from entry IDs to normalized versions
     normalized_to_original_id: dict[
         str, list[int]
     ]  # Mapping from normalized tags to list of entry IDs
@@ -336,9 +330,7 @@ def extract_component_statistics(entries: List[GroupCategoryEntry]):
                 total_words += 1
 
                 # Track context (words that appear with this word)
-                context_words = [
-                    w for j, w in enumerate(words) if i != j and len(w) > 1
-                ]
+                context_words = [w for j, w in enumerate(words) if i != j and len(w) > 1]
                 word_contexts[word].update(context_words)
 
                 # Track compound patterns
@@ -459,16 +451,13 @@ def is_meaningful_phrase(phrase: str) -> bool:
     if len(words) >= 3:
         # If it has stop words in the middle but meaningful words at start/end
         first_word_meaningful = words[0].lower() not in STOP_WORDS and len(words[0]) > 2
-        last_word_meaningful = (
-            words[-1].lower() not in STOP_WORDS and len(words[-1]) > 2
-        )
+        last_word_meaningful = words[-1].lower() not in STOP_WORDS and len(words[-1]) > 2
 
         if first_word_meaningful and last_word_meaningful:
             # Check if middle words are mostly stop words
             middle_words = words[1:-1]
             stop_word_ratio = (
-                sum(1 for w in middle_words if w.lower() in STOP_WORDS)
-                / len(middle_words)
+                sum(1 for w in middle_words if w.lower() in STOP_WORDS) / len(middle_words)
                 if middle_words
                 else 0
             )
@@ -508,19 +497,13 @@ def _score_decomposition(
     char_penalty = 1.0 if all(len(comp) > 1 for comp in components) else 0.7
 
     # heavy penalty for starting with a special character
-    special_char_penalty = (
-        1.0 if all(comp[0:1].isalnum() for comp in components) else 0.2
-    )
+    special_char_penalty = 1.0 if all(comp[0:1].isalnum() for comp in components) else 0.2
 
     # Heavy penalty for stop words
     stop_word_penalty = 1.0
-    stop_word_percent = (
-        sum(1 for comp in components if comp.lower() in STOP_WORDS) / num_components
-    )
+    stop_word_percent = sum(1 for comp in components if comp.lower() in STOP_WORDS) / num_components
     if stop_word_percent > 0.45:
-        stop_word_penalty = (
-            0.1  # Severely penalize any decomposition with mostly stop words
-        )
+        stop_word_penalty = 0.1  # Severely penalize any decomposition with mostly stop words
 
     total_score = (
         freq_score
@@ -627,9 +610,7 @@ def _are_meaningful_components(components: List[str], tag_to_idx) -> bool:
         ):  # Single words are often meaningful
             meaningful_count += 1
 
-    return (
-        meaningful_count / len(components) >= 0.5
-    )  # At least half should be meaningful
+    return meaningful_count / len(components) >= 0.5  # At least half should be meaningful
 
 
 def detect_prefix_suffix_patterns(
@@ -718,10 +699,7 @@ def analyze_hierarchical_patterns(vocabulary: list[str]) -> Dict[str, Dict]:
             existing_words = existing_tag.split()
 
             # Check if existing_tag is a prefix of current tag
-            if (
-                len(existing_words) < len(words)
-                and words[: len(existing_words)] == existing_words
-            ):
+            if len(existing_words) < len(words) and words[: len(existing_words)] == existing_words:
                 # This is a hierarchical extension
                 base_tag = existing_tag
                 extension = " ".join(words[len(existing_words) :])
@@ -761,9 +739,7 @@ def analyze_hierarchical_patterns(vocabulary: list[str]) -> Dict[str, Dict]:
                 ),  # Higher confidence with more extensions
             }
 
-            logger.debug(
-                f"Hierarchical pattern: '{base_tag}' + {list(unique_extensions)}"
-            )
+            logger.debug(f"Hierarchical pattern: '{base_tag}' + {list(unique_extensions)}")
 
     logger.info(f"Found {len(hierarchical_candidates)} hierarchical patterns")
     return hierarchical_candidates
@@ -842,9 +818,9 @@ def analyze_embedding_compositionality(
                     else:
                         # Generate embedding for unknown component
                         try:
-                            comp_emb = embedding_model.encode(
-                                [component], show_progress_bar=False
-                            )[0]
+                            comp_emb = embedding_model.encode([component], show_progress_bar=False)[
+                                0
+                            ]
                             component_embeddings.append(comp_emb)
                         except Exception as e:
                             logger.debug(
@@ -857,9 +833,9 @@ def analyze_embedding_compositionality(
                     compositional_embedding = np.mean(component_embeddings, axis=0)
 
                     # Calculate similarity between full tag and compositional embedding
-                    similarity = cosine_similarity(
-                        [full_embedding], [compositional_embedding]
-                    )[0][0]
+                    similarity = cosine_similarity([full_embedding], [compositional_embedding])[0][
+                        0
+                    ]
 
                     if similarity > best_score:
                         best_score = similarity
@@ -913,10 +889,7 @@ def analyze_cooccurrence_patterns(
             component_matches = []
 
             for component in possible_components:
-                if (
-                    component in component_stats.cooccurrence_matrix
-                    and component != tag
-                ):
+                if component in component_stats.cooccurrence_matrix and component != tag:
                     comp_coocs = component_stats.cooccurrence_matrix[component]
 
                     # Calculate overlap in co-occurrence partners
@@ -1027,11 +1000,7 @@ def calculate_structural_score(original_tag: str, components: List[str]) -> floa
         covered_words.update(comp_words)
 
     original_words = set(words)
-    coverage = (
-        len(covered_words & original_words) / len(original_words)
-        if original_words
-        else 0.0
-    )
+    coverage = len(covered_words & original_words) / len(original_words) if original_words else 0.0
 
     # Bonus for perfect coverage
     perfect_coverage_bonus = 0.3 if coverage >= 0.8 else 0.0
@@ -1062,9 +1031,7 @@ def calculate_embedding_score(
                 component_embeddings.append(embeddings[comp_idx])
             else:
                 # Generate embedding for unknown component
-                comp_emb = embedding_model.encode([component], show_progress_bar=False)[
-                    0
-                ]
+                comp_emb = embedding_model.encode([component], show_progress_bar=False)[0]
                 component_embeddings.append(comp_emb)
 
         if len(component_embeddings) >= 2:
@@ -1072,9 +1039,7 @@ def calculate_embedding_score(
             compositional_embedding = np.mean(component_embeddings, axis=0)
 
             # Calculate cosine similarity
-            similarity = cosine_similarity(
-                [original_embedding], [compositional_embedding]
-            )[0][0]
+            similarity = cosine_similarity([original_embedding], [compositional_embedding])[0][0]
 
             return max(0.0, similarity)
 
@@ -1131,10 +1096,7 @@ def calculate_pattern_score(
         prefix = " ".join(words[:i]).lower()
         if prefix in component_stats.prefix_patterns:
             pattern_frequency = len(component_stats.prefix_patterns[prefix])
-            if (
-                prefix in [comp.lower() for comp in components]
-                and pattern_frequency >= 2
-            ):
+            if prefix in [comp.lower() for comp in components] and pattern_frequency >= 2:
                 score += 0.5 * min(1.0, pattern_frequency / 10.0)
 
     # Check if components match common suffix patterns
@@ -1142,10 +1104,7 @@ def calculate_pattern_score(
         suffix = " ".join(words[-i:]).lower()
         if suffix in component_stats.suffix_patterns:
             pattern_frequency = len(component_stats.suffix_patterns[suffix])
-            if (
-                suffix in [comp.lower() for comp in components]
-                and pattern_frequency >= 2
-            ):
+            if suffix in [comp.lower() for comp in components] and pattern_frequency >= 2:
                 score += 0.5 * min(1.0, pattern_frequency / 10.0)
 
     return min(1.0, score)
@@ -1164,9 +1123,7 @@ def _comprehensive_decomposition_analysis(
     logger.info("=== Running Comprehensive Decomposition Analysis ===")
 
     if not component_stats:
-        logger.error(
-            "Component statistics not available. Call extract_component_statistics first."
-        )
+        logger.error("Component statistics not available. Call extract_component_statistics first.")
         return {}
 
     combined_candidates = {}
@@ -1374,9 +1331,7 @@ def generate_decomposition_candidates(
 
             entry = entry_by_id[entry_id]
 
-            best_decomposition = (
-                info["decompositions"][0] if info["decompositions"] else ([], 0.0)
-            )
+            best_decomposition = info["decompositions"][0] if info["decompositions"] else ([], 0.0)
             components = best_decomposition[0]
             base_score = best_decomposition[1]
 
@@ -1387,9 +1342,7 @@ def generate_decomposition_candidates(
             frequency_score = calculate_frequency_score(
                 components, component_stats, min_component_frequency
             )
-            semantic_score = calculate_semantic_score(
-                normalized_tag, components, component_stats
-            )
+            semantic_score = calculate_semantic_score(normalized_tag, components, component_stats)
             structural_score = calculate_structural_score(normalized_tag, components)
             embedding_score = calculate_embedding_score(
                 normalized_tag,
@@ -1401,9 +1354,7 @@ def generate_decomposition_candidates(
             cooccurrence_score = calculate_cooccurrence_score(
                 normalized_tag, components, component_stats
             )
-            pattern_score = calculate_pattern_score(
-                normalized_tag, components, component_stats
-            )
+            pattern_score = calculate_pattern_score(normalized_tag, components, component_stats)
 
             # Multi-evidence weighted confidence
             evidence_weights = {
@@ -1497,7 +1448,6 @@ def create_decomposed_entries(
             new_entry = GroupCategoryEntry(
                 folder_id=original_entry.folder_id,
                 partial_category_id=original_entry.partial_category_id,
-                id=original_entry.id,
                 iteration_id=iteration_id,
                 cluster_id=original_entry.cluster_id,
                 processed_name=formatted_component,
@@ -1506,9 +1456,7 @@ def create_decomposed_entries(
                     (original_entry.derived_names or []) + [best_candidate.original_tag]
                 ),
                 path=original_entry.path,
-                confidence=(
-                    original_entry.confidence * best_candidate.overall_confidence
-                ),
+                confidence=(original_entry.confidence * best_candidate.overall_confidence),
                 processed=False,
             )
             new_entries.append(new_entry)
@@ -1528,7 +1476,11 @@ def create_decomposed_entries(
     return new_entries
 
 
-def decompose_compound_tags(session: Session) -> None:
+def decompose_compound_tags(
+        session: Session,
+        run_id: int,
+        snapshot_id: int,
+        ) -> None:
     """
     Main function to decompose compound tags in the most recent GroupCategoryEntry iteration.
 
@@ -1540,36 +1492,30 @@ def decompose_compound_tags(session: Session) -> None:
     """
     logger.info("Starting compound tag decomposition")
 
-    # Get the next iteration ID
+    # Get the next iteration ID - import has to be here to prevent circular imports
     from stages.grouping.group import get_next_iteration_id
-    from storage.work_models import GroupIteration as GroupingIteration
-
     iteration_id = get_next_iteration_id(session)
 
     # Create the iteration record
-    # Note: We need to get run_id and snapshot_id from existing iterations
-    # Get the most recent iteration to retrieve run_id and snapshot_id
     stmt = select(GroupingIteration).order_by(GroupingIteration.id.desc()).limit(1)
     last_iteration = session.scalars(stmt).first()
 
     if not last_iteration:
-        raise ValueError(
-            "No existing iterations found. Cannot create decomposition iteration."
-        )
+        raise ValueError("No existing iterations found. Cannot create decomposition iteration.")
 
     iteration = GroupingIteration(
         id=iteration_id,
-        run_id=last_iteration.run_id,
-        snapshot_id=last_iteration.snapshot_id,
+        run_id=run_id,
+        snapshot_id=snapshot_id,
         description="Tag decomposition",
     )
     session.add(iteration)
     session.commit()
 
     # Get entries from the previous iteration
-    stmt = select(GroupCategoryEntry).where(
-        GroupCategoryEntry.iteration_id == iteration_id - 1
-    )
+    stmt = (select(GroupCategoryEntry)
+            .where(GroupCategoryEntry.iteration_id == iteration_id - 1)
+            )
     entries = list(session.scalars(stmt).all())
 
     if not entries:
@@ -1627,24 +1573,4 @@ def decompose_compound_tags(session: Session) -> None:
     # Commit changes
     session.commit()
 
-    logger.info(
-        f"Tag decomposition completed. Added entries for iteration {iteration_id}"
-    )
-
-
-if __name__ == "__main__":
-    # Example usage for testing
-    import sys
-    from pathlib import Path
-    from storage.manager import StorageManager
-
-    if len(sys.argv) != 2:
-        logger.error("Usage: python tag_decomposition.py <database_dir_path>")
-        logger.error("The database_dir_path should contain index.db and work.db")
-        sys.exit(1)
-
-    db_path = Path(sys.argv[1])
-    storage_manager = StorageManager(database_path=db_path)
-
-    with storage_manager.get_work_session() as session:
-        decompose_compound_tags(session)
+    logger.info(f"Tag decomposition completed. Added entries for iteration {iteration_id}")

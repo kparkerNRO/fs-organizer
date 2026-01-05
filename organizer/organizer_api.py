@@ -408,6 +408,7 @@ def run_group_task(task_id: str, storage_manager: StorageManager):
         )
 
     except Exception as e:
+        logger.error("Error in grouping", exc_info=e)
         update_task(task_id, status=TaskStatus.FAILED, error=str(e))
 
 

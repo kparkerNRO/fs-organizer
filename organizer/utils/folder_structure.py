@@ -37,7 +37,6 @@ def get_newest_entry_for_structure(
     ).scalar_one_or_none()
 
     if newest_entry:
-        logger.info(f"newest entry structure: {type(newest_entry.structure)}")
         entry = newest_entry.structure
         return entry
     return None
