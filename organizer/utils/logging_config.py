@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
@@ -11,6 +11,7 @@ def setup_logging(log_file_prefix: str = "organizer") -> logging.Logger:
     Configure logging for the application.
 
     Sets up both console and file logging with consistent formatting.
+    Uses rotating file handler to keep at most 4 previous log files.
     Only configures if not already configured to avoid duplicate handlers.
 
     Args:
@@ -28,7 +29,7 @@ def setup_logging(log_file_prefix: str = "organizer") -> logging.Logger:
     # Create log directory
     log_dir = Path("./logs")
     log_dir.mkdir(exist_ok=True)
-    log_file = log_dir / f"{log_file_prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_file = log_dir / f"{log_file_prefix}.log"
 
     # Create formatters
     formatter = logging.Formatter(
@@ -40,8 +41,15 @@ def setup_logging(log_file_prefix: str = "organizer") -> logging.Logger:
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
 
-    # File handler
-    file_handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
+    # Rotating file handler - keeps at most 4 previous files
+    # maxBytes=10MB per file, backupCount=4 keeps 4 backup files
+    file_handler = RotatingFileHandler(
+        log_file,
+        mode="a",
+        maxBytes=5 * 1024 * 1024 * 1024,  # 10 (GB?)
+        backupCount=4,
+        encoding="utf-8"
+    )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
 

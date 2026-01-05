@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from storage.index_models import Node
 
 
@@ -11,7 +11,13 @@ class StructureType(str, Enum):
     grouped = "grouped"
 
 
+class NodeType(str, Enum):
+    file = "file"
+    folder = "folder"
+
+
 class FSNode(BaseModel):
+    type: NodeType
     id: int | None = None
     name: str
     confidence: float = 1.0
@@ -20,6 +26,7 @@ class FSNode(BaseModel):
 
 
 class File(FSNode):
+    type: Literal[NodeType.file] = Field(default=NodeType.file)
     originalPath: str
     newPath: str | None = None
 
@@ -29,8 +36,9 @@ class File(FSNode):
 
 
 class FolderV2(FSNode):
+    type: Literal[NodeType.folder] = Field(default=NodeType.folder)
     count: int = 0
-    children: list[FSNode] = []
+    children: list["File | FolderV2"] = []
 
     @property
     def children_map(self):

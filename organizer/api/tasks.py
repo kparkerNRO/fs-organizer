@@ -1,9 +1,11 @@
+from logging import getLogger
 import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Dict, Any
 from pydantic import BaseModel
 
+logger = getLogger(__name__)
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -53,7 +55,9 @@ def update_task(
     error: str | None = None,
 ):
     """Update an existing task"""
+    
     if task_id not in tasks:
+        logger.warning(f"Update for task {task_id} requested, but that task doesn't exist")
         return
 
     task = tasks[task_id]

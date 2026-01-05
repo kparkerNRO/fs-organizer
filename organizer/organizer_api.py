@@ -82,17 +82,20 @@ def get_db_session(storage_manager: StorageManager = Depends(get_storage_manager
 
 
 def get_folder_structure_from_db(
-    storage_manager: StorageManager, stage: StructureType = StructureType.organized
+    storage_manager: StorageManager,
+    stage: StructureType = StructureType.organized,
+    run_id: int | None = None
 ) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
         with storage_manager.get_work_session() as session:
-            newest_entry = get_newest_entry_for_structure(session, stage.value, None)
+            newest_entry = get_newest_entry_for_structure(session, stage.value, run_id)
 
             if newest_entry:
                 return sort_folder_structure(newest_entry)
             return None
-    except Exception:
+    except Exception as err:
+        logger.error("Error getting folder structure", exc_info=err)
         return None
 
 
@@ -297,9 +300,9 @@ def run_gather_task(
             )
             return
 
-        update_task(task_id, message="Setting up storage", progress=0.3)
+        update_task(task_id, message="Setting up storage", progress=0.1)
 
-        update_task(task_id, message="Gathering folder structure", progress=0.4)
+        update_task(task_id, message="Gathering folder structure", progress=0.2)
 
         # Gather folder structure using new ingest_filesystem
         storage_path = storage_manager.index_path.parent
@@ -325,6 +328,7 @@ def run_gather_task(
         )
 
     except Exception as e:
+        logger.error("Error running task", exc_info=e)
         update_task(task_id, status=TaskStatus.FAILED, error=str(e))
 
 

@@ -66,6 +66,7 @@ def test_process_zip_basic(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_file_nodes = index_session.query(Node).filter_by(file_source=ZIP_FILE_SOURCE).all()
@@ -111,6 +112,7 @@ def test_process_zip_with_module_json(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_file_nodes = (
@@ -161,6 +163,7 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_file_nodes = (
@@ -210,6 +213,7 @@ def test_process_zip_ignores(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_file_nodes = (
@@ -248,6 +252,7 @@ def test_process_zip_top_level_folder(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_dirs = (
@@ -289,6 +294,7 @@ def test_process_zip_top_level_folder_non_specified(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0
     )
 
     zip_dirs = (

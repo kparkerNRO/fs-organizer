@@ -28,7 +28,17 @@ export interface FolderTreeOperationResult {
 
 // Helper function to check if a node is a file
 export const isFileNode = (node: FolderTreeNode): node is File => {
-  return "id" in node;
+  // Ensure node is a valid object
+  if (!node || typeof node !== 'object') {
+    return false;
+  }
+
+  // Check for type field first (new way)
+  if ("type" in node && node.type !== undefined) {
+    return node.type === "file";
+  }
+  // Fall back to checking for children (backward compatible)
+  return !("children" in node);
 };
 
 // Helper function to build node path
@@ -849,6 +859,7 @@ export const invertFolder = (
       // If existing folder exists, we need to merge carefully
       // Create a new folder with the original name to hold the child's original children
       const newChildFolder: FolderV2 = {
+        type: "folder",
         name: originalFolderName,
         children: childClone.children || [],
         confidence: 1,
@@ -867,6 +878,7 @@ export const invertFolder = (
       // No existing folder, create the full inverted structure
       // Create a new folder with the original name that will contain the child's original children
       const newChildFolder: FolderV2 = {
+        type: "folder",
         name: originalFolderName,
         children: childClone.children || [],
         confidence: 1,
@@ -955,6 +967,7 @@ export const createFolder = (
 
   // Create the new folder
   const newFolder: FolderV2 = {
+    type: "folder",
     name: folderName,
     count: 0,
     confidence: 1.0,

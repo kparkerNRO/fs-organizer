@@ -62,6 +62,7 @@ export interface Expandable {
 }
 
 export interface File extends Selectable {
+  type?: "file";
   id: number;
   name: string;
   confidence: number;
@@ -73,9 +74,13 @@ export interface File extends Selectable {
 }
 
 export interface FolderV2 extends Selectable, Expandable {
+  type?: "folder";
+  id?: number;
   name: string;
   count: number;
   confidence: number;
+  possibleClassifications?: string[];
+  originalPath?: string;
   children: (File | FolderV2)[];
   path?: string;
 }

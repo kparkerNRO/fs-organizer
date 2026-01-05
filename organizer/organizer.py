@@ -15,6 +15,7 @@ from storage.manager import StorageManager
 from storage.work_models import Run
 from utils.folder_structure import (
     calculate_folder_structure_for_categories,
+    create_folder_structure_for_snapshot,
     export_snapshot_structure,
 )
 from utils.logging_config import setup_logging
@@ -136,19 +137,28 @@ def folders(
     typer.echo(f"Using snapshot_id={snapshot_id}")
 
     storage_manager = StorageManager(storage_path)
-    if run_id is None:
-        run = _get_latest_run(storage_manager, snapshot_id)
-        run_id = run.id
-    typer.echo(f"Using run_id={run_id}")
+    if structure_type == StructureType.original:
+        with (
+            storage_manager.get_index_session(read_only=True) as index_session,
+            storage_manager.get_work_session() as work_session,
+        ):
+            structure = create_folder_structure_for_snapshot(index_session)
+            work_session.add(structure)
+            work_session.commit()
+    else:
+        if run_id is None:
+            run = _get_latest_run(storage_manager, snapshot_id)
+            run_id = run.id
+        typer.echo(f"Using run_id={run_id}")
 
-    if structure_type != StructureType.original:
-        calculate_folder_structure_for_categories(
+        if structure_type != StructureType.original:
+            calculate_folder_structure_for_categories(
+                storage_manager, snapshot_id, run_id, structure_type=structure_type
+            )
+        recalculate_cleaned_paths_for_structure(
             storage_manager, snapshot_id, run_id, structure_type=structure_type
         )
-    recalculate_cleaned_paths_for_structure(
-        storage_manager, snapshot_id, run_id, structure_type=structure_type
-    )
-    get_folder_heirarchy(storage_manager, run_id, structure_type=structure_type)
+        get_folder_heirarchy(storage_manager, run_id, structure_type=structure_type)
     typer.echo("Folder hierarchy generation complete.")
 
 
@@ -214,7 +224,7 @@ def pipeline(
     typer.echo(f"✓ Created snapshot ID: {snapshot_id}")
 
     typer.echo("Grouping folders...")
-    run_id =group_folders(storage_manager, snapshot_id=snapshot_id)
+    run_id = group_folders(storage_manager, snapshot_id=snapshot_id)
     typer.echo("✓ Grouping complete.")
 
     typer.echo("Calculating folder structure...")

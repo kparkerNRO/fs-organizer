@@ -22,11 +22,13 @@ export const mockCategoriesResponse: FetchCategoriesResponse = {
 };
 
 export const mockFolderStructure: FolderV2 = {
+  type: "folder",
   name: "Root",
   count: 10,
   confidence: 1.0,
   children: [
     {
+      type: "folder",
       name: "Child Folder",
       count: 5,
       confidence: 0.8,
