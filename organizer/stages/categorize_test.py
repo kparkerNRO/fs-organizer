@@ -89,10 +89,13 @@ class TestGetCategoriesForPath:
         sample_snapshot,
     ):
         """Test when parent folder doesn't exist"""
-        test_node = cast(Node, NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.FILE,
-        ))
+        test_node = cast(
+            Node,
+            NodeFactory(
+                snapshot_id=sample_snapshot.id,
+                kind=NodeKind.FILE,
+            ),
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -112,11 +115,14 @@ class TestGetCategoriesForPath:
         sample_snapshot,
     ):
         """Test when parent folder has associated groups"""
-        test_node = cast(Node, NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.FILE,
-            parent_node_id=sample_folders[1].id,
-        ))
+        test_node = cast(
+            Node,
+            NodeFactory(
+                snapshot_id=sample_snapshot.id,
+                kind=NodeKind.FILE,
+                parent_node_id=sample_folders[1].id,
+            ),
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -139,11 +145,14 @@ class TestGetCategoriesForPath:
         sample_snapshot,
     ):
         """Test with zip file path matching"""
-        test_node = cast(Node, NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.FILE,
-            parent_node_id=sample_folders[2].id,
-        ))
+        test_node = cast(
+            Node,
+            NodeFactory(
+                snapshot_id=sample_snapshot.id,
+                kind=NodeKind.FILE,
+                parent_node_id=sample_folders[2].id,
+            ),
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -176,11 +185,14 @@ class TestGetCategoriesForPath:
         )
         index_session.commit()
 
-        test_node = cast(Node, NodeFactory(
-            snapshot_id=sample_iteration.snapshot_id,
-            kind=NodeKind.FILE,
-            abs_path="/nonexistent/path/file.txt",
-        ))
+        test_node = cast(
+            Node,
+            NodeFactory(
+                snapshot_id=sample_iteration.snapshot_id,
+                kind=NodeKind.FILE,
+                abs_path="/nonexistent/path/file.txt",
+            ),
+        )
 
         result = get_categories_for_node(
             index_session,
