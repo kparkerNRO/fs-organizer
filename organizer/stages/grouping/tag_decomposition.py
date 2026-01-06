@@ -14,20 +14,19 @@ component tags, maintaining confidence scores and derivation tracking.
 """
 
 import logging
-import sys
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Set, Tuple
-from pathlib import Path
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
+from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
-from sqlalchemy.orm import Session
 from sqlalchemy import select
-
+from sqlalchemy.orm import Session
 from storage.work_models import GroupCategoryEntry
+from storage.work_models import GroupIteration as GroupingIteration
+
 
 # Configure logger to write to stdout
 logger = logging.getLogger(__name__)
@@ -1497,7 +1496,6 @@ def create_decomposed_entries(
             new_entry = GroupCategoryEntry(
                 folder_id=original_entry.folder_id,
                 partial_category_id=original_entry.partial_category_id,
-                group_id=original_entry.group_id,
                 iteration_id=iteration_id,
                 cluster_id=original_entry.cluster_id,
                 processed_name=formatted_component,
@@ -1528,7 +1526,11 @@ def create_decomposed_entries(
     return new_entries
 
 
-def decompose_compound_tags(session: Session) -> None:
+def decompose_compound_tags(
+    session: Session,
+    run_id: int,
+    snapshot_id: int,
+) -> None:
     """
     Main function to decompose compound tags in the most recent GroupCategoryEntry iteration.
 
@@ -1540,15 +1542,12 @@ def decompose_compound_tags(session: Session) -> None:
     """
     logger.info("Starting compound tag decomposition")
 
-    # Get the next iteration ID
+    # Get the next iteration ID - import has to be here to prevent circular imports
     from stages.grouping.group import get_next_iteration_id
-    from storage.work_models import GroupIteration as GroupingIteration
 
     iteration_id = get_next_iteration_id(session)
 
     # Create the iteration record
-    # Note: We need to get run_id and snapshot_id from existing iterations
-    # Get the most recent iteration to retrieve run_id and snapshot_id
     stmt = select(GroupingIteration).order_by(GroupingIteration.id.desc()).limit(1)
     last_iteration = session.scalars(stmt).first()
 
@@ -1559,8 +1558,8 @@ def decompose_compound_tags(session: Session) -> None:
 
     iteration = GroupingIteration(
         id=iteration_id,
-        run_id=last_iteration.run_id,
-        snapshot_id=last_iteration.snapshot_id,
+        run_id=run_id,
+        snapshot_id=snapshot_id,
         description="Tag decomposition",
     )
     session.add(iteration)
@@ -1590,7 +1589,6 @@ def decompose_compound_tags(session: Session) -> None:
             new_entry = GroupCategoryEntry(
                 folder_id=entry.folder_id,
                 partial_category_id=entry.partial_category_id,
-                group_id=entry.group_id,
                 iteration_id=iteration_id,
                 cluster_id=entry.cluster_id,
                 processed_name=entry.processed_name,
@@ -1612,7 +1610,6 @@ def decompose_compound_tags(session: Session) -> None:
                 new_entry = GroupCategoryEntry(
                     folder_id=entry.folder_id,
                     partial_category_id=entry.partial_category_id,
-                    group_id=entry.group_id,
                     iteration_id=iteration_id,
                     cluster_id=entry.cluster_id,
                     processed_name=entry.processed_name,
@@ -1632,21 +1629,3 @@ def decompose_compound_tags(session: Session) -> None:
     logger.info(
         f"Tag decomposition completed. Added entries for iteration {iteration_id}"
     )
-
-
-if __name__ == "__main__":
-    # Example usage for testing
-    import sys
-    from pathlib import Path
-    from storage.manager import StorageManager
-
-    if len(sys.argv) != 2:
-        logger.error("Usage: python tag_decomposition.py <database_dir_path>")
-        logger.error("The database_dir_path should contain index.db and work.db")
-        sys.exit(1)
-
-    db_path = Path(sys.argv[1])
-    storage_manager = StorageManager(database_path=db_path)
-
-    with storage_manager.get_work_session() as session:
-        decompose_compound_tags(session)

@@ -7,14 +7,14 @@ Compare with predict_test.py to see the improvements.
 import json
 
 import pytest
+from storage.factories import TrainingSampleFactory
+from storage.training_models import ModelRun, SamplePrediction
+
 from fine_tuning.services.predict import (
     create_and_save_run_results,
     create_model_run,
     save_predictions_to_db,
 )
-from storage.training_models import ModelRun, SamplePrediction
-
-from storage.factories import TrainingSampleFactory
 
 
 @pytest.mark.ml
@@ -43,7 +43,7 @@ class TestSavePredictionsToDb:
             predictions=predictions,
             confidences=confidences,
             probabilities=probabilities,
-            run_id=model_run.run_id,
+            run_id=model_run.id,
             prediction_type="test",
         )
 
@@ -65,7 +65,7 @@ class TestSavePredictionsToDb:
         assert pred1.true_label == "asset_type"
         assert pred1.is_correct is True
         assert pred1.prediction_type == "test"
-        assert pred1.run_id == model_run.run_id
+        assert pred1.run_id == model_run.id
 
         # Check second prediction
         assert pred2.predicted_label == "other"
@@ -86,7 +86,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[[0.95, 0.03, 0.02]],  # type: ignore[list-item]  # List format
-            run_id=model_run.run_id,
+            run_id=model_run.id,
         )
 
         assert num_saved == 1
@@ -110,7 +110,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.8],
             probabilities=[{"asset_type": 0.8, "content_subject": 0.2}],
-            run_id=model_run.run_id,
+            run_id=model_run.id,
         )
 
         assert num_saved == 1
@@ -136,7 +136,7 @@ class TestSavePredictionsToDb:
             predictions=["asset_type"],
             confidences=[0.95],
             probabilities=[{"asset_type": 0.95}],
-            run_id=model_run.run_id,
+            run_id=model_run.id,
             prediction_type=prediction_type,
         )
 
@@ -160,7 +160,7 @@ class TestCreateModelRun:
             config=config,
         )
 
-        assert run.run_id is not None
+        assert run.id is not None
         assert run.status == "running"
         assert run.run_type == "baseline"
         assert run.base_model_id == "setfit-baseline-v2"
@@ -308,7 +308,7 @@ class TestCreateAndSaveRunResults:
         # Check predictions were saved
         predictions_saved = (
             training_session.query(SamplePrediction)
-            .filter_by(run_id=model_run.run_id)
+            .filter_by(run_id=model_run.id)
             .all()
         )
         assert len(predictions_saved) == 2

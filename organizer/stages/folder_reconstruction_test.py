@@ -1,25 +1,12 @@
-from sqlalchemy import select
-
 from api.api import StructureType
-from stages.folder_reconstruction import (
-    generate_folder_heirarchy_from_path,
-    recalculate_cleaned_paths,
-    recalculate_cleaned_paths_for_structure,
-)
+from sqlalchemy import select
 from storage.factories import GroupCategoryEntryFactory, NodeFactory
 from storage.manager import NodeKind
 from storage.work_models import FileMapping
 
-
-def test_generate_folder_heirarchy_from_path_accumulates_counts():
-    working = generate_folder_heirarchy_from_path("root/sub", {})
-    assert working == {"root": {"sub": {"__count__": 1}}}
-
-    working = generate_folder_heirarchy_from_path("root/sub", working)
-    working = generate_folder_heirarchy_from_path("root/other", working)
-
-    assert working["root"]["sub"]["__count__"] == 2
-    assert working["root"]["other"]["__count__"] == 1
+from stages.folder_reconstruction import (
+    calculate_cleaned_paths_for_structure,
+)
 
 
 def test_recalculate_cleaned_paths_creates_and_updates_mappings(
@@ -30,7 +17,7 @@ def test_recalculate_cleaned_paths_creates_and_updates_mappings(
     work_session,
 ):
     folder = NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id,
+        snapshot_id=sample_snapshot.id,
         kind=NodeKind.DIR.value,
         name="My_Folder",
         rel_path="My_Folder",
@@ -38,7 +25,7 @@ def test_recalculate_cleaned_paths_creates_and_updates_mappings(
         depth=1,
     )
     archive = NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id,
+        snapshot_id=sample_snapshot.id,
         kind=NodeKind.DIR.value,
         name="Archive.zip",
         rel_path="Archive.zip",
@@ -49,15 +36,18 @@ def test_recalculate_cleaned_paths_creates_and_updates_mappings(
     work_session.add(
         FileMapping(
             run_id=sample_run.id,
-            node_id=archive.node_id,
+            node_id=archive.id,
             original_path=archive.abs_path,
             new_path="old-path",
         )
     )
     work_session.commit()
 
-    updated = recalculate_cleaned_paths(
-        storage_manager, sample_snapshot.snapshot_id, sample_run.id
+    updated = calculate_cleaned_paths_for_structure(
+        storage_manager,
+        sample_snapshot.id,
+        sample_run.id,
+        structure_type=StructureType.original,
     )
 
     assert updated == 2
@@ -70,8 +60,8 @@ def test_recalculate_cleaned_paths_creates_and_updates_mappings(
         .scalars()
         .all()
     }
-    assert mappings[folder.node_id] == "My Folder"
-    assert mappings[archive.node_id] == "Archive"
+    assert mappings[folder.id] == "My Folder"
+    assert mappings[archive.id] == "Archive"
 
 
 def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
@@ -83,7 +73,7 @@ def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
     work_session,
 ):
     parent = NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id,
+        snapshot_id=sample_snapshot.id,
         kind=NodeKind.DIR.value,
         name="parent",
         rel_path="parent",
@@ -91,17 +81,17 @@ def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
         depth=1,
     )
     child = NodeFactory(
-        snapshot_id=sample_snapshot.snapshot_id,
+        snapshot_id=sample_snapshot.id,
         kind=NodeKind.DIR.value,
         name="child",
         rel_path="parent/child",
         abs_path="/test/parent/child",
         depth=2,
-        parent_node_id=parent.node_id,
+        parent_node_id=parent.id,
     )
 
     GroupCategoryEntryFactory(
-        folder_id=parent.node_id,
+        folder_id=parent.id,
         iteration=sample_iteration,
         processed_name="art_category",
         confidence=0.9,
@@ -110,16 +100,16 @@ def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
     work_session.add(
         FileMapping(
             run_id=sample_run.id,
-            node_id=child.node_id,
+            node_id=child.id,
             original_path=child.abs_path,
             new_path="old-path",
         )
     )
     work_session.commit()
 
-    updated = recalculate_cleaned_paths_for_structure(
+    updated = calculate_cleaned_paths_for_structure(
         storage_manager,
-        sample_snapshot.snapshot_id,
+        sample_snapshot.id,
         sample_run.id,
         StructureType.organized,
     )
@@ -134,5 +124,5 @@ def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
         .scalars()
         .all()
     }
-    assert mappings[parent.node_id] == ""
-    assert mappings[child.node_id] == "art_category"
+    assert mappings[parent.id] == ""
+    assert mappings[child.id] == "art_category"

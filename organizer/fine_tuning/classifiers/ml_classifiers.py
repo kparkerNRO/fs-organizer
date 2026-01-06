@@ -13,7 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from storage.training_models import TrainingSample
 from fine_tuning.taxonomy import get_labels
 
-from setfit import SetFitModel
+from setfit import SetFitModel  # type: ignore
 from sentence_transformers import SentenceTransformer
 
 

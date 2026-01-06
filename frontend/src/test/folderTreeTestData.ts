@@ -2,6 +2,7 @@ import { FolderV2, File, FolderViewResponse } from "../types/types";
 
 // Test file data
 export const mockFile1: File = {
+  type: "file",
   id: 1,
   name: "document1.pdf",
   confidence: 0.9,
@@ -13,6 +14,7 @@ export const mockFile1: File = {
 };
 
 export const mockFile2: File = {
+  type: "file",
   id: 2,
   name: "image.jpg",
   confidence: 0.85,
@@ -24,6 +26,7 @@ export const mockFile2: File = {
 };
 
 export const mockFile3: File = {
+  type: "file",
   id: 3,
   name: "script.js",
   confidence: 0.8,
@@ -35,6 +38,7 @@ export const mockFile3: File = {
 };
 
 export const mockFile4: File = {
+  type: "file",
   id: 4,
   name: "readme.txt",
   confidence: 0.95,
@@ -47,6 +51,7 @@ export const mockFile4: File = {
 
 // Test folder data
 export const mockSubfolder1: FolderV2 = {
+  type: "folder",
   name: "images",
   path: "/root/documents/images",
   confidence: 0.95,
@@ -55,6 +60,7 @@ export const mockSubfolder1: FolderV2 = {
 };
 
 export const mockSubfolder2: FolderV2 = {
+  type: "folder",
   name: "scripts",
   path: "/root/code/scripts",
   confidence: 0.88,
@@ -63,6 +69,7 @@ export const mockSubfolder2: FolderV2 = {
 };
 
 export const mockFolder1: FolderV2 = {
+  type: "folder",
   name: "documents",
   path: "/root/documents",
   confidence: 0.92,
@@ -71,6 +78,7 @@ export const mockFolder1: FolderV2 = {
 };
 
 export const mockFolder2: FolderV2 = {
+  type: "folder",
   name: "code",
   path: "/root/code",
   confidence: 0.85,
@@ -80,6 +88,7 @@ export const mockFolder2: FolderV2 = {
 
 // Root folder with complex structure
 export const mockRootFolder: FolderV2 = {
+  type: "folder",
   name: "root",
   path: "/root",
   confidence: 1.0,
@@ -89,18 +98,21 @@ export const mockRootFolder: FolderV2 = {
 
 // Alternative simple tree for basic tests
 export const simpleTestTree: FolderV2 = {
+  type: "folder",
   name: "simple",
   path: "/simple",
   confidence: 1.0,
   count: 2,
   children: [
     {
+      type: "folder",
       name: "folder1",
       path: "/simple/folder1",
       confidence: 0.9,
       count: 1,
       children: [
         {
+          type: "file",
           id: 10,
           name: "file1.txt",
           confidence: 0.8,
@@ -113,6 +125,7 @@ export const simpleTestTree: FolderV2 = {
       ],
     },
     {
+      type: "file",
       id: 11,
       name: "file2.txt",
       confidence: 0.9,
@@ -127,18 +140,21 @@ export const simpleTestTree: FolderV2 = {
 
 // Flat structure for testing merge operations
 export const flatTestTree: FolderV2 = {
+  type: "folder",
   name: "flat",
   path: "/flat",
   confidence: 1.0,
   count: 3,
   children: [
     {
+      type: "folder",
       name: "folder_a",
       path: "/flat/folder_a",
       confidence: 0.8,
       count: 1,
       children: [
         {
+          type: "file",
           id: 20,
           name: "file_a1.txt",
           confidence: 0.8,
@@ -151,12 +167,14 @@ export const flatTestTree: FolderV2 = {
       ],
     },
     {
+      type: "folder",
       name: "folder_b",
       path: "/flat/folder_b",
       confidence: 0.7,
       count: 1,
       children: [
         {
+          type: "file",
           id: 21,
           name: "file_b1.txt",
           confidence: 0.7,
@@ -169,12 +187,14 @@ export const flatTestTree: FolderV2 = {
       ],
     },
     {
+      type: "folder",
       name: "folder_c",
       path: "/flat/folder_c",
       confidence: 0.9,
       count: 1,
       children: [
         {
+          type: "file",
           id: 22,
           name: "file_c1.txt",
           confidence: 0.9,
@@ -193,12 +213,14 @@ export const flatTestTree: FolderV2 = {
 export const mockFolderViewResponse: FolderViewResponse = {
   original: mockRootFolder,
   new: {
+    type: "folder",
     name: "reorganized",
     path: "/reorganized",
     confidence: 1.0,
     count: 2,
     children: [
       {
+        type: "folder",
         name: "all_documents",
         path: "/reorganized/all_documents",
         confidence: 0.95,
@@ -206,6 +228,7 @@ export const mockFolderViewResponse: FolderViewResponse = {
         children: [mockFile1, mockFile2],
       },
       {
+        type: "folder",
         name: "all_code",
         path: "/reorganized/all_code",
         confidence: 0.9,

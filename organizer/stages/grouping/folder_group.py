@@ -17,12 +17,10 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     """
     # First find parent nodes that have multiple folder children
     parent_counts = (
-        session.query(
-            Node.parent_node_id, func.count(Node.node_id).label("folder_count")
-        )
+        session.query(Node.parent_node_id, func.count(Node.id).label("folder_count"))
         .filter(Node.kind == "dir")
         .group_by(Node.parent_node_id)
-        .having(func.count(Node.node_id) > 1)
+        .having(func.count(Node.id) > 1)
         .subquery()
     )
 
@@ -68,7 +66,7 @@ def process_folders(session: Session):
         from utils.filename_processing import clean_filename
 
         cleaned_name_to_id = {
-            clean_filename(folder.name): folder.node_id for folder in folders
+            clean_filename(folder.name): folder.id for folder in folders
         }
         token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))
         if token_grouping:

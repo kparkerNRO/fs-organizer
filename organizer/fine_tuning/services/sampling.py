@@ -6,14 +6,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
-from fine_tuning.services.common import (
-    extract_feature_nodes,
-)
-from fine_tuning.services.feature_extraction import (
-    extract_features_for_run,
-)
-from fine_tuning.taxonomy import get_labels
 from pydantic import Field
 from pydantic.v1 import BaseSettings
 from sqlalchemy import select
@@ -23,6 +15,15 @@ from storage.manager import NodeKind, StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import get_config
 from utils.text_processing import char_trigrams, jaccard_similarity
+
+from fine_tuning.classifiers.heuristic_classifier import HeuristicClassifier
+from fine_tuning.services.common import (
+    extract_feature_nodes,
+)
+from fine_tuning.services.feature_extraction import (
+    extract_features_for_run,
+)
+from fine_tuning.taxonomy import get_labels
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +240,7 @@ def write_sample_csv(
         for feature_node in feature_nodes:
             row = {
                 "snapshot_id": snapshot_id,
-                "node_id": feature_node.node.node_id,
+                "node_id": feature_node.node.id,
                 "rel_path": feature_node.node.rel_path,
                 "depth": feature_node.node.depth,
                 "parent_name": feature_node.parent_name,

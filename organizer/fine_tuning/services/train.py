@@ -3,12 +3,12 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
-from datasets import Dataset
+from datasets import Dataset  # type: ignore
 from fine_tuning.services.common import load_samples
 from fine_tuning.taxonomy import get_labels
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from setfit import SetFitModel, SetFitTrainer
+from setfit import SetFitModel, SetFitTrainer  # type: ignore
 from sklearn.metrics import classification_report, f1_score
 from sklearn.model_selection import train_test_split
 from storage.manager import StorageManager

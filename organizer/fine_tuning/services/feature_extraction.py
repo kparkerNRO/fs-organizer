@@ -2,13 +2,6 @@ import json
 import logging
 from typing import Dict, List, Optional
 
-from fine_tuning.classifiers.heuristic_classifier import (
-    COLLAB_MARKERS,
-)
-from fine_tuning.services.common import (
-    FeatureNodeCore,
-    extract_feature_nodes,
-)
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +10,14 @@ from storage.manager import StorageManager
 from storage.training_models import LabelRun, TrainingSample
 from utils.config import Config
 from utils.text_processing import has_matching_token, tokenize_string
+
+from fine_tuning.classifiers.heuristic_classifier import (
+    COLLAB_MARKERS,
+)
+from fine_tuning.services.common import (
+    FeatureNodeCore,
+    extract_feature_nodes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +141,7 @@ def extract_features_for_run(
 
         training_sample = TrainingSample(
             snapshot_id=feature_node.snapshot_id,
-            node_id=feature_node.node.node_id,
+            node_id=feature_node.node.id,
             name_raw=feature_node.node.name,
             name_norm=name_norm,
             parent_name_norm=feature_node.parent_name,

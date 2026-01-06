@@ -65,7 +65,7 @@ export const groupFolders = async (
   abortSignal?: AbortSignal,
 ): Promise<TaskInfo> => {
   // Start the group task
-  const response = await fetch(`${env.apiUrl}/api/group`, {
+  const response = await fetch(`${env.apiUrl}/api/group?profile=true`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -184,7 +184,7 @@ export interface PipelineStatus {
   has_gather: boolean;
   has_group: boolean;
   has_folders: boolean;
-  db_path: string;
+  storage_path: string;
 }
 
 export const getPipelineStatus = async (): Promise<PipelineStatus | null> => {

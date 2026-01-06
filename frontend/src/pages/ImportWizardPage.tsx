@@ -370,6 +370,22 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 
       {state.originalStructure && (
         <ButtonRow>
+          <WarningButton
+            onClick={() => {
+              updateState({
+                hasTriggeredGather: false,
+                originalStructure: undefined,
+                groupedStructure: undefined,
+                organizedStructure: undefined,
+                selectedFileId: null,
+              });
+              // Re-trigger the gather process
+              handleFolderSelect(state.sourcePath);
+            }}
+            disabled={state.isLoading}
+          >
+            Re-run Gather
+          </WarningButton>
           <SuccessButton onClick={onNext}>Next</SuccessButton>
         </ButtonRow>
       )}
@@ -385,6 +401,8 @@ const GroupStep: React.FC<StepProps> = ({
 }) => {
   const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
+  // Use a ref to prevent double-triggering
+  const hasInitiatedGrouping = React.useRef(false);
 
   React.useEffect(() => {
     return () => {
@@ -403,8 +421,12 @@ const GroupStep: React.FC<StepProps> = ({
     if (
       !state.groupedStructure &&
       state.originalStructure &&
-      !state.hasTriggeredGroup
+      !state.hasTriggeredGroup &&
+      !hasInitiatedGrouping.current
     ) {
+      // Mark as initiated immediately to prevent double-trigger
+      hasInitiatedGrouping.current = true;
+
       const controller = new AbortController();
       setAbortController(controller);
 
@@ -513,6 +535,21 @@ const GroupStep: React.FC<StepProps> = ({
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
         <WarningButton
+          onClick={() => {
+            // Reset ref to allow re-triggering
+            hasInitiatedGrouping.current = false;
+            updateState({
+              hasTriggeredGroup: false,
+              groupedStructure: undefined,
+              organizedStructure: undefined,
+              selectedFileId: null,
+            });
+          }}
+          disabled={state.isLoading}
+        >
+          Re-run Grouping
+        </WarningButton>
+        <WarningButton
           onClick={async () => {
             if (state.groupedStructure) {
               try {
@@ -551,9 +588,10 @@ const OrganizeStep: React.FC<StepProps> = ({
   onNext,
   onPrev,
 }) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
+  // Use a ref to prevent double-triggering
+  const hasInitiatedFolders = React.useRef(false);
 
   React.useEffect(() => {
     return () => {
@@ -572,8 +610,12 @@ const OrganizeStep: React.FC<StepProps> = ({
     if (
       !state.organizedStructure &&
       state.groupedStructure &&
-      !state.hasTriggeredFolders
+      !state.hasTriggeredFolders &&
+      !hasInitiatedFolders.current
     ) {
+      // Mark as initiated immediately to prevent double-trigger
+      hasInitiatedFolders.current = true;
+
       const controller = new AbortController();
       setAbortController(controller);
 

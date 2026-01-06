@@ -1,12 +1,15 @@
-import pytest
+import io
+import zipfile
+from datetime import datetime
 from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from stages.gather import process_zip, ingest_filesystem
-from storage.index_models import IndexBase, Snapshot, Node, NodeFeatures
-from storage.manager import NodeKind, FileSource, StorageManager
-import zipfile
-import io
+from storage.index_models import IndexBase, Node, NodeFeatures, Snapshot
+from storage.manager import FileSource, NodeKind, StorageManager
+
+from stages.gather import ingest_filesystem, process_zip
 
 FILESYSTEM_SOURCE = "filesystem"
 ZIP_FILE_SOURCE = "zip_file"
@@ -27,13 +30,13 @@ def index_session():
 @pytest.fixture
 def snapshot_id(index_session):
     snapshot = Snapshot(
-        created_at="2024-01-01T00:00:00",
+        created_at=datetime(2024, 1, 1, 0, 0, 0),
         root_path="/test",
         root_abs_path="/test",
     )
     index_session.add(snapshot)
     index_session.commit()
-    return snapshot.snapshot_id
+    return snapshot.id
 
 
 @pytest.fixture
@@ -63,6 +66,7 @@ def test_process_zip_basic(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_file_nodes = (
@@ -110,6 +114,7 @@ def test_process_zip_with_module_json(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_file_nodes = (
@@ -162,12 +167,13 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_file_nodes = (
         index_session.query(Node)
         .filter_by(
-            kind=NodeKind.FILE.value,
+            kind=NodeKind.DIR.value,
             file_source=ZIP_FILE_SOURCE,
         )
         .all()
@@ -190,13 +196,13 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
     )
 
     assert len(zip_file_nodes) == 1
-    assert len(zip_content_dirs) == 0
-    assert len(zip_content_files) == 3  # file1.txt, nested.zip, nested_file.txt
+    assert len(zip_content_dirs) == 1
+    assert len(zip_content_files) == 2  # file1.txt, nested.zip, nested_file.txt
 
     assert zip_file_nodes[0].name == "test.zip"
 
     file_names = sorted(node.name for node in zip_content_files)
-    assert file_names == ["file1.txt", "nested.zip", "nested_file.txt"]
+    assert file_names == ["file1.txt", "nested_file.txt"]
 
 
 def test_process_zip_ignores(index_session, snapshot_id):
@@ -211,12 +217,13 @@ def test_process_zip_ignores(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_file_nodes = (
         index_session.query(Node)
         .filter_by(
-            kind=NodeKind.FILE.value,
+            kind=NodeKind.DIR.value,
             file_source=ZIP_FILE_SOURCE,
         )
         .all()
@@ -249,6 +256,7 @@ def test_process_zip_top_level_folder(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_dirs = (
@@ -290,6 +298,7 @@ def test_process_zip_top_level_folder_non_specified(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
+        count=0,
     )
 
     zip_dirs = (
@@ -331,7 +340,7 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
     zip_path.write_bytes(buffer.getvalue())
 
     storage_manager = StorageManager(database_path=tmp_path)
-    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)
@@ -369,17 +378,17 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
             .filter_by(
                 snapshot_id=snapshot_id,
                 name="file2.zip",
-                kind=NodeKind.FILE.value,
+                kind=NodeKind.DIR.value,
                 file_source=FileSource.ZIP_FILE.value,
             )
             .one()
         )
 
         assert dir_node.file_source == FILESYSTEM_SOURCE
-        assert file_node.parent_node_id == dir_node.node_id
+        assert file_node.parent_node_id == dir_node.id
         assert zip_node.parent_node_id is None
 
-        features = session.query(NodeFeatures).filter_by(node_id=dir_node.node_id).one()
+        features = session.query(NodeFeatures).filter_by(node_id=dir_node.id).one()
         assert features.normalized_name == "dir"
     finally:
         session.close()
@@ -398,7 +407,7 @@ def test_ingest_filesystem_zip_nodes(tmp_path: Path):
     zip_path.write_bytes(buffer.getvalue())
 
     storage_manager = StorageManager(database_path=tmp_path)
-    snapshot_id = ingest_filesystem(storage_manager, base_path, None)
+    snapshot_id = ingest_filesystem(storage_manager, base_path)
 
     engine = create_engine(f"sqlite:///{tmp_path / 'index.db'}")
     Session = sessionmaker(bind=engine)
@@ -417,7 +426,7 @@ def test_ingest_filesystem_zip_nodes(tmp_path: Path):
             session.query(Node)
             .filter_by(
                 snapshot_id=snapshot_id,
-                parent_node_id=zip_node.node_id,
+                parent_node_id=zip_node.id,
                 file_source=ZIP_CONTENT_SOURCE,
             )
             .all()

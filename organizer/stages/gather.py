@@ -7,9 +7,10 @@ from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 from storage.index_models import Node, NodeFeatures
-from storage.manager import FileSource, NodeKind
+from storage.manager import FileSource, NodeKind, StorageManager
 from utils.config import get_config
 from utils.filename_processing import clean_filename
+from utils.folder_structure import create_folder_structure_for_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +103,10 @@ def process_zip(
     zip_name: str,
     session: Session,
     snapshot_id: int,
+    count: int,
     zip_file_source: FileSource = FileSource.ZIP_FILE,
     preserve_modules: bool = True,
-) -> None:
+) -> int:
     try:
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
@@ -149,11 +151,11 @@ def process_zip(
                     rel_path=folder_rel_path / zip_name,
                     abs_path=base_path / folder_rel_path / zip_name,
                     depth=folder_depth + 1,
-                    parent_node_id=folder_node.node_id,
+                    parent_node_id=folder_node.id,
                     file_source=zip_file_source,
                 )
                 session.commit()
-                return
+                return count
 
             # Count children at the ZIP root level
             root_folders, root_files = count_zip_children(entries)
@@ -161,7 +163,7 @@ def process_zip(
             zip_node = _create_node(
                 session,
                 snapshot_id=snapshot_id,
-                kind=NodeKind.FILE,
+                kind=NodeKind.DIR,
                 name=zip_name,
                 rel_path=zip_rel_path,
                 abs_path=zip_abs_path,
@@ -180,7 +182,7 @@ def process_zip(
 
                 # Process directory structure
                 current_rel_path = zip_rel_path
-                current_parent_id = zip_node.node_id
+                current_parent_id = zip_node.id
                 for part in entry_path.parts[:-1]:  # Exclude the file name itself
                     new_rel_path = current_rel_path / part
                     if new_rel_path in zip_dir_nodes:
@@ -192,6 +194,7 @@ def process_zip(
                         folder_children, file_children = count_zip_children(
                             entries, str(new_rel_path.relative_to(zip_rel_path))
                         )
+                        count += 1
 
                         new_folder = _create_node(
                             session,
@@ -206,8 +209,8 @@ def process_zip(
                             num_folder_children=folder_children,
                             num_file_children=file_children,
                         )
-                        current_parent_id = new_folder.node_id
-                        zip_dir_nodes[new_rel_path] = new_folder.node_id
+                        current_parent_id = new_folder.id
+                        zip_dir_nodes[new_rel_path] = new_folder.id
 
                     current_rel_path = new_rel_path
 
@@ -217,6 +220,7 @@ def process_zip(
                     if file_name:
                         file_rel_path = current_rel_path / file_name
                         depth = len(file_rel_path.parts)
+                        count += 1
 
                         if file_name.lower().endswith(".zip"):
                             try:
@@ -229,7 +233,8 @@ def process_zip(
                                         file_name,
                                         session,
                                         snapshot_id,
-                                        FileSource.ZIP_CONTENT,
+                                        count=count,
+                                        zip_file_source=FileSource.ZIP_CONTENT,
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
                                 logger.error(
@@ -254,11 +259,16 @@ def process_zip(
                                 mtime=mtime,
                             )
 
+                if count % 1000 == 0:
+                    logger.info(f"Processed {count} files")
+
             session.commit()
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
         logger.error(f"Error processing zip {zip_name}: {e}")
         raise
+
+    return count
 
 
 def _create_node(
@@ -300,16 +310,17 @@ def _create_node(
     session.flush()
 
     features = NodeFeatures(
-        node_id=node.node_id,
+        node_id=node.id,
         normalized_name=clean_filename(name),
     )
     session.add(features)
     return node
 
 
-def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
+def ingest_filesystem(storage_manager: StorageManager, base_path):
     with storage_manager.ingestion_job(root_path=base_path) as job:
         snapshot_id = job.snapshot_id
+        count = 0
         with storage_manager.get_index_session() as index_session:
             dir_nodes: dict[str, int] = {}
 
@@ -321,6 +332,7 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
                 root_path = Path(root)
 
                 for d in dirs:
+                    count += 1
                     folder_path = root_path / d
                     rel_path = folder_path.relative_to(base_path)
                     parent_rel_path = rel_path.parent
@@ -362,9 +374,13 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
                         ctime=stat.st_ctime,
                         inode=stat.st_ino,
                     )
-                    dir_nodes[str(rel_path)] = node.node_id
+                    dir_nodes[str(rel_path)] = node.id
+
+                    if count % 1000 == 0:
+                        logger.info(f"Processed {count} files")
 
                 for f in files:
+                    count += 1
                     file_path = root_path / f
                     rel_path = file_path.relative_to(base_path)
                     parent_rel_path = rel_path.parent
@@ -383,7 +399,7 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
                             continue
 
                         try:
-                            process_zip(
+                            count = process_zip(
                                 file_path,
                                 base_path,
                                 Path("")
@@ -393,7 +409,8 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
                                 f,
                                 index_session,
                                 snapshot_id,
-                                FileSource.ZIP_FILE,
+                                count,
+                                zip_file_source=FileSource.ZIP_FILE,
                             )
                         except zipfile.BadZipFile as e:
                             logger.error(f"Error processing zip file {file_path}: {e}")
@@ -415,7 +432,22 @@ def ingest_filesystem(storage_manager, base_path, storage_path: Path | None):
                         ctime=stat.st_ctime,
                         inode=stat.st_ino,
                     )
+                    if count % 1000 == 0:
+                        logger.info(f"Processed {count} files")
 
             index_session.commit()
+
+            logger.info("File system processed ")
+
+        with (
+            storage_manager.get_work_session() as work_session,
+            storage_manager.get_index_session(read_only=True) as ro_index,
+        ):
+            fs = create_folder_structure_for_snapshot(
+                ro_index, snapshot_id=snapshot_id, include_files=False
+            )
+            work_session.add(fs)
+            work_session.commit()
+            logger.info("Virtual structure created")
 
     return snapshot_id

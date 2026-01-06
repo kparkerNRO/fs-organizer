@@ -4,16 +4,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
-from fine_tuning.services.common import (
-    load_samples,
-)
-from fine_tuning.services.evaluation import evaluate_predictions
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from sqlalchemy.orm import Session
 from storage.manager import StorageManager
 from storage.training_models import ModelRun, SamplePrediction, TrainingSample
+
+from fine_tuning.classifiers.ml_classifiers import SetFitClassifier, ZeroShotClassifier
+from fine_tuning.services.common import (
+    load_samples,
+)
+from fine_tuning.services.evaluation import evaluate_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def save_predictions_to_db(
 
         prediction_obj = SamplePrediction(
             run_id=run_id,
-            sample_id=sample.sample_id,
+            sample_id=sample.id,
             sample_name=sample.name_raw,
             predicted_label=pred,
             confidence=conf,
@@ -130,7 +131,7 @@ def create_model_run(
         model_version = model_path if model_path else f"unknown-{taxonomy}"
 
     run = ModelRun(
-        started_at=datetime.now().isoformat(),
+        started_at=datetime.now(),
         status="running",
         run_type=run_type,
         base_model_id=base_model_id,
@@ -184,7 +185,7 @@ def create_and_save_run_results(
     )
 
     run.status = "completed"
-    run.finished_at = datetime.now().isoformat()
+    run.finished_at = datetime.now()
     run.test_samples_count = len(samples)
 
     if metrics:
@@ -204,7 +205,7 @@ def create_and_save_run_results(
     )
 
     session.commit()
-    logger.info(f"Saved run metadata (run_id={run.run_id})")
+    logger.info(f"Saved run metadata (run_id={run.id})")
 
     # Always save predictions to database
     num_saved = save_predictions_to_db(
@@ -213,7 +214,7 @@ def create_and_save_run_results(
         predictions,
         confidences,
         probabilities,
-        run_id=run.run_id,
+        run_id=run.id,
         prediction_type=split or "all",
     )
     logger.info(f"Saved {num_saved} predictions to database")

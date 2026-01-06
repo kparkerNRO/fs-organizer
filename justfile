@@ -83,7 +83,18 @@ folders db_path:
 
 # Start FastAPI development server
 api:
-    cd organizer && uv run fastapi dev organizer_api.py
+    cd organizer && uv run uvicorn organizer_api:app --reload \
+        --reload-exclude "*.db" \
+        --reload-exclude "*.db-shm" \
+        --reload-exclude "*.db-wal" \
+        --reload-exclude "logs/*"
+
+# Start FastAPI development server with debugger (VSCode attach on port 5678)
+api-debug:
+    cd organizer && \
+        ENABLE_PROFILING=true \
+        uv run python -m debugpy --listen 5678 \
+        -m uvicorn organizer_api:app
 
 # Run all backend tests
 test-backend:
@@ -149,6 +160,14 @@ build-electron-pack:
 lint-frontend:
     cd frontend && npm run lint
 
+# Format frontend code with Prettier
+format-frontend:
+    cd frontend && npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css}"
+
+# Check frontend code formatting with Prettier
+check-format-frontend:
+    cd frontend && npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css}"
+
 # Run frontend tests
 test-frontend:
     cd frontend && npm run test:run
@@ -172,7 +191,7 @@ install: install-backend install-frontend
 lint: lint-backend lint-frontend
 
 # Format all code
-format: format-backend
+format: format-backend format-frontend
 
 # Run all tests
 test: test-backend test-frontend
@@ -202,11 +221,3 @@ clean:
     rm -rf frontend/node_modules/.vite
     find organizer -type d -name __pycache__ -exec rm -rf {} +
     find organizer -type d -name "*.egg-info" -exec rm -rf {} +
-
-# Show project status
-status:
-    @echo "=== Git Status ==="
-    git status --short
-    @echo ""
-    @echo "=== Latest Database ==="
-    @if [ -L organizer/outputs/latest ]; then ls -lh organizer/outputs/latest/latest.db 2>/dev/null || echo "No database found"; else echo "No latest symlink found"; fi
