@@ -267,22 +267,6 @@ class TestDeletion:
 class TestImmutability:
     """Test snapshot immutability enforcement."""
 
-    def test_node_modification_not_allowed(self, storage_manager: StorageManager):
-        """Test that attempting to modify nodes raises NotImplementedError."""
-        # Should raise error
-        with pytest.raises(NotImplementedError, match="immutable"):
-            storage_manager.update_node(1, name="new_name")
-
-    def test_compute_features_externally_not_allowed(
-        self, storage_manager: StorageManager
-    ):
-        """Test that external call to compute_node_features raises error."""
-        # Should raise error
-        with pytest.raises(
-            NotImplementedError, match="computed during ingest_filesystem"
-        ):
-            storage_manager.compute_node_features(1)
-
     def test_read_only_session_prevents_mutation(self, storage_manager: StorageManager):
         """Test that read_only sessions prevent accidental mutations."""
         # Get read-only session

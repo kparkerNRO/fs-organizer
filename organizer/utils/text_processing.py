@@ -175,24 +175,3 @@ def get_matching_patterns(text: str, patterns: list[str]) -> list[str]:
 
 def has_matching_token(token_list: List[str], cue_set: Set[str]) -> bool:
     return any(has_close_match(t, list(cue_set)) for t in token_list)
-
-
-def get_max_common_words(tokens, name_to_comp):
-    base_token = tokens[0]
-    working_token = [base_token]
-    lower_tokens = [token.lower() for token in tokens]
-
-    lower_name = name_to_comp.lower()
-    lower_comp_tokens = lower_name.split(" ")
-
-    # greedily add tokens until they stop matching
-    for i in range(1, len(tokens) + 1):
-        test_tokens = lower_tokens[0:i]
-        lower_comp_test_tokens = lower_comp_tokens[0:i]
-        if lower_comp_test_tokens == test_tokens:
-            working_token = lower_tokens[0:i]
-        else:
-            break
-
-    shared_tokens = " ".join(tokens[: len(working_token)])
-    return shared_tokens

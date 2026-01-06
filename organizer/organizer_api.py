@@ -4,15 +4,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict
 
-from api.api import (
+from api.models import CategoryResponse, SortColumn
+from api.models import SortOrder
+from data_models.pipeline import (
     Category as CategoryAPI,
 )
-from api.api import (
-    CategoryResponse,
+from data_models.pipeline import (
     FolderV2,
-    FolderViewResponse,
-    SortColumn,
-    SortOrder,
     PipelineStage,
 )
 from api.models import AsyncTaskResponse, GatherRequest
@@ -23,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import Cast, String
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import func
+from api.models import FolderViewResponse
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
 from storage.id_defaults import get_latest_run

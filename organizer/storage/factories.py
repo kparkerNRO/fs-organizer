@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import cast
 
 import factory
-from api.api import PipelineStage
+from data_models.pipeline import PipelineStage
 from factory import Faker, LazyAttribute, SelfAttribute, Sequence
 from factory.alchemy import SQLAlchemyModelFactory
 from sqlalchemy.orm import object_session

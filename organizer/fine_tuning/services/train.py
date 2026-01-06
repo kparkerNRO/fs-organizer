@@ -145,7 +145,7 @@ def prepare_training_data(
     label2id = {label: i for i, label in enumerate(labels_list)}
     id2label = {i: label for label, i in label2id.items()}
 
-    logger.info(f"Loading training data from {manager.get_training_db_path()}...")
+    logger.info("Loading training data...")
     with manager.get_training_session() as session:
         samples = load_samples(session, labeled_only=True, label_run_id=label_run_id)
 

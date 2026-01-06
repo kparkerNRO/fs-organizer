@@ -1,6 +1,6 @@
 import pytest
 from typing import cast
-from api.api import PipelineStage
+from data_models.pipeline import PipelineStage
 from storage.factories import FileNodeFactory, GroupCategoryEntryFactory, NodeFactory
 from storage.index_models import Node
 from storage.manager import FileSource, NodeKind
@@ -10,7 +10,7 @@ from storage.work_models import (
 )
 from utils.folder_structure import calculate_folder_structure_for_stage
 
-from organizer.utils.folder_structure import (
+from utils.folder_structure import (
     get_groups_for_node,
 )
 

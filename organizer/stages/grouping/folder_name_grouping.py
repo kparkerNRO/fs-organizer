@@ -2,12 +2,13 @@ from typing import Dict, List
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from storage.manager import NodeKind
 from storage.index_models import Node
 
 from stages.grouping.helpers import common_token_grouping
 
 
-def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
+def _get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     """
     Retrieve folders grouped by parent node where there is more than one folder
     in the group.
@@ -18,7 +19,7 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     # First find parent nodes that have multiple folder children
     parent_counts = (
         session.query(Node.parent_node_id, func.count(Node.id).label("folder_count"))
-        .filter(Node.kind == "dir")
+        .filter(Node.kind == NodeKind.DIR)
         .group_by(Node.parent_node_id)
         .having(func.count(Node.id) > 1)
         .subquery()
@@ -27,7 +28,7 @@ def get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     # Then get all folders that belong to these parent nodes
     folders = (
         session.query(Node)
-        .filter(Node.kind == "dir")
+        .filter(Node.kind == NodeKind.DIR)
         .join(parent_counts, Node.parent_node_id == parent_counts.c.parent_node_id)
         .order_by(Node.parent_node_id, Node.name)
         .all()
@@ -58,7 +59,7 @@ def process_folders(session: Session):
         Dict mapping node_id to categories
     """
 
-    grouped_folders = get_folder_groups(session)
+    grouped_folders = _get_folder_groups(session)
     node_categories = {}
 
     for _, folders in grouped_folders.items():

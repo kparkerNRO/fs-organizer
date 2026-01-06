@@ -379,6 +379,29 @@ class StorageManager:
         finally:
             session.close()
 
+    @contextmanager
+    def get_training_session(self) -> Iterator[Session]:
+        """Get SQLAlchemy session for training.db.
+
+        Returns:
+            Context manager yielding a SQLAlchemy session
+
+        Raises:
+            RuntimeError: If training database was not initialized
+        """
+        if not self._initialize_training or self.training_engine is None:
+            raise RuntimeError(
+                "Training database not initialized. "
+                "Create StorageManager with initialize_training=True"
+            )
+
+        Session = sessionmaker(bind=self.training_engine)
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()
+
     # Referential integrity validation methods
 
     def _validate_snapshot_exists(self, snapshot_id: int) -> bool:
@@ -550,67 +573,3 @@ class StorageManager:
             raise
         else:
             self._finish_run(run_id, RunStatus.COMPLETED)
-
-    # Placeholder methods for modification prevention
-
-    def update_node(self, node_id: int, **kwargs):
-        """NOT ALLOWED: Nodes cannot be modified after snapshot creation.
-
-        Raises:
-            NotImplementedError: Always, as nodes are immutable
-        """
-        raise NotImplementedError(
-            "Nodes are immutable. Create a new snapshot to capture changes."
-        )
-
-    def compute_node_features(self, snapshot_id: int):
-        """NOT ALLOWED: Features must be computed during snapshot creation.
-
-        Raises:
-            NotImplementedError: Always, as features must be computed atomically
-        """
-        raise NotImplementedError(
-            "Node features are computed during ingest_filesystem(). "
-            "This method should not be called externally."
-        )
-
-    # Training database support
-
-    def get_training_db_path(self) -> Path:
-        """Get path to training.db database.
-
-        Returns:
-            Path to training.db file
-
-        Raises:
-            RuntimeError: If training database was not initialized
-        """
-        if not self._initialize_training:
-            raise RuntimeError(
-                "Training database not initialized. "
-                "Create StorageManager with initialize_training=True"
-            )
-        return self.training_path
-
-    @contextmanager
-    def get_training_session(self) -> Iterator[Session]:
-        """Get SQLAlchemy session for training.db.
-
-        Returns:
-            Context manager yielding a SQLAlchemy session
-
-        Raises:
-            RuntimeError: If training database was not initialized
-        """
-        if not self._initialize_training or self.training_engine is None:
-            raise RuntimeError(
-                "Training database not initialized. "
-                "Create StorageManager with initialize_training=True"
-            )
-
-        Session = sessionmaker(bind=self.training_engine)
-        session = Session()
-        try:
-            yield session
-        finally:
-            session.close()

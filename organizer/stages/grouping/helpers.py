@@ -3,11 +3,13 @@ from typing import Optional
 
 from nltk.metrics import edit_distance
 from rapidfuzz import fuzz
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+from storage.work_models import GroupCategory, GroupIteration
 from utils.filename_processing import (
     clean_filename,
     strip_part_from_base,
 )
-from utils.text_processing import get_max_common_words
 
 common_words = {"the", "a", "an", "of", "in", "on", "at"}
 
@@ -116,6 +118,27 @@ def spelling_grouping(group: list) -> Optional[dict[str, list[str]]]:
     return new_grouping
 
 
+def get_max_common_words(tokens, name_to_comp):
+    base_token = tokens[0]
+    working_token = [base_token]
+    lower_tokens = [token.lower() for token in tokens]
+
+    lower_name = name_to_comp.lower()
+    lower_comp_tokens = lower_name.split(" ")
+
+    # greedily add tokens until they stop matching
+    for i in range(1, len(tokens) + 1):
+        test_tokens = lower_tokens[0:i]
+        lower_comp_test_tokens = lower_comp_tokens[0:i]
+        if lower_comp_test_tokens == test_tokens:
+            working_token = lower_tokens[0:i]
+        else:
+            break
+
+    shared_tokens = " ".join(tokens[: len(working_token)])
+    return shared_tokens
+
+
 def common_token_grouping(
     names_to_group: list, overlap_func=get_max_common_words, prefer_longer_names=False
 ) -> Optional[dict[str, list[str]]]:
@@ -193,3 +216,20 @@ def common_token_grouping(
         return None
 
     return names_to_replacement
+
+
+def get_next_iteration_id(session: Session):
+    # Check both GroupCategory and GroupIteration to get the true max iteration_id
+    category_max = session.execute(
+        select(func.max(GroupCategory.iteration_id))
+    ).scalar_one()
+    iteration_max = session.execute(select(func.max(GroupIteration.id))).scalar_one()
+
+    max_id = max(
+        category_max if category_max is not None else -1,
+        iteration_max if iteration_max is not None else -1,
+    )
+
+    if max_id == -1:
+        return 0
+    return max_id + 1

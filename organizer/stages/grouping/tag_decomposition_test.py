@@ -154,7 +154,7 @@ def test_full_decomposition_pipeline(work_session, test_entries, sample_run):
     decompose_compound_tags(work_session, sample_run.id, sample_run.snapshot_id)
 
     # Check new iteration was created
-    from stages.grouping.group import get_next_iteration_id
+    from stages.grouping.helpers import get_next_iteration_id
 
     new_iteration_id = get_next_iteration_id(work_session) - 1
 

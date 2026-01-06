@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 from typing import cast
 
-from api.api import File, FolderV2, PipelineStage
+from data_models.pipeline import File, FolderV2, PipelineStage
 from sqlalchemy import func, select
 from sqlalchemy import select as sql_select
 from sqlalchemy.orm import Session
-from organizer.storage.index_models import Node
+from storage.index_models import Node
 from storage.id_defaults import get_latest_run
 from storage.index_models import Snapshot
 from storage.manager import NodeKind, StorageManager
@@ -185,7 +185,7 @@ def create_folder_structure_for_snapshot(
     # Query nodes, optionally filtering files
     query = sql_select(Node).where(Node.snapshot_id == snapshot.id)
     if not include_files:
-        query = query.where(Node.kind == "dir")
+        query = query.where(Node.kind == NodeKind.DIR)
 
     nodes = list(index_session.execute(query.order_by(Node.rel_path)).scalars().all())
 
@@ -336,7 +336,7 @@ def calculate_folder_structure_for_stage(
         files = (
             index_session.execute(
                 select(Node)
-                .where(Node.snapshot_id == snapshot_id, Node.kind == "file")
+                .where(Node.snapshot_id == snapshot_id, Node.kind == NodeKind.FILE)
                 .limit(5000)
             )
             .scalars()

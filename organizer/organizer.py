@@ -2,14 +2,14 @@ import logging
 from pathlib import Path
 
 import typer
-from api.api import PipelineStage
+from data_models.pipeline import PipelineStage
 from fine_tuning.cli import app as fine_tuning_app
-from organizer.utils.filename_processing import (
+from utils.filename_processing import (
     calculate_cleaned_paths_from_groups,
 )
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
-from storage.id_defaults import get_latest_run_for_snapshot
+from storage.id_defaults import get_effective_snapshot_id, get_latest_run_for_snapshot
 from storage.manager import StorageManager
 from storage.work_models import Run
 from utils.folder_structure import (
@@ -118,11 +118,22 @@ def group(
 
 @app.command()
 def folders(
-    storage_path: Path = typer.Argument(
-        ..., help="Storage directory containing index.db and work.db"
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains databases). If not specified, uses default data directory.",
     ),
-    snapshot_id: int = typer.Option(..., help="Snapshot ID to process"),
-    run_id: int | None = typer.Option(None, help="Run ID to use"),
+    snapshot_id: int | None = typer.Option(
+        None,
+        "--snapshot-id",
+        help="Snapshot ID to use when selecting a run.",
+    ),
+    run_id: int | None = typer.Option(
+        None,
+        "--run-id",
+        help="Run ID to use instead of looking up the latest run.",
+    ),
     structure_type: PipelineStage = typer.Option(
         PipelineStage.organized,
         "--structure-type",
@@ -137,6 +148,9 @@ def folders(
     typer.echo(f"Using snapshot_id={snapshot_id}")
 
     storage_manager = StorageManager(storage_path)
+    if not snapshot_id:
+        snapshot_id = get_effective_snapshot_id(storage_manager, snapshot_id)
+
     if structure_type == PipelineStage.original:
         with (
             storage_manager.get_index_session(read_only=True) as index_session,

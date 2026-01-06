@@ -5,12 +5,12 @@ from typing import Optional
 
 from sqlalchemy import func, select
 
-from organizer.api.api import PipelineStage
-from organizer.storage.index_models import Node
-from organizer.storage.manager import StorageManager
-from organizer.storage.work_models import FileMapping, GroupCategoryEntry
-from organizer.utils.folder_structure import get_groups_for_node
-from utils.common import VIEW_TYPES
+from data_models.pipeline import PipelineStage
+from storage.index_models import Node
+from storage.manager import NodeKind, StorageManager
+from storage.work_models import FileMapping, GroupCategoryEntry
+from utils.folder_structure import get_groups_for_node
+from utils.file_operations import VIEW_TYPES
 from utils.config import Config, get_config
 
 PATH_EXTRAS = " -,()/"
@@ -199,7 +199,9 @@ def calculate_cleaned_paths_from_groups(
 
         nodes = (
             index_session.execute(
-                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "dir")
+                select(Node).where(
+                    Node.snapshot_id == snapshot_id, Node.kind == NodeKind.DIR
+                )
             )
             .scalars()
             .all()
