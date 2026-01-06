@@ -2216,8 +2216,6 @@ dependencies = [
     { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
     { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "sentence-transformers", version = "5.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "sentence-transformers", version = "5.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "sqlalchemy" },
     { name = "typer" },
     { name = "wordfreq" },
@@ -2226,9 +2224,6 @@ dependencies = [
 [package.dev-dependencies]
 classifier = [
     { name = "datasets" },
-    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
-    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
-    { name = "scikit-learn", version = "1.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "sentence-transformers", version = "5.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "sentence-transformers", version = "5.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "setfit" },
@@ -2250,7 +2245,6 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.11.0" },
     { name = "ruff", specifier = ">=0.8.4" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
-    { name = "sentence-transformers", specifier = ">=4.1.0" },
     { name = "sqlalchemy", specifier = ">=2.0.36" },
     { name = "typer", specifier = ">=0.15.1" },
     { name = "wordfreq", specifier = ">=3.1.1" },
@@ -2259,7 +2253,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 classifier = [
     { name = "datasets", specifier = ">=4.4.2" },
-    { name = "scikit-learn", specifier = ">=1.6.0" },
     { name = "sentence-transformers", specifier = ">=4.1.0" },
     { name = "setfit", specifier = ">=1.1.3" },
 ]

@@ -12,7 +12,6 @@ dependencies = [
     "rapidfuzz>=3.11.0",
     "ruff>=0.8.4",
     "scikit-learn>=1.6.0",
-    "sentence-transformers>=4.1.0",
     "sqlalchemy>=2.0.36",
     "typer>=0.15.1",
     "wordfreq>=3.1.1",
@@ -28,7 +27,6 @@ dev = [
 
 classifier = [
     "datasets>=4.4.2",
-    "scikit-learn>=1.6.0",
     "sentence-transformers>=4.1.0",
     "setfit>=1.1.3",
 ]

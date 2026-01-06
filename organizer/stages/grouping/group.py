@@ -489,10 +489,14 @@ def group_folders(
             work_session, config=config, run_id=run_id, snapshot_id=snapshot_id
         )
 
-        # New tag decomposition stage
-        from stages.grouping.tag_decomposition import decompose_compound_tags
+        # New tag decomposition stage (requires ML dependencies)
+        try:
+            from stages.grouping.tag_decomposition import decompose_compound_tags
 
-        decompose_compound_tags(work_session)
+            decompose_compound_tags(work_session)
+        except ImportError:
+            # ML dependencies not available, skip tag decomposition
+            pass
 
         compact_groups(
             work_session=work_session,
