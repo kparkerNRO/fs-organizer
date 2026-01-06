@@ -145,13 +145,13 @@ def test_entries(work_session, sample_run, test_nodes):
 
 
 @pytest.mark.ml
-def test_full_decomposition_pipeline(work_session, test_entries):
+def test_full_decomposition_pipeline(work_session, test_entries, sample_run):
     """Test the complete decomposition pipeline"""
     # Count original entries
     original_count = len(test_entries)
 
     # Run decomposition
-    decompose_compound_tags(work_session)
+    decompose_compound_tags(work_session, sample_run.id, sample_run.snapshot_id)
 
     # Check new iteration was created
     from stages.grouping.group import get_next_iteration_id

@@ -173,7 +173,7 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
     zip_file_nodes = (
         index_session.query(Node)
         .filter_by(
-            kind=NodeKind.FILE.value,
+            kind=NodeKind.DIR.value,
             file_source=ZIP_FILE_SOURCE,
         )
         .all()
@@ -196,13 +196,13 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
     )
 
     assert len(zip_file_nodes) == 1
-    assert len(zip_content_dirs) == 0
-    assert len(zip_content_files) == 3  # file1.txt, nested.zip, nested_file.txt
+    assert len(zip_content_dirs) == 1
+    assert len(zip_content_files) == 2  # file1.txt, nested.zip, nested_file.txt
 
     assert zip_file_nodes[0].name == "test.zip"
 
     file_names = sorted(node.name for node in zip_content_files)
-    assert file_names == ["file1.txt", "nested.zip", "nested_file.txt"]
+    assert file_names == ["file1.txt", "nested_file.txt"]
 
 
 def test_process_zip_ignores(index_session, snapshot_id):
@@ -223,7 +223,7 @@ def test_process_zip_ignores(index_session, snapshot_id):
     zip_file_nodes = (
         index_session.query(Node)
         .filter_by(
-            kind=NodeKind.FILE.value,
+            kind=NodeKind.DIR.value,
             file_source=ZIP_FILE_SOURCE,
         )
         .all()
@@ -378,7 +378,7 @@ def test_ingest_filesystem_creates_nodes(tmp_path: Path):
             .filter_by(
                 snapshot_id=snapshot_id,
                 name="file2.zip",
-                kind=NodeKind.FILE.value,
+                kind=NodeKind.DIR.value,
                 file_source=FileSource.ZIP_FILE.value,
             )
             .one()

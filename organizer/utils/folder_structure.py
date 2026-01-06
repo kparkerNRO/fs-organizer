@@ -312,7 +312,6 @@ def calculate_folder_structure_for_categories(
                 work_session,
                 file,
                 iteration_id,
-                snapshot_id,
             )
             names = [cast(str, cat.processed_name) for cat in categories]
             new_path = "/".join(names)

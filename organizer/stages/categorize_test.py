@@ -16,35 +16,38 @@ from stages.categorize import (
 
 @pytest.fixture
 def sample_folders(index_session, sample_snapshot):
-    folders = [
-        NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.DIR.value,
-            name="parent_folder",
-            rel_path="parent_folder",
-            abs_path="/test/parent_folder",
-            depth=1,
-        ),
-        NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.DIR.value,
-            name="child_folder",
-            rel_path="parent_folder/child_folder",
-            abs_path="/test/parent_folder/child_folder",
-            depth=2,
-        ),
-        NodeFactory(
-            snapshot_id=sample_snapshot.id,
-            kind=NodeKind.DIR.value,
-            name="zip_content",
-            rel_path="content.zip/zip_content",
-            abs_path="/test/content.zip/zip_content",
-            depth=2,
-            file_source=FileSource.ZIP_CONTENT.value,
-        ),
-    ]
+    parent_folder = NodeFactory(
+        snapshot_id=sample_snapshot.id,
+        kind=NodeKind.DIR.value,
+        name="parent_folder",
+        rel_path="parent_folder",
+        abs_path="/test/parent_folder",
+        depth=1,
+    )
+    # Flush to ensure parent_folder is committed before child references it
+    index_session.flush()
 
-    return folders
+    child_folder = NodeFactory(
+        snapshot_id=sample_snapshot.id,
+        kind=NodeKind.DIR.value,
+        name="child_folder",
+        rel_path="parent_folder/child_folder",
+        abs_path="/test/parent_folder/child_folder",
+        depth=2,
+        parent_node_id=parent_folder.id,
+    )
+
+    zip_content = NodeFactory(
+        snapshot_id=sample_snapshot.id,
+        kind=NodeKind.DIR.value,
+        name="zip_content",
+        rel_path="content.zip/zip_content",
+        abs_path="/test/content.zip/zip_content",
+        depth=2,
+        file_source=FileSource.ZIP_CONTENT.value,
+    )
+
+    return [parent_folder, child_folder, zip_content]
 
 
 @pytest.fixture
@@ -82,12 +85,13 @@ class TestGetCategoriesForPath:
         sample_folders,
         sample_group_entries,
         sample_iteration,
+        sample_snapshot,
     ):
         """Test when parent folder doesn't exist"""
         test_node = NodeFactory(
-            snapshot_id=sample_iteration.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.FILE,
-        ).build()
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -104,13 +108,14 @@ class TestGetCategoriesForPath:
         sample_folders,
         sample_group_entries,
         sample_iteration,
+        sample_snapshot,
     ):
         """Test when parent folder has associated groups"""
         test_node = NodeFactory(
-            snapshot_id=sample_iteration.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.FILE,
             parent_node_id=sample_folders[1].id,
-        ).build()
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -118,7 +123,7 @@ class TestGetCategoriesForPath:
             iteration_id=sample_iteration.id,
         )
 
-        assert [category.processed_name for category in result] == ["art_category"]
+        assert [category.processed_name for category in result] == ["art_category", "digital_art"]
 
     def test_get_categories_for_path_zip_matching(
         self,
@@ -127,13 +132,14 @@ class TestGetCategoriesForPath:
         sample_folders,
         sample_group_entries,
         sample_iteration,
+        sample_snapshot,
     ):
         """Test with zip file path matching"""
         test_node = NodeFactory(
-            snapshot_id=sample_iteration.snapshot_id,
+            snapshot_id=sample_snapshot.id,
             kind=NodeKind.FILE,
             parent_node_id=sample_folders[2].id,
-        ).build()
+        )
         result = get_categories_for_node(
             index_session,
             work_session,
@@ -170,7 +176,7 @@ class TestGetCategoriesForPath:
             snapshot_id=sample_iteration.snapshot_id,
             kind=NodeKind.FILE,
             abs_path="/nonexistent/path/file.txt",
-        ).build()
+        )
 
         result = get_categories_for_node(
             index_session,

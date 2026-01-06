@@ -30,7 +30,6 @@ def test_process_folders_to_groups(
     process_folders_to_groups(
         index_session=index_session,
         work_session=work_session,
-        group_id=None,
         run_id=sample_run.id,
         snapshot_id=sample_snapshot.id,
     )

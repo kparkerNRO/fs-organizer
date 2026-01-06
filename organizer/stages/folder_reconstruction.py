@@ -69,7 +69,6 @@ def calculate_cleaned_paths_for_structure(
                     work_session=work_session,
                     node=node,
                     iteration_id=iteration_id,
-                    snapshot_id=snapshot_id,
                 )
                 cleaned_path = "/".join(
                     [str(category.processed_name) for category in categories]
