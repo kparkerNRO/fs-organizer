@@ -405,7 +405,9 @@ class StorageManager:
         """
         with self.get_index_session(read_only=True) as session:
             return (
-                session.query(Node).filter_by(id=node_id, snapshot_id=snapshot_id).first()
+                session.query(Node)
+                .filter_by(id=node_id, snapshot_id=snapshot_id)
+                .first()
                 is not None
             )
 
@@ -461,7 +463,9 @@ class StorageManager:
         with self.get_index_session() as session:
             snapshot = session.query(Snapshot).filter_by(id=snapshot_id).first()
             if snapshot:
-                session.delete(snapshot)  # Cascades to nodes, node_features via SQLAlchemy
+                session.delete(
+                    snapshot
+                )  # Cascades to nodes, node_features via SQLAlchemy
                 session.commit()
 
     def delete_run(self, run_id: int):
@@ -555,7 +559,9 @@ class StorageManager:
         Raises:
             NotImplementedError: Always, as nodes are immutable
         """
-        raise NotImplementedError("Nodes are immutable. Create a new snapshot to capture changes.")
+        raise NotImplementedError(
+            "Nodes are immutable. Create a new snapshot to capture changes."
+        )
 
     def compute_node_features(self, snapshot_id: int):
         """NOT ALLOWED: Features must be computed during snapshot creation.

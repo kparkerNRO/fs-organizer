@@ -16,7 +16,7 @@ from api.api import (
     StructureType,
 )
 from api.models import AsyncTaskResponse, GatherRequest
-from api.profiling import ProfilerContext, ProfilingMiddleware, is_profiling_enabled
+from api.profiling import ProfilingMiddleware, is_profiling_enabled
 from api.tasks import TaskInfo, TaskStatus, create_task, tasks, update_task
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -91,7 +91,7 @@ def get_db_session(storage_manager: StorageManager = Depends(get_storage_manager
 def get_folder_structure_from_db(
     storage_manager: StorageManager,
     stage: StructureType = StructureType.organized,
-    run_id: int | None = None
+    run_id: int | None = None,
 ) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
@@ -153,7 +153,9 @@ async def get_groups(
                     "original_path",
                     CategoryEntry.path,
                     "processed_names",
-                    func.json(Cast(func.coalesce(CategoryEntry.derived_names, "[]"), String)),
+                    func.json(
+                        Cast(func.coalesce(CategoryEntry.derived_names, "[]"), String)
+                    ),
                     "confidence",
                     CategoryEntry.confidence,
                 )
@@ -195,7 +197,9 @@ async def get_folders(
     session=Depends(get_db_session),
 ):
     logger.info("GET /folders")
-    newest_entry = get_newest_entry_for_structure(session, StructureType.organized, None)
+    newest_entry = get_newest_entry_for_structure(
+        session, StructureType.organized, None
+    )
     if newest_entry is not None:
         parsed_new_entry = json.loads(newest_entry)
         sorted_new = sort_folder_structure(parsed_new_entry)
@@ -270,9 +274,17 @@ async def get_pipeline_status(
     """Check which pipeline stages have available data"""
     logger.info("GET /api/status - checking pipeline stages")
 
-    has_gather = get_folder_structure_from_db(storage_manager, StructureType.original) is not None
-    has_group = get_folder_structure_from_db(storage_manager, StructureType.grouped) is not None
-    has_folders = get_folder_structure_from_db(storage_manager, StructureType.organized) is not None
+    has_gather = (
+        get_folder_structure_from_db(storage_manager, StructureType.original)
+        is not None
+    )
+    has_group = (
+        get_folder_structure_from_db(storage_manager, StructureType.grouped) is not None
+    )
+    has_folders = (
+        get_folder_structure_from_db(storage_manager, StructureType.organized)
+        is not None
+    )
 
     return {
         "has_gather": has_gather,
@@ -353,7 +365,9 @@ async def api_gather(
     task_id = create_task("Gather task created")
 
     # Start the background task
-    background_tasks.add_task(run_gather_task, task_id, request.base_path, storage_manager)
+    background_tasks.add_task(
+        run_gather_task, task_id, request.base_path, storage_manager
+    )
 
     logger.info(f"Gather task created with ID: {task_id}")
     return AsyncTaskResponse(

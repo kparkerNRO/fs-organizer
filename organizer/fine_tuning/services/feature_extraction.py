@@ -78,7 +78,9 @@ def extract_features_for_run(
     settings: FeatureExtractionConfigSettings,
 ) -> int:
     rows = list(
-        index_session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
+        index_session.execute(
+            select(Node).where(Node.snapshot_id == snapshot_id)
+        ).scalars()
     )
 
     feature_nodes: list[FeatureNodeCore] = extract_feature_nodes(
@@ -100,8 +102,12 @@ def extract_features_for_run(
         name_norm = ""  # TODO
         # name_norm = processed_name_by_id[node.node_id]
 
-        child_token_bag = [t for cn in feature_node.child_names for t in tokenize_string(cn)]
-        sibling_token_bag = [t for sn in feature_node.sibling_names for t in tokenize_string(sn)]
+        child_token_bag = [
+            t for cn in feature_node.child_names for t in tokenize_string(cn)
+        ]
+        sibling_token_bag = [
+            t for sn in feature_node.sibling_names for t in tokenize_string(sn)
+        ]
 
         flags = {
             "collab": has_matching_token(tokenize_string(node.name), COLLAB_MARKERS)
@@ -110,11 +116,16 @@ def extract_features_for_run(
                 and has_matching_token(tokenize_string(parent.name), COLLAB_MARKERS)
             ),
             "childMedia": has_matching_token(child_token_bag, app_config.media_types),
-            "childVarHint": has_matching_token(child_token_bag, app_config.variant_types),
-            "childFmt": any(
-                cn.strip(".").lower() in app_config.format_types for cn in feature_node.child_names
+            "childVarHint": has_matching_token(
+                child_token_bag, app_config.variant_types
             ),
-            "sibVarHint": has_matching_token(sibling_token_bag, app_config.variant_types),
+            "childFmt": any(
+                cn.strip(".").lower() in app_config.format_types
+                for cn in feature_node.child_names
+            ),
+            "sibVarHint": has_matching_token(
+                sibling_token_bag, app_config.variant_types
+            ),
         }
 
         text = _build_feature_text(
@@ -140,7 +151,9 @@ def extract_features_for_run(
             depth=int(feature_node.node.depth),
             child_names_topk_json=json.dumps(feature_node.child_names),
             sibling_names_topk_json=json.dumps(feature_node.sibling_names),
-            descendant_file_exts_topk_json=json.dumps(feature_node.descendent_extentions),
+            descendant_file_exts_topk_json=json.dumps(
+                feature_node.descendent_extentions
+            ),
             has_collab_cue=flags["collab"],
             looks_like_format=app_config.is_media_type(node.name),
             child_has_media_type_cue=flags["childMedia"],

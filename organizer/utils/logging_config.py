@@ -48,7 +48,7 @@ def setup_logging(log_file_prefix: str = "organizer") -> logging.Logger:
         mode="a",
         maxBytes=5 * 1024 * 1024 * 1024,  # 10 (GB?)
         backupCount=4,
-        encoding="utf-8"
+        encoding="utf-8",
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)

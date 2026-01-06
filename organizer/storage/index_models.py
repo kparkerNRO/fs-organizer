@@ -68,7 +68,9 @@ class Node(IndexBase):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshot.id"), nullable=False)
-    parent_node_id: Mapped[Optional[int]] = mapped_column(ForeignKey("node.id"), nullable=True)
+    parent_node_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("node.id"), nullable=True
+    )
     kind: Mapped[str] = mapped_column(
         String, CheckConstraint("kind IN ('file', 'dir')"), nullable=False
     )
@@ -84,14 +86,18 @@ class Node(IndexBase):
 
     # CRITICAL: file_source must be NOT NULL to ensure unique constraint works
     # Values: 'filesystem' | 'zip_file' | 'zip_content'
-    file_source: Mapped[str] = mapped_column(String, nullable=False, default="filesystem")
+    file_source: Mapped[str] = mapped_column(
+        String, nullable=False, default="filesystem"
+    )
 
     num_folder_children: Mapped[int] = mapped_column(Integer, default=0)
     num_file_children: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships
     snapshot: Mapped["Snapshot"] = relationship(back_populates="nodes")
-    parent: Mapped[Optional["Node"]] = relationship(remote_side=[id], backref="children")
+    parent: Mapped[Optional["Node"]] = relationship(
+        remote_side=[id], backref="children"
+    )
     features: Mapped[Optional["NodeFeatures"]] = relationship(
         back_populates="node",
         uselist=False,

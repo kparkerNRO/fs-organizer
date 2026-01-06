@@ -265,7 +265,9 @@ class TestWriteSampleCsv:
         }
         assert all(rows[0].get(key) == value for key, value in expected_row.items())
 
-    def test_csv_with_parent_and_grandparent(self, index_session, sample_snapshot, tmp_path):
+    def test_csv_with_parent_and_grandparent(
+        self, index_session, sample_snapshot, tmp_path
+    ):
         """Test CSV includes parent and grandparent information"""
         snapshot_id = sample_snapshot.id
         NodeFactory(id=1, snapshot_id=snapshot_id, name="Grandparent", depth=0)
@@ -481,7 +483,9 @@ class TestValidateInputCsv:
         csv_path = tmp_path / "test.csv"
 
         with csv_path.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["snapshot_id", "node_id", "name", "label"])
+            writer = csv.DictWriter(
+                f, fieldnames=["snapshot_id", "node_id", "name", "label"]
+            )
             writer.writeheader()
             writer.writerow(
                 {
@@ -560,7 +564,9 @@ class TestApplyLabelsToSamples:
         ]
         label_runs_dict = {label_run.snapshot_id: label_run}
 
-        labeled_count = apply_labels_to_samples(training_session, rows, label_runs_dict, split=None)
+        labeled_count = apply_labels_to_samples(
+            training_session, rows, label_runs_dict, split=None
+        )
 
         assert labeled_count == 2
 
@@ -607,7 +613,9 @@ class TestApplyLabelsToSamples:
         ]
         label_runs_dict = {label_run.snapshot_id: label_run}
 
-        labeled_count = apply_labels_to_samples(training_session, rows, label_runs_dict, split=None)
+        labeled_count = apply_labels_to_samples(
+            training_session, rows, label_runs_dict, split=None
+        )
 
         # Should not label non-existent sample and should not raise error
         assert labeled_count == 0

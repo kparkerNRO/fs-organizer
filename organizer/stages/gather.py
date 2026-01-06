@@ -108,10 +108,11 @@ def process_zip(
     preserve_modules: bool = True,
 ) -> int:
     try:
-
         with zipfile.ZipFile(zip_source, "r") as zf:
             entries = zf.namelist()
-            zip_rel_path = parent_rel_path / zip_name if parent_rel_path else Path(zip_name)
+            zip_rel_path = (
+                parent_rel_path / zip_name if parent_rel_path else Path(zip_name)
+            )
             zip_abs_path = base_path / zip_rel_path
 
             # Shortcut if it's a Foundry module: i.e., if module.json exists at the root level
@@ -124,7 +125,9 @@ def process_zip(
                 # HACK: this creates an artificial folder to tag foundry modules
                 folder_name = "Foundry Module " + zip_name
                 folder_rel_path = (
-                    parent_rel_path / folder_name if parent_rel_path else Path(folder_name)
+                    parent_rel_path / folder_name
+                    if parent_rel_path
+                    else Path(folder_name)
                 )
                 folder_depth = len(folder_rel_path.parts)
                 folder_node = _create_node(
@@ -234,10 +237,14 @@ def process_zip(
                                         zip_file_source=FileSource.ZIP_CONTENT,
                                     )
                             except (zipfile.BadZipFile, Exception) as e:
-                                logger.error(f"Error processing nested zip {entry}: {e}")
+                                logger.error(
+                                    f"Error processing nested zip {entry}: {e}"
+                                )
                         else:
                             info = zf.getinfo(entry)
-                            mtime = datetime(*info.date_time, tzinfo=timezone.utc).timestamp()
+                            mtime = datetime(
+                                *info.date_time, tzinfo=timezone.utc
+                            ).timestamp()
                             _create_node(
                                 session,
                                 snapshot_id=snapshot_id,
@@ -256,9 +263,6 @@ def process_zip(
                     logger.info(f"Processed {count} files")
 
             session.commit()
-
-            
-
 
     except (NotImplementedError, zipfile.BadZipFile) as e:
         logger.error(f"Error processing zip {zip_name}: {e}")
@@ -342,12 +346,14 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
                     child_dirs = [
                         child_dir
                         for child_dir in os.listdir(folder_path)
-                        if (folder_path / child_dir).is_dir() and not should_ignore(child_dir)
+                        if (folder_path / child_dir).is_dir()
+                        and not should_ignore(child_dir)
                     ]
                     child_files = [
                         child_file
                         for child_file in os.listdir(folder_path)
-                        if (folder_path / child_file).is_file() and not should_ignore(child_file)
+                        if (folder_path / child_file).is_file()
+                        and not should_ignore(child_file)
                     ]
 
                     stat = folder_path.stat()
@@ -396,7 +402,9 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
                             count = process_zip(
                                 file_path,
                                 base_path,
-                                Path("") if parent_rel_path == Path(".") else parent_rel_path,
+                                Path("")
+                                if parent_rel_path == Path(".")
+                                else parent_rel_path,
                                 parent_node_id,
                                 f,
                                 index_session,
@@ -431,7 +439,10 @@ def ingest_filesystem(storage_manager: StorageManager, base_path):
 
             logger.info("File system processed ")
 
-        with storage_manager.get_work_session() as work_session, storage_manager.get_index_session(read_only=True) as ro_index:
+        with (
+            storage_manager.get_work_session() as work_session,
+            storage_manager.get_index_session(read_only=True) as ro_index,
+        ):
             fs = create_folder_structure_for_snapshot(
                 ro_index, snapshot_id=snapshot_id, include_files=False
             )

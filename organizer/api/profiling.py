@@ -35,7 +35,9 @@ class ProfilingMiddleware(BaseHTTPMiddleware):
 
         if self.enabled:
             self.output_dir.mkdir(exist_ok=True)
-            logger.info(f"Profiling middleware enabled. Output directory: {self.output_dir}")
+            logger.info(
+                f"Profiling middleware enabled. Output directory: {self.output_dir}"
+            )
 
     async def dispatch(self, request: Request, call_next):
         # Check if profiling is requested via query parameter

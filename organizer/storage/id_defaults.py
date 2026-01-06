@@ -12,18 +12,25 @@ from storage.work_models import Run
 
 def get_latest_run(session) -> Run | None:
     """Return the most recent run in work.db."""
-    run = session.execute(select(Run).order_by(Run.id.desc()).limit(1)).scalars().first()
+    run = (
+        session.execute(select(Run).order_by(Run.id.desc()).limit(1)).scalars().first()
+    )
     if run is not None:
         session.expunge(run)
     return run
 
 
-def get_latest_run_for_snapshot(storage_manager: StorageManager, snapshot_id: int) -> Run | None:
+def get_latest_run_for_snapshot(
+    storage_manager: StorageManager, snapshot_id: int
+) -> Run | None:
     """Return the most recent run for a given snapshot in work.db."""
     with storage_manager.get_work_session() as session:
         run = (
             session.execute(
-                select(Run).where(Run.snapshot_id == snapshot_id).order_by(Run.id.desc()).limit(1)
+                select(Run)
+                .where(Run.snapshot_id == snapshot_id)
+                .order_by(Run.id.desc())
+                .limit(1)
             )
             .scalars()
             .first()
@@ -43,7 +50,9 @@ def get_latest_label_run_id(storage_manager: StorageManager) -> int | None:
         return session.execute(select(func.max(LabelRun.id))).scalar()
 
 
-def get_effective_snapshot_id(storage_manager: StorageManager, snapshot_id: int | None) -> int:
+def get_effective_snapshot_id(
+    storage_manager: StorageManager, snapshot_id: int | None
+) -> int:
     """Return provided snapshot_id, or default to the newest snapshot."""
     if snapshot_id is not None:
         return snapshot_id
@@ -53,7 +62,9 @@ def get_effective_snapshot_id(storage_manager: StorageManager, snapshot_id: int 
     return latest_snapshot_id
 
 
-def get_effective_label_run_id(storage_manager: StorageManager, label_run_id: int | None) -> int:
+def get_effective_label_run_id(
+    storage_manager: StorageManager, label_run_id: int | None
+) -> int:
     """Return provided label_run_id, or default to the newest label run."""
     if label_run_id is not None:
         return label_run_id

@@ -18,7 +18,9 @@ from stages.grouping.group import (
 from stages.grouping.helpers import common_token_grouping
 
 
-def test_process_folders_to_groups(index_session, work_session, sample_run, sample_snapshot):
+def test_process_folders_to_groups(
+    index_session, work_session, sample_run, sample_snapshot
+):
     # Set up test data
     NodeFactory(snapshot_id=sample_snapshot.id, name="apple doc", kind=NodeKind.DIR)
     NodeFactory(snapshot_id=sample_snapshot.id, name="banana v2", kind=NodeKind.DIR)
@@ -54,7 +56,9 @@ def test_process_folders_to_groups(index_session, work_session, sample_run, samp
 
 
 # Test refine_groups with singleton clusters
-def test_refine_groups_singletons(index_session, work_session, sample_run, sample_snapshot):
+def test_refine_groups_singletons(
+    index_session, work_session, sample_run, sample_snapshot
+):
     # Create iteration records
     iteration0 = cast(
         GroupIteration,
@@ -115,7 +119,9 @@ def test_refine_groups_singletons(index_session, work_session, sample_run, sampl
 
 
 # Test refine_groups with clustered items
-def test_refine_groups_clusters(index_session, work_session, sample_run, sample_snapshot):
+def test_refine_groups_clusters(
+    index_session, work_session, sample_run, sample_snapshot
+):
     # Create iteration records
     iteration0 = cast(
         GroupIteration,

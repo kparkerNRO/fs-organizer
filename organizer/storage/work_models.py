@@ -161,7 +161,9 @@ class GroupCategoryEntry(WorkBase):
     partial_category_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("partial_name_categories.id"), index=True
     )
-    group_id: Mapped[Optional[int]] = mapped_column(ForeignKey("stg_group_category.id"), index=True)
+    group_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("stg_group_category.id"), index=True
+    )
     iteration_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("stg_group_iteration.id"), index=True
     )
@@ -214,7 +216,9 @@ class Classification(WorkBase):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
     node_id: Mapped[int]
-    classification: Mapped[Optional[str]]  # 'variant' | 'collection' | 'subject' | 'uncertain'
+    classification: Mapped[
+        Optional[str]
+    ]  # 'variant' | 'collection' | 'subject' | 'uncertain'
     confidence: Mapped[Optional[float]] = mapped_column(Float)
     method: Mapped[Optional[str]]  # 'structural' | 'llm' | 'manual'
 

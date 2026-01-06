@@ -93,7 +93,9 @@ class TrainingSample(TrainingBase):
     __table_args__ = (
         Index("idx_training_sample_snapshot", "snapshot_id"),
         Index("idx_training_sample_node", "node_id"),
-        Index("idx_training_sample_label_run_node", "label_run_id", "node_id", unique=True),
+        Index(
+            "idx_training_sample_label_run_node", "label_run_id", "node_id", unique=True
+        ),
         Index("idx_training_sample_split", "split"),
         Index("idx_training_sample_label", "label"),
     )
@@ -134,7 +136,9 @@ class ModelRun(TrainingBase):
     training_data_hash: Mapped[Optional[str]]  # Hash for reproducibility
 
     # Configuration
-    hyperparameters_json: Mapped[Optional[str]]  # Learning rate, batch size, metrics, etc.
+    hyperparameters_json: Mapped[
+        Optional[str]
+    ]  # Learning rate, batch size, metrics, etc.
     config_hash: Mapped[Optional[str]]
 
     # Dataset info
@@ -187,7 +191,9 @@ class TrainingEpoch(TrainingBase):
     val_f1: Mapped[Optional[float]] = mapped_column(Float)
 
     # Per-class metrics (JSON)
-    class_metrics_json: Mapped[Optional[str]]  # {'variant': {'precision': 0.9, ...}, ...}
+    class_metrics_json: Mapped[
+        Optional[str]
+    ]  # {'variant': {'precision': 0.9, ...}, ...}
 
     # Training info
     learning_rate: Mapped[Optional[float]] = mapped_column(Float)
@@ -218,7 +224,9 @@ class ModelCheckpoint(TrainingBase):
 
     # Checkpoint info
     checkpoint_path: Mapped[str] = mapped_column(String)  # Path to saved model
-    checkpoint_type: Mapped[str] = mapped_column(String)  # 'best' | 'final' | 'periodic'
+    checkpoint_type: Mapped[str] = mapped_column(
+        String
+    )  # 'best' | 'final' | 'periodic'
     file_size_bytes: Mapped[Optional[int]] = mapped_column(Integer)
 
     # Metrics at checkpoint time
@@ -248,7 +256,9 @@ class SamplePrediction(TrainingBase):
     run_id: Mapped[int] = mapped_column(ForeignKey("model_run.id"))
     sample_id: Mapped[int]  # FK to training_sample (same database)
     sample_name: Mapped[str | None]
-    epoch_number: Mapped[Optional[int]] = mapped_column(Integer)  # Which epoch (None = final)
+    epoch_number: Mapped[Optional[int]] = mapped_column(
+        Integer
+    )  # Which epoch (None = final)
 
     # Prediction
     predicted_label: Mapped[str] = mapped_column(String)

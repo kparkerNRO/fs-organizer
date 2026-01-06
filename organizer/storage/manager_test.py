@@ -188,7 +188,9 @@ class TestReferentialIntegrity:
         # Now it should exist
         assert storage_manager._validate_snapshot_exists(snapshot.id)
 
-    def test_validate_node_exists(self, storage_manager: StorageManager, node, snapshot):
+    def test_validate_node_exists(
+        self, storage_manager: StorageManager, node, snapshot
+    ):
         """Test _validate_node_exists method."""
         # Should exist
         assert storage_manager._validate_node_exists(node.id, snapshot.id)
@@ -199,7 +201,9 @@ class TestReferentialIntegrity:
         # Should not exist with wrong node_id
         assert not storage_manager._validate_node_exists(999, snapshot.id)
 
-    def test_check_snapshot_has_runs(self, storage_manager: StorageManager, snapshot, work_session):
+    def test_check_snapshot_has_runs(
+        self, storage_manager: StorageManager, snapshot, work_session
+    ):
         """Test _check_snapshot_has_runs method."""
         # No runs yet
         assert not storage_manager._check_snapshot_has_runs(snapshot.id)
@@ -269,10 +273,14 @@ class TestImmutability:
         with pytest.raises(NotImplementedError, match="immutable"):
             storage_manager.update_node(1, name="new_name")
 
-    def test_compute_features_externally_not_allowed(self, storage_manager: StorageManager):
+    def test_compute_features_externally_not_allowed(
+        self, storage_manager: StorageManager
+    ):
         """Test that external call to compute_node_features raises error."""
         # Should raise error
-        with pytest.raises(NotImplementedError, match="computed during ingest_filesystem"):
+        with pytest.raises(
+            NotImplementedError, match="computed during ingest_filesystem"
+        ):
             storage_manager.compute_node_features(1)
 
     def test_read_only_session_prevents_mutation(self, storage_manager: StorageManager):

@@ -1,5 +1,6 @@
 import json
 from logging import getLogger
+import os
 from pathlib import Path
 from typing import cast
 
@@ -7,7 +8,7 @@ from api.api import File, FolderV2, FSNode, StructureType
 from sqlalchemy import func, select
 from sqlalchemy import select as sql_select
 from sqlalchemy.orm import Session
-from stages.categorize import get_categories_for_path
+from stages.categorize import get_categories_for_node
 from storage.id_defaults import get_latest_run
 from storage.index_models import Node, Snapshot
 from storage.manager import NodeKind, StorageManager
@@ -25,9 +26,13 @@ def get_newest_entry_for_structure(
             return None
         run_id = run.id
 
-    logger.info(f"Getting structure definition for type {structure_type} with run_id {run_id}")
+    logger.info(
+        f"Getting structure definition for type {structure_type} with run_id {run_id}"
+    )
 
-    query = select(FolderStructure).where(FolderStructure.structure_type == structure_type)
+    query = select(FolderStructure).where(
+        FolderStructure.structure_type == structure_type
+    )
 
     if run_id:
         query = query.where(FolderStructure.run_id == run_id)
@@ -116,8 +121,7 @@ def _build_tree_structure(
             # Add children recursively
             if has_children:
                 folder_children = [
-                    node_to_folder(child)
-                    for child in children_map[node.id]
+                    node_to_folder(child) for child in children_map[node.id]
                 ]
 
                 folder.children = folder_children
@@ -130,7 +134,9 @@ def _build_tree_structure(
             f"No root nodes found. Total nodes: {len(nodes)}. All nodes have a parent_node_id set."
         )
 
-    structure = [node_to_folder(root) for root in sorted(root_nodes, key=lambda n: n.name)]
+    structure = [
+        node_to_folder(root) for root in sorted(root_nodes, key=lambda n: n.name)
+    ]
 
     structure_root = FolderV2(
         id=0,
@@ -203,7 +209,9 @@ def export_snapshot_structure(
     """
 
     with storage.get_index_session(read_only=True) as index_session:
-        file_structure = create_folder_structure_for_snapshot(index_session, include_files)
+        file_structure = create_folder_structure_for_snapshot(
+            index_session, include_files
+        )
         # Write to JSON file
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -241,7 +249,9 @@ def _insert_file_in_structure(
         else:
             confidence = 1
         if component not in current_representation.children_map.keys():
-            current_representation.children.append(FolderV2(name=component, confidence=confidence))
+            current_representation.children.append(
+                FolderV2(name=component, confidence=confidence)
+            )
         current_representation = current_representation.children_map[component]
 
     current_representation.children.append(
@@ -270,7 +280,9 @@ def calculate_folder_structure_for_categories(
         # Get all file nodes from index database
         files = (
             index_session.execute(
-                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "file").limit(5000)
+                select(Node)
+                .where(Node.snapshot_id == snapshot_id, Node.kind == "file")
+                .limit(5000)
             )
             .scalars()
             .all()
@@ -295,7 +307,7 @@ def calculate_folder_structure_for_categories(
                 logger.info(f"Processed {i}/{total_files} files")
 
             # Get categories using index session for node lookups and work session for groups
-            categories = get_categories_for_path(
+            categories = get_categories_for_node(
                 index_session,
                 work_session,
                 file,
@@ -325,7 +337,8 @@ def calculate_folder_structure_for_categories(
                 )
 
             category_names = [
-                (category.processed_name, category.confidence) for category in categories
+                (category.processed_name, category.confidence)
+                for category in categories
             ]
             _insert_file_in_structure(folder_structure, file, category_names, new_path)
 
@@ -339,3 +352,17 @@ def calculate_folder_structure_for_categories(
             )
         )
         work_session.commit()
+
+
+def get_folder_heirarchy(
+    manager: StorageManager, run_id: int, structure_type: StructureType
+):
+    logger.debug(f"Current working directory: {os.getcwd()}")
+
+    with manager.get_work_session() as session:
+        entry = get_newest_entry_for_structure(session, structure_type, run_id)
+        if entry is not None:
+            entry = json.loads(entry)
+            pretty_entry = json.dumps(entry, indent=4)
+            logger.info(pretty_entry)
+        return entry

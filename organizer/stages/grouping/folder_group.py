@@ -65,7 +65,9 @@ def process_folders(session: Session):
         # Use normalized_name from features if available, otherwise use clean_filename
         from utils.filename_processing import clean_filename
 
-        cleaned_name_to_id = {clean_filename(folder.name): folder.id for folder in folders}
+        cleaned_name_to_id = {
+            clean_filename(folder.name): folder.id for folder in folders
+        }
         token_grouping = common_token_grouping(list(cleaned_name_to_id.keys()))
         if token_grouping:
             for name, category in token_grouping.items():

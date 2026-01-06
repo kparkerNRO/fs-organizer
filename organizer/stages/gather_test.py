@@ -66,10 +66,12 @@ def test_process_zip_basic(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
-    zip_file_nodes = index_session.query(Node).filter_by(file_source=ZIP_FILE_SOURCE).all()
+    zip_file_nodes = (
+        index_session.query(Node).filter_by(file_source=ZIP_FILE_SOURCE).all()
+    )
     zip_dirs = (
         index_session.query(Node)
         .filter_by(
@@ -112,7 +114,7 @@ def test_process_zip_with_module_json(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
     zip_file_nodes = (
@@ -131,7 +133,9 @@ def test_process_zip_with_module_json(index_session, snapshot_id):
         )
         .all()
     )
-    zip_content_nodes = index_session.query(Node).filter_by(file_source=ZIP_CONTENT_SOURCE).all()
+    zip_content_nodes = (
+        index_session.query(Node).filter_by(file_source=ZIP_CONTENT_SOURCE).all()
+    )
 
     assert len(zip_dirs) == 1  # Foundry module wrapper folder
     assert len(zip_file_nodes) == 1  # Only the zip file itself should be added
@@ -163,7 +167,7 @@ def test_process_zip_nested_zip(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
     zip_file_nodes = (
@@ -213,7 +217,7 @@ def test_process_zip_ignores(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
     zip_file_nodes = (
@@ -252,7 +256,7 @@ def test_process_zip_top_level_folder(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
     zip_dirs = (
@@ -294,7 +298,7 @@ def test_process_zip_top_level_folder_non_specified(index_session, snapshot_id):
         "test.zip",
         index_session,
         snapshot_id,
-        count=0
+        count=0,
     )
 
     zip_dirs = (

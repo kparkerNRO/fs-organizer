@@ -71,7 +71,9 @@ def compute_custom_distance_matrix(
             )
 
             # structural distance = difference in depth
-            struct_dist = compute_distance_to_shared_parent(folders[i].path, folders[j].path)
+            struct_dist = compute_distance_to_shared_parent(
+                folders[i].path, folders[j].path
+            )
 
             # combine
             dist = alpha * text_dist + (1 - alpha) * (struct_dist / (1 + struct_dist))

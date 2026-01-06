@@ -40,7 +40,9 @@ class TestLoadSamples:
             ("test", 1),
         ],
     )
-    def test_load_samples_by_split(self, training_session, label_run, split, expected_count):
+    def test_load_samples_by_split(
+        self, training_session, label_run, split, expected_count
+    ):
         """Test loading samples filtered by split"""
         TrainingSampleFactory(label_run=label_run)
         TrainingSampleFactory(label_run=label_run, split="validation")
@@ -75,7 +77,9 @@ class TestLoadSamples:
     def test_load_combined_filters(self, training_session, label_run):
         """Test loading samples with multiple filters combined"""
         TrainingSampleFactory(label_run=label_run, label="asset_type", split="train")
-        TrainingSampleFactory(label_run=label_run, label="content_subject", split="validation")
+        TrainingSampleFactory(
+            label_run=label_run, label="content_subject", split="validation"
+        )
         TrainingSampleFactory(label_run=label_run, label=None)
 
         loaded = load_samples(

@@ -62,7 +62,9 @@ def save_predictions_to_db(
     """
     prediction_objects = []
 
-    for sample, pred, conf, probs in zip(samples, predictions, confidences, probabilities):
+    for sample, pred, conf, probs in zip(
+        samples, predictions, confidences, probabilities
+    ):
         is_correct = None
         if sample.label:
             is_correct = sample.label == pred
@@ -162,7 +164,9 @@ def create_and_save_run_results(
     split: str | None,
 ) -> None:
     """Creates a ModelRun and saves all results to the database."""
-    run_type_label = "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
+    run_type_label = (
+        "zero-shot" if isinstance(classifier, ZeroShotClassifier) else "fine-tuned"
+    )
     if use_baseline:
         run_type_label = "baseline"
 
@@ -235,7 +239,9 @@ def predict_and_evaluate(
             labeled_only=labeled_only,
             label_run_id=label_run_id,
         )
-        logger.info(f"Loaded {len(samples)} samples from {manager.get_training_db_path()}")
+        logger.info(
+            f"Loaded {len(samples)} samples from {manager.get_training_db_path()}"
+        )
 
         if not samples:
             logger.info("No samples found.")
@@ -245,12 +251,16 @@ def predict_and_evaluate(
         predictions, confidences, probabilities = classifier.predict(samples)
 
         y_true = [s.label for s in samples if s.label]
-        y_pred_labeled = [pred for i, pred in enumerate(predictions) if samples[i].label]
+        y_pred_labeled = [
+            pred for i, pred in enumerate(predictions) if samples[i].label
+        ]
 
         metrics = {}
         if y_true and y_pred_labeled:
             logger.info(f"Evaluating {len(y_true)} labeled samples...")
-            metrics = evaluate_predictions(y_true, y_pred_labeled, classifier.labels, verbose=True)
+            metrics = evaluate_predictions(
+                y_true, y_pred_labeled, classifier.labels, verbose=True
+            )
         else:
             logger.info("No labeled samples found. Skipping evaluation.")
 

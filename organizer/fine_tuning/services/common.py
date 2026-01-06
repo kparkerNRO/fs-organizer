@@ -58,7 +58,9 @@ def _load_and_index_nodes(
     session: Session, snapshot_id: int
 ) -> Tuple[Dict[int, Node], Dict[int, str], Dict[Optional[int], List[int]]]:
     """Load all nodes for a snapshot and build relationship indexes."""
-    rows = session.execute(select(Node).where(Node.snapshot_id == snapshot_id)).scalars()
+    rows = session.execute(
+        select(Node).where(Node.snapshot_id == snapshot_id)
+    ).scalars()
     nodes_by_id: Dict[int, Node] = {}
     processed_name_by_id: Dict[int, str] = {}
     children_by_parent: Dict[Optional[int], List[int]] = {}
@@ -146,18 +148,24 @@ def extract_feature_nodes(
 
         parent = nodes_by_id.get(node.parent_node_id) if node.parent_node_id else None
         grandparent = (
-            nodes_by_id.get(parent.parent_node_id) if parent and parent.parent_node_id else None
+            nodes_by_id.get(parent.parent_node_id)
+            if parent and parent.parent_node_id
+            else None
         )
 
         child_nodes = [
-            nodes_by_id[cid] for cid in children_by_parent.get(node.id, []) if cid in nodes_by_id
+            nodes_by_id[cid]
+            for cid in children_by_parent.get(node.id, [])
+            if cid in nodes_by_id
         ][:max_children]
 
         if parent:
             sibling_nodes = [
                 nodes_by_id[sid]
                 for sid in children_by_parent.get(parent.id, [])
-                if sid != node.id and sid in nodes_by_id and nodes_by_id[sid].kind == NodeKind.DIR
+                if sid != node.id
+                and sid in nodes_by_id
+                and nodes_by_id[sid].kind == NodeKind.DIR
             ][:max_siblings]
         else:
             sibling_nodes = []

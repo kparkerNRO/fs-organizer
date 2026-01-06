@@ -5,8 +5,7 @@ import typer
 from api.api import StructureType
 from fine_tuning.cli import app as fine_tuning_app
 from stages.folder_reconstruction import (
-    get_folder_heirarchy,
-    recalculate_cleaned_paths_for_structure,
+    calculate_cleaned_paths_for_structure,
 )
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
@@ -17,6 +16,7 @@ from utils.folder_structure import (
     calculate_folder_structure_for_categories,
     create_folder_structure_for_snapshot,
     export_snapshot_structure,
+    get_folder_heirarchy,
 )
 from utils.logging_config import setup_logging
 
@@ -155,7 +155,7 @@ def folders(
             calculate_folder_structure_for_categories(
                 storage_manager, snapshot_id, run_id, structure_type=structure_type
             )
-        recalculate_cleaned_paths_for_structure(
+        calculate_cleaned_paths_for_structure(
             storage_manager, snapshot_id, run_id, structure_type=structure_type
         )
         get_folder_heirarchy(storage_manager, run_id, structure_type=structure_type)
@@ -189,7 +189,9 @@ def export_structure(
             include_files=include_files,
         )
 
-        typer.echo(f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}")
+        typer.echo(
+            f"Exporting snapshot {result['snapshot_id']} from {result['created_at']}"
+        )
         typer.echo(f"Found {result['total_nodes']} nodes")
         typer.echo(f"✓ Exported directory structure to {result['output_path']}")
 
@@ -231,10 +233,12 @@ def pipeline(
     calculate_folder_structure_for_categories(
         storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
     )
-    recalculate_cleaned_paths_for_structure(
+    calculate_cleaned_paths_for_structure(
         storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
     )
-    get_folder_heirarchy(storage_manager, run_id, structure_type=StructureType.organized)
+    get_folder_heirarchy(
+        storage_manager, run_id, structure_type=StructureType.organized
+    )
     typer.echo("✓ Folder hierarchy generation complete.")
 
 

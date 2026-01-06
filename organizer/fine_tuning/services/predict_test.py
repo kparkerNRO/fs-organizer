@@ -51,7 +51,9 @@ class TestSavePredictionsToDb:
 
         # Verify predictions were saved
         saved_predictions = (
-            training_session.query(SamplePrediction).order_by(SamplePrediction.sample_id).all()
+            training_session.query(SamplePrediction)
+            .order_by(SamplePrediction.sample_id)
+            .all()
         )
 
         assert len(saved_predictions) == 2
@@ -71,7 +73,9 @@ class TestSavePredictionsToDb:
         assert pred2.true_label == "content_subject"
         assert pred2.is_correct is False
 
-    def test_save_predictions_with_list_probabilities(self, training_session, label_run, model_run):
+    def test_save_predictions_with_list_probabilities(
+        self, training_session, label_run, model_run
+    ):
         """Test saving predictions with list-format probabilities"""
         sample = TrainingSampleFactory(label_run=label_run, label="asset_type")
         training_session.flush()
@@ -93,7 +97,9 @@ class TestSavePredictionsToDb:
         assert set(probs_dict.keys()) == {"label_0", "label_1", "label_2"}
         assert probs_dict["label_0"] == 0.95
 
-    def test_save_predictions_unlabeled_samples(self, training_session, label_run, model_run):
+    def test_save_predictions_unlabeled_samples(
+        self, training_session, label_run, model_run
+    ):
         """Test saving predictions for unlabeled samples"""
         sample = TrainingSampleFactory(label_run=label_run, label=None)
         training_session.flush()
@@ -301,7 +307,9 @@ class TestCreateAndSaveRunResults:
 
         # Check predictions were saved
         predictions_saved = (
-            training_session.query(SamplePrediction).filter_by(run_id=model_run.id).all()
+            training_session.query(SamplePrediction)
+            .filter_by(run_id=model_run.id)
+            .all()
         )
         assert len(predictions_saved) == 2
         assert {p.predicted_label for p in predictions_saved} == {

@@ -159,7 +159,9 @@ def test_full_decomposition_pipeline(work_session, test_entries):
     new_iteration_id = get_next_iteration_id(work_session) - 1
 
     # Get new entries
-    stmt = select(GroupCategoryEntry).where(GroupCategoryEntry.iteration_id == new_iteration_id)
+    stmt = select(GroupCategoryEntry).where(
+        GroupCategoryEntry.iteration_id == new_iteration_id
+    )
     new_entries = work_session.scalars(stmt).all()
 
     # Should have more entries due to decomposition
