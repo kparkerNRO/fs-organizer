@@ -156,10 +156,11 @@ def recalculate_cleaned_paths_for_structure(
 
         for node in nodes:
             categories = get_categories_for_path(
-                index_session,
-                work_session,
-                Path(str(node.abs_path)),
-                iteration_id,
+                index_session=index_session,
+                work_session=work_session,
+                node=node,
+                iteration_id=iteration_id,
+                snapshot_id=snapshot_id
             )
             cleaned_path = "/".join([str(category.processed_name) for category in categories])
 

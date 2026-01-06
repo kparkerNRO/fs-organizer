@@ -89,6 +89,13 @@ api:
         --reload-exclude "*.db-wal" \
         --reload-exclude "logs/*"
 
+# Start FastAPI development server with debugger (VSCode attach on port 5678)
+api-debug:
+    cd organizer && \
+        ENABLE_PROFILING=true \
+        uv run python -m debugpy --listen 5678 \
+        -m uvicorn organizer_api:app
+
 # Run all backend tests
 test-backend:
     cd organizer && uv run pytest

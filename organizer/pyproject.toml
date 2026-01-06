@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.115.6",
     "nltk>=3.9.1",
     "pydantic>=2.12.5",
+    "pyinstrument>=5.1.2",
     "pytest>=8.3.4",
     "rapidfuzz>=3.11.0",
     "ruff>=0.8.4",
@@ -20,6 +21,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "debugpy>=1.8.19",
     "factory-boy>=3.3.0",
     "pre-commit>=4.0.1",
     "pyright>=1.1.407",

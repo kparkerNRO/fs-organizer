@@ -65,7 +65,7 @@ export const groupFolders = async (
   abortSignal?: AbortSignal,
 ): Promise<TaskInfo> => {
   // Start the group task
-  const response = await fetch(`${env.apiUrl}/api/group`, {
+  const response = await fetch(`${env.apiUrl}/api/group?profile=true`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

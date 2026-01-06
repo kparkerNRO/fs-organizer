@@ -270,7 +270,7 @@ def calculate_folder_structure_for_categories(
         # Get all file nodes from index database
         files = (
             index_session.execute(
-                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "file")
+                select(Node).where(Node.snapshot_id == snapshot_id, Node.kind == "file").limit(5000)
             )
             .scalars()
             .all()
@@ -298,8 +298,9 @@ def calculate_folder_structure_for_categories(
             categories = get_categories_for_path(
                 index_session,
                 work_session,
-                file.abs_path,
+                file,
                 iteration_id,
+                snapshot_id,
             )
             names = [cast(str, cat.processed_name) for cat in categories]
             new_path = "/".join(names)

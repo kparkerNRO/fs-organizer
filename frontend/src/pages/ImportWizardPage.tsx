@@ -370,6 +370,22 @@ const ImportStep: React.FC<StepProps> = ({ state, updateState, onNext }) => {
 
       {state.originalStructure && (
         <ButtonRow>
+          <WarningButton
+            onClick={() => {
+              updateState({
+                hasTriggeredGather: false,
+                originalStructure: undefined,
+                groupedStructure: undefined,
+                organizedStructure: undefined,
+                selectedFileId: null,
+              });
+              // Re-trigger the gather process
+              handleFolderSelect(state.sourcePath);
+            }}
+            disabled={state.isLoading}
+          >
+            Re-run Gather
+          </WarningButton>
           <SuccessButton onClick={onNext}>Next</SuccessButton>
         </ButtonRow>
       )}
@@ -518,6 +534,21 @@ const GroupStep: React.FC<StepProps> = ({
 
       <ButtonRow>
         <SecondaryButton onClick={onPrev}>Previous</SecondaryButton>
+        <WarningButton
+          onClick={() => {
+            // Reset ref to allow re-triggering
+            hasInitiatedGrouping.current = false;
+            updateState({
+              hasTriggeredGroup: false,
+              groupedStructure: undefined,
+              organizedStructure: undefined,
+              selectedFileId: null,
+            });
+          }}
+          disabled={state.isLoading}
+        >
+          Re-run Grouping
+        </WarningButton>
         <WarningButton
           onClick={async () => {
             if (state.groupedStructure) {

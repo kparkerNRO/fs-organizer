@@ -16,6 +16,7 @@ from api.api import (
     StructureType,
 )
 from api.models import AsyncTaskResponse, GatherRequest
+from api.profiling import ProfilerContext, ProfilingMiddleware, is_profiling_enabled
 from api.tasks import TaskInfo, TaskStatus, create_task, tasks, update_task
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +54,8 @@ async def lifespan(_app: FastAPI):
     setup_logging("organizer_api")
     logger.info("FS-Organizer API server starting up")
     logger.info(f"Storage path: {DATA_DIR}")
+    if is_profiling_enabled():
+        logger.info("API profiling is ENABLED (use ?profile=true on requests)")
 
     yield
 
@@ -68,6 +71,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add profiling middleware (controlled by ENABLE_PROFILING env var)
+if is_profiling_enabled():
+    app.add_middleware(ProfilingMiddleware)
 
 
 def get_storage_manager() -> StorageManager:

@@ -8,6 +8,7 @@ from storage.manager import FileSource, NodeKind
 from storage.work_models import (
     FileMapping,
     FolderStructure,
+    GroupIteration,
 )
 from utils.folder_structure import calculate_folder_structure_for_categories
 
@@ -78,26 +79,26 @@ def sample_group_entries(work_session, sample_iteration, sample_folders):
 class TestGetParentFolder:
     """Test cases for get_parent_folder function"""
 
-    def test_get_parent_folder_normal_path(self, index_session, sample_folders):
+    def test_get_parent_folder_normal_path(self, index_session, sample_folders, sample_snapshot):
         """Test finding parent folder with normal file path"""
         parent_path = Path("/test/parent_folder")
-        result = get_parent_folder(index_session, parent_path)
+        result = get_parent_folder(index_session, parent_path, snapshot_id=sample_snapshot.id)
 
         assert result is not None
         assert result.name == "parent_folder"
         assert result.abs_path == "/test/parent_folder"
 
-    def test_get_parent_folder_not_found(self, index_session, sample_folders):
+    def test_get_parent_folder_not_found(self, index_session, sample_folders, sample_snapshot):
         """Test when parent folder doesn't exist"""
         parent_path = Path("/nonexistent/path")
-        result = get_parent_folder(index_session, parent_path)
+        result = get_parent_folder(index_session, parent_path, snapshot_id=sample_snapshot.id)
 
         assert result is None
 
-    def test_get_parent_folder_zip_content_false(self, index_session, sample_folders):
+    def test_get_parent_folder_zip_content_false(self, index_session, sample_folders, sample_snapshot):
         """Test zip content handling when zip_content=False"""
         parent_path = Path("/test/content.zip/zip_content")
-        result = get_parent_folder(index_session, parent_path, zip_content=False)
+        result = get_parent_folder(index_session, parent_path, zip_content=False, snapshot_id=sample_snapshot.id)
 
         # The function finds the exact path match regardless of zip_content flag
         assert result is not None
@@ -107,15 +108,15 @@ class TestGetParentFolder:
         """Test zip content handling when zip_content=True"""
         # Test with a path that doesn't exist to trigger fallback behavior
         parent_path = Path("/test/nonexistent.zip/some_content")
-        result = get_parent_folder(index_session, parent_path, zip_content=True)
+        result = get_parent_folder(index_session, parent_path, zip_content=True, snapshot_id=sample_snapshot.id)
 
         assert result is None  # Should not find anything since neither path exists
 
-    def test_get_parent_folder_zip_content_fallback(self, index_session, sample_folders):
+    def test_get_parent_folder_zip_content_fallback(self, index_session, sample_folders, sample_snapshot):
         """Test fallback to parent when zip_content=True but direct path not found"""
         # Create a scenario where the direct path doesn't exist but parent does
         parent_path = Path("/test/nonexistent.zip/some_folder")
-        result = get_parent_folder(index_session, parent_path, zip_content=True)
+        result = get_parent_folder(index_session, parent_path, zip_content=True, snapshot_id=sample_snapshot.id)
 
         assert result is None  # Neither direct path nor parent should exist
 
@@ -129,12 +130,16 @@ class TestGetCategoriesForPath:
         work_session,
         sample_folders,
         sample_group_entries,
-        sample_iteration,
+        sample_iteration: GroupIteration,
     ):
         """Test with string path input"""
         path = "/test/parent_folder/child_folder/file.txt"
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session,
+            work_session,
+            path,
+            iteration_id=sample_iteration.id,
+            snapshot_id=sample_iteration.snapshot_id,
         )
 
         assert [category.processed_name for category in result] == [
@@ -153,7 +158,7 @@ class TestGetCategoriesForPath:
         """Test with Path object input"""
         path = Path("/test/parent_folder/child_folder/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
 
         assert [category.processed_name for category in result] == [
@@ -172,7 +177,7 @@ class TestGetCategoriesForPath:
         """Test when parent folder doesn't exist"""
         path = Path("/nonexistent/path/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
 
         assert result == []
@@ -188,7 +193,7 @@ class TestGetCategoriesForPath:
         """Test when parent folder has associated groups"""
         path = Path("/test/parent_folder/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
 
         assert [category.processed_name for category in result] == ["art_category"]
@@ -204,7 +209,7 @@ class TestGetCategoriesForPath:
         """Test with zip file path matching"""
         path = Path("/test/content.zip/zip_content/file.txt")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
 
         assert [category.processed_name for category in result] == ["zip_category"]
@@ -232,7 +237,7 @@ class TestGetCategoriesForPath:
         )
 
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
         assert [category.processed_name for category in result] == [
             "art_category",
@@ -456,7 +461,7 @@ class TestEdgeCases:
         """Test get_categories_for_path with root path"""
         path = Path("/")
         result = get_categories_for_path(
-            index_session, work_session, path, iteration_id=sample_iteration.id
+            index_session, work_session, path, iteration_id=sample_iteration.id, snapshot_id=sample_iteration.snapshot_id
         )
         assert result == []
 
