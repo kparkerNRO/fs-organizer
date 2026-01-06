@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import cast
 
-from api.api import File, FolderV2, FSNode, StructureType
+from api.api import File, FolderV2, StructureType
 from sqlalchemy import func, select
 from sqlalchemy import select as sql_select
 from sqlalchemy.orm import Session
@@ -85,7 +85,7 @@ def sort_folder_structure(folder_data: dict) -> dict:
 
 def _build_tree_structure(
     nodes: list[Node],
-) -> tuple[int, FSNode]:
+) -> tuple[int, FolderV2]:
     """
     Build hierarchical tree structure from flat list of nodes.
 
@@ -107,7 +107,7 @@ def _build_tree_structure(
                 children_map[node.parent_node_id] = []
             children_map[node.parent_node_id].append(node)
 
-    def node_to_folder(node: Node) -> FSNode:
+    def node_to_folder(node: Node) -> File | FolderV2:
         """Convert a Node to a dictionary representation."""
         # Check if node has children (e.g., ZIP files are FILE kind but have children)
         has_children = node.id in children_map
