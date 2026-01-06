@@ -1,6 +1,6 @@
 import pytest
 from typing import cast
-from api.api import StructureType
+from api.api import PipelineStage
 from storage.factories import FileNodeFactory, GroupCategoryEntryFactory, NodeFactory
 from storage.index_models import Node
 from storage.manager import FileSource, NodeKind
@@ -8,10 +8,10 @@ from storage.work_models import (
     FileMapping,
     FolderStructure,
 )
-from utils.folder_structure import calculate_folder_structure_for_categories
+from utils.folder_structure import calculate_folder_structure_for_stage
 
-from stages.categorize import (
-    get_categories_for_node,
+from organizer.utils.folder_structure import (
+    get_groups_for_node,
 )
 
 
@@ -96,7 +96,7 @@ class TestGetCategoriesForPath:
                 kind=NodeKind.FILE,
             ),
         )
-        result = get_categories_for_node(
+        result = get_groups_for_node(
             index_session,
             work_session,
             test_node,
@@ -123,7 +123,7 @@ class TestGetCategoriesForPath:
                 parent_node_id=sample_folders[1].id,
             ),
         )
-        result = get_categories_for_node(
+        result = get_groups_for_node(
             index_session,
             work_session,
             test_node,
@@ -153,7 +153,7 @@ class TestGetCategoriesForPath:
                 parent_node_id=sample_folders[2].id,
             ),
         )
-        result = get_categories_for_node(
+        result = get_groups_for_node(
             index_session,
             work_session,
             test_node,
@@ -194,7 +194,7 @@ class TestGetCategoriesForPath:
             ),
         )
 
-        result = get_categories_for_node(
+        result = get_groups_for_node(
             index_session,
             work_session,
             test_node,
@@ -233,7 +233,7 @@ class TestCalculateCategories:
             confidence=0.9,
         )
 
-        calculate_folder_structure_for_categories(
+        calculate_folder_structure_for_stage(
             storage_manager, storage_snapshot.id, storage_run.id
         )
 
@@ -250,7 +250,7 @@ class TestCalculateCategories:
 
         folder_structures = storage_work_session.query(FolderStructure).all()
         assert len(folder_structures) == 1
-        assert folder_structures[0].structure_type == StructureType.organized.value
+        assert folder_structures[0].structure_type == PipelineStage.organized.value
 
     def test_calculate_categories_processes_all_files(
         self,
@@ -284,7 +284,7 @@ class TestCalculateCategories:
             confidence=0.9,
         )
 
-        calculate_folder_structure_for_categories(
+        calculate_folder_structure_for_stage(
             storage_manager, storage_snapshot.id, storage_run.id
         )
 
@@ -362,7 +362,7 @@ class TestCalculateCategories:
             processed_name="test",
         )
 
-        calculate_folder_structure_for_categories(
+        calculate_folder_structure_for_stage(
             storage_manager, storage_snapshot.id, storage_run.id
         )
 
@@ -420,7 +420,7 @@ class TestEdgeCases:
         self, storage_manager, storage_work_session, storage_snapshot, storage_run
     ):
         """Test calculate_categories when no GroupCategoryEntry exists"""
-        result = calculate_folder_structure_for_categories(
+        result = calculate_folder_structure_for_stage(
             storage_manager, storage_snapshot.id, storage_run.id
         )
         assert result is None

@@ -13,7 +13,7 @@ from api.api import (
     FolderViewResponse,
     SortColumn,
     SortOrder,
-    StructureType,
+    PipelineStage,
 )
 from api.models import AsyncTaskResponse, GatherRequest
 from api.profiling import ProfilingMiddleware, is_profiling_enabled
@@ -32,8 +32,8 @@ from storage.work_models import (
     GroupCategoryEntry,
 )
 from utils.folder_structure import (
-    calculate_folder_structure_for_categories,
-    get_newest_entry_for_structure,
+    calculate_folder_structure_for_stage,
+    get_newest_entry_for_stage,
     sort_folder_structure,
 )
 from utils.logging_config import setup_logging
@@ -90,13 +90,13 @@ def get_db_session(storage_manager: StorageManager = Depends(get_storage_manager
 
 def get_folder_structure_from_db(
     storage_manager: StorageManager,
-    stage: StructureType = StructureType.organized,
+    stage: PipelineStage = PipelineStage.organized,
     run_id: int | None = None,
 ) -> dict | None:
     """Get the latest folder structure from the database"""
     try:
         with storage_manager.get_work_session() as session:
-            newest_entry = get_newest_entry_for_structure(session, stage.value, run_id)
+            newest_entry = get_newest_entry_for_stage(session, stage.value, run_id)
 
             if newest_entry:
                 return sort_folder_structure(newest_entry)
@@ -197,16 +197,14 @@ async def get_folders(
     session=Depends(get_db_session),
 ):
     logger.info("GET /folders")
-    newest_entry = get_newest_entry_for_structure(
-        session, StructureType.organized, None
-    )
+    newest_entry = get_newest_entry_for_stage(session, PipelineStage.organized, None)
     if newest_entry is not None:
         parsed_new_entry = json.loads(newest_entry)
         sorted_new = sort_folder_structure(parsed_new_entry)
     else:
         raise HTTPException(status_code=404, detail="organized structure not found")
 
-    old_entry = get_newest_entry_for_structure(session, StructureType.original, None)
+    old_entry = get_newest_entry_for_stage(session, PipelineStage.original, None)
     if old_entry:
         parsed_old_entry = json.loads(old_entry.structure)
         sorted_original = sort_folder_structure(parsed_old_entry)
@@ -239,7 +237,7 @@ async def get_gather_structure(
     storage_manager: StorageManager = Depends(get_storage_manager),
 ):
     """Get the original folder structure from the gather stage"""
-    structure = get_folder_structure_from_db(storage_manager, StructureType.original)
+    structure = get_folder_structure_from_db(storage_manager, PipelineStage.original)
     if structure is None:
         raise HTTPException(status_code=404, detail="No gather structure found")
     return {"folder_structure": structure}
@@ -250,7 +248,7 @@ async def get_group_structure(
     storage_manager: StorageManager = Depends(get_storage_manager),
 ):
     """Get the folder structure after grouping stage"""
-    structure = get_folder_structure_from_db(storage_manager, StructureType.grouped)
+    structure = get_folder_structure_from_db(storage_manager, PipelineStage.grouped)
     if structure is None:
         raise HTTPException(status_code=404, detail="No group structure found")
     return {"folder_structure": structure}
@@ -261,7 +259,7 @@ async def get_folders_structure(
     storage_manager: StorageManager = Depends(get_storage_manager),
 ):
     """Get the final organized folder structure"""
-    structure = get_folder_structure_from_db(storage_manager, StructureType.organized)
+    structure = get_folder_structure_from_db(storage_manager, PipelineStage.organized)
     if structure is None:
         raise HTTPException(status_code=404, detail="No organized structure found")
     return {"folder_structure": structure}
@@ -275,14 +273,14 @@ async def get_pipeline_status(
     logger.info("GET /api/status - checking pipeline stages")
 
     has_gather = (
-        get_folder_structure_from_db(storage_manager, StructureType.original)
+        get_folder_structure_from_db(storage_manager, PipelineStage.original)
         is not None
     )
     has_group = (
-        get_folder_structure_from_db(storage_manager, StructureType.grouped) is not None
+        get_folder_structure_from_db(storage_manager, PipelineStage.grouped) is not None
     )
     has_folders = (
-        get_folder_structure_from_db(storage_manager, StructureType.organized)
+        get_folder_structure_from_db(storage_manager, PipelineStage.organized)
         is not None
     )
 
@@ -334,7 +332,7 @@ def run_gather_task(
             "storage_path": str(storage_path),
             "snapshot_id": snapshot_id,
             "folder_structure": get_folder_structure_from_db(
-                storage_manager, StructureType.original
+                storage_manager, PipelineStage.original
             ),
         }
 
@@ -404,18 +402,18 @@ def run_group_task(task_id: str, storage_manager: StorageManager):
                 )
                 return
 
-        calculate_folder_structure_for_categories(
+        calculate_folder_structure_for_stage(
             storage_manager,
             latest_run.snapshot_id,
             latest_run.id,
-            structure_type=StructureType.grouped,
+            structure_type=PipelineStage.grouped,
         )
 
         update_task(task_id, message="Getting folder structure", progress=0.9)
 
         # Get folder structure if available
         folder_structure = get_folder_structure_from_db(
-            storage_manager, stage=StructureType.grouped
+            storage_manager, stage=PipelineStage.grouped
         )
 
         result = {"message": "Grouping complete", "folder_structure": folder_structure}
@@ -483,16 +481,16 @@ def run_folders_task(task_id: str, storage_manager: StorageManager):
                 )
                 return
 
-        calculate_folder_structure_for_categories(
+        calculate_folder_structure_for_stage(
             storage_manager,
             latest_run.snapshot_id,
             latest_run.id,
-            structure_type=StructureType.organized,
+            structure_type=PipelineStage.organized,
         )
 
         # Get the newly generated folder structure
         folder_structure = get_folder_structure_from_db(
-            storage_manager, stage=StructureType.organized
+            storage_manager, stage=PipelineStage.organized
         )
 
         result = {

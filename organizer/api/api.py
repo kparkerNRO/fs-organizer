@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from storage.index_models import Node
 
 
-class StructureType(str, Enum):
+class PipelineStage(str, Enum):
     original = "old"
     organized = "new"
     grouped = "grouped"

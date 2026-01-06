@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import cast
 
 import factory
-from api.api import StructureType
+from api.api import PipelineStage
 from factory import Faker, LazyAttribute, SelfAttribute, Sequence
 from factory.alchemy import SQLAlchemyModelFactory
 from sqlalchemy.orm import object_session
@@ -308,7 +308,7 @@ class FolderStructureFactory(BaseFactory):
 
     run = factory.SubFactory(RunFactory)
     run_id = SelfAttribute("run.id")
-    structure_type = StructureType.organized.value
+    structure_type = PipelineStage.organized.value
     structure = {"name": "root", "children": []}
     created_at = None
 
