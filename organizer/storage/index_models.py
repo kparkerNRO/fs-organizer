@@ -21,7 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from storage.db_helpers import DateTime
+from storage.db_types import DateTime
 
 # Schema version (increment on breaking changes)
 INDEX_SCHEMA_VERSION = "1.0.0"
@@ -84,7 +84,6 @@ class Node(IndexBase):
     inode: Mapped[Optional[int]] = mapped_column(Integer)
     depth: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # CRITICAL: file_source must be NOT NULL to ensure unique constraint works
     # Values: 'filesystem' | 'zip_file' | 'zip_content'
     file_source: Mapped[str] = mapped_column(
         String, nullable=False, default="filesystem"

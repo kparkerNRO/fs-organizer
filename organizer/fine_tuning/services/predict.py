@@ -239,9 +239,7 @@ def predict_and_evaluate(
             labeled_only=labeled_only,
             label_run_id=label_run_id,
         )
-        logger.info(
-            f"Loaded {len(samples)} samples from {manager.get_training_db_path()}"
-        )
+        logger.info(f"Loaded {len(samples)} samples")
 
         if not samples:
             logger.info("No samples found.")

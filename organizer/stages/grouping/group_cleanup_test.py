@@ -1,5 +1,5 @@
 import pytest
-from stages.grouping.group_cleanup import GroupEntry, unify_category_spelling
+from stages.grouping.group_cleanup import GroupEntry, _unify_category_spelling
 
 
 @pytest.mark.parametrize(
@@ -54,7 +54,7 @@ from stages.grouping.group_cleanup import GroupEntry, unify_category_spelling
     ],
 )
 def test_correct_spelling(input_entries, expected_entries):
-    unify_category_spelling(input_entries)
+    _unify_category_spelling(input_entries)
     for name, entries in input_entries.items():
         entry = entries[0]
         expected_entry = expected_entries[name][0]

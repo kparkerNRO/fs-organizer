@@ -25,7 +25,7 @@ class GroupEntry:
             self.categories = []
 
 
-def update_group_mapping(confidence_value, filename_to_group_map, mapping_function):
+def _update_group_mapping(confidence_value, filename_to_group_map, mapping_function):
     working_list = list(filename_to_group_map.keys())
     group = mapping_function(working_list)
 
@@ -41,7 +41,7 @@ def update_group_mapping(confidence_value, filename_to_group_map, mapping_functi
     return working_list
 
 
-def group_by_tokens(
+def _group_by_tokens(
     filename_to_group_map: dict[str, GroupEntry], confidence_value: float = 0.85
 ):
     """
@@ -62,7 +62,7 @@ def group_by_tokens(
             filename_to_group_map[name].confidence = confidence_value
 
 
-def unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
+def _unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
     # normalize category names to use the same spelling
     def merge_groups(group1: str, group2: str, group_to_entries):
         group2_entries = group_to_entries.get(group2, [])
@@ -105,7 +105,7 @@ def unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
                         entry.confidence = 0.6
 
 
-def process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
+def _process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
     """
     Process the outliers - groups with only one member
     """
@@ -157,7 +157,7 @@ def process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
             del group_to_entries[group]
 
 
-def process_ungrouped(
+def _process_ungrouped(
     group_to_entries: dict[str, list[GroupEntry]], filenames: list[str]
 ):
     """
@@ -188,11 +188,11 @@ def refine_group(filenames: list[str]) -> dict[str, list[GroupEntry]]:
     }
 
     # normalize the names - correct for casing, punctuation, and spelling
-    update_group_mapping(1.0, filename_to_group_map, normalized_grouping)
-    update_group_mapping(0.95, filename_to_group_map, spelling_grouping)
+    _update_group_mapping(1.0, filename_to_group_map, normalized_grouping)
+    _update_group_mapping(0.95, filename_to_group_map, spelling_grouping)
 
     # group names by common tokens
-    group_by_tokens(filename_to_group_map)
+    _group_by_tokens(filename_to_group_map)
 
     # at this point they've been grouped, so any further processing is group-aware
 
@@ -203,8 +203,8 @@ def refine_group(filenames: list[str]) -> dict[str, list[GroupEntry]]:
     if len(refined_groups) == 1:
         return refined_groups
 
-    unify_category_spelling(refined_groups)
-    process_outliers(refined_groups)
-    process_ungrouped(refined_groups, filenames)
+    _unify_category_spelling(refined_groups)
+    _process_outliers(refined_groups)
+    _process_ungrouped(refined_groups, filenames)
 
     return refined_groups

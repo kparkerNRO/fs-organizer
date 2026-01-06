@@ -4,23 +4,23 @@ import os
 from pathlib import Path
 from typing import cast
 
-from api.api import File, FolderV2, StructureType
+from data_models.pipeline import File, FolderV2, PipelineStage
 from sqlalchemy import func, select
 from sqlalchemy import select as sql_select
 from sqlalchemy.orm import Session
-from stages.categorize import get_categories_for_node
+from storage.index_models import Node
 from storage.id_defaults import get_latest_run
-from storage.index_models import Node, Snapshot
+from storage.index_models import Snapshot
 from storage.manager import NodeKind, StorageManager
 from storage.work_models import FileMapping, FolderStructure, GroupCategoryEntry
 
 logger = getLogger(__name__)
 
 
-def get_newest_entry_for_structure(
-    work_session: Session, structure_type: StructureType, run_id: int | None
+def get_newest_entry_for_stage(
+    work_session: Session, structure_type: PipelineStage, run_id: int | None
 ):
-    if not run_id and structure_type != StructureType.original:
+    if not run_id and structure_type != PipelineStage.original:
         run = get_latest_run(work_session)
         if not run:
             return None
@@ -45,6 +45,20 @@ def get_newest_entry_for_structure(
         entry = newest_entry.structure
         return entry
     return None
+
+
+def get_folder_heirarchy(
+    manager: StorageManager, run_id: int, structure_type: PipelineStage
+):
+    logger.debug(f"Current working directory: {os.getcwd()}")
+
+    with manager.get_work_session() as session:
+        entry = get_newest_entry_for_stage(session, structure_type, run_id)
+        if entry is not None:
+            entry = json.loads(entry)
+            pretty_entry = json.dumps(entry, indent=4)
+            logger.info(pretty_entry)
+        return entry
 
 
 def sort_folder_structure(folder_data: dict) -> dict:
@@ -171,7 +185,7 @@ def create_folder_structure_for_snapshot(
     # Query nodes, optionally filtering files
     query = sql_select(Node).where(Node.snapshot_id == snapshot.id)
     if not include_files:
-        query = query.where(Node.kind == "dir")
+        query = query.where(Node.kind == NodeKind.DIR)
 
     nodes = list(index_session.execute(query.order_by(Node.rel_path)).scalars().all())
 
@@ -181,7 +195,7 @@ def create_folder_structure_for_snapshot(
     processed_structure = FolderStructure(
         snapshot_id=snapshot.id,
         run_id=associated_run,
-        structure_type=StructureType.original,
+        structure_type=PipelineStage.original,
         structure=structure.model_dump(),
         total_nodes=count,
     )
@@ -264,11 +278,52 @@ def _insert_file_in_structure(
     )
 
 
-def calculate_folder_structure_for_categories(
+def get_groups_for_node(
+    index_session: Session,
+    work_session: Session,
+    node: Node,
+    iteration_id: int,
+) -> list[GroupCategoryEntry]:
+    """
+    recursively get categories for the provided path
+    """
+    parent = index_session.execute(
+        select(Node).where(Node.id == node.parent_node_id)
+    ).scalar_one_or_none()
+
+    if not parent:
+        return []
+
+    # GroupCategoryEntry uses folder_id which maps to node_id in the new schema
+    groups = (
+        work_session.execute(
+            select(GroupCategoryEntry)
+            .where(GroupCategoryEntry.iteration_id == iteration_id)
+            .where(GroupCategoryEntry.folder_id == parent.id)
+        )
+        .scalars()
+        .all()
+    )
+
+    categories = get_groups_for_node(index_session, work_session, parent, iteration_id)
+    category_names = {cat.processed_name: index for index, cat in enumerate(categories)}
+    for group in groups:
+        processed_name = group.processed_name
+        if group.processed_name in category_names:
+            categories[category_names[processed_name]].confidence = min(
+                group.confidence, categories[category_names[processed_name]].confidence
+            )
+        else:
+            categories.append(group)
+
+    return categories
+
+
+def calculate_folder_structure_for_stage(
     manager: StorageManager,
     snapshot_id: int,
     run_id: int,
-    structure_type: StructureType = StructureType.organized,
+    structure_type: PipelineStage = PipelineStage.organized,
     # category_resolver: Callable[
     #     [Session, Session, str | Path, int | None], list[GroupCategoryEntry]
     # ] = get_categories_for_path,
@@ -281,7 +336,7 @@ def calculate_folder_structure_for_categories(
         files = (
             index_session.execute(
                 select(Node)
-                .where(Node.snapshot_id == snapshot_id, Node.kind == "file")
+                .where(Node.snapshot_id == snapshot_id, Node.kind == NodeKind.FILE)
                 .limit(5000)
             )
             .scalars()
@@ -307,7 +362,7 @@ def calculate_folder_structure_for_categories(
                 logger.info(f"Processed {i}/{total_files} files")
 
             # Get categories using index session for node lookups and work session for groups
-            categories = get_categories_for_node(
+            categories = get_groups_for_node(
                 index_session,
                 work_session,
                 file,
@@ -351,17 +406,3 @@ def calculate_folder_structure_for_categories(
             )
         )
         work_session.commit()
-
-
-def get_folder_heirarchy(
-    manager: StorageManager, run_id: int, structure_type: StructureType
-):
-    logger.debug(f"Current working directory: {os.getcwd()}")
-
-    with manager.get_work_session() as session:
-        entry = get_newest_entry_for_structure(session, structure_type, run_id)
-        if entry is not None:
-            entry = json.loads(entry)
-            pretty_entry = json.dumps(entry, indent=4)
-            logger.info(pretty_entry)
-        return entry

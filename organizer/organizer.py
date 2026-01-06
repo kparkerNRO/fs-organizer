@@ -2,18 +2,18 @@ import logging
 from pathlib import Path
 
 import typer
-from api.api import StructureType
+from data_models.pipeline import PipelineStage
 from fine_tuning.cli import app as fine_tuning_app
-from stages.folder_reconstruction import (
-    calculate_cleaned_paths_for_structure,
+from utils.filename_processing import (
+    calculate_cleaned_paths_from_groups,
 )
 from stages.gather import ingest_filesystem
 from stages.grouping.group import group_folders
-from storage.id_defaults import get_latest_run_for_snapshot
+from storage.id_defaults import get_effective_snapshot_id, get_latest_run_for_snapshot
 from storage.manager import StorageManager
 from storage.work_models import Run
 from utils.folder_structure import (
-    calculate_folder_structure_for_categories,
+    calculate_folder_structure_for_stage,
     create_folder_structure_for_snapshot,
     export_snapshot_structure,
     get_folder_heirarchy,
@@ -118,13 +118,24 @@ def group(
 
 @app.command()
 def folders(
-    storage_path: Path = typer.Argument(
-        ..., help="Storage directory containing index.db and work.db"
+    storage_path: Path = typer.Option(
+        None,
+        "--storage",
+        "-s",
+        help="Storage directory (contains databases). If not specified, uses default data directory.",
     ),
-    snapshot_id: int = typer.Option(..., help="Snapshot ID to process"),
-    run_id: int | None = typer.Option(None, help="Run ID to use"),
-    structure_type: StructureType = typer.Option(
-        StructureType.organized,
+    snapshot_id: int | None = typer.Option(
+        None,
+        "--snapshot-id",
+        help="Snapshot ID to use when selecting a run.",
+    ),
+    run_id: int | None = typer.Option(
+        None,
+        "--run-id",
+        help="Run ID to use instead of looking up the latest run.",
+    ),
+    structure_type: PipelineStage = typer.Option(
+        PipelineStage.organized,
         "--structure-type",
         "-s",
         help="Folder structure type to generate and use for cleaned paths.",
@@ -137,7 +148,10 @@ def folders(
     typer.echo(f"Using snapshot_id={snapshot_id}")
 
     storage_manager = StorageManager(storage_path)
-    if structure_type == StructureType.original:
+    if not snapshot_id:
+        snapshot_id = get_effective_snapshot_id(storage_manager, snapshot_id)
+
+    if structure_type == PipelineStage.original:
         with (
             storage_manager.get_index_session(read_only=True) as index_session,
             storage_manager.get_work_session() as work_session,
@@ -151,11 +165,11 @@ def folders(
             run_id = run.id
         typer.echo(f"Using run_id={run_id}")
 
-        if structure_type != StructureType.original:
-            calculate_folder_structure_for_categories(
+        if structure_type != PipelineStage.original:
+            calculate_folder_structure_for_stage(
                 storage_manager, snapshot_id, run_id, structure_type=structure_type
             )
-        calculate_cleaned_paths_for_structure(
+        calculate_cleaned_paths_from_groups(
             storage_manager, snapshot_id, run_id, structure_type=structure_type
         )
         get_folder_heirarchy(storage_manager, run_id, structure_type=structure_type)
@@ -230,14 +244,14 @@ def pipeline(
     typer.echo("✓ Grouping complete.")
 
     typer.echo("Calculating folder structure...")
-    calculate_folder_structure_for_categories(
-        storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
+    calculate_folder_structure_for_stage(
+        storage_manager, snapshot_id, run_id, structure_type=PipelineStage.organized
     )
-    calculate_cleaned_paths_for_structure(
-        storage_manager, snapshot_id, run_id, structure_type=StructureType.organized
+    calculate_cleaned_paths_from_groups(
+        storage_manager, snapshot_id, run_id, structure_type=PipelineStage.organized
     )
     get_folder_heirarchy(
-        storage_manager, run_id, structure_type=StructureType.organized
+        storage_manager, run_id, structure_type=PipelineStage.organized
     )
     typer.echo("✓ Folder hierarchy generation complete.")
 

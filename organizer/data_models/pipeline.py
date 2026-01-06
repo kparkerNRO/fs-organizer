@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from storage.index_models import Node
 
 
-class StructureType(str, Enum):
+class PipelineStage(str, Enum):
     original = "old"
     organized = "new"
     grouped = "grouped"
@@ -49,11 +49,6 @@ class FolderV2(FSNode):
         return FolderV2(id=node.id, name=node.name, originalPath=node.rel_path)
 
 
-class FolderViewResponse(BaseModel):
-    original: FolderV2
-    new: FolderV2
-
-
 class Folder(BaseModel):
     id: int
     name: str
@@ -73,22 +68,3 @@ class Category(BaseModel):
     confidence: float
     possibleClassifications: Optional[List[str]] = None
     children: Optional[List[Folder]] = None
-
-
-class CategoryResponse(BaseModel):
-    data: List[Category] = []
-    totalItems: int = 0
-    totalPages: int = 1
-    currentPage: int = 1
-
-
-class SortColumn(str, Enum):
-    NAME = "name"
-    COUNT = "count"
-    CONFIDENCE = "confidence"
-    ID = "id"
-
-
-class SortOrder(str, Enum):
-    asc = "asc"
-    desc = "desc"

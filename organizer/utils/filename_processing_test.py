@@ -1,11 +1,11 @@
-from api.api import StructureType
+from data_models.pipeline import PipelineStage
 from sqlalchemy import select
 from storage.factories import GroupCategoryEntryFactory, NodeFactory
 from storage.manager import NodeKind
 from storage.work_models import FileMapping
 
-from stages.folder_reconstruction import (
-    calculate_cleaned_paths_for_structure,
+from utils.filename_processing import (
+    calculate_cleaned_paths_from_groups,
 )
 
 
@@ -43,11 +43,11 @@ def test_recalculate_cleaned_paths_creates_and_updates_mappings(
     )
     work_session.commit()
 
-    updated = calculate_cleaned_paths_for_structure(
+    updated = calculate_cleaned_paths_from_groups(
         storage_manager,
         sample_snapshot.id,
         sample_run.id,
-        structure_type=StructureType.original,
+        structure_type=PipelineStage.original,
     )
 
     assert updated == 2
@@ -107,11 +107,11 @@ def test_recalculate_cleaned_paths_for_structure_organized_uses_categories(
     )
     work_session.commit()
 
-    updated = calculate_cleaned_paths_for_structure(
+    updated = calculate_cleaned_paths_from_groups(
         storage_manager,
         sample_snapshot.id,
         sample_run.id,
-        StructureType.organized,
+        PipelineStage.organized,
     )
 
     assert updated == 2

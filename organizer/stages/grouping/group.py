@@ -4,6 +4,7 @@ from logging import getLogger
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from stages.grouping.helpers import get_next_iteration_id
 from storage.id_defaults import get_effective_snapshot_id
 from storage.index_models import Node
 from storage.manager import NodeKind, StorageManager
@@ -16,31 +17,13 @@ from storage.work_models import (
 from utils.config import Config, get_config
 from utils.filename_processing import clean_filename, split_view_type
 
-from stages.grouping.group_cleanup import refine_group
 from stages.grouping.tag_decomposition import decompose_compound_tags
 
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
 logger = getLogger(__name__)
 
 
-def get_next_iteration_id(session: Session):
-    # Check both GroupCategory and GroupIteration to get the true max iteration_id
-    category_max = session.execute(
-        select(func.max(GroupCategory.iteration_id))
-    ).scalar_one()
-    iteration_max = session.execute(select(func.max(GroupIteration.id))).scalar_one()
-
-    max_id = max(
-        category_max if category_max is not None else -1,
-        iteration_max if iteration_max is not None else -1,
-    )
-
-    if max_id == -1:
-        return 0
-    return max_id + 1
-
-
-def process_folders_to_groups(
+def _process_folders_to_groups(
     index_session, work_session, run_id: int, snapshot_id: int
 ):
     """
@@ -86,170 +69,7 @@ def process_folders_to_groups(
     logger.info("Groups created")
 
 
-def refine_groups(
-    session,
-    current_group_categories: list[GroupCategoryEntry],
-    iteration_id,
-    next_group_id=1,
-) -> int:
-    """
-    After groupings have been calculated, evalute the groups to determine which represent
-    "real" groupings (i.e. single unique name, or multiple names with a common prefix), and
-    which are unable to be grouped.
-
-    """
-    logger.info(f"Refining groups, starting at next_group_id={next_group_id}")
-    clusters: dict[str, list[GroupCategoryEntry]] = defaultdict(list)
-    for entry in current_group_categories:
-        clusters[entry.cluster_id].append(entry)
-
-    current_group_id = next_group_id
-
-    for cluster_id, cluster_entries in clusters.items():
-        # singletons - just store them and move on
-        if len(cluster_entries) == 1:
-            entry = cluster_entries[0]
-
-            group_category = GroupCategory(
-                id=current_group_id,
-                name=entry.pre_processed_name,
-                count=1,
-                group_confidence=1,
-                iteration_id=iteration_id,
-                needs_review=False,
-            )
-
-            # Add and flush the group_category first to satisfy foreign key constraints
-            session.add(group_category)
-            session.flush()
-
-            # Now update the entry with the group_id
-            entry.group_id = current_group_id
-            entry.processed_name = entry.pre_processed_name
-            entry.processed = True
-
-            current_group_id += 1
-
-            continue
-
-        record_names = [record.pre_processed_name for record in cluster_entries]
-
-        # evaluate the group - this does a few things
-        # 1. try to normalize the names to a common prefix correcting for spelling
-        # 2. determine sub-categories when the group name is a common prefix
-        group_name_to_groups = refine_group(record_names)
-
-        # Create groups based on refined results
-        for group_name, entries_by_name in group_name_to_groups.items():
-            subcategories = list(
-                set(
-                    [
-                        entry.categories[1]
-                        for entry in entries_by_name
-                        if entry.categories and len(entry.categories) > 1
-                    ]
-                )
-            )
-            member_confidences = []
-
-            group_category = GroupCategory(
-                id=current_group_id,
-                name=group_name,
-                iteration_id=iteration_id,
-            )
-            subgroups = {
-                subcategory: GroupCategory(
-                    id=sub_id, name=subcategory, iteration_id=iteration_id
-                )
-                for sub_id, subcategory in enumerate(
-                    subcategories, start=current_group_id + 1
-                )
-            }
-            subcategory_to_entry = {subcategory: [] for subcategory in subcategories}
-
-            # Add group_category and subgroups first to satisfy foreign key constraints
-            session.add(group_category)
-            for subgroup in subgroups.values():
-                session.add(subgroup)
-            session.flush()
-
-            # Find entries that match this refined group
-            group_members = []
-            for group_entry in entries_by_name:
-                matching_entries = [
-                    e
-                    for e in cluster_entries
-                    if e.pre_processed_name == group_entry.original_name
-                ]
-
-                for entry in matching_entries:
-                    entry.group_id = group_category.id
-                    entry.processed = True
-                    entry.confidence = min(entry.confidence, group_entry.confidence)
-                    entry.derived_names = group_entry.categories
-                    entry.iteration_id = iteration_id
-
-                    if group_entry.categories and len(group_entry.categories) > 0:
-                        entry.processed_name = group_entry.categories[0]
-
-                    member_confidences.append(entry.confidence)
-                    group_members.append(entry)
-
-                    if group_entry.categories and len(group_entry.categories) > 1:
-                        subgroup = group_entry.categories[1]
-                        subgroup_entry = GroupCategoryEntry(
-                            folder_id=entry.folder_id,
-                            partial_category_id=entry.partial_category_id,
-                            pre_processed_name=entry.pre_processed_name,
-                            processed_name=subgroup,
-                            path=entry.path,
-                            confidence=entry.confidence,
-                            processed=True,
-                            iteration_id=iteration_id,
-                            derived_names=entry.derived_names,
-                        )
-                        session.add(subgroup_entry)
-                        subcategory_to_entry[subgroup].append(subgroup_entry)
-            session.flush()
-
-            current_group_id += len(subgroups) + 1
-
-            # Calculate overall group confidence
-            group_category.overall_confidence = (  # type: ignore[attr-defined]
-                min(member_confidences) if member_confidences else 0.5
-            )
-            group_category.count = len(group_members)
-            group_category.needs_review = (
-                group_category.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD  # type: ignore[attr-defined]
-            )
-
-            # group_categories.append(group_category)
-            session.add(group_category)
-
-            for _, subgroup in subgroups.items():
-                sub_member_confidences = [
-                    e.confidence for e in subcategory_to_entry[subgroup.name]
-                ]
-                subgroup.overall_confidence = (  # type: ignore[attr-defined]
-                    min(sub_member_confidences) if sub_member_confidences else 0.5
-                )
-                subgroup.count = len(
-                    [e for e in group_members if e.processed_name == subgroup.name]
-                )
-                subgroup.needs_review = (
-                    subgroup.overall_confidence < REVIEW_CONFIDENCE_THRESHOLD  # type: ignore[attr-defined]
-                )
-
-                session.add(subgroup)
-            session.flush()
-
-        session.flush()
-
-    session.commit()
-    return current_group_id
-
-
-def pre_process_groups(
+def _pre_process_groups(
     session: Session,
     config: Config,
     run_id: int,
@@ -323,7 +143,7 @@ def pre_process_groups(
     session.commit()
 
 
-def compact_groups(
+def _compact_groups(
     index_session: Session,
     work_session: Session,
     run_id: int,
@@ -477,20 +297,20 @@ def group_folders(
 
         logger.info(f"Using {snapshot_id=}, {run.id=}")
 
-        process_folders_to_groups(
+        _process_folders_to_groups(
             work_session=work_session,
             index_session=index_session,
             run_id=run.id,
             snapshot_id=snapshot_id,
         )
-        pre_process_groups(
+        _pre_process_groups(
             work_session, config=config, run_id=run.id, snapshot_id=snapshot_id
         )
         work_session.commit()
 
         decompose_compound_tags(work_session, run_id=run.id, snapshot_id=snapshot_id)
 
-        compact_groups(
+        _compact_groups(
             work_session=work_session,
             index_session=index_session,
             run_id=run.id,

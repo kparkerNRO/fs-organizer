@@ -1543,7 +1543,7 @@ def decompose_compound_tags(
     logger.info("Starting compound tag decomposition")
 
     # Get the next iteration ID - import has to be here to prevent circular imports
-    from stages.grouping.group import get_next_iteration_id
+    from stages.grouping.helpers import get_next_iteration_id
 
     iteration_id = get_next_iteration_id(session)
 

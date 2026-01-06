@@ -1,19 +1,14 @@
-from typing import cast
-
 import pytest
 from storage.factories import (
-    GroupCategoryEntryFactory,
-    GroupIterationFactory,
     NodeFactory,
 )
 from storage.manager import NodeKind
-from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
+from storage.work_models import GroupCategory, GroupCategoryEntry
 from utils.config import get_minimal_config
 
 from stages.grouping.group import (
     group_folders,
-    process_folders_to_groups,
-    refine_groups,
+    _process_folders_to_groups,
 )
 from stages.grouping.helpers import common_token_grouping
 
@@ -27,7 +22,7 @@ def test_process_folders_to_groups(
 
     # Run the function (it will create iteration 0)
     # Pass None for group_id since we don't have a group yet
-    process_folders_to_groups(
+    _process_folders_to_groups(
         index_session=index_session,
         work_session=work_session,
         run_id=sample_run.id,
@@ -52,162 +47,6 @@ def test_process_folders_to_groups(
     # Note: clean_filename removes trailing numbers, so "v2" becomes "v"
     assert entry_map["banana v2"].processed_name == "banana v"
     assert entry_map["banana v2"].pre_processed_name == "banana v2"
-
-
-# Test refine_groups with singleton clusters
-def test_refine_groups_singletons(
-    index_session, work_session, sample_run, sample_snapshot
-):
-    # Create iteration records
-    iteration0 = cast(
-        GroupIteration,
-        GroupIterationFactory(
-            id=0,
-            description="test iteration 0",
-            run=sample_run,
-        ),
-    )
-    GroupIterationFactory(
-        id=1,
-        description="test iteration 1",
-        run=sample_run,
-    )
-
-    # Set up entries with different cluster IDs (singletons)
-    entries: list[GroupCategoryEntry] = [
-        cast(
-            GroupCategoryEntry,
-            GroupCategoryEntryFactory(
-                folder_id=1,
-                cluster_id=1,
-                pre_processed_name="apple",
-                processed_name="apple",
-                path="/test/apple",
-                confidence=1.0,
-                iteration=iteration0,
-            ),
-        ),
-        cast(
-            GroupCategoryEntry,
-            GroupCategoryEntryFactory(
-                folder_id=2,
-                cluster_id=2,
-                pre_processed_name="banana",
-                processed_name="banana",
-                path="/test/banana",
-                confidence=1.0,
-                iteration=iteration0,
-            ),
-        ),
-    ]
-
-    # Run the function
-    next_group_id = 1
-    refine_groups(work_session, entries, 1, next_group_id=next_group_id)
-
-    # Verify groups were created properly
-    groups = work_session.query(GroupCategory).all()
-    assert len(groups) == 2
-
-    # Verify entries updated
-    updated_entries = work_session.query(GroupCategoryEntry).all()
-    for entry in updated_entries:
-        assert entry.processed is True
-        assert next_group_id == entry.group_id
-        next_group_id += 1
-
-
-# Test refine_groups with clustered items
-def test_refine_groups_clusters(
-    index_session, work_session, sample_run, sample_snapshot
-):
-    # Create iteration records
-    iteration0 = cast(
-        GroupIteration,
-        GroupIterationFactory(
-            id=0,
-            description="test iteration 0",
-            run=sample_run,
-        ),
-    )
-    GroupIterationFactory(
-        id=1,
-        description="test iteration 1",
-        run=sample_run,
-    )
-
-    # Set up entries with same cluster ID for apple items
-    entries: list[GroupCategoryEntry] = [
-        cast(
-            GroupCategoryEntry,
-            GroupCategoryEntryFactory(
-                folder_id=1,
-                cluster_id=1,
-                pre_processed_name="apple pie",
-                processed_name="apple pie",
-                path="/test/apple pie",
-                confidence=1.0,
-                iteration=iteration0,
-            ),
-        ),
-        cast(
-            GroupCategoryEntry,
-            GroupCategoryEntryFactory(
-                folder_id=2,
-                cluster_id=1,
-                pre_processed_name="apple tart",
-                processed_name="apple tart",
-                path="/test/apple tart",
-                confidence=1.0,
-                iteration=iteration0,
-            ),
-        ),
-        cast(
-            GroupCategoryEntry,
-            GroupCategoryEntryFactory(
-                folder_id=3,
-                cluster_id=2,
-                pre_processed_name="banana",
-                processed_name="banana",
-                path="/test/banana",
-                confidence=1.0,
-                iteration=iteration0,
-            ),
-        ),
-    ]
-
-    # Run the function
-    next_group_id = 1
-    refine_groups(work_session, entries, 1, next_group_id=next_group_id)
-
-    # Verify groups were created properly - at least 3 groups should exist
-    groups = work_session.query(GroupCategory).all()
-    assert len(groups) == 4
-    group_names = [g.name for g in groups]
-    assert set(group_names) == {"apple", "tart", "pie", "banana"}
-
-    # Verify entries were processed - should be marked as processed
-    apple_entries = (
-        work_session.query(GroupCategoryEntry)
-        .filter(GroupCategoryEntry.pre_processed_name.in_(["apple pie", "apple tart"]))
-        .all()
-    )
-
-    assert len(apple_entries) == 4
-    categories = [e.processed_name for e in apple_entries]
-    assert set(categories) == {"apple", "tart", "pie"}
-    for entry in apple_entries:
-        assert entry.processed is True
-
-    # Check banana entry is processed
-    banana_entry = (
-        work_session.query(GroupCategoryEntry)
-        .filter(GroupCategoryEntry.pre_processed_name == "banana")
-        .one()
-    )
-    assert banana_entry is not None
-    assert banana_entry.processed is True
-    assert banana_entry.processed_name == "banana"
 
 
 # Test common_token_grouping for integration with refine_groups

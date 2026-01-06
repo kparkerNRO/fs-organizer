@@ -13,7 +13,7 @@ from typing import List, Optional
 from sqlalchemy import Float, ForeignKey, Index, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from storage.db_helpers import DateTime, JsonDict, JsonList
+from storage.db_types import DateTime, JsonDict, JsonList
 
 # Schema version (increment on breaking changes)
 WORK_SCHEMA_VERSION = "1.0.0"
