@@ -160,6 +160,14 @@ build-electron-pack:
 lint-frontend:
     cd frontend && npm run lint
 
+# Format frontend code with Prettier
+format-frontend:
+    cd frontend && npx prettier --write "src/**/*.{ts,tsx,js,jsx,json,css}"
+
+# Check frontend code formatting with Prettier
+check-format-frontend:
+    cd frontend && npx prettier --check "src/**/*.{ts,tsx,js,jsx,json,css}"
+
 # Run frontend tests
 test-frontend:
     cd frontend && npm run test:run
@@ -183,7 +191,7 @@ install: install-backend install-frontend
 lint: lint-backend lint-frontend
 
 # Format all code
-format: format-backend
+format: format-backend format-frontend
 
 # Run all tests
 test: test-backend test-frontend

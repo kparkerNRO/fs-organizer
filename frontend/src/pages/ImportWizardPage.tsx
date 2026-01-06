@@ -590,7 +590,7 @@ const OrganizeStep: React.FC<StepProps> = ({
 }) => {
   const [abortController, setAbortController] =
     React.useState<AbortController | null>(null);
-  // Use a ref to prevent double-triggering 
+  // Use a ref to prevent double-triggering
   const hasInitiatedFolders = React.useRef(false);
 
   React.useEffect(() => {

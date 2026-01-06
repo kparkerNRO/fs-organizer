@@ -29,7 +29,7 @@ export interface FolderTreeOperationResult {
 // Helper function to check if a node is a file
 export const isFileNode = (node: FolderTreeNode): node is File => {
   // Ensure node is a valid object
-  if (!node || typeof node !== 'object') {
+  if (!node || typeof node !== "object") {
     return false;
   }
 

@@ -123,7 +123,10 @@ class TestGetCategoriesForPath:
             iteration_id=sample_iteration.id,
         )
 
-        assert [category.processed_name for category in result] == ["art_category", "digital_art"]
+        assert [category.processed_name for category in result] == [
+            "art_category",
+            "digital_art",
+        ]
 
     def test_get_categories_for_path_zip_matching(
         self,
