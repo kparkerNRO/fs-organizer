@@ -271,8 +271,7 @@ def apply_group_cleanup(
 
         # Create a mapping from original name to entry for quick lookup
         name_to_entry = {
-            entry.processed_name or entry.pre_processed_name: entry
-            for entry in entries
+            entry.processed_name or entry.pre_processed_name: entry for entry in entries
         }
 
         # Create new entries based on refined groups
