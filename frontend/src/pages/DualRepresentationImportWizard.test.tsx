@@ -238,7 +238,7 @@ describe("DualRepresentationImportWizard", () => {
       },
     };
 
-    global.AbortController = vi.fn(() => mockAbortController) as any;
+    global.AbortController = vi.fn(() => mockAbortController) as unknown as typeof AbortController;
 
     vi.mocked(api.gatherFiles).mockImplementation(() => new Promise(() => {}));
 

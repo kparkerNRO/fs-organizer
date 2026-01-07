@@ -15,6 +15,7 @@ import {
 import { selectFolder } from "../utils/folderSelection";
 import { HierarchyBrowser } from "../components/HierarchyBrowser";
 import { useDualRepresentation } from "../hooks/useDualRepresentation";
+import { DualRepresentation, HierarchyItem } from "../types/types";
 
 interface WizardState {
   currentStep: number;
@@ -282,7 +283,7 @@ const GatherStep: React.FC<GatherStepProps> = ({
 };
 
 interface ViewStepProps {
-  dualRep: any;
+  dualRep: DualRepresentation | null;
   isDualRepLoading: boolean;
   dualRepError: Error | null;
   highlightedItemId: string | null;
@@ -351,13 +352,13 @@ const ViewStep: React.FC<ViewStepProps> = ({
           <Stat>
             <StatLabel>Nodes:</StatLabel>
             <StatValue>
-              {Object.values(dualRep.items).filter((item: any) => item.type === 'node').length}
+              {Object.values(dualRep.items).filter((item: HierarchyItem) => item.type === 'node').length}
             </StatValue>
           </Stat>
           <Stat>
             <StatLabel>Categories:</StatLabel>
             <StatValue>
-              {Object.values(dualRep.items).filter((item: any) => item.type === 'category').length}
+              {Object.values(dualRep.items).filter((item: HierarchyItem) => item.type === 'category').length}
             </StatValue>
           </Stat>
         </StatsRow>
