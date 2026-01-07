@@ -140,7 +140,7 @@ def get_max_common_words(tokens, name_to_comp):
 
 
 def common_token_grouping(
-    names_to_group: list, overlap_func=get_max_common_words, prefer_longer_names=False
+    names_to_group: list, overlap_func=get_max_common_words, prefer_longer_names=True
 ) -> Optional[dict[str, list[str]]]:
     if len(names_to_group) == 0:
         return None

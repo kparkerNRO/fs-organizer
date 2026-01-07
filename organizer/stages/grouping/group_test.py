@@ -106,8 +106,8 @@ def test_process_folders_to_groups(
                 "A wild test three",
             ],
             {
-                "A wild test one": ["A wild", "test one"],
-                "A wild test three": ["A wild", "test three"],
+                "A wild test one": ["A wild test", "one"],
+                "A wild test three": ["A wild test", "three"],
                 "A wild two": ["A wild", "two"],
                 "A wild four": ["A wild", "four"],
             },
@@ -123,8 +123,8 @@ def test_process_folders_to_groups(
                 "A wild four",
             ],
             {
-                "A wild test one": ["A wild", "test one"],
-                "A wild test three": ["A wild", "test three"],
+                "A wild test one": ["A wild test", "one"],
+                "A wild test three": ["A wild test", "three"],
                 "A wild two": ["A wild", "two"],
                 "A wild four": ["A wild", "four"],
             },
