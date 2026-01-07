@@ -5,7 +5,6 @@ This module tests the _apply_folder_name_grouping function which identifies
 common prefixes in folder names and creates hierarchical group structures.
 """
 
-import pytest
 from storage.factories import NodeFactory
 from storage.manager import NodeKind
 from storage.work_models import GroupCategoryEntry, GroupIteration
