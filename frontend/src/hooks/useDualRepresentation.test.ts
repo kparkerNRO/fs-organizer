@@ -36,7 +36,8 @@ describe("useDualRepresentation", () => {
     const { result } = renderHook(() => useDualRepresentation());
 
     expect(result.current.dualRep).toBeNull();
-    expect(result.current.isLoading).toBe(false);
+    // isLoading is true because the hook auto-fetches on mount
+    expect(result.current.isLoading).toBe(true);
     expect(result.current.error).toBeNull();
     expect(result.current.hasPendingChanges).toBe(false);
     expect(result.current.highlightedItemId).toBeNull();

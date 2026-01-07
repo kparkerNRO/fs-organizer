@@ -50,9 +50,9 @@ describe("featureFlags", () => {
 
     // Should fall back to defaults
     expect(featureFlags.useDualRepresentation).toBe(false);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to parse feature flags")
-    );
+    expect(consoleWarnSpy).toHaveBeenCalled();
+    // Check that the first argument contains the expected message
+    expect(consoleWarnSpy.mock.calls[0][0]).toContain("Failed to parse feature flags");
 
     consoleWarnSpy.mockRestore();
   });
