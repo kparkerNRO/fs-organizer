@@ -54,9 +54,7 @@ def build_dual_representation(
     if run_id:
         with storage_manager.get_work_session() as work_session:
             # Build category hierarchy from work.db
-            _build_category_hierarchy(
-                work_session, run_id, items, category_hierarchy
-            )
+            _build_category_hierarchy(work_session, run_id, items, category_hierarchy)
 
     return DualRepresentation(
         items=items,

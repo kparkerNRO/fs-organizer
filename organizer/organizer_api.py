@@ -13,7 +13,12 @@ from data_models.pipeline import (
     FolderV2,
     PipelineStage,
 )
-from api.models import AsyncTaskResponse, GatherRequest, DualRepresentation, HierarchyDiff
+from api.models import (
+    AsyncTaskResponse,
+    GatherRequest,
+    DualRepresentation,
+    HierarchyDiff,
+)
 from api.profiling import ProfilingMiddleware, is_profiling_enabled
 from api.tasks import TaskInfo, TaskStatus, create_task, tasks, update_task
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException

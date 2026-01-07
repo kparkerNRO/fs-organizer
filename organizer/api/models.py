@@ -61,14 +61,16 @@ class FolderViewResponse(BaseModel):
 
 class HierarchyItem(BaseModel):
     """Represents either a file/directory from the filesystem (Node) or a semantic category."""
+
     id: str  # e.g., "node-123", "category-456"
     name: str
-    type: Literal['node', 'category']
+    type: Literal["node", "category"]
     originalPath: Optional[str] = None  # For nodes
 
 
 class DualRepresentation(BaseModel):
     """The complete data structure sent from the backend containing dual hierarchies."""
+
     items: Dict[str, HierarchyItem]
     node_hierarchy: Dict[str, List[str]]
     category_hierarchy: Dict[str, List[str]]
@@ -76,5 +78,6 @@ class DualRepresentation(BaseModel):
 
 class HierarchyDiff(BaseModel):
     """Represents changes made by the user on the frontend (moving nodes between categories)."""
+
     added: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were added
     deleted: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were removed

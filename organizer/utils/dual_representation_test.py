@@ -5,9 +5,6 @@ from pathlib import Path
 import pytest
 
 from storage.factories import (
-    GroupCategoryEntryFactory,
-    GroupCategoryFactory,
-    GroupIterationFactory,
     NodeFactory,
     RunFactory,
     SnapshotFactory,
@@ -54,7 +51,7 @@ def setup_test_data(storage_manager: StorageManager):
             abs_path="/test/docs",
             rel_path="docs",
         )
-        child_node2 = NodeFactory(
+        NodeFactory(
             id=3,
             snapshot_id=snapshot.id,
             name="file.txt",
@@ -71,7 +68,12 @@ def setup_test_data(storage_manager: StorageManager):
     with storage_manager.get_work_session() as work_session:
         # Create models directly to avoid SubFactory issues
         from datetime import datetime
-        from storage.work_models import Run, GroupIteration, GroupCategory, GroupCategoryEntry
+        from storage.work_models import (
+            Run,
+            GroupIteration,
+            GroupCategory,
+            GroupCategoryEntry,
+        )
 
         # Create run
         run = Run(snapshot_id=snapshot_id, started_at=datetime.now())
@@ -119,13 +121,13 @@ class TestBuildDualRepresentation:
             SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
             snapshot = SnapshotFactory(id=1)
             index_session.commit()
-            snapshot_id = snapshot.id
+            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
 
         with storage_manager.get_work_session() as work_session:
             RunFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
             run = RunFactory(id=1, snapshot_id=snapshot_id)
             work_session.commit()
-            run_id = run.id
+            run_id: int = run.id  # type: ignore[attr-defined]
 
         dual_rep = build_dual_representation(
             storage_manager,
@@ -149,14 +151,14 @@ class TestBuildDualRepresentation:
             snapshot = SnapshotFactory(id=1)
 
             NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            node = NodeFactory(
+            NodeFactory(
                 id=1,
                 snapshot_id=snapshot.id,
                 name="test_node",
                 kind=NodeKind.DIR,
             )
             index_session.commit()
-            snapshot_id = snapshot.id
+            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
 
         dual_rep = build_dual_representation(
             storage_manager,
@@ -223,7 +225,9 @@ class TestBuildDualRepresentation:
         assert dir_item.name == "docs"
         assert dir_item.originalPath == "/test/docs"
 
-    def test_category_properties(self, storage_manager: StorageManager, setup_test_data):
+    def test_category_properties(
+        self, storage_manager: StorageManager, setup_test_data
+    ):
         """Test that category items have correct properties."""
         snapshot_id, run_id = setup_test_data
 
@@ -239,7 +243,9 @@ class TestBuildDualRepresentation:
         assert category_item.name == "Work Documents"
         assert category_item.originalPath is None
 
-    def test_hierarchy_structure(self, storage_manager: StorageManager, setup_test_data):
+    def test_hierarchy_structure(
+        self, storage_manager: StorageManager, setup_test_data
+    ):
         """Test that hierarchies are correctly structured."""
         snapshot_id, run_id = setup_test_data
 
@@ -266,7 +272,7 @@ class TestBuildDualRepresentation:
             NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
             NodeFactory(id=1, snapshot_id=snapshot.id, name="test", kind=NodeKind.DIR)
             index_session.commit()
-            snapshot_id = snapshot.id
+            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
 
         dual_rep = build_dual_representation(
             storage_manager,

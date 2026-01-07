@@ -57,23 +57,23 @@ def setup_complete_data(storage_manager: StorageManager):
         run = RunFactory(id=1, snapshot_id=snapshot_id)
 
         GroupIterationFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        iteration = GroupIterationFactory(id=1, run_id=run.id, snapshot_id=snapshot_id)
+        iteration = GroupIterationFactory(id=1, run_id=run.id, snapshot_id=snapshot_id)  # type: ignore[attr-defined]
 
         GroupCategoryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
         category = GroupCategoryFactory(
-            id=1, iteration_id=iteration.id, name="Personal"
+            id=1, iteration_id=iteration.id, name="Personal"  # type: ignore[attr-defined]
         )
 
         GroupCategoryEntryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
         GroupCategoryEntryFactory(
             folder_id=child_node_id,
-            group_id=category.id,
-            iteration_id=iteration.id,
+            group_id=category.id,  # type: ignore[attr-defined]
+            iteration_id=iteration.id,  # type: ignore[attr-defined]
             processed_name="Personal",
         )
 
         work_session.commit()
-        run_id = run.id
+        run_id = run.id  # type: ignore[attr-defined]
 
     return snapshot_id, run_id
 
@@ -102,7 +102,9 @@ class TestGetDualRepresentationEndpoint:
         # - Items contain both nodes and categories
         pass
 
-    def test_response_structure(self, storage_manager: StorageManager, setup_complete_data):
+    def test_response_structure(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test that response has correct structure."""
         # Direct test of the logic without HTTP layer
         from utils.dual_representation import build_dual_representation
@@ -161,7 +163,9 @@ class TestApplyHierarchyDiffEndpoint:
             assert log_entry.run_id == run_id
             assert log_entry.diff == diff.model_dump()
 
-    def test_diff_with_additions(self, storage_manager: StorageManager, setup_complete_data):
+    def test_diff_with_additions(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test applying a diff with additions."""
         from api.models import HierarchyDiff
 
@@ -185,7 +189,9 @@ class TestApplyHierarchyDiffEndpoint:
             assert "added" in log_entry.diff
             assert log_entry.diff["added"]["category-1"] == ["node-1", "node-2"]
 
-    def test_diff_with_deletions(self, storage_manager: StorageManager, setup_complete_data):
+    def test_diff_with_deletions(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test applying a diff with deletions."""
         from api.models import HierarchyDiff
 
@@ -238,7 +244,9 @@ class TestApplyHierarchyDiffEndpoint:
             assert len(log_entry.diff["added"]) == 2
             assert len(log_entry.diff["deleted"]) == 1
 
-    def test_multiple_diffs_logged(self, storage_manager: StorageManager, setup_complete_data):
+    def test_multiple_diffs_logged(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test that multiple diffs can be logged."""
         from api.models import HierarchyDiff
 
@@ -266,7 +274,9 @@ class TestApplyHierarchyDiffEndpoint:
             assert len(logs) == 2
             assert logs[0].id != logs[1].id
 
-    def test_diff_log_timestamp(self, storage_manager: StorageManager, setup_complete_data):
+    def test_diff_log_timestamp(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test that diff log includes timestamp."""
         from api.models import HierarchyDiff
 
@@ -287,7 +297,9 @@ class TestApplyHierarchyDiffEndpoint:
 class TestDualRepresentationIntegration:
     """Integration tests for the dual representation system."""
 
-    def test_end_to_end_workflow(self, storage_manager: StorageManager, setup_complete_data):
+    def test_end_to_end_workflow(
+        self, storage_manager: StorageManager, setup_complete_data
+    ):
         """Test the complete workflow from building to applying diffs."""
         from api.models import HierarchyDiff
         from utils.dual_representation import build_dual_representation
