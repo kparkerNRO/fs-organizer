@@ -27,7 +27,6 @@ export const DualRepresentationExample: React.FC = () => {
     setView,
     getItem,
     getChildren,
-    moveItem,
   } = useDualRepresentation();
 
   // Render a single item in the hierarchy

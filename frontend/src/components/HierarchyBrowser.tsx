@@ -7,7 +7,7 @@
 
 import React from "react";
 import styled from "styled-components";
-import { HierarchyItem, ItemStore, Hierarchy } from "../types/types";
+import { ItemStore, Hierarchy } from "../types/types";
 
 interface HierarchyBrowserProps {
   items: ItemStore;

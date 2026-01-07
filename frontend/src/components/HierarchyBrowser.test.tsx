@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "../test/utils";
 import { HierarchyBrowser } from "./HierarchyBrowser";
-import { HierarchyItem, ItemStore, Hierarchy } from "../types/types";
+import { ItemStore, Hierarchy } from "../types/types";
 
 const createMockItems = (): ItemStore => ({
   "node-root": {
@@ -200,7 +200,7 @@ describe("HierarchyBrowser", () => {
     const items = createMockItems();
     const hierarchy = createMockHierarchy();
 
-    const { container } = render(
+    render(
       <HierarchyBrowser
         items={items}
         hierarchy={hierarchy}

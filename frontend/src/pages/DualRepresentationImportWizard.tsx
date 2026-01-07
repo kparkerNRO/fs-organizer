@@ -10,7 +10,7 @@ import styled from "styled-components";
 import {
   gatherFiles,
   groupFolders as apiGroupFolders,
-  getDualRepresentation,
+
 } from "../api";
 import { selectFolder } from "../utils/folderSelection";
 import { HierarchyBrowser } from "../components/HierarchyBrowser";

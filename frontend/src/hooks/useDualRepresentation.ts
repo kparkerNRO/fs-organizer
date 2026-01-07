@@ -13,7 +13,7 @@ import {
   DualRepresentation,
   HierarchyDiff,
   HierarchyItem,
-  Hierarchy,
+
 } from "../types/types";
 import { getDualRepresentation, applyHierarchyDiff } from "../api";
 

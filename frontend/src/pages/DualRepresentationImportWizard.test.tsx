@@ -9,20 +9,6 @@ vi.mock("../api");
 vi.mock("../utils/folderSelection");
 vi.mock("../hooks/useDualRepresentation");
 
-const mockDualRep = {
-  items: {
-    "node-root": { id: "node-root", name: "root", type: "node" as const },
-    "node-1": { id: "node-1", name: "Documents", type: "node" as const },
-    "category-root": { id: "category-root", name: "Categories", type: "category" as const },
-    "category-1": { id: "category-1", name: "Work", type: "category" as const },
-  },
-  node_hierarchy: {
-    "node-root": ["node-1"],
-  },
-  category_hierarchy: {
-    "category-root": ["category-1"],
-  },
-};
 
 // Mock the useDualRepresentation hook
 vi.mock("../hooks/useDualRepresentation", () => ({

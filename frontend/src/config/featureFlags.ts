@@ -96,7 +96,9 @@ if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV
 
   // Make functions available globally in development
   if (typeof window !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).setFeatureFlag = setFeatureFlag;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).resetFeatureFlags = resetFeatureFlags;
   }
 }
