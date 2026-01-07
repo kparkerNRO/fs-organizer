@@ -9,7 +9,6 @@ vi.mock("../api");
 vi.mock("../utils/folderSelection");
 vi.mock("../hooks/useDualRepresentation");
 
-
 // Mock the useDualRepresentation hook
 vi.mock("../hooks/useDualRepresentation", () => ({
   useDualRepresentation: () => ({
@@ -43,7 +42,9 @@ describe("DualRepresentationImportWizard", () => {
   it("renders the wizard with step 1 initially", () => {
     render(<DualRepresentationImportWizard />);
 
-    expect(screen.getByText("Import Wizard (Dual Representation)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Import Wizard (Dual Representation)"),
+    ).toBeInTheDocument();
     expect(screen.getByText("EXPERIMENTAL")).toBeInTheDocument();
     expect(screen.getByText("1. Gather & Group")).toBeInTheDocument();
   });
@@ -57,7 +58,9 @@ describe("DualRepresentationImportWizard", () => {
   it("displays folder input and buttons", () => {
     render(<DualRepresentationImportWizard />);
 
-    expect(screen.getByPlaceholderText("Select folder or enter path...")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Select folder or enter path..."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Browse")).toBeInTheDocument();
     expect(screen.getByText("Process")).toBeInTheDocument();
   });
@@ -65,7 +68,9 @@ describe("DualRepresentationImportWizard", () => {
   it("allows typing in folder path", () => {
     render(<DualRepresentationImportWizard />);
 
-    const input = screen.getByPlaceholderText("Select folder or enter path...") as HTMLInputElement;
+    const input = screen.getByPlaceholderText(
+      "Select folder or enter path...",
+    ) as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: "/test/path" } });
 
@@ -117,7 +122,9 @@ describe("DualRepresentationImportWizard", () => {
     render(<DualRepresentationImportWizard />);
 
     const browseButton = screen.getByText("Browse");
-    const input = screen.getByPlaceholderText("Select folder or enter path...") as HTMLInputElement;
+    const input = screen.getByPlaceholderText(
+      "Select folder or enter path...",
+    ) as HTMLInputElement;
 
     fireEvent.click(browseButton);
 
@@ -135,7 +142,9 @@ describe("DualRepresentationImportWizard", () => {
     render(<DualRepresentationImportWizard />);
 
     const browseButton = screen.getByText("Browse");
-    const input = screen.getByPlaceholderText("Select folder or enter path...") as HTMLInputElement;
+    const input = screen.getByPlaceholderText(
+      "Select folder or enter path...",
+    ) as HTMLInputElement;
 
     fireEvent.click(browseButton);
 
@@ -158,7 +167,9 @@ describe("DualRepresentationImportWizard", () => {
     fireEvent.click(processButton);
 
     await waitFor(() => {
-      expect(screen.getByText("Processing folder structure...")).toBeInTheDocument();
+      expect(
+        screen.getByText("Processing folder structure..."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -183,7 +194,9 @@ describe("DualRepresentationImportWizard", () => {
 
     expect(screen.getByText("🚀 Dual Representation Mode")).toBeInTheDocument();
     expect(
-      screen.getByText(/This experimental version uses the new dual representation API/i)
+      screen.getByText(
+        /This experimental version uses the new dual representation API/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -206,10 +219,14 @@ describe("DualRepresentationImportWizard", () => {
   });
 
   it("handles processing errors gracefully", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
 
-    vi.mocked(api.gatherFiles).mockRejectedValue(new Error("Processing failed"));
+    vi.mocked(api.gatherFiles).mockRejectedValue(
+      new Error("Processing failed"),
+    );
 
     render(<DualRepresentationImportWizard />);
 
@@ -221,7 +238,7 @@ describe("DualRepresentationImportWizard", () => {
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
-        "Error processing folder. See console for details."
+        "Error processing folder. See console for details.",
       );
     });
 
@@ -238,7 +255,9 @@ describe("DualRepresentationImportWizard", () => {
       },
     };
 
-    global.AbortController = vi.fn(() => mockAbortController) as unknown as typeof AbortController;
+    global.AbortController = vi.fn(
+      () => mockAbortController,
+    ) as unknown as typeof AbortController;
 
     vi.mocked(api.gatherFiles).mockImplementation(() => new Promise(() => {}));
 

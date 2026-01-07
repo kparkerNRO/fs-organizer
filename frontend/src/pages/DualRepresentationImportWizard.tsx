@@ -7,11 +7,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import styled from "styled-components";
-import {
-  gatherFiles,
-  groupFolders as apiGroupFolders,
-
-} from "../api";
+import { gatherFiles, groupFolders as apiGroupFolders } from "../api";
 import { selectFolder } from "../utils/folderSelection";
 import { HierarchyBrowser } from "../components/HierarchyBrowser";
 import { useDualRepresentation } from "../hooks/useDualRepresentation";
@@ -48,7 +44,7 @@ export const DualRepresentationImportWizard: React.FC = () => {
   } = useDualRepresentation();
 
   const updateState = useCallback((updates: Partial<WizardState>) => {
-    setState(prev => ({ ...prev, ...updates }));
+    setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const nextStep = () => {
@@ -97,7 +93,10 @@ export const DualRepresentationImportWizard: React.FC = () => {
         <Title>Import Wizard (Dual Representation)</Title>
         <FeatureBadge>EXPERIMENTAL</FeatureBadge>
         <StepIndicator>
-          <StepItem active={state.currentStep === 1} completed={state.currentStep > 1}>
+          <StepItem
+            active={state.currentStep === 1}
+            completed={state.currentStep > 1}
+          >
             1. Gather & Group
           </StepItem>
           <StepItem active={state.currentStep === 2} completed={false}>
@@ -123,7 +122,8 @@ const GatherStep: React.FC<GatherStepProps> = ({
   onNext,
   fetchDualRep,
 }) => {
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [abortController, setAbortController] =
+    useState<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
@@ -165,7 +165,7 @@ const GatherStep: React.FC<GatherStepProps> = ({
       await gatherFiles(
         state.sourcePath,
         (progress) => updateState({ progress: Math.round(progress * 100) }),
-        controller.signal
+        controller.signal,
       );
 
       if (controller.signal.aborted) return;
@@ -179,7 +179,7 @@ const GatherStep: React.FC<GatherStepProps> = ({
       // Step 2: Group
       await apiGroupFolders(
         (progress) => updateState({ progress: Math.round(progress * 100) }),
-        controller.signal
+        controller.signal,
       );
 
       if (controller.signal.aborted) return;
@@ -226,8 +226,9 @@ const GatherStep: React.FC<GatherStepProps> = ({
       <InfoBox>
         <InfoTitle>🚀 Dual Representation Mode</InfoTitle>
         <InfoText>
-          This experimental version uses the new dual representation API, which provides
-          a unified view of both your original folder structure and the categorized organization.
+          This experimental version uses the new dual representation API, which
+          provides a unified view of both your original folder structure and the
+          categorized organization.
         </InfoText>
       </InfoBox>
 
@@ -352,13 +353,21 @@ const ViewStep: React.FC<ViewStepProps> = ({
           <Stat>
             <StatLabel>Nodes:</StatLabel>
             <StatValue>
-              {Object.values(dualRep.items).filter((item: HierarchyItem) => item.type === 'node').length}
+              {
+                Object.values(dualRep.items).filter(
+                  (item: HierarchyItem) => item.type === "node",
+                ).length
+              }
             </StatValue>
           </Stat>
           <Stat>
             <StatLabel>Categories:</StatLabel>
             <StatValue>
-              {Object.values(dualRep.items).filter((item: HierarchyItem) => item.type === 'category').length}
+              {
+                Object.values(dualRep.items).filter(
+                  (item: HierarchyItem) => item.type === "category",
+                ).length
+              }
             </StatValue>
           </Stat>
         </StatsRow>
@@ -472,7 +481,7 @@ const StepItem = styled.div<{ active: boolean; completed: boolean }>`
   border: 1px solid transparent;
   user-select: none;
 
-  ${props => {
+  ${(props) => {
     if (props.active) {
       return `
         background-color: #2563eb;
@@ -635,11 +644,11 @@ const BrowseButton = styled(BaseButton)`
 `;
 
 const ProcessButton = styled(BaseButton)<{ $isCancel?: boolean }>`
-  background-color: ${props => props.$isCancel ? '#ef4444' : '#2563eb'};
+  background-color: ${(props) => (props.$isCancel ? "#ef4444" : "#2563eb")};
   color: white;
 
   &:hover:not(:disabled) {
-    background-color: ${props => props.$isCancel ? '#dc2626' : '#1d4ed8'};
+    background-color: ${(props) => (props.$isCancel ? "#dc2626" : "#1d4ed8")};
   }
 `;
 
