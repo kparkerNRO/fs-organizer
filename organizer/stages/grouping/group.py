@@ -311,9 +311,7 @@ def group_folders(
 
         decompose_compound_tags(work_session, run_id=run.id, snapshot_id=snapshot_id)
 
-        apply_folder_name_grouping(
-            work_session, run_id=run.id, snapshot_id=snapshot_id
-        )
+        apply_folder_name_grouping(work_session, run_id=run.id, snapshot_id=snapshot_id)
 
         _compact_groups(
             work_session=work_session,
