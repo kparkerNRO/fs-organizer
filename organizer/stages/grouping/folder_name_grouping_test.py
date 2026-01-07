@@ -10,7 +10,10 @@ from storage.factories import NodeFactory
 from storage.manager import NodeKind
 from storage.work_models import GroupCategoryEntry, GroupIteration
 
-from stages.grouping.group import _apply_folder_name_grouping, _is_valid_group_prefix
+from stages.grouping.folder_name_grouping import (
+    apply_folder_name_grouping,
+    _is_valid_group_prefix,
+)
 
 
 class TestIsValidGroupPrefix:
@@ -108,7 +111,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -213,7 +216,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -295,7 +298,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -389,7 +392,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -468,7 +471,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -558,7 +561,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -589,7 +592,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
@@ -649,7 +652,7 @@ class TestApplyFolderNameGrouping:
         work_session.commit()
 
         # Apply folder name grouping
-        _apply_folder_name_grouping(
+        apply_folder_name_grouping(
             work_session, run_id=sample_run.id, snapshot_id=sample_snapshot.id
         )
 
