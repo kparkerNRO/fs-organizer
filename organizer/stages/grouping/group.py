@@ -19,6 +19,7 @@ from utils.filename_processing import clean_filename, split_view_type
 
 from stages.grouping.tag_decomposition import decompose_compound_tags
 from stages.grouping.folder_name_grouping import apply_folder_name_grouping
+from stages.grouping.group_cleanup import apply_group_cleanup
 
 REVIEW_CONFIDENCE_THRESHOLD = 0.7
 logger = getLogger(__name__)
@@ -312,6 +313,8 @@ def group_folders(
         decompose_compound_tags(work_session, run_id=run.id, snapshot_id=snapshot_id)
 
         apply_folder_name_grouping(work_session, run_id=run.id, snapshot_id=snapshot_id)
+
+        apply_group_cleanup(work_session, run_id=run.id, snapshot_id=snapshot_id)
 
         _compact_groups(
             work_session=work_session,

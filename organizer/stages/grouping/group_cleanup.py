@@ -1,15 +1,23 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from logging import getLogger
 from typing import Optional
+
+from rapidfuzz.distance import Levenshtein
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from wordfreq import zipf_frequency
+
 from stages.grouping.helpers import (
     common_token_grouping,
+    get_next_iteration_id,
     has_number_difference,
     normalized_grouping,
     spelling_grouping,
 )
+from storage.work_models import GroupCategoryEntry, GroupIteration
 
-from nltk.metrics import edit_distance
+logger = getLogger(__name__)
 
 
 @dataclass
@@ -82,8 +90,8 @@ def _unify_category_spelling(group_to_entries: dict[str, list[GroupEntry]]):
             if group_name == compare_group:
                 continue
 
-            if edit_distance(
-                group_name, compare_group, transpositions=True
+            if Levenshtein.distance(
+                group_name, compare_group
             ) < 3 and not has_number_difference(group_name, compare_group):
                 # see if one of them is a real word
                 freq_group = zipf_frequency(group_name, "en")
@@ -141,7 +149,7 @@ def _process_outliers(group_to_entries: dict[str, list[GroupEntry]]):
 
         group_entry = entries[0]
         edit_dists = [
-            edit_distance(comp_file, group_entry.original_name, transpositions=True)
+            Levenshtein.distance(comp_file, group_entry.original_name)
             for comp_file in filenames_in_main
         ]
         min_edit_dist = min(edit_dists) or 1
@@ -208,3 +216,99 @@ def refine_group(filenames: list[str]) -> dict[str, list[GroupEntry]]:
     _process_ungrouped(refined_groups, filenames)
 
     return refined_groups
+
+
+def apply_group_cleanup(
+    session: Session,
+    run_id: int,
+    snapshot_id: int,
+) -> None:
+    """
+    Apply group cleanup to refine and merge similar group names.
+    This step processes groups from the previous iteration and applies normalization,
+    spelling correction, and similarity-based merging to clean up group names.
+    """
+    logger.info("Applying group cleanup")
+
+    # Get the current iteration ID and create a new iteration
+    iteration_id = get_next_iteration_id(session)
+
+    iteration = GroupIteration(
+        id=iteration_id,
+        run_id=run_id,
+        snapshot_id=snapshot_id,
+        description="Group cleanup and refinement",
+    )
+    session.add(iteration)
+    session.flush()
+
+    # Get entries from the previous iteration
+    stmt = select(GroupCategoryEntry).where(
+        GroupCategoryEntry.iteration_id == iteration_id - 1
+    )
+    previous_entries = session.scalars(stmt).all()
+
+    if not previous_entries:
+        logger.info("No entries to process")
+        return
+
+    # Group entries by folder_id
+    folder_to_entries = defaultdict(list)
+    for entry in previous_entries:
+        folder_to_entries[entry.folder_id].append(entry)
+
+    # Process each folder's entries
+    for folder_id, entries in folder_to_entries.items():
+        # Extract the processed names for this folder
+        names = [entry.processed_name or entry.pre_processed_name for entry in entries]
+        names = [name for name in names if name]  # Filter out None/empty
+
+        if not names:
+            continue
+
+        # Apply the refinement logic
+        refined_groups = refine_group(names)
+
+        # Create a mapping from original name to entry for quick lookup
+        name_to_entry = {
+            entry.processed_name or entry.pre_processed_name: entry for entry in entries
+        }
+
+        # Create new entries based on refined groups
+        for group_name, group_entries in refined_groups.items():
+            for group_entry in group_entries:
+                original_entry = name_to_entry.get(group_entry.original_name)
+                if not original_entry:
+                    continue
+
+                # Create entries for all categories if they exist
+                if group_entry.categories and len(group_entry.categories) > 1:
+                    # Multiple categories - create an entry for each
+                    for category in group_entry.categories:
+                        new_entry = GroupCategoryEntry(
+                            folder_id=folder_id,
+                            iteration_id=iteration_id,
+                            pre_processed_name=original_entry.pre_processed_name,
+                            processed_name=category,
+                            path=original_entry.path,
+                            confidence=group_entry.confidence,
+                            processed=False,
+                            derived_names=original_entry.derived_names,
+                        )
+                        session.add(new_entry)
+                else:
+                    # Single category or grouped name
+                    new_entry = GroupCategoryEntry(
+                        folder_id=folder_id,
+                        iteration_id=iteration_id,
+                        pre_processed_name=original_entry.pre_processed_name,
+                        processed_name=group_entry.grouped_name,
+                        path=original_entry.path,
+                        confidence=group_entry.confidence,
+                        processed=False,
+                        derived_names=original_entry.derived_names,
+                    )
+                    session.add(new_entry)
+
+    session.commit()
+    logger.info("Group cleanup complete")
