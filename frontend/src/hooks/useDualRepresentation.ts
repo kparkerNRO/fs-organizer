@@ -13,7 +13,6 @@ import {
   DualRepresentation,
   HierarchyDiff,
   HierarchyItem,
-
 } from "../types/types";
 import { getDualRepresentation, applyHierarchyDiff } from "../api";
 
@@ -29,7 +28,7 @@ export interface DualRepresentationState {
 
   // UI state
   highlightedItemId: string | null;
-  selectedView: 'node' | 'category';
+  selectedView: "node" | "category";
 }
 
 export interface DualRepresentationActions {
@@ -48,11 +47,11 @@ export interface DualRepresentationActions {
 
   // UI operations
   highlightItem: (itemId: string | null) => void;
-  setView: (view: 'node' | 'category') => void;
+  setView: (view: "node" | "category") => void;
 
   // Utility functions
   getItem: (itemId: string) => HierarchyItem | undefined;
-  getChildren: (parentId: string, hierarchy: 'node' | 'category') => string[];
+  getChildren: (parentId: string, hierarchy: "node" | "category") => string[];
   findItemInBothHierarchies: (itemId: string) => {
     inNodeHierarchy: boolean;
     inCategoryHierarchy: boolean;
@@ -61,7 +60,8 @@ export interface DualRepresentationActions {
   };
 }
 
-export type UseDualRepresentationReturn = DualRepresentationState & DualRepresentationActions;
+export type UseDualRepresentationReturn = DualRepresentationState &
+  DualRepresentationActions;
 
 export const useDualRepresentation = (): UseDualRepresentationReturn => {
   const [state, setState] = useState<DualRepresentationState>({
@@ -71,25 +71,28 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
     pendingDiff: { added: {}, deleted: {} },
     hasPendingChanges: false,
     highlightedItemId: null,
-    selectedView: 'node',
+    selectedView: "node",
   });
 
   // Fetch dual representation from the API
   const fetchDualRepresentation = useCallback(async () => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       const data = await getDualRepresentation();
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         dualRep: data,
         isLoading: false,
         error: null,
       }));
     } catch (error) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error : new Error('Failed to fetch dual representation'),
+        error:
+          error instanceof Error
+            ? error
+            : new Error("Failed to fetch dual representation"),
       }));
     }
   }, []);
@@ -101,7 +104,7 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
 
   // Add a child to a parent in the pending diff
   const addToParent = useCallback((parentId: string, childId: string) => {
-    setState(prev => {
+    setState((prev) => {
       const newDiff = { ...prev.pendingDiff };
 
       if (!newDiff.added[parentId]) {
@@ -122,7 +125,7 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
 
   // Remove a child from a parent in the pending diff
   const removeFromParent = useCallback((parentId: string, childId: string) => {
-    setState(prev => {
+    setState((prev) => {
       const newDiff = { ...prev.pendingDiff };
 
       if (!newDiff.deleted[parentId]) {
@@ -142,10 +145,13 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
   }, []);
 
   // Move an item from one parent to another
-  const moveItem = useCallback((itemId: string, fromParentId: string, toParentId: string) => {
-    removeFromParent(fromParentId, itemId);
-    addToParent(toParentId, itemId);
-  }, [removeFromParent, addToParent]);
+  const moveItem = useCallback(
+    (itemId: string, fromParentId: string, toParentId: string) => {
+      removeFromParent(fromParentId, itemId);
+      addToParent(toParentId, itemId);
+    },
+    [removeFromParent, addToParent],
+  );
 
   // Apply pending changes to the backend
   const applyPendingChanges = useCallback(async () => {
@@ -153,12 +159,12 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
       return;
     }
 
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       await applyHierarchyDiff(state.pendingDiff);
 
       // Clear pending changes and refresh
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         pendingDiff: { added: {}, deleted: {} },
         hasPendingChanges: false,
@@ -167,17 +173,18 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
 
       await fetchDualRepresentation();
     } catch (error) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isLoading: false,
-        error: error instanceof Error ? error : new Error('Failed to apply changes'),
+        error:
+          error instanceof Error ? error : new Error("Failed to apply changes"),
       }));
     }
   }, [state.hasPendingChanges, state.pendingDiff, fetchDualRepresentation]);
 
   // Clear pending changes without applying
   const clearPendingChanges = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       pendingDiff: { added: {}, deleted: {} },
       hasPendingChanges: false,
@@ -186,59 +193,73 @@ export const useDualRepresentation = (): UseDualRepresentationReturn => {
 
   // Highlight an item (for synchronized highlighting)
   const highlightItem = useCallback((itemId: string | null) => {
-    setState(prev => ({ ...prev, highlightedItemId: itemId }));
+    setState((prev) => ({ ...prev, highlightedItemId: itemId }));
   }, []);
 
   // Set the current view (node or category)
-  const setView = useCallback((view: 'node' | 'category') => {
-    setState(prev => ({ ...prev, selectedView: view }));
+  const setView = useCallback((view: "node" | "category") => {
+    setState((prev) => ({ ...prev, selectedView: view }));
   }, []);
 
   // Get an item by ID
-  const getItem = useCallback((itemId: string): HierarchyItem | undefined => {
-    return state.dualRep?.items[itemId];
-  }, [state.dualRep]);
+  const getItem = useCallback(
+    (itemId: string): HierarchyItem | undefined => {
+      return state.dualRep?.items[itemId];
+    },
+    [state.dualRep],
+  );
 
   // Get children of a parent
-  const getChildren = useCallback((parentId: string, hierarchy: 'node' | 'category'): string[] => {
-    if (!state.dualRep) return [];
+  const getChildren = useCallback(
+    (parentId: string, hierarchy: "node" | "category"): string[] => {
+      if (!state.dualRep) return [];
 
-    const hierarchyData = hierarchy === 'node'
-      ? state.dualRep.node_hierarchy
-      : state.dualRep.category_hierarchy;
+      const hierarchyData =
+        hierarchy === "node"
+          ? state.dualRep.node_hierarchy
+          : state.dualRep.category_hierarchy;
 
-    return hierarchyData[parentId] || [];
-  }, [state.dualRep]);
+      return hierarchyData[parentId] || [];
+    },
+    [state.dualRep],
+  );
 
   // Find an item in both hierarchies
-  const findItemInBothHierarchies = useCallback((itemId: string) => {
-    const result = {
-      inNodeHierarchy: false,
-      inCategoryHierarchy: false,
-      nodeParents: [] as string[],
-      categoryParents: [] as string[],
-    };
+  const findItemInBothHierarchies = useCallback(
+    (itemId: string) => {
+      const result = {
+        inNodeHierarchy: false,
+        inCategoryHierarchy: false,
+        nodeParents: [] as string[],
+        categoryParents: [] as string[],
+      };
 
-    if (!state.dualRep) return result;
+      if (!state.dualRep) return result;
 
-    // Check node hierarchy
-    for (const [parentId, children] of Object.entries(state.dualRep.node_hierarchy)) {
-      if (children.includes(itemId)) {
-        result.inNodeHierarchy = true;
-        result.nodeParents.push(parentId);
+      // Check node hierarchy
+      for (const [parentId, children] of Object.entries(
+        state.dualRep.node_hierarchy,
+      )) {
+        if (children.includes(itemId)) {
+          result.inNodeHierarchy = true;
+          result.nodeParents.push(parentId);
+        }
       }
-    }
 
-    // Check category hierarchy
-    for (const [parentId, children] of Object.entries(state.dualRep.category_hierarchy)) {
-      if (children.includes(itemId)) {
-        result.inCategoryHierarchy = true;
-        result.categoryParents.push(parentId);
+      // Check category hierarchy
+      for (const [parentId, children] of Object.entries(
+        state.dualRep.category_hierarchy,
+      )) {
+        if (children.includes(itemId)) {
+          result.inCategoryHierarchy = true;
+          result.categoryParents.push(parentId);
+        }
       }
-    }
 
-    return result;
-  }, [state.dualRep]);
+      return result;
+    },
+    [state.dualRep],
+  );
 
   // Auto-fetch on mount
   useEffect(() => {

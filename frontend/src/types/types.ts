@@ -125,7 +125,7 @@ export interface TaskInfo {
 export interface HierarchyItem {
   id: string; // e.g., "node-123", "category-abc"
   name: string;
-  type: 'node' | 'category';
+  type: "node" | "category";
   originalPath?: string; // For nodes
 }
 

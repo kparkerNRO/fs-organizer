@@ -49,7 +49,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     expect(screen.getByText("Documents")).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Root should not be visible, only its children
@@ -81,7 +81,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Both parent and child should be present
@@ -98,7 +98,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Documents has 1 child (file1.txt)
@@ -115,7 +115,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         showPath={true}
-      />
+      />,
     );
 
     expect(screen.getByText("/home/user/Documents")).toBeInTheDocument();
@@ -131,7 +131,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         showPath={false}
-      />
+      />,
     );
 
     expect(screen.queryByText("/home/user/Documents")).not.toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         onItemClick={onItemClick}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText("Documents"));
@@ -167,7 +167,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         onItemHover={onItemHover}
-      />
+      />,
     );
 
     fireEvent.mouseEnter(screen.getByText("Documents"));
@@ -186,7 +186,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         onItemHover={onItemHover}
-      />
+      />,
     );
 
     const documentsElement = screen.getByText("Documents");
@@ -206,7 +206,7 @@ describe("HierarchyBrowser", () => {
         hierarchy={hierarchy}
         rootId="node-root"
         highlightedItemId="node-1"
-      />
+      />,
     );
 
     // The highlighted item should have specific styling
@@ -237,7 +237,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="category-root"
-      />
+      />,
     );
 
     expect(screen.getByText("Work Files")).toBeInTheDocument();
@@ -254,7 +254,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Node items should render with 📄 icon
@@ -279,7 +279,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Should render without errors, showing empty hierarchy
@@ -303,7 +303,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     // Should not crash, should just not render the missing item
@@ -329,7 +329,7 @@ describe("HierarchyBrowser", () => {
         items={items}
         hierarchy={hierarchy}
         rootId="node-root"
-      />
+      />,
     );
 
     expect(screen.getByText("Level 1")).toBeInTheDocument();

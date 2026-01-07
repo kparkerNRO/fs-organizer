@@ -355,7 +355,9 @@ export const getDualRepresentation = async (): Promise<DualRepresentation> => {
   const response = await fetch(`${env.apiUrl}/api/v2/folder-structure`);
 
   if (!response.ok) {
-    throw new Error(`Failed to get dual representation: ${response.statusText}`);
+    throw new Error(
+      `Failed to get dual representation: ${response.statusText}`,
+    );
   }
 
   return await response.json();
@@ -365,7 +367,9 @@ export const getDualRepresentation = async (): Promise<DualRepresentation> => {
  * Apply a hierarchy diff (user edits) to the category structure.
  * Sends changes made by the user to the backend for persistence.
  */
-export const applyHierarchyDiff = async (diff: HierarchyDiff): Promise<{ message: string; log_id: number }> => {
+export const applyHierarchyDiff = async (
+  diff: HierarchyDiff,
+): Promise<{ message: string; log_id: number }> => {
   const response = await fetch(`${env.apiUrl}/api/v2/folder-structure`, {
     method: "PATCH",
     headers: {

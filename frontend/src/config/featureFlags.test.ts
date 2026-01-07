@@ -33,7 +33,7 @@ describe("featureFlags", () => {
       JSON.stringify({
         useDualRepresentation: true,
         enableDebugTools: true,
-      })
+      }),
     );
 
     const { featureFlags } = await import("./featureFlags");
@@ -44,7 +44,9 @@ describe("featureFlags", () => {
 
   it("should handle invalid JSON in localStorage gracefully", async () => {
     localStorageMock.getItem.mockReturnValue("invalid json");
-    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const consoleWarnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => {});
 
     const { featureFlags } = await import("./featureFlags");
 
@@ -52,7 +54,9 @@ describe("featureFlags", () => {
     expect(featureFlags.useDualRepresentation).toBe(false);
     expect(consoleWarnSpy).toHaveBeenCalled();
     // Check that the first argument contains the expected message
-    expect(consoleWarnSpy.mock.calls[0][0]).toContain("Failed to parse feature flags");
+    expect(consoleWarnSpy.mock.calls[0][0]).toContain(
+      "Failed to parse feature flags",
+    );
 
     consoleWarnSpy.mockRestore();
   });
@@ -65,7 +69,7 @@ describe("featureFlags", () => {
     expect(featureFlags.useDualRepresentation).toBe(true);
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       "featureFlags",
-      expect.stringContaining('"useDualRepresentation":true')
+      expect.stringContaining('"useDualRepresentation":true'),
     );
   });
 
@@ -74,14 +78,16 @@ describe("featureFlags", () => {
       value: undefined,
       writable: true,
     });
-    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const consoleWarnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => {});
 
     const { setFeatureFlag } = await import("./featureFlags");
 
     setFeatureFlag("useDualRepresentation", true);
 
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      "Cannot set feature flag: localStorage not available"
+      "Cannot set feature flag: localStorage not available",
     );
 
     consoleWarnSpy.mockRestore();

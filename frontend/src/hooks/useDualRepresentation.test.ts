@@ -9,8 +9,17 @@ vi.mock("../api");
 const mockDualRepresentation = {
   items: {
     "node-root": { id: "node-root", name: "root", type: "node" as const },
-    "node-1": { id: "node-1", name: "Documents", type: "node" as const, originalPath: "/Documents" },
-    "category-root": { id: "category-root", name: "Categories", type: "category" as const },
+    "node-1": {
+      id: "node-1",
+      name: "Documents",
+      type: "node" as const,
+      originalPath: "/Documents",
+    },
+    "category-root": {
+      id: "category-root",
+      name: "Categories",
+      type: "category" as const,
+    },
     "category-1": { id: "category-1", name: "Work", type: "category" as const },
   },
   node_hierarchy: {
@@ -31,7 +40,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("initializes with default state", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -45,7 +56,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("fetches dual representation on mount", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -74,7 +87,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("can refresh data", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -94,7 +109,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("adds items to parent in pending diff", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -107,7 +124,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("removes items from parent in pending diff", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -115,12 +134,16 @@ describe("useDualRepresentation", () => {
       result.current.removeFromParent("category-1", "node-1");
     });
 
-    expect(result.current.pendingDiff.deleted["category-1"]).toContain("node-1");
+    expect(result.current.pendingDiff.deleted["category-1"]).toContain(
+      "node-1",
+    );
     expect(result.current.hasPendingChanges).toBe(true);
   });
 
   it("moves items between parents", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -128,13 +151,17 @@ describe("useDualRepresentation", () => {
       result.current.moveItem("node-1", "category-1", "category-2");
     });
 
-    expect(result.current.pendingDiff.deleted["category-1"]).toContain("node-1");
+    expect(result.current.pendingDiff.deleted["category-1"]).toContain(
+      "node-1",
+    );
     expect(result.current.pendingDiff.added["category-2"]).toContain("node-1");
     expect(result.current.hasPendingChanges).toBe(true);
   });
 
   it("does not add duplicate children to pending diff", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -148,8 +175,13 @@ describe("useDualRepresentation", () => {
   });
 
   it("applies pending changes and refreshes", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
-    vi.mocked(api.applyHierarchyDiff).mockResolvedValue({ message: "Success", log_id: 1 });
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
+    vi.mocked(api.applyHierarchyDiff).mockResolvedValue({
+      message: "Success",
+      log_id: 1,
+    });
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -176,8 +208,13 @@ describe("useDualRepresentation", () => {
   });
 
   it("does not apply when there are no pending changes", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
-    vi.mocked(api.applyHierarchyDiff).mockResolvedValue({ message: "Success", log_id: 1 });
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
+    vi.mocked(api.applyHierarchyDiff).mockResolvedValue({
+      message: "Success",
+      log_id: 1,
+    });
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -193,8 +230,12 @@ describe("useDualRepresentation", () => {
   });
 
   it("handles errors when applying changes", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
-    vi.mocked(api.applyHierarchyDiff).mockRejectedValue(new Error("Apply failed"));
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
+    vi.mocked(api.applyHierarchyDiff).mockRejectedValue(
+      new Error("Apply failed"),
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -215,7 +256,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("clears pending changes", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -235,7 +278,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("highlights items", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -253,7 +298,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("sets the current view", () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -267,7 +314,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("gets an item by ID", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -286,7 +335,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("returns undefined for non-existent item", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -300,7 +351,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("gets children of a parent in node hierarchy", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -314,7 +367,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("gets children of a parent in category hierarchy", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -328,7 +383,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("returns empty array for non-existent parent", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 
@@ -372,7 +429,9 @@ describe("useDualRepresentation", () => {
   });
 
   it("handles item not in any hierarchy", async () => {
-    vi.mocked(api.getDualRepresentation).mockResolvedValue(mockDualRepresentation);
+    vi.mocked(api.getDualRepresentation).mockResolvedValue(
+      mockDualRepresentation,
+    );
 
     const { result } = renderHook(() => useDualRepresentation());
 

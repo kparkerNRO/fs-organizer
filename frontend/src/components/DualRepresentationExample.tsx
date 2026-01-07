@@ -30,7 +30,11 @@ export const DualRepresentationExample: React.FC = () => {
   } = useDualRepresentation();
 
   // Render a single item in the hierarchy
-  const renderItem = (itemId: string, hierarchy: 'node' | 'category', depth: number = 0) => {
+  const renderItem = (
+    itemId: string,
+    hierarchy: "node" | "category",
+    depth: number = 0,
+  ) => {
     const item = getItem(itemId);
     if (!item) return null;
 
@@ -42,26 +46,32 @@ export const DualRepresentationExample: React.FC = () => {
         key={itemId}
         style={{
           marginLeft: `${depth * 20}px`,
-          padding: '4px 8px',
-          backgroundColor: isHighlighted ? '#e3f2fd' : 'transparent',
-          cursor: 'pointer',
-          borderRadius: '4px',
+          padding: "4px 8px",
+          backgroundColor: isHighlighted ? "#e3f2fd" : "transparent",
+          cursor: "pointer",
+          borderRadius: "4px",
         }}
         onClick={() => highlightItem(itemId)}
         onMouseEnter={() => highlightItem(itemId)}
         onMouseLeave={() => highlightItem(null)}
       >
-        <div style={{ fontWeight: item.type === 'category' ? 'bold' : 'normal' }}>
-          {item.type === 'node' ? '📄' : '📁'} {item.name}
+        <div
+          style={{ fontWeight: item.type === "category" ? "bold" : "normal" }}
+        >
+          {item.type === "node" ? "📄" : "📁"} {item.name}
           {item.originalPath && (
-            <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '8px' }}>
+            <span
+              style={{ fontSize: "0.8em", color: "#666", marginLeft: "8px" }}
+            >
               {item.originalPath}
             </span>
           )}
         </div>
         {children.length > 0 && (
           <div>
-            {children.map(childId => renderItem(childId, hierarchy, depth + 1))}
+            {children.map((childId) =>
+              renderItem(childId, hierarchy, depth + 1),
+            )}
           </div>
         )}
       </div>
@@ -69,17 +79,28 @@ export const DualRepresentationExample: React.FC = () => {
   };
 
   // Render a hierarchy (node or category)
-  const renderHierarchy = (hierarchy: 'node' | 'category') => {
+  const renderHierarchy = (hierarchy: "node" | "category") => {
     if (!dualRep) return null;
 
-    const rootId = hierarchy === 'node' ? 'node-root' : 'category-root';
+    const rootId = hierarchy === "node" ? "node-root" : "category-root";
     const rootChildren = getChildren(rootId, hierarchy);
 
     return (
-      <div style={{ flex: 1, padding: '16px', border: '1px solid #ddd', borderRadius: '8px' }}>
-        <h3>{hierarchy === 'node' ? 'File System Structure' : 'Category Structure'}</h3>
+      <div
+        style={{
+          flex: 1,
+          padding: "16px",
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+        }}
+      >
+        <h3>
+          {hierarchy === "node"
+            ? "File System Structure"
+            : "Category Structure"}
+        </h3>
         <div>
-          {rootChildren.map(childId => renderItem(childId, hierarchy))}
+          {rootChildren.map((childId) => renderItem(childId, hierarchy))}
         </div>
       </div>
     );
@@ -90,12 +111,14 @@ export const DualRepresentationExample: React.FC = () => {
     if (!hasPendingChanges) return null;
 
     return (
-      <div style={{
-        padding: '16px',
-        backgroundColor: '#fff3e0',
-        borderRadius: '8px',
-        marginTop: '16px',
-      }}>
+      <div
+        style={{
+          padding: "16px",
+          backgroundColor: "#fff3e0",
+          borderRadius: "8px",
+          marginTop: "16px",
+        }}
+      >
         <h4>Pending Changes</h4>
         <div>
           {Object.keys(pendingDiff.added).length > 0 && (
@@ -111,16 +134,16 @@ export const DualRepresentationExample: React.FC = () => {
             </div>
           )}
         </div>
-        <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+        <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
           <button
             onClick={applyPendingChanges}
             style={{
-              padding: '8px 16px',
-              backgroundColor: '#4caf50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
+              padding: "8px 16px",
+              backgroundColor: "#4caf50",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
             }}
           >
             Apply Changes
@@ -128,12 +151,12 @@ export const DualRepresentationExample: React.FC = () => {
           <button
             onClick={clearPendingChanges}
             style={{
-              padding: '8px 16px',
-              backgroundColor: '#f44336',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
+              padding: "8px 16px",
+              backgroundColor: "#f44336",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
             }}
           >
             Clear Changes
@@ -146,7 +169,7 @@ export const DualRepresentationExample: React.FC = () => {
   // Loading state
   if (isLoading && !dualRep) {
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: "16px" }}>
         <p>Loading dual representation...</p>
       </div>
     );
@@ -155,14 +178,14 @@ export const DualRepresentationExample: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div style={{ padding: '16px', color: 'red' }}>
+      <div style={{ padding: "16px", color: "red" }}>
         <p>Error: {error.message}</p>
         <button
           onClick={fetchDualRepresentation}
           style={{
-            padding: '8px 16px',
-            marginTop: '8px',
-            cursor: 'pointer',
+            padding: "8px 16px",
+            marginTop: "8px",
+            cursor: "pointer",
           }}
         >
           Retry
@@ -174,7 +197,7 @@ export const DualRepresentationExample: React.FC = () => {
   // No data state
   if (!dualRep) {
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: "16px" }}>
         <p>No data available. Please run gather and group first.</p>
       </div>
     );
@@ -182,59 +205,76 @@ export const DualRepresentationExample: React.FC = () => {
 
   // Main render
   return (
-    <div style={{ padding: '16px' }}>
-      <div style={{ marginBottom: '16px' }}>
+    <div style={{ padding: "16px" }}>
+      <div style={{ marginBottom: "16px" }}>
         <h2>Dual Representation Viewer</h2>
-        <p style={{ color: '#666' }}>
+        <p style={{ color: "#666" }}>
           Hover over items to see synchronized highlighting across both views.
         </p>
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: "16px" }}>
         <button
-          onClick={() => setView('node')}
+          onClick={() => setView("node")}
           style={{
-            padding: '8px 16px',
-            marginRight: '8px',
-            backgroundColor: selectedView === 'node' ? '#2196f3' : '#e0e0e0',
-            color: selectedView === 'node' ? 'white' : 'black',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
+            padding: "8px 16px",
+            marginRight: "8px",
+            backgroundColor: selectedView === "node" ? "#2196f3" : "#e0e0e0",
+            color: selectedView === "node" ? "white" : "black",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
           }}
         >
           Node View
         </button>
         <button
-          onClick={() => setView('category')}
+          onClick={() => setView("category")}
           style={{
-            padding: '8px 16px',
-            backgroundColor: selectedView === 'category' ? '#2196f3' : '#e0e0e0',
-            color: selectedView === 'category' ? 'white' : 'black',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
+            padding: "8px 16px",
+            backgroundColor:
+              selectedView === "category" ? "#2196f3" : "#e0e0e0",
+            color: selectedView === "category" ? "white" : "black",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
           }}
         >
           Category View
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px' }}>
-        {renderHierarchy('node')}
-        {renderHierarchy('category')}
+      <div style={{ display: "flex", gap: "16px" }}>
+        {renderHierarchy("node")}
+        {renderHierarchy("category")}
       </div>
 
       {renderPendingChanges()}
 
-      <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#f5f5f5', borderRadius: '8px' }}>
+      <div
+        style={{
+          marginTop: "16px",
+          padding: "16px",
+          backgroundColor: "#f5f5f5",
+          borderRadius: "8px",
+        }}
+      >
         <h4>Statistics</h4>
         <p>Total Items: {Object.keys(dualRep.items).length}</p>
         <p>
-          Nodes: {Object.values(dualRep.items).filter(item => item.type === 'node').length}
+          Nodes:{" "}
+          {
+            Object.values(dualRep.items).filter((item) => item.type === "node")
+              .length
+          }
         </p>
         <p>
-          Categories: {Object.values(dualRep.items).filter(item => item.type === 'category').length}
+          Categories:{" "}
+          {
+            Object.values(dualRep.items).filter(
+              (item) => item.type === "category",
+            ).length
+          }
         </p>
         {highlightedItemId && (
           <p>Highlighted: {getItem(highlightedItemId)?.name}</p>
