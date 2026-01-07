@@ -115,3 +115,47 @@ export interface TaskInfo {
   created_at: string;
   updated_at: string;
 }
+
+// Dual Representation Types (V2 API)
+
+/**
+ * Represents either a file/directory from the filesystem (Node) or a semantic category.
+ * Files are always leaf nodes. ZIP files are treated as folders.
+ */
+export interface HierarchyItem {
+  id: string; // e.g., "node-123", "category-abc"
+  name: string;
+  type: 'node' | 'category';
+  originalPath?: string; // For nodes
+}
+
+/**
+ * Stores all items in a flattened structure for quick lookup.
+ */
+export type ItemStore = Record<string, HierarchyItem>;
+
+/**
+ * Represents the parent-child relationships using IDs.
+ * The key is the parent ID, and the value is an array of child IDs.
+ */
+export type Hierarchy = Record<string, string[]>;
+
+/**
+ * The complete data structure sent from the backend.
+ */
+export interface DualRepresentation {
+  items: ItemStore;
+  node_hierarchy: Hierarchy;
+  category_hierarchy: Hierarchy;
+}
+
+/**
+ * Represents changes made by the user on the frontend (moving nodes between categories).
+ * Reordering of children within a category is not supported.
+ */
+export interface HierarchyDiff {
+  // Key: Parent ID. Value: An array of child IDs that were added.
+  added: Record<string, string[]>;
+  // Key: Parent ID. Value: An array of child IDs that were removed.
+  deleted: Record<string, string[]>;
+}

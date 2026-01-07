@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel
 
 from api.tasks import TaskStatus
@@ -54,3 +54,27 @@ class SortOrder(str, Enum):
 class FolderViewResponse(BaseModel):
     original: FolderV2
     new: FolderV2
+
+
+# Dual Representation Models (for v2 API)
+
+
+class HierarchyItem(BaseModel):
+    """Represents either a file/directory from the filesystem (Node) or a semantic category."""
+    id: str  # e.g., "node-123", "category-456"
+    name: str
+    type: Literal['node', 'category']
+    originalPath: Optional[str] = None  # For nodes
+
+
+class DualRepresentation(BaseModel):
+    """The complete data structure sent from the backend containing dual hierarchies."""
+    items: Dict[str, HierarchyItem]
+    node_hierarchy: Dict[str, List[str]]
+    category_hierarchy: Dict[str, List[str]]
+
+
+class HierarchyDiff(BaseModel):
+    """Represents changes made by the user on the frontend (moving nodes between categories)."""
+    added: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were added
+    deleted: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were removed

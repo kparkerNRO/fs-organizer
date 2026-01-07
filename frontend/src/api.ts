@@ -11,6 +11,8 @@ import {
   FolderViewResponse,
   AsyncTaskResponse,
   TaskInfo,
+  DualRepresentation,
+  HierarchyDiff,
 } from "./types/types";
 import { env } from "./config/env";
 
@@ -340,4 +342,41 @@ export const saveGraph = async (folderStructure: FolderV2): Promise<void> => {
   if (!response.ok) {
     throw new Error(`Failed to save graph: ${response.statusText}`);
   }
+};
+
+// V2 API - Dual Representation
+
+/**
+ * Fetch the dual representation of folder hierarchies.
+ * Returns both the original filesystem structure (nodes) and the
+ * categorized structure in a unified format.
+ */
+export const getDualRepresentation = async (): Promise<DualRepresentation> => {
+  const response = await fetch(`${env.apiUrl}/api/v2/folder-structure`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to get dual representation: ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+
+/**
+ * Apply a hierarchy diff (user edits) to the category structure.
+ * Sends changes made by the user to the backend for persistence.
+ */
+export const applyHierarchyDiff = async (diff: HierarchyDiff): Promise<{ message: string; log_id: number }> => {
+  const response = await fetch(`${env.apiUrl}/api/v2/folder-structure`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(diff),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to apply hierarchy diff: ${response.statusText}`);
+  }
+
+  return await response.json();
 };

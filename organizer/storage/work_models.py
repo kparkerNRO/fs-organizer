@@ -270,6 +270,20 @@ class FileMapping(WorkBase):
     )
 
 
+class HierarchyDiffLog(WorkBase):
+    """Log of hierarchy diffs applied by users.
+
+    Stores user modifications to the category hierarchy for analytics and tracking.
+    """
+
+    __tablename__ = "log_hierarchy_diff"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    diff: Mapped[dict] = mapped_column(JsonDict)  # The HierarchyDiff object
+
+
 class Meta(WorkBase):
     """Metadata key-value store for work.db.
 
