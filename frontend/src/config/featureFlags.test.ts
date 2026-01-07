@@ -118,9 +118,9 @@ describe("featureFlags", () => {
 
     // Clear window functions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (window as any) // eslint-disable-line @typescript-eslint/no-explicit-any.setFeatureFlag;
+    delete (window as any).setFeatureFlag;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (window as any) // eslint-disable-line @typescript-eslint/no-explicit-any.resetFeatureFlags;
+    delete (window as any).resetFeatureFlags;
 
     await import("./featureFlags");
 
