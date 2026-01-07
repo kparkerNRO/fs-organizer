@@ -1,8 +1,8 @@
 import re
 from typing import Optional
 
-from nltk.metrics import edit_distance
 from rapidfuzz import fuzz
+from rapidfuzz.distance import Levenshtein
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from storage.work_models import GroupCategory, GroupIteration
@@ -104,8 +104,8 @@ def spelling_grouping(group: list) -> Optional[dict[str, list[str]]]:
 
         for category2 in group:
             if category != category2:
-                if edit_distance(
-                    category, category2, transpositions=True
+                if Levenshtein.distance(
+                    category, category2
                 ) < 2 and not has_number_difference(category, category2):
                     new_grouping[category2] = [category]
                     new_grouping[category] = [category]
