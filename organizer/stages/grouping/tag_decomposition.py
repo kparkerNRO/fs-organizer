@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from storage.work_models import GroupCategoryEntry
 from storage.work_models import GroupIteration as GroupingIteration
+from stages.grouping.constants import STOP_WORDS
 
 
 # Configure logger to write to stdout
@@ -41,41 +42,6 @@ SEMANTIC_SIMILARITY_THRESHOLD = 0.3  # Threshold for semantic similarity
 MIN_COMPONENT_LENGTH = (
     1  # Minimum character length for components (excluding stop words)
 )
-
-# Title case configuration
-STOP_WORDS = {
-    "a",
-    "an",
-    "and",
-    "as",
-    "at",
-    "but",
-    "by",
-    "for",
-    "if",
-    "in",
-    "into",
-    "is",
-    "it",
-    "no",
-    "not",
-    "of",
-    "on",
-    "or",
-    "such",
-    "that",
-    "the",
-    "their",
-    "then",
-    "there",
-    "these",
-    "they",
-    "this",
-    "to",
-    "was",
-    "will",
-    "with",
-}
 
 COMMON_ACRONYMS = {
     "ai",

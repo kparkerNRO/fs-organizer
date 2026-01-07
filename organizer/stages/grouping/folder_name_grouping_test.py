@@ -75,6 +75,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial GroupCategoryEntry records
         entries = [
@@ -180,6 +181,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries
         entries = [
@@ -262,6 +264,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries
         entries = [
@@ -356,6 +359,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries
         entries = [
@@ -435,6 +439,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries
         entries = [
@@ -525,6 +530,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries
         entries = [
@@ -625,6 +631,7 @@ class TestApplyFolderNameGrouping:
             description="Test iteration",
         )
         work_session.add(iteration)
+        work_session.flush()  # Flush to satisfy foreign key constraint
 
         # Create initial entries with different confidence scores
         entries = [

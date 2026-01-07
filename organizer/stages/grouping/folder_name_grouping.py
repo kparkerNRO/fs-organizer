@@ -9,7 +9,7 @@ from storage.index_models import Node
 from storage.work_models import GroupCategoryEntry, GroupIteration
 
 from stages.grouping.helpers import common_token_grouping, get_next_iteration_id
-from stages.grouping.tag_decomposition import STOP_WORDS
+from stages.grouping.constants import STOP_WORDS
 
 logger = getLogger(__name__)
 

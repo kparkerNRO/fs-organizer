@@ -195,5 +195,30 @@ def test_group_folders(
     )
     assert len(entries_iter2) == 3
 
+    # Iteration 3: Folder name grouping (new step)
+    # This step identifies "apple" as a common prefix and creates:
+    # - "apple" and "pie" for folder "apple pie"
+    # - "apple" and "tart" for folder "apple tart"
+    # - "banana bread" (no grouping)
+    entries_iter3 = (
+        storage_work_session.query(GroupCategoryEntry)
+        .filter(GroupCategoryEntry.iteration_id == 3)
+        .all()
+    )
+    assert len(entries_iter3) == 5  # apple (2x), pie, tart, banana bread
+
+    # After compacting and creating exact groups, we should have 4 groups:
+    # "apple" (2 folders), "pie" (1 folder), "tart" (1 folder), "banana bread" (1 folder)
     groups = storage_work_session.query(GroupCategory).all()
-    assert len(groups) == 3
+    assert len(groups) == 4
+
+    # Verify the groups
+    group_map = {g.name: g for g in groups}
+    assert "apple" in group_map
+    assert group_map["apple"].count == 2  # Both apple pie and apple tart
+    assert "pie" in group_map
+    assert group_map["pie"].count == 1
+    assert "tart" in group_map
+    assert group_map["tart"].count == 1
+    assert "banana bread" in group_map
+    assert group_map["banana bread"].count == 1
