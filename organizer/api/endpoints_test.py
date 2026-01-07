@@ -48,13 +48,16 @@ def setup_complete_data(storage_manager: StorageManager):
             parent_node_id=root_node.id,
         )
         index_session.commit()
+        # Capture IDs before session closes
+        snapshot_id = snapshot.id
+        child_node_id = child_node.id
 
     with storage_manager.get_work_session() as work_session:
         RunFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        run = RunFactory(id=1, snapshot_id=snapshot.id)
+        run = RunFactory(id=1, snapshot_id=snapshot_id)
 
         GroupIterationFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        iteration = GroupIterationFactory(id=1, run_id=run.id, snapshot_id=snapshot.id)
+        iteration = GroupIterationFactory(id=1, run_id=run.id, snapshot_id=snapshot_id)
 
         GroupCategoryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
         category = GroupCategoryFactory(
@@ -63,15 +66,16 @@ def setup_complete_data(storage_manager: StorageManager):
 
         GroupCategoryEntryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
         GroupCategoryEntryFactory(
-            folder_id=child_node.id,
+            folder_id=child_node_id,
             group_id=category.id,
             iteration_id=iteration.id,
             processed_name="Personal",
         )
 
         work_session.commit()
+        run_id = run.id
 
-    return snapshot.id, run.id
+    return snapshot_id, run_id
 
 
 class TestGetDualRepresentationEndpoint:

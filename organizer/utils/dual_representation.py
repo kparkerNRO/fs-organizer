@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
 from storage.manager import NodeKind, StorageManager
-from storage.work_models import GroupCategory, GroupCategoryEntry
+from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,15 @@ def build_dual_representation(
     with storage_manager.get_index_session(read_only=True) as index_session:
         # Build node hierarchy from index.db
         _build_node_hierarchy(index_session, snapshot_id, items, node_hierarchy)
+
+    # Always create category root, even if there are no categories
+    root_id = "category-root"
+    items[root_id] = HierarchyItem(
+        id=root_id,
+        name="Categories",
+        type="category",
+    )
+    category_hierarchy[root_id] = []
 
     if run_id:
         with storage_manager.get_work_session() as work_session:
@@ -133,25 +142,18 @@ def _build_category_hierarchy(
         items: Dictionary to populate with HierarchyItem objects (categories)
         category_hierarchy: Dictionary to populate with category relationships
     """
-    # Get the latest iteration_id
+    # Get the latest iteration for this run
     iteration_id = work_session.execute(
-        select(func.max(GroupCategoryEntry.iteration_id))
-    ).scalar_one()
+        select(func.max(GroupIteration.id)).where(GroupIteration.run_id == run_id)
+    ).scalar()
 
     if iteration_id is None:
-        logger.warning("No group categories available for categorization")
+        logger.info(f"No group iterations found for run_id: {run_id}")
         return
 
-    # Create a root for the category hierarchy
     root_id = "category-root"
-    items[root_id] = HierarchyItem(
-        id=root_id,
-        name="Categories",
-        type="category",
-    )
-    category_hierarchy[root_id] = []
 
-    # Query all categories
+    # Query all categories for this iteration
     categories = (
         work_session.execute(
             select(GroupCategory).where(GroupCategory.iteration_id == iteration_id)

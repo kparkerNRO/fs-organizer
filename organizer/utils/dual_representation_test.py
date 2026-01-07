@@ -64,42 +64,50 @@ def setup_test_data(storage_manager: StorageManager):
             rel_path="docs/file.txt",
         )
         index_session.commit()
+        # Capture IDs before session closes
+        snapshot_id = snapshot.id
+        child_node1_id = child_node1.id
 
     with storage_manager.get_work_session() as work_session:
+        # Create models directly to avoid SubFactory issues
+        from datetime import datetime
+        from storage.work_models import Run, GroupIteration, GroupCategory, GroupCategoryEntry
+
         # Create run
-        RunFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        run = RunFactory(id=1, snapshot_id=snapshot.id)
+        run = Run(snapshot_id=snapshot_id, started_at=datetime.now())
+        work_session.add(run)
+        work_session.flush()  # Get the run.id
 
         # Create group iteration
-        GroupIterationFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        iteration = GroupIterationFactory(
-            id=1,
+        iteration = GroupIteration(
             run_id=run.id,
-            snapshot_id=snapshot.id,
+            snapshot_id=snapshot_id,
         )
+        work_session.add(iteration)
+        work_session.flush()  # Get the iteration.id
 
-        # Create categories
-        GroupCategoryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        category1 = GroupCategoryFactory(
-            id=1,
+        # Create category
+        category1 = GroupCategory(
             iteration_id=iteration.id,
             name="Work Documents",
             count=1,
         )
+        work_session.add(category1)
+        work_session.flush()  # Get the category.id
 
-        # Create category entries (mapping nodes to categories)
-        GroupCategoryEntryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        GroupCategoryEntryFactory(
-            id=1,
-            folder_id=child_node1.id,
+        # Create category entry (mapping nodes to categories)
+        entry = GroupCategoryEntry(
+            folder_id=child_node1_id,
             group_id=category1.id,
             iteration_id=iteration.id,
             processed_name="Work Documents",
         )
+        work_session.add(entry)
 
         work_session.commit()
+        run_id = run.id
 
-    return snapshot.id, run.id
+    return snapshot_id, run_id
 
 
 class TestBuildDualRepresentation:
@@ -148,10 +156,11 @@ class TestBuildDualRepresentation:
                 kind=NodeKind.DIR,
             )
             index_session.commit()
+            snapshot_id = snapshot.id
 
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot_id=snapshot.id,
+            snapshot_id=snapshot_id,
             run_id=None,
         )
 
@@ -257,10 +266,11 @@ class TestBuildDualRepresentation:
             NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
             NodeFactory(id=1, snapshot_id=snapshot.id, name="test", kind=NodeKind.DIR)
             index_session.commit()
+            snapshot_id = snapshot.id
 
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot_id=snapshot.id,
+            snapshot_id=snapshot_id,
             run_id=None,
         )
 
