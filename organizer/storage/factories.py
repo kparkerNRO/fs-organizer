@@ -20,6 +20,7 @@ from storage.work_models import (
     GroupCategoryEntry,
     GroupEntry,
     GroupIteration,
+    HierarchyDiffLog,
     PartialNameCategory,
     Run,
     StageState,
@@ -335,3 +336,14 @@ class WorkMetaFactory(BaseFactory):
 
     key = Sequence(lambda n: f"key_{n}")
     value = None
+
+
+class HierarchyDiffLogFactory(BaseFactory):
+    """Factory for creating HierarchyDiffLog instances"""
+
+    class Meta:
+        model = HierarchyDiffLog
+
+    run = factory.SubFactory(RunFactory)
+    run_id = SelfAttribute("run.id")
+    diff = {"added": {}, "deleted": {}}

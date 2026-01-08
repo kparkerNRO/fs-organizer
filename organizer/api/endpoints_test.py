@@ -1,7 +1,5 @@
 """Tests for v2 API endpoints (dual representation)."""
 
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,17 +8,12 @@ from storage.factories import (
     GroupCategoryEntryFactory,
     GroupCategoryFactory,
     GroupIterationFactory,
+    HierarchyDiffLogFactory,
     NodeFactory,
     RunFactory,
     SnapshotFactory,
 )
-from storage.manager import NodeKind, StorageManager
-
-
-@pytest.fixture
-def storage_manager(tmp_path: Path) -> StorageManager:
-    """Create a temporary storage manager for testing."""
-    return StorageManager(database_path=tmp_path)
+from storage.manager import NodeKind
 
 
 @pytest.fixture
@@ -30,54 +23,33 @@ def client():
 
 
 @pytest.fixture
-def setup_complete_data(storage_manager: StorageManager):
+def setup_complete_data(storage_index_session, storage_work_session):
     """Setup complete test data including nodes and categories."""
-    with storage_manager.get_index_session() as index_session:
-        SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-        snapshot = SnapshotFactory(id=1)
+    snapshot = SnapshotFactory()
 
-        NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-        root_node = NodeFactory(
-            id=1, snapshot_id=snapshot.id, name="root", kind=NodeKind.DIR
-        )
-        child_node = NodeFactory(
-            id=2,
-            snapshot_id=snapshot.id,
-            name="documents",
-            kind=NodeKind.DIR,
-            parent_node_id=root_node.id,
-        )
-        index_session.commit()
-        # Capture IDs before session closes
-        snapshot_id = snapshot.id
-        child_node_id = child_node.id
+    root_node = NodeFactory(snapshot_id=snapshot.id, name="root", kind=NodeKind.DIR)
+    child_node = NodeFactory(
+        snapshot_id=snapshot.id,
+        name="documents",
+        kind=NodeKind.DIR,
+        parent_node_id=root_node.id,
+    )
+    storage_index_session.commit()
 
-    with storage_manager.get_work_session() as work_session:
-        RunFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        run = RunFactory(id=1, snapshot_id=snapshot_id)
+    run = RunFactory(snapshot_id=snapshot.id)
+    iteration = GroupIterationFactory(run=run, snapshot_id=snapshot.id)
+    category = GroupCategoryFactory(iteration=iteration, name="Personal")
 
-        GroupIterationFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        iteration = GroupIterationFactory(id=1, run_id=run.id, snapshot_id=snapshot_id)  # type: ignore[attr-defined]
+    GroupCategoryEntryFactory(
+        folder_id=child_node.id,
+        group_id=category.id,
+        iteration=iteration,
+        processed_name="Personal",
+    )
 
-        GroupCategoryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        category = GroupCategoryFactory(
-            id=1,
-            iteration_id=iteration.id,  # type: ignore[attr-defined]
-            name="Personal",
-        )
+    storage_work_session.commit()
 
-        GroupCategoryEntryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-        GroupCategoryEntryFactory(
-            folder_id=child_node_id,
-            group_id=category.id,  # type: ignore[attr-defined]
-            iteration_id=iteration.id,  # type: ignore[attr-defined]
-            processed_name="Personal",
-        )
-
-        work_session.commit()
-        run_id = run.id  # type: ignore[attr-defined]
-
-    return snapshot_id, run_id
+    return snapshot.id, run.id
 
 
 class TestGetDualRepresentationEndpoint:
@@ -85,28 +57,23 @@ class TestGetDualRepresentationEndpoint:
 
     def test_no_runs_returns_404(self, client, monkeypatch, tmp_path):
         """Test that endpoint returns 404 when no runs exist."""
-        # Mock storage manager to return empty database
-        storage_manager = StorageManager(database_path=tmp_path)
-
-        def mock_get_storage_manager():
-            return storage_manager
-
-        # We would need to properly mock the dependency here
-        # For now, this test documents the expected behavior
-        # In a real scenario, you'd use dependency_overrides
+        # TODO: Implement endpoint test with proper dependency injection mocking
+        # Expected behavior:
+        # - Mock storage manager to return empty database
+        # - Use FastAPI dependency_overrides to inject mock
+        # - Assert 404 status code when no runs exist
+        pass
 
     def test_successful_retrieval(self, client, monkeypatch, setup_complete_data):
         """Test successful retrieval of dual representation."""
-        # This test would require proper dependency injection mocking
-        # Documenting expected behavior:
+        # TODO: Implement endpoint test with proper dependency injection mocking
+        # Expected behavior:
         # - Status code 200
         # - Response contains items, node_hierarchy, category_hierarchy
         # - Items contain both nodes and categories
         pass
 
-    def test_response_structure(
-        self, storage_manager: StorageManager, setup_complete_data
-    ):
+    def test_response_structure(self, storage_manager, setup_complete_data):
         """Test that response has correct structure."""
         # Direct test of the logic without HTTP layer
         from utils.dual_representation import build_dual_representation
@@ -115,12 +82,13 @@ class TestGetDualRepresentationEndpoint:
         dual_rep = build_dual_representation(storage_manager, snapshot_id, run_id)
 
         # Verify structure
-        assert "items" in dual_rep.model_dump()
-        assert "node_hierarchy" in dual_rep.model_dump()
-        assert "category_hierarchy" in dual_rep.model_dump()
+        model_data = dual_rep.model_dump()
+        assert "items" in model_data
+        assert "node_hierarchy" in model_data
+        assert "category_hierarchy" in model_data
 
         # Verify items have correct keys
-        items_dict = dual_rep.model_dump()["items"]
+        items_dict = model_data["items"]
         for item_id, item in items_dict.items():
             assert "id" in item
             assert "name" in item
@@ -129,8 +97,8 @@ class TestGetDualRepresentationEndpoint:
 
     def test_error_handling(self):
         """Test error handling for invalid snapshot_id."""
-        # This would test the exception handling in the endpoint
-        # Expected: 500 error with appropriate message
+        # TODO: Implement endpoint error handling test
+        # Expected: 500 error with appropriate message when invalid snapshot_id
         pass
 
 
@@ -139,10 +107,11 @@ class TestApplyHierarchyDiffEndpoint:
 
     def test_no_runs_returns_404(self):
         """Test that endpoint returns 404 when no runs exist."""
+        # TODO: Implement endpoint test for 404 error
         # Expected behavior: 404 error when no runs are found
         pass
 
-    def test_empty_diff(self, storage_manager: StorageManager, setup_complete_data):
+    def test_empty_diff(self, storage_work_session, setup_complete_data):
         """Test applying an empty diff."""
         from api.models import HierarchyDiff
 
@@ -150,24 +119,15 @@ class TestApplyHierarchyDiffEndpoint:
         diff = HierarchyDiff(added={}, deleted={})
 
         # This should succeed and log the empty diff
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(
-                run_id=run_id,
-                diff=diff.model_dump(),
-            )
-            session.add(log_entry)
-            session.commit()
+        # Verify it was logged
+        assert log_entry.id is not None
+        assert log_entry.run_id == run_id
+        assert log_entry.diff == diff.model_dump()
 
-            # Verify it was logged
-            assert log_entry.id is not None
-            assert log_entry.run_id == run_id
-            assert log_entry.diff == diff.model_dump()
-
-    def test_diff_with_additions(
-        self, storage_manager: StorageManager, setup_complete_data
-    ):
+    def test_diff_with_additions(self, storage_work_session, setup_complete_data):
         """Test applying a diff with additions."""
         from api.models import HierarchyDiff
 
@@ -177,23 +137,14 @@ class TestApplyHierarchyDiffEndpoint:
             deleted={},
         )
 
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(
-                run_id=run_id,
-                diff=diff.model_dump(),
-            )
-            session.add(log_entry)
-            session.commit()
+        assert log_entry.id is not None
+        assert "added" in log_entry.diff
+        assert log_entry.diff["added"]["category-1"] == ["node-1", "node-2"]
 
-            assert log_entry.id is not None
-            assert "added" in log_entry.diff
-            assert log_entry.diff["added"]["category-1"] == ["node-1", "node-2"]
-
-    def test_diff_with_deletions(
-        self, storage_manager: StorageManager, setup_complete_data
-    ):
+    def test_diff_with_deletions(self, storage_work_session, setup_complete_data):
         """Test applying a diff with deletions."""
         from api.models import HierarchyDiff
 
@@ -203,21 +154,14 @@ class TestApplyHierarchyDiffEndpoint:
             deleted={"category-2": ["node-3"]},
         )
 
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(
-                run_id=run_id,
-                diff=diff.model_dump(),
-            )
-            session.add(log_entry)
-            session.commit()
+        assert log_entry.id is not None
+        assert "deleted" in log_entry.diff
+        assert log_entry.diff["deleted"]["category-2"] == ["node-3"]
 
-            assert log_entry.id is not None
-            assert "deleted" in log_entry.diff
-            assert log_entry.diff["deleted"]["category-2"] == ["node-3"]
-
-    def test_complex_diff(self, storage_manager: StorageManager, setup_complete_data):
+    def test_complex_diff(self, storage_work_session, setup_complete_data):
         """Test applying a complex diff with multiple operations."""
         from api.models import HierarchyDiff
 
@@ -232,78 +176,60 @@ class TestApplyHierarchyDiffEndpoint:
             },
         )
 
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(
-                run_id=run_id,
-                diff=diff.model_dump(),
-            )
-            session.add(log_entry)
-            session.commit()
+        assert log_entry.id is not None
+        assert len(log_entry.diff["added"]) == 2
+        assert len(log_entry.diff["deleted"]) == 1
 
-            assert log_entry.id is not None
-            assert len(log_entry.diff["added"]) == 2
-            assert len(log_entry.diff["deleted"]) == 1
-
-    def test_multiple_diffs_logged(
-        self, storage_manager: StorageManager, setup_complete_data
-    ):
+    def test_multiple_diffs_logged(self, storage_work_session, setup_complete_data):
         """Test that multiple diffs can be logged."""
         from api.models import HierarchyDiff
+        from sqlalchemy import select
+        from storage.work_models import HierarchyDiffLog
 
         snapshot_id, run_id = setup_complete_data
 
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        # Log first diff
+        diff1 = HierarchyDiff(added={"category-1": ["node-1"]}, deleted={})
+        HierarchyDiffLogFactory(run_id=run_id, diff=diff1.model_dump())
 
-            # Log first diff
-            diff1 = HierarchyDiff(added={"category-1": ["node-1"]}, deleted={})
-            log1 = HierarchyDiffLog(run_id=run_id, diff=diff1.model_dump())
-            session.add(log1)
-            session.commit()
+        # Log second diff
+        diff2 = HierarchyDiff(added={"category-2": ["node-2"]}, deleted={})
+        HierarchyDiffLogFactory(run_id=run_id, diff=diff2.model_dump())
 
-            # Log second diff
-            diff2 = HierarchyDiff(added={"category-2": ["node-2"]}, deleted={})
-            log2 = HierarchyDiffLog(run_id=run_id, diff=diff2.model_dump())
-            session.add(log2)
-            session.commit()
+        storage_work_session.commit()
 
-            # Verify both were logged
-            from sqlalchemy import select
+        # Verify both were logged
+        logs = storage_work_session.execute(select(HierarchyDiffLog)).scalars().all()
+        assert len(logs) == 2
+        assert logs[0].id != logs[1].id
 
-            logs = session.execute(select(HierarchyDiffLog)).scalars().all()
-            assert len(logs) == 2
-            assert logs[0].id != logs[1].id
-
-    def test_diff_log_timestamp(
-        self, storage_manager: StorageManager, setup_complete_data
-    ):
+    def test_diff_log_timestamp(self, storage_work_session, setup_complete_data):
         """Test that diff log includes timestamp."""
         from api.models import HierarchyDiff
 
         snapshot_id, run_id = setup_complete_data
         diff = HierarchyDiff(added={"category-1": ["node-1"]}, deleted={})
 
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(run_id=run_id, diff=diff.model_dump())
-            session.add(log_entry)
-            session.commit()
-
-            assert log_entry.created_at is not None
-            # created_at should be set automatically
+        assert log_entry.created_at is not None
+        # created_at should be set automatically
 
 
 class TestDualRepresentationIntegration:
     """Integration tests for the dual representation system."""
 
     def test_end_to_end_workflow(
-        self, storage_manager: StorageManager, setup_complete_data
+        self, storage_manager, storage_work_session, setup_complete_data
     ):
         """Test the complete workflow from building to applying diffs."""
         from api.models import HierarchyDiff
+        from sqlalchemy import select
+        from storage.work_models import HierarchyDiffLog
         from utils.dual_representation import build_dual_representation
 
         snapshot_id, run_id = setup_complete_data
@@ -320,20 +246,17 @@ class TestDualRepresentationIntegration:
         )
 
         # 3. Log the diff
-        with storage_manager.get_work_session() as session:
-            from storage.work_models import HierarchyDiffLog
+        HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
+        storage_work_session.commit()
 
-            log_entry = HierarchyDiffLog(run_id=run_id, diff=diff.model_dump())
-            session.add(log_entry)
-            session.commit()
-
-            # 4. Verify the diff was logged
-            from sqlalchemy import select
-
-            logged_diffs = session.execute(select(HierarchyDiffLog)).scalars().all()
-            assert len(logged_diffs) == 1
-            assert logged_diffs[0].run_id == run_id
+        # 4. Verify the diff was logged
+        logged_diffs = (
+            storage_work_session.execute(select(HierarchyDiffLog)).scalars().all()
+        )
+        assert len(logged_diffs) == 1
+        assert logged_diffs[0].run_id == run_id
 
         # 5. Build representation again (should reflect changes in future implementation)
+        # TODO: Implement diff application logic to modify the dual representation
         dual_rep_after = build_dual_representation(storage_manager, snapshot_id, run_id)
         assert dual_rep_after is not None

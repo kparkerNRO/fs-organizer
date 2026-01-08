@@ -9,11 +9,12 @@ import logging
 from typing import Dict, List
 
 from api.models import DualRepresentation, HierarchyItem
+from data_models.pipeline import PipelineStage
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from storage.index_models import Node
 from storage.manager import NodeKind, StorageManager
-from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
+from storage.work_models import FolderStructure, GroupCategory, GroupCategoryEntry, GroupIteration
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ def build_dual_representation(
     storage_manager: StorageManager,
     snapshot_id: int,
     run_id: int | None = None,
+    structure_type: PipelineStage = PipelineStage.organized,
+    save_to_db: bool = False,
 ) -> DualRepresentation:
     """
     Build a DualRepresentation from the database.
@@ -30,6 +33,8 @@ def build_dual_representation(
         storage_manager: Storage manager for database access
         snapshot_id: Snapshot ID to build representation for
         run_id: Optional run ID for category data
+        structure_type: Type of structure (original, organized, etc.)
+        save_to_db: Whether to save the structure to the database
 
     Returns:
         DualRepresentation with items and both hierarchies
@@ -55,6 +60,27 @@ def build_dual_representation(
         with storage_manager.get_work_session() as work_session:
             # Build category hierarchy from work.db
             _build_category_hierarchy(work_session, run_id, items, category_hierarchy)
+
+            # Save to database if requested
+            if save_to_db:
+                dual_rep = DualRepresentation(
+                    items=items,
+                    node_hierarchy=node_hierarchy,
+                    category_hierarchy=category_hierarchy,
+                )
+
+                # TODO: Determine total node count from items
+                total_nodes = len([item for item in items.values() if item.type == "node"])
+
+                folder_structure = FolderStructure(
+                    run_id=run_id,
+                    snapshot_id=snapshot_id,
+                    structure_type=structure_type.value,
+                    structure=dual_rep.model_dump(),
+                    total_nodes=total_nodes,
+                )
+                work_session.add(folder_structure)
+                work_session.commit()
 
     return DualRepresentation(
         items=items,

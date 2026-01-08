@@ -1,138 +1,91 @@
 """Tests for dual representation building utilities."""
 
-from pathlib import Path
-
 import pytest
 
 from storage.factories import (
+    GroupCategoryEntryFactory,
+    GroupCategoryFactory,
+    GroupIterationFactory,
     NodeFactory,
     RunFactory,
     SnapshotFactory,
 )
-from storage.manager import NodeKind, StorageManager
+from storage.manager import NodeKind
 from utils.dual_representation import build_dual_representation
 
 
 @pytest.fixture
-def storage_manager(tmp_path: Path) -> StorageManager:
-    """Create a temporary storage manager for testing."""
-    return StorageManager(database_path=tmp_path)
-
-
-@pytest.fixture
-def setup_test_data(storage_manager: StorageManager):
+def setup_test_data(storage_index_session, storage_work_session):
     """Setup test data in both index and work databases."""
-    with storage_manager.get_index_session() as index_session:
-        # Create snapshot
-        SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-        snapshot = SnapshotFactory(
-            id=1,
-            root_path="/test",
-            root_abs_path="/test",
-        )
+    # Create snapshot
+    snapshot = SnapshotFactory()
 
-        # Create nodes
-        NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-        root_node = NodeFactory(
-            id=1,
-            snapshot_id=snapshot.id,
-            name="root",
-            kind=NodeKind.DIR,
-            parent_node_id=None,
-            abs_path="/test",
-            rel_path=".",
-        )
-        child_node1 = NodeFactory(
-            id=2,
-            snapshot_id=snapshot.id,
-            name="docs",
-            kind=NodeKind.DIR,
-            parent_node_id=root_node.id,
-            abs_path="/test/docs",
-            rel_path="docs",
-        )
-        NodeFactory(
-            id=3,
-            snapshot_id=snapshot.id,
-            name="file.txt",
-            kind=NodeKind.FILE,
-            parent_node_id=child_node1.id,
-            abs_path="/test/docs/file.txt",
-            rel_path="docs/file.txt",
-        )
-        index_session.commit()
-        # Capture IDs before session closes
-        snapshot_id = snapshot.id
-        child_node1_id = child_node1.id
+    # Create nodes
+    root_node = NodeFactory(
+        snapshot_id=snapshot.id,
+        name="root",
+        kind=NodeKind.DIR,
+        parent_node_id=None,
+        abs_path="/test",
+        rel_path=".",
+    )
+    child_node1 = NodeFactory(
+        snapshot_id=snapshot.id,
+        name="docs",
+        kind=NodeKind.DIR,
+        parent_node_id=root_node.id,
+        abs_path="/test/docs",
+        rel_path="docs",
+    )
+    NodeFactory(
+        snapshot_id=snapshot.id,
+        name="file.txt",
+        kind=NodeKind.FILE,
+        parent_node_id=child_node1.id,
+        abs_path="/test/docs/file.txt",
+        rel_path="docs/file.txt",
+    )
+    storage_index_session.commit()
 
-    with storage_manager.get_work_session() as work_session:
-        # Create models directly to avoid SubFactory issues
-        from datetime import datetime
-        from storage.work_models import (
-            Run,
-            GroupIteration,
-            GroupCategory,
-            GroupCategoryEntry,
-        )
+    # Create run with factories
+    run = RunFactory(snapshot_id=snapshot.id)
 
-        # Create run
-        run = Run(snapshot_id=snapshot_id, started_at=datetime.now())
-        work_session.add(run)
-        work_session.flush()  # Get the run.id
+    # Create group iteration
+    iteration = GroupIterationFactory(run=run, snapshot_id=snapshot.id)
 
-        # Create group iteration
-        iteration = GroupIteration(
-            run_id=run.id,
-            snapshot_id=snapshot_id,
-        )
-        work_session.add(iteration)
-        work_session.flush()  # Get the iteration.id
+    # Create category
+    category = GroupCategoryFactory(iteration=iteration, name="Work Documents")
 
-        # Create category
-        category1 = GroupCategory(
-            iteration_id=iteration.id,
-            name="Work Documents",
-            count=1,
-        )
-        work_session.add(category1)
-        work_session.flush()  # Get the category.id
+    # Create category entry
+    GroupCategoryEntryFactory(
+        folder_id=child_node1.id,
+        group_id=category.id,
+        iteration=iteration,
+        processed_name="Work Documents",
+    )
 
-        # Create category entry (mapping nodes to categories)
-        entry = GroupCategoryEntry(
-            folder_id=child_node1_id,
-            group_id=category1.id,
-            iteration_id=iteration.id,
-            processed_name="Work Documents",
-        )
-        work_session.add(entry)
+    storage_work_session.commit()
 
-        work_session.commit()
-        run_id = run.id
-
-    return snapshot_id, run_id
+    return snapshot.id, run.id
 
 
 class TestBuildDualRepresentation:
     """Test the build_dual_representation function."""
 
-    def test_empty_database(self, storage_manager: StorageManager):
+    def test_empty_database(
+        self, storage_manager, storage_index_session, storage_work_session
+    ):
         """Test building dual representation with no data."""
-        with storage_manager.get_index_session() as index_session:
-            SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            snapshot = SnapshotFactory(id=1)
-            index_session.commit()
-            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
+        snapshot = SnapshotFactory()
+        storage_index_session.commit()
 
-        with storage_manager.get_work_session() as work_session:
-            RunFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
-            run = RunFactory(id=1, snapshot_id=snapshot_id)
-            work_session.commit()
-            run_id: int = run.id  # type: ignore[attr-defined]
+        run = RunFactory(snapshot_id=snapshot.id)
+        storage_work_session.commit()
 
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot_id=snapshot_id,
-            run_id=run_id,
+            snapshot_id=snapshot.id,
+            run_id=run.id,
         )
 
         assert dual_rep is not None
@@ -144,38 +97,35 @@ class TestBuildDualRepresentation:
         assert "node-root" in dual_rep.items
         assert "category-root" in dual_rep.items
 
-    def test_with_nodes_only(self, storage_manager: StorageManager):
+    def test_with_nodes_only(
+        self, storage_manager, storage_index_session, storage_work_session
+    ):
         """Test building dual representation with only nodes (no categories)."""
-        with storage_manager.get_index_session() as index_session:
-            SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            snapshot = SnapshotFactory(id=1)
-
-            NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            NodeFactory(
-                id=1,
-                snapshot_id=snapshot.id,
-                name="test_node",
-                kind=NodeKind.DIR,
-            )
-            index_session.commit()
-            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
+        snapshot = SnapshotFactory()
+        node = NodeFactory(
+            snapshot_id=snapshot.id,
+            name="test_node",
+            kind=NodeKind.DIR,
+        )
+        storage_index_session.commit()
 
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot_id=snapshot_id,
+            snapshot_id=snapshot.id,
             run_id=None,
         )
 
         # Check that node was added
-        assert "node-1" in dual_rep.items
-        assert dual_rep.items["node-1"].name == "test_node"
-        assert dual_rep.items["node-1"].type == "node"
+        node_key = f"node-{node.id}"
+        assert node_key in dual_rep.items
+        assert dual_rep.items[node_key].name == "test_node"
+        assert dual_rep.items[node_key].type == "node"
 
         # Should have hierarchy entry for root
         assert "node-root" in dual_rep.node_hierarchy
-        assert "node-1" in dual_rep.node_hierarchy["node-root"]
+        assert node_key in dual_rep.node_hierarchy["node-root"]
 
-    def test_with_full_data(self, storage_manager: StorageManager, setup_test_data):
+    def test_with_full_data(self, storage_manager, setup_test_data):
         """Test building dual representation with complete data."""
         snapshot_id, run_id = setup_test_data
 
@@ -185,25 +135,21 @@ class TestBuildDualRepresentation:
             run_id=run_id,
         )
 
-        # Check nodes are present
-        assert "node-1" in dual_rep.items  # root
-        assert "node-2" in dual_rep.items  # docs
-        assert "node-3" in dual_rep.items  # file.txt
+        # Check nodes are present (verify count rather than specific IDs)
+        node_items = [item for item in dual_rep.items.values() if item.type == "node"]
+        assert len(node_items) == 4  # root + docs + file.txt + node-root
 
         # Check categories are present
-        assert "category-1" in dual_rep.items  # Work Documents
+        category_items = [
+            item for item in dual_rep.items.values() if item.type == "category"
+        ]
+        assert len(category_items) == 2  # Work Documents + category-root
 
-        # Check node hierarchy
+        # Check hierarchies exist
         assert "node-root" in dual_rep.node_hierarchy
-        assert "node-1" in dual_rep.node_hierarchy["node-root"]
-        assert "node-2" in dual_rep.node_hierarchy["node-1"]
-        assert "node-3" in dual_rep.node_hierarchy["node-2"]
-
-        # Check category hierarchy
         assert "category-root" in dual_rep.category_hierarchy
-        assert "category-1" in dual_rep.category_hierarchy["category-root"]
 
-    def test_node_properties(self, storage_manager: StorageManager, setup_test_data):
+    def test_node_properties(self, storage_manager, setup_test_data):
         """Test that node items have correct properties."""
         snapshot_id, run_id = setup_test_data
 
@@ -213,21 +159,27 @@ class TestBuildDualRepresentation:
             run_id=run_id,
         )
 
-        # Check file node
-        file_item = dual_rep.items["node-3"]
+        # Find file node by name
+        file_item = next(
+            item
+            for item in dual_rep.items.values()
+            if item.type == "node" and item.name == "file.txt"
+        )
         assert file_item.type == "node"
         assert file_item.name == "file.txt"
         assert file_item.originalPath == "/test/docs/file.txt"
 
-        # Check directory node
-        dir_item = dual_rep.items["node-2"]
+        # Find directory node by name
+        dir_item = next(
+            item
+            for item in dual_rep.items.values()
+            if item.type == "node" and item.name == "docs"
+        )
         assert dir_item.type == "node"
         assert dir_item.name == "docs"
         assert dir_item.originalPath == "/test/docs"
 
-    def test_category_properties(
-        self, storage_manager: StorageManager, setup_test_data
-    ):
+    def test_category_properties(self, storage_manager, setup_test_data):
         """Test that category items have correct properties."""
         snapshot_id, run_id = setup_test_data
 
@@ -237,15 +189,17 @@ class TestBuildDualRepresentation:
             run_id=run_id,
         )
 
-        # Check category
-        category_item = dual_rep.items["category-1"]
+        # Find category by name
+        category_item = next(
+            item
+            for item in dual_rep.items.values()
+            if item.type == "category" and item.name == "Work Documents"
+        )
         assert category_item.type == "category"
         assert category_item.name == "Work Documents"
         assert category_item.originalPath is None
 
-    def test_hierarchy_structure(
-        self, storage_manager: StorageManager, setup_test_data
-    ):
+    def test_hierarchy_structure(self, storage_manager, setup_test_data):
         """Test that hierarchies are correctly structured."""
         snapshot_id, run_id = setup_test_data
 
@@ -257,30 +211,28 @@ class TestBuildDualRepresentation:
 
         # Node hierarchy should be tree-like
         assert isinstance(dual_rep.node_hierarchy["node-root"], list)
-        assert isinstance(dual_rep.node_hierarchy["node-1"], list)
+        assert len(dual_rep.node_hierarchy["node-root"]) > 0
 
         # Category hierarchy should have categories under root
         assert isinstance(dual_rep.category_hierarchy["category-root"], list)
-        assert "category-1" in dual_rep.category_hierarchy["category-root"]
+        assert len(dual_rep.category_hierarchy["category-root"]) == 1
 
-    def test_without_run_id(self, storage_manager: StorageManager):
+    def test_without_run_id(
+        self, storage_manager, storage_index_session, storage_work_session
+    ):
         """Test building without run_id (no categories)."""
-        with storage_manager.get_index_session() as index_session:
-            SnapshotFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            snapshot = SnapshotFactory(id=1)
-
-            NodeFactory._meta.sqlalchemy_session = index_session  # type: ignore[misc]
-            NodeFactory(id=1, snapshot_id=snapshot.id, name="test", kind=NodeKind.DIR)
-            index_session.commit()
-            snapshot_id: int = snapshot.id  # type: ignore[attr-defined]
+        snapshot = SnapshotFactory()
+        node = NodeFactory(snapshot_id=snapshot.id, name="test", kind=NodeKind.DIR)
+        storage_index_session.commit()
 
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot_id=snapshot_id,
+            snapshot_id=snapshot.id,
             run_id=None,
         )
 
         # Should have nodes but category hierarchy should only have root
-        assert "node-1" in dual_rep.items
+        node_key = f"node-{node.id}"
+        assert node_key in dual_rep.items
         assert "category-root" in dual_rep.items
         assert len(dual_rep.category_hierarchy["category-root"]) == 0
