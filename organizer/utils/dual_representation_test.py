@@ -32,7 +32,7 @@ class TestCreateHierarchyFromNodes:
         snapshot = SnapshotFactory()
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # Should have root item only
         assert len(items) == 1
@@ -58,7 +58,7 @@ class TestCreateHierarchyFromNodes:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # Should have root item and one node item
         assert len(items) == 2
@@ -99,7 +99,7 @@ class TestCreateHierarchyFromNodes:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # Verify items store contains all nodes with intrinsic data only
         assert len(items) == 4  # root + dir1 + dir2 + file
@@ -154,7 +154,7 @@ class TestCreateHierarchyFromNodes:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # dir1 should have two children
         dir1_record = hierarchy.root.children[0]
@@ -173,12 +173,15 @@ class TestCreateHierarchyFromCategories:
         storage_work_session.commit()
 
         hierarchy, items = create_hierarchy_from_categories(
-            run.id, run.snapshot_id, PipelineStage.organized, storage_manager
+            run.id,  # type: ignore[attr-defined]
+            run.snapshot_id,  # type: ignore[attr-defined]
+            PipelineStage.organized,
+            storage_manager,
         )
 
         # Should have root item only
         assert len(items) == 1
-        root_item_id = f"run-{run.id}-root"
+        root_item_id = f"run-{run.id}-root"  # type: ignore[attr-defined]
         assert root_item_id in items
 
         # Tree should have no children
@@ -203,20 +206,23 @@ class TestCreateHierarchyFromCategories:
         # Map nodes to category
         GroupCategoryEntryFactory(
             folder_id=node1.id,
-            group_id=category.id,
+            group_id=category.id,  # type: ignore[attr-defined]
             iteration=iteration,
             processed_name="Document 1",
         )
         GroupCategoryEntryFactory(
             folder_id=node2.id,
-            group_id=category.id,
+            group_id=category.id,  # type: ignore[attr-defined]
             iteration=iteration,
             processed_name="Document 2",
         )
         storage_work_session.commit()
 
         hierarchy, items = create_hierarchy_from_categories(
-            run.id, snapshot.id, PipelineStage.organized, storage_manager
+            run.id,  # type: ignore[attr-defined]
+            snapshot.id,  # type: ignore[attr-defined]
+            PipelineStage.organized,
+            storage_manager,
         )
 
         # Should have root, one category, and two nodes
@@ -250,7 +256,7 @@ class TestCreateHierarchyFromCategories:
         # Only categorize one node
         GroupCategoryEntryFactory(
             folder_id=categorized_node.id,
-            group_id=category.id,
+            group_id=category.id,  # type: ignore[attr-defined]
             iteration=iteration,
             processed_name="Work File",
         )
@@ -258,7 +264,10 @@ class TestCreateHierarchyFromCategories:
 
         # Build organized hierarchy only
         hierarchy, items = create_hierarchy_from_categories(
-            run.id, snapshot.id, PipelineStage.organized, storage_manager
+            run.id,  # type: ignore[attr-defined]
+            snapshot.id,  # type: ignore[attr-defined]
+            PipelineStage.organized,
+            storage_manager,
         )
 
         # Uncategorized node should NOT be in items
@@ -289,7 +298,7 @@ class TestBuildDualRepresentation:
         # Only categorize one node
         GroupCategoryEntryFactory(
             folder_id=categorized_node.id,
-            group_id=category.id,
+            group_id=category.id,  # type: ignore[attr-defined]
             iteration=iteration,
             processed_name="Work File",
         )
@@ -298,8 +307,8 @@ class TestBuildDualRepresentation:
         # Build both original and organized
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot.id,
-            run.id,
+            snapshot.id,  # type: ignore[attr-defined]
+            run.id,  # type: ignore[attr-defined]
             stages=[PipelineStage.original, PipelineStage.organized],
         )
 
@@ -327,7 +336,7 @@ class TestConvertHierarchyToFolderStructure:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # Convert to FolderV2 format
         folder_v2 = convert_hierarchy_to_folder_structure(hierarchy, items)
@@ -357,7 +366,7 @@ class TestDataIntegrity:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         node_item = items[f"node-{node.id}"]
         assert node_item.originalPath == "/test/path/file.txt"
@@ -371,7 +380,7 @@ class TestDataIntegrity:
         )
         storage_index_session.commit()
 
-        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)
+        hierarchy, items = create_hierarchy_from_nodes(snapshot.id, storage_manager)  # type: ignore[attr-defined]
 
         # Item should NOT have name
         node_item = items[f"node-{node.id}"]
@@ -403,7 +412,7 @@ class TestDataIntegrity:
         # Use different name in category
         GroupCategoryEntryFactory(
             folder_id=node.id,
-            group_id=category.id,
+            group_id=category.id,  # type: ignore[attr-defined]
             iteration=iteration,
             processed_name="renamed_file.txt",  # Different name!
         )
@@ -412,8 +421,8 @@ class TestDataIntegrity:
         # Build both hierarchies
         dual_rep = build_dual_representation(
             storage_manager,
-            snapshot.id,
-            run.id,
+            snapshot.id,  # type: ignore[attr-defined]
+            run.id,  # type: ignore[attr-defined]
             stages=[PipelineStage.original, PipelineStage.organized],
         )
 

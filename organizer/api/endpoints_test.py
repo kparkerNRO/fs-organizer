@@ -42,14 +42,14 @@ def setup_complete_data(storage_index_session, storage_work_session):
 
     GroupCategoryEntryFactory(
         folder_id=child_node.id,
-        group_id=category.id,
+        group_id=category.id,  # type: ignore[attr-defined]
         iteration=iteration,
         processed_name="Personal",
     )
 
     storage_work_session.commit()
 
-    return snapshot.id, run.id
+    return snapshot.id, run.id  # type: ignore[attr-defined]
 
 
 class TestGetDualRepresentationEndpoint:
@@ -142,7 +142,7 @@ class TestApplyHierarchyDiffEndpoint:
         storage_work_session.commit()
 
         # Verify it was logged
-        assert log_entry.id is not None
+        assert log_entry.id is not None  # type: ignore[attr-defined]
         assert log_entry.run_id == run_id
         assert log_entry.diff == diff.model_dump()
 
@@ -159,7 +159,7 @@ class TestApplyHierarchyDiffEndpoint:
         log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
         storage_work_session.commit()
 
-        assert log_entry.id is not None
+        assert log_entry.id is not None  # type: ignore[attr-defined]
         assert "added" in log_entry.diff
         assert log_entry.diff["added"]["category-1"] == ["node-1", "node-2"]
 
@@ -176,7 +176,7 @@ class TestApplyHierarchyDiffEndpoint:
         log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
         storage_work_session.commit()
 
-        assert log_entry.id is not None
+        assert log_entry.id is not None  # type: ignore[attr-defined]
         assert "deleted" in log_entry.diff
         assert log_entry.diff["deleted"]["category-2"] == ["node-3"]
 
@@ -198,7 +198,7 @@ class TestApplyHierarchyDiffEndpoint:
         log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
         storage_work_session.commit()
 
-        assert log_entry.id is not None
+        assert log_entry.id is not None  # type: ignore[attr-defined]
         assert len(log_entry.diff["added"]) == 2
         assert len(log_entry.diff["deleted"]) == 1
 
@@ -235,7 +235,7 @@ class TestApplyHierarchyDiffEndpoint:
         log_entry = HierarchyDiffLogFactory(run_id=run_id, diff=diff.model_dump())
         storage_work_session.commit()
 
-        assert log_entry.created_at is not None
+        assert log_entry.created_at is not None  # type: ignore[attr-defined]
         # created_at should be set automatically
 
 
