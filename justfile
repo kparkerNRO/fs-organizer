@@ -123,10 +123,11 @@ type-backend:
 # Lint and format backend code
 fix-backend: lint-backend format-backend
 
-# Run pre-commit checks (same as pre-commit hooks)
-pre-commit:
+# Run CI checks 
+ci-check:
     cd organizer && uv run ruff check --fix .
     cd organizer && uv run ruff format .
+    cd organizer && uv run ty check .
 
 # ============================================
 # Frontend - Electron App (frontend/)

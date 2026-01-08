@@ -94,6 +94,9 @@ class Hierarchy(BaseModel):
     The same items can appear in multiple hierarchies with different relationships.
     """
 
+    contained_ids: set[int] # set of all of the database record ids contained in the heirarchy
+    structure_id: int
+    run_id: int | None
     stage: str  # Pipeline stage name (e.g., "original", "organized", "grouped")
     source_type: Literal["node", "category"]  # Database table this was built from
     root: HierarchyRecord  # Root of the hierarchy tree

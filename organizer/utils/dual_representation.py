@@ -25,6 +25,21 @@ from storage.work_models import (
 logger = logging.getLogger(__name__)
 
 
+"""
+REWORK THIS FILE
+Expected functions:
+* convert_folder_structure_to_hierarchy
+* convert_hierarchy_to_folder_structure
+* create_hierarchy_from_categories(run_id, snapshot_id, pipeline_stage)
+* create_hierarchy_from_structure(structure_id)
+
+DO NOT use DualRepresentation. DualRepresentation is an api-level construct.
+At all stages lower than the API, work exclusively in Hierarchies
+* Hierarchies are a direct analogue to FolderV2 - the storage and usage should
+    be functionally identical
+
+"""
+
 def _build_hierarchy_tree(tree: Dict[str, List[str]], root_id: str) -> HierarchyRecord:
     """
     Convert a flat tree structure to a recursive HierarchyRecord tree.
