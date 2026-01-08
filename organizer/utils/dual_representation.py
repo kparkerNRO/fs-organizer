@@ -357,25 +357,31 @@ def _save_hierarchy_to_db(
     """
     Save a computed Hierarchy and its ItemStore to the database.
 
+    Uses the new FolderStructure fields to store Hierarchy data properly:
+    - format_type: "hierarchy"
+    - structure: root HierarchyRecord
+    - items: ItemStore dictionary
+    - contained_ids: database IDs (as list for JSON)
+    - source_type: ItemType enum value
+    - structure_type: PipelineStage value (e.g., "old", "new")
+
     Returns the structure_id (FolderStructure.id) of the saved hierarchy.
     """
     with storage_manager.get_work_session() as work_session:
-        # Prepare the data to save
-        hierarchy_data = {
-            "hierarchy": hierarchy.model_dump(mode="json"),
-            "items": {k: v.model_dump(mode="json") for k, v in items.items()},
-        }
-
-        # Create structure_type key to identify this hierarchy
-        # Format: "hierarchy-{stage}" (e.g., "hierarchy-old", "hierarchy-new")
-        structure_type_key = f"hierarchy-{hierarchy.stage.value}"
-
         folder_structure = FolderStructure(
             run_id=hierarchy.run_id,
             snapshot_id=snapshot_id,
             total_nodes=len(hierarchy.contained_ids),
-            structure_type=structure_type_key,
-            structure=hierarchy_data,
+            structure_type=hierarchy.stage.value,  # Just the stage value: "old", "new", etc.
+            structure=hierarchy.root.model_dump(
+                mode="json"
+            ),  # Store root HierarchyRecord
+            format_type="hierarchy",  # Indicates this is Hierarchy format, not FolderV2
+            contained_ids={
+                "ids": list(hierarchy.contained_ids)
+            },  # Set as list for JSON
+            source_type=hierarchy.source_type.value,  # "node" or "category"
+            items={k: v.model_dump(mode="json") for k, v in items.items()},  # ItemStore
         )
         work_session.add(folder_structure)
         work_session.commit()
@@ -396,13 +402,15 @@ def _load_hierarchy_from_db(
     """
     Load a cached Hierarchy and its ItemStore from the database.
 
+    Reads from the new FolderStructure fields to reconstruct Hierarchy.
+
     Returns (Hierarchy, items) if found, None otherwise.
     """
-    structure_type_key = f"hierarchy-{stage.value}"
-
     with storage_manager.get_work_session() as work_session:
-        query = select(FolderStructure).where(
-            FolderStructure.structure_type == structure_type_key
+        query = (
+            select(FolderStructure)
+            .where(FolderStructure.structure_type == stage.value)
+            .where(FolderStructure.format_type == "hierarchy")
         )
 
         if run_id is not None:
@@ -421,15 +429,25 @@ def _load_hierarchy_from_db(
             )
             return None
 
-        # Deserialize the data
-        hierarchy_data = result.structure.get("hierarchy", {})
-        items_data = result.structure.get("items", {})
+        # Deserialize from new fields
+        root_data = result.structure  # Root HierarchyRecord
+        items_data = result.items or {}  # ItemStore
+        contained_ids_data = result.contained_ids or {"ids": []}
+        source_type_str = result.source_type or "node"
 
-        hierarchy = Hierarchy.model_validate(hierarchy_data)
+        # Reconstruct HierarchyRecord and items
+        root = HierarchyRecord.model_validate(root_data)
         items = {k: HierarchyItem.model_validate(v) for k, v in items_data.items()}
 
-        # Update structure_id to reference the database record
-        hierarchy.structure_id = result.id
+        # Reconstruct Hierarchy object
+        hierarchy = Hierarchy(
+            contained_ids=set(contained_ids_data.get("ids", [])),
+            structure_id=result.id,
+            run_id=result.run_id,
+            stage=stage,
+            source_type=ItemType(source_type_str),
+            root=root,
+        )
 
         logger.info(
             f"Loaded cached hierarchy (stage={stage.value}, run_id={run_id}) from DB id={result.id}"

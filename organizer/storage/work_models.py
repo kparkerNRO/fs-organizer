@@ -231,10 +231,13 @@ class Classification(WorkBase):
 
 class FolderStructure(WorkBase):
     """
-    Represents the most-recently calculated folder structure
-    for the old and new structures. This should be serializable into
-    data_models.api.FolderV2 and data_models.api.File objects via
-    pydantic
+    Represents the most-recently calculated folder structure.
+
+    Can serialize to either:
+    - FolderV2 format (legacy, for old/new structures)
+    - Hierarchy format (new dual representation with ItemStore)
+
+    Use format_type field to distinguish between formats.
     """
 
     __tablename__ = "out_folder_structure"
@@ -243,9 +246,21 @@ class FolderStructure(WorkBase):
     run_id: Mapped[int | None] = mapped_column(ForeignKey("run.id"))
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
     total_nodes: Mapped[int]
-    structure_type: Mapped[str] = mapped_column(String)
-    structure: Mapped[dict] = mapped_column(JsonDict)
+    structure_type: Mapped[str] = mapped_column(String)  # e.g., "old", "new", "grouped"
+    structure: Mapped[dict] = mapped_column(JsonDict)  # Main structure data
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # New fields for Hierarchy format support
+    format_type: Mapped[Optional[str]] = mapped_column(
+        String
+    )  # "hierarchy" or "folderv2"
+    contained_ids: Mapped[Optional[dict]] = mapped_column(
+        JsonDict
+    )  # Set serialized as list in JSON
+    source_type: Mapped[Optional[str]] = mapped_column(String)  # "node" or "category"
+    items: Mapped[Optional[dict]] = mapped_column(
+        JsonDict
+    )  # ItemStore for Hierarchy format
 
 
 class FileMapping(WorkBase):
