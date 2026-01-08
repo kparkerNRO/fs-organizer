@@ -66,6 +66,11 @@ class HierarchyItem(BaseModel):
     name: str
     type: Literal["node", "category"]
     originalPath: Optional[str] = None  # For nodes
+    # Fields for compatibility with FolderV2/File
+    confidence: float = 1.0  # Confidence score for classification
+    possibleClassifications: list[str] = []  # Possible classifications for this item
+    newPath: Optional[str] = None  # New path for files after organization
+    count: int = 0  # Number of children (for folders/categories)
 
 
 class DualRepresentation(BaseModel):

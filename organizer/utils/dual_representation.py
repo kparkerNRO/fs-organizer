@@ -19,6 +19,59 @@ from storage.work_models import FolderStructure, GroupCategory, GroupCategoryEnt
 logger = logging.getLogger(__name__)
 
 
+def dual_representation_to_folder_structure(
+    dual_rep: DualRepresentation, hierarchy_type: str = "node"
+) -> dict:
+    """
+    Convert DualRepresentation to FolderV2-compatible structure.
+
+    This provides backward compatibility for code expecting the old FolderV2 format.
+
+    Args:
+        dual_rep: The dual representation to convert
+        hierarchy_type: Either "node" for filesystem hierarchy or "category" for categorized hierarchy
+
+    Returns:
+        Dict compatible with FolderV2 structure (can be parsed with FolderV2.model_validate)
+
+    TODO: This is a compatibility layer. Consider migrating all consumers to use DualRepresentation directly.
+    """
+    hierarchy = (
+        dual_rep.node_hierarchy
+        if hierarchy_type == "node"
+        else dual_rep.category_hierarchy
+    )
+    root_id = "node-root" if hierarchy_type == "node" else "category-root"
+
+    def build_tree(item_id: str) -> dict:
+        """Recursively build FolderV2-style tree from flat representation."""
+        item = dual_rep.items[item_id]
+        children_ids = hierarchy.get(item_id, [])
+
+        result = {
+            "id": item.id,
+            "name": item.name,
+            "type": "folder" if item.type in ["node", "category"] else "file",
+            "confidence": item.confidence,
+            "possibleClassifications": item.possibleClassifications,
+            "count": item.count,
+        }
+
+        if item.originalPath:
+            result["originalPath"] = item.originalPath
+        if item.newPath:
+            result["newPath"] = item.newPath
+
+        if children_ids:
+            result["children"] = [build_tree(child_id) for child_id in children_ids]
+        else:
+            result["children"] = []
+
+        return result
+
+    return build_tree(root_id)
+
+
 def build_dual_representation(
     storage_manager: StorageManager,
     snapshot_id: int,
@@ -150,6 +203,11 @@ def _build_node_hierarchy(
             if node_id not in node_hierarchy:
                 node_hierarchy[node_id] = []
 
+    # Second pass: populate count field for all parent nodes
+    for node_id, children in node_hierarchy.items():
+        if node_id in items:
+            items[node_id].count = len(children)
+
 
 def _build_category_hierarchy(
     work_session: Session,
@@ -192,11 +250,12 @@ def _build_category_hierarchy(
     for category in categories:
         category_id = f"category-{category.id}"
 
-        # Add to items store
+        # Add to items store with confidence from database
         items[category_id] = HierarchyItem(
             id=category_id,
             name=category.name,
             type="category",
+            confidence=category.group_confidence if category.group_confidence else 1.0,
         )
 
         # Add to root's children
@@ -205,7 +264,7 @@ def _build_category_hierarchy(
         # Initialize empty children list
         category_hierarchy[category_id] = []
 
-    # Query all category entries to map files to categories
+    # Query all category entries to map files to categories and get file mappings
     entries = (
         work_session.execute(
             select(GroupCategoryEntry).where(
@@ -218,7 +277,19 @@ def _build_category_hierarchy(
 
     logger.info(f"Processing {len(entries)} category entries")
 
-    # Map nodes to categories
+    # Get file mappings for newPath
+    from storage.work_models import FileMapping
+
+    file_mappings = (
+        work_session.execute(
+            select(FileMapping).where(FileMapping.run_id == run_id)
+        )
+        .scalars()
+        .all()
+    )
+    mapping_dict = {fm.node_id: fm.new_path for fm in file_mappings}
+
+    # Map nodes to categories and update confidence
     for entry in entries:
         if entry.group_id is not None:
             category_id = f"category-{entry.group_id}"
@@ -227,3 +298,18 @@ def _build_category_hierarchy(
             # Only add if the node exists in items (it should from node hierarchy)
             if node_id in items and category_id in category_hierarchy:
                 category_hierarchy[category_id].append(node_id)
+
+                # Update node confidence from entry
+                if entry.confidence:
+                    items[node_id].confidence = min(
+                        items[node_id].confidence, entry.confidence
+                    )
+
+                # Add newPath if available
+                if entry.folder_id in mapping_dict:
+                    items[node_id].newPath = mapping_dict[entry.folder_id]
+
+    # Second pass: populate count and root count
+    for category_id, children in category_hierarchy.items():
+        if category_id in items:
+            items[category_id].count = len(children)

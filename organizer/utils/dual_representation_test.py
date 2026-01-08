@@ -3,6 +3,7 @@
 import pytest
 
 from storage.factories import (
+    FileMappingFactory,
     GroupCategoryEntryFactory,
     GroupCategoryFactory,
     GroupIterationFactory,
@@ -11,7 +12,10 @@ from storage.factories import (
     SnapshotFactory,
 )
 from storage.manager import NodeKind
-from utils.dual_representation import build_dual_representation
+from utils.dual_representation import (
+    build_dual_representation,
+    dual_representation_to_folder_structure,
+)
 
 
 @pytest.fixture
@@ -236,3 +240,125 @@ class TestBuildDualRepresentation:
         assert node_key in dual_rep.items
         assert "category-root" in dual_rep.items
         assert len(dual_rep.category_hierarchy["category-root"]) == 0
+
+    def test_confidence_and_count_fields(self, storage_manager, setup_test_data):
+        """Test that confidence and count fields are populated correctly."""
+        snapshot_id, run_id = setup_test_data
+
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=snapshot_id,
+            run_id=run_id,
+        )
+
+        # Check that count is populated for nodes with children
+        root_item = dual_rep.items["node-root"]
+        assert root_item.count > 0
+
+        # Check that confidence is set for categories
+        category_item = next(
+            item
+            for item in dual_rep.items.values()
+            if item.type == "category" and item.name == "Work Documents"
+        )
+        assert category_item.confidence >= 0.0
+        assert category_item.confidence <= 1.0
+
+    def test_new_path_from_file_mapping(
+        self, storage_manager, storage_index_session, storage_work_session
+    ):
+        """Test that newPath is populated from FileMapping."""
+        snapshot = SnapshotFactory()
+        file_node = NodeFactory(
+            snapshot_id=snapshot.id,
+            name="document.pdf",
+            kind=NodeKind.FILE,
+        )
+        storage_index_session.commit()
+
+        run = RunFactory(snapshot_id=snapshot.id)
+        iteration = GroupIterationFactory(run=run, snapshot_id=snapshot.id)
+        category = GroupCategoryFactory(iteration=iteration, name="Documents")
+
+        # Create file mapping
+        FileMappingFactory(
+            run=run,
+            node_id=file_node.id,
+            original_path="/test/document.pdf",
+            new_path="Documents/document.pdf",
+        )
+
+        # Create category entry
+        GroupCategoryEntryFactory(
+            folder_id=file_node.id,
+            group_id=category.id,
+            iteration=iteration,
+            processed_name="Documents",
+        )
+
+        storage_work_session.commit()
+
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=snapshot.id,
+            run_id=run.id,
+        )
+
+        # Find the file node and check newPath
+        file_item = next(
+            item
+            for item in dual_rep.items.values()
+            if item.type == "node" and item.name == "document.pdf"
+        )
+        assert file_item.newPath == "Documents/document.pdf"
+
+    def test_compatibility_conversion_to_folder_structure(
+        self, storage_manager, setup_test_data
+    ):
+        """Test conversion to FolderV2-compatible format."""
+        snapshot_id, run_id = setup_test_data
+
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=snapshot_id,
+            run_id=run_id,
+        )
+
+        # Convert to FolderV2 format
+        folder_structure = dual_representation_to_folder_structure(
+            dual_rep, hierarchy_type="node"
+        )
+
+        # Verify structure has expected fields
+        assert "id" in folder_structure
+        assert "name" in folder_structure
+        assert "type" in folder_structure
+        assert "children" in folder_structure
+        assert "count" in folder_structure
+        assert "confidence" in folder_structure
+
+        # Verify it's a valid tree
+        assert isinstance(folder_structure["children"], list)
+        assert len(folder_structure["children"]) > 0
+
+    def test_compatibility_conversion_category_hierarchy(
+        self, storage_manager, setup_test_data
+    ):
+        """Test conversion of category hierarchy to FolderV2 format."""
+        snapshot_id, run_id = setup_test_data
+
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=snapshot_id,
+            run_id=run_id,
+        )
+
+        # Convert category hierarchy
+        category_structure = dual_representation_to_folder_structure(
+            dual_rep, hierarchy_type="category"
+        )
+
+        # Verify structure
+        assert category_structure["name"] == "Categories"
+        assert "children" in category_structure
+        assert len(category_structure["children"]) == 1  # Work Documents category
