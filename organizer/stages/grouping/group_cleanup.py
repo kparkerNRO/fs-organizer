@@ -57,7 +57,7 @@ def _group_by_tokens(
     it can't be used with the generic update_group_mapping function
     """
     working_list = list(filename_to_group_map.keys())
-    groups = common_token_grouping(working_list)
+    groups = common_token_grouping(working_list, prefer_longer_names=True)
 
     if not groups:
         return
@@ -183,10 +183,10 @@ def _process_ungrouped(
     for filename in filenames:
         filename_to_count[filename] += 1
 
-    for group, entries in group_to_entries.items():
-        entry = entries[0]
-        if filename_to_count[entry.original_name] == 1:
-            entry.confidence = 0.1
+    # for group, entries in group_to_entries.items():
+    #     entry = entries[0]
+    #     if filename_to_count[entry.original_name] == 1:
+    #         entry.confidence = 0.1
 
 
 def refine_group(filenames: list[str]) -> dict[str, list[GroupEntry]]:

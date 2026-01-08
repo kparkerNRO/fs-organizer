@@ -147,7 +147,7 @@ def apply_folder_name_grouping(
     names_to_process = list(name_to_entries.keys())
 
     # Apply common_token_grouping to identify shared prefixes
-    grouping_result = common_token_grouping(names_to_process)
+    grouping_result = common_token_grouping(names_to_process, prefer_longer_names=True)
 
     # Track which entries have been processed
     processed_names = set()
