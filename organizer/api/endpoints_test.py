@@ -62,8 +62,8 @@ def setup_complete_data(storage_manager: StorageManager):
         GroupCategoryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
         category = GroupCategoryFactory(
             id=1,
-            iteration_id=iteration.id,
-            name="Personal",  # type: ignore[attr-defined]
+            iteration_id=iteration.id,  # type: ignore[attr-defined]
+            name="Personal",
         )
 
         GroupCategoryEntryFactory._meta.sqlalchemy_session = work_session  # type: ignore[misc]
