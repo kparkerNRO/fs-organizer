@@ -5,8 +5,7 @@ in notes/dual_representation_design.md and test cases in
 notes/dual_representation_test_cases.md.
 """
 
-from api.models import ItemType
-from data_models.pipeline import PipelineStage
+from data_models.pipeline import ItemType, PipelineStage
 from storage.factories import (
     GroupCategoryEntryFactory,
     GroupCategoryFactory,

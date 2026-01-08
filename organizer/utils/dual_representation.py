@@ -13,18 +13,23 @@ Key architectural notes:
 
 import logging
 
-from api.models import (
-    DualRepresentation,
+from api.models import DualRepresentation
+from data_models.pipeline import (
     Hierarchy,
     HierarchyItem,
     HierarchyRecord,
     ItemType,
+    PipelineStage,
 )
-from data_models.pipeline import PipelineStage
 from sqlalchemy import func, select
 from storage.index_models import Node
 from storage.manager import StorageManager
-from storage.work_models import GroupCategory, GroupCategoryEntry, GroupIteration
+from storage.work_models import (
+    FolderStructure,
+    GroupCategory,
+    GroupCategoryEntry,
+    GroupIteration,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +348,96 @@ def convert_hierarchy_to_folder_structure(
     return build_tree(hierarchy.root)
 
 
+def _save_hierarchy_to_db(
+    hierarchy: Hierarchy,
+    items: dict[str, HierarchyItem],
+    snapshot_id: int,
+    storage_manager: StorageManager,
+) -> int:
+    """
+    Save a computed Hierarchy and its ItemStore to the database.
+
+    Returns the structure_id (FolderStructure.id) of the saved hierarchy.
+    """
+    with storage_manager.get_work_session() as work_session:
+        # Prepare the data to save
+        hierarchy_data = {
+            "hierarchy": hierarchy.model_dump(mode="json"),
+            "items": {k: v.model_dump(mode="json") for k, v in items.items()},
+        }
+
+        # Create structure_type key to identify this hierarchy
+        # Format: "hierarchy-{stage}" (e.g., "hierarchy-old", "hierarchy-new")
+        structure_type_key = f"hierarchy-{hierarchy.stage.value}"
+
+        folder_structure = FolderStructure(
+            run_id=hierarchy.run_id,
+            snapshot_id=snapshot_id,
+            total_nodes=len(hierarchy.contained_ids),
+            structure_type=structure_type_key,
+            structure=hierarchy_data,
+        )
+        work_session.add(folder_structure)
+        work_session.commit()
+
+        logger.info(
+            f"Saved hierarchy (stage={hierarchy.stage.value}, run_id={hierarchy.run_id}) to DB with id={folder_structure.id}"
+        )
+
+        return folder_structure.id
+
+
+def _load_hierarchy_from_db(
+    snapshot_id: int,
+    stage: PipelineStage,
+    run_id: int | None,
+    storage_manager: StorageManager,
+) -> tuple[Hierarchy, dict[str, HierarchyItem]] | None:
+    """
+    Load a cached Hierarchy and its ItemStore from the database.
+
+    Returns (Hierarchy, items) if found, None otherwise.
+    """
+    structure_type_key = f"hierarchy-{stage.value}"
+
+    with storage_manager.get_work_session() as work_session:
+        query = select(FolderStructure).where(
+            FolderStructure.structure_type == structure_type_key
+        )
+
+        if run_id is not None:
+            query = query.where(FolderStructure.run_id == run_id)
+        else:
+            query = query.where(FolderStructure.run_id.is_(None))
+
+        # Get the most recent entry
+        result = work_session.execute(
+            query.order_by(FolderStructure.id.desc()).limit(1)
+        ).scalar_one_or_none()
+
+        if not result:
+            logger.debug(
+                f"No cached hierarchy found for stage={stage.value}, run_id={run_id}"
+            )
+            return None
+
+        # Deserialize the data
+        hierarchy_data = result.structure.get("hierarchy", {})
+        items_data = result.structure.get("items", {})
+
+        hierarchy = Hierarchy.model_validate(hierarchy_data)
+        items = {k: HierarchyItem.model_validate(v) for k, v in items_data.items()}
+
+        # Update structure_id to reference the database record
+        hierarchy.structure_id = result.id
+
+        logger.info(
+            f"Loaded cached hierarchy (stage={stage.value}, run_id={run_id}) from DB id={result.id}"
+        )
+
+        return hierarchy, items
+
+
 def build_dual_representation(
     storage_manager: StorageManager,
     snapshot_id: int,
@@ -374,16 +469,33 @@ def build_dual_representation(
 
     # Build each requested stage
     for stage in stages:
-        if stage == PipelineStage.original:
-            hierarchy, items = create_hierarchy_from_nodes(snapshot_id, storage_manager)
-            hierarchies[stage.value] = hierarchy
-            all_items.update(items)  # Merge into shared ItemStore
+        # Try loading from cache first
+        cached = _load_hierarchy_from_db(snapshot_id, stage, run_id, storage_manager)
 
-        elif stage in [PipelineStage.organized, PipelineStage.grouped] and run_id:
-            hierarchy, items = create_hierarchy_from_categories(
-                run_id, snapshot_id, stage, storage_manager
+        if cached:
+            hierarchy, items = cached
+            logger.info(f"Using cached hierarchy for stage={stage.value}")
+        else:
+            # Compute hierarchy if not cached
+            if stage == PipelineStage.original:
+                hierarchy, items = create_hierarchy_from_nodes(
+                    snapshot_id, storage_manager
+                )
+            elif stage in [PipelineStage.organized, PipelineStage.grouped] and run_id:
+                hierarchy, items = create_hierarchy_from_categories(
+                    run_id, snapshot_id, stage, storage_manager
+                )
+            else:
+                continue  # Skip stages that can't be computed
+
+            # Save computed hierarchy to database for future use
+            structure_id = _save_hierarchy_to_db(
+                hierarchy, items, snapshot_id, storage_manager
             )
-            hierarchies[stage.value] = hierarchy
-            all_items.update(items)  # Merge into shared ItemStore
+            hierarchy.structure_id = structure_id
+            logger.info(f"Computed and saved hierarchy for stage={stage.value}")
+
+        hierarchies[stage.value] = hierarchy
+        all_items.update(items)  # Merge into shared ItemStore
 
     return DualRepresentation(items=all_items, hierarchies=hierarchies)
