@@ -101,8 +101,10 @@ class TestGetDualRepresentationEndpoint:
         for stage_name, hierarchy in hierarchies_dict.items():
             assert "stage" in hierarchy
             assert "source_type" in hierarchy
-            assert "tree" in hierarchy
-            assert "root_id" in hierarchy
+            assert "root" in hierarchy
+            # Verify root is a HierarchyRecord with id and children
+            assert "id" in hierarchy["root"]
+            assert "children" in hierarchy["root"]
 
         # Verify items have correct keys
         items_dict = model_data["items"]

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel
 
 from api.tasks import TaskStatus
@@ -73,18 +73,30 @@ class HierarchyItem(BaseModel):
     count: int = 0  # Number of children (for folders/categories)
 
 
+class HierarchyRecord(BaseModel):
+    """
+    Represents a node in a hierarchical tree structure.
+
+    This is a recursive structure where each record can have children.
+    Metadata dict is provided for future extensibility.
+    """
+
+    id: str  # Item ID (e.g., "node-123", "category-456")
+    children: List["HierarchyRecord"] = []  # Child records
+    metadata: Dict[str, Any] = {}  # Extensible metadata for future use
+
+
 class Hierarchy(BaseModel):
     """
     Represents a single hierarchy for a specific pipeline stage.
 
-    A hierarchy defines parent-child relationships between items.
+    A hierarchy defines parent-child relationships between items using a tree structure.
     The same items can appear in multiple hierarchies with different relationships.
     """
 
     stage: str  # Pipeline stage name (e.g., "original", "organized", "grouped")
     source_type: Literal["node", "category"]  # Database table this was built from
-    tree: Dict[str, List[str]]  # parent_id -> list of child_ids
-    root_id: str  # ID of the root item for this hierarchy
+    root: HierarchyRecord  # Root of the hierarchy tree
 
 
 class DualRepresentation(BaseModel):
@@ -107,3 +119,7 @@ class HierarchyDiff(BaseModel):
 
     added: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were added
     deleted: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were removed
+
+
+# Rebuild model to handle forward references (recursive HierarchyRecord)
+HierarchyRecord.model_rebuild()

@@ -3,7 +3,13 @@
 import pytest
 from pydantic import ValidationError
 
-from api.models import DualRepresentation, Hierarchy, HierarchyDiff, HierarchyItem
+from api.models import (
+    DualRepresentation,
+    Hierarchy,
+    HierarchyDiff,
+    HierarchyItem,
+    HierarchyRecord,
+)
 
 
 class TestHierarchyItem:
@@ -58,21 +64,67 @@ class TestHierarchyItem:
         assert item.originalPath is None
 
 
+class TestHierarchyRecord:
+    """Test HierarchyRecord model validation."""
+
+    def test_simple_record(self):
+        """Test creating a simple HierarchyRecord."""
+        record = HierarchyRecord(id="node-1")
+        assert record.id == "node-1"
+        assert record.children == []
+        assert record.metadata == {}
+
+    def test_record_with_children(self):
+        """Test creating a HierarchyRecord with children."""
+        child1 = HierarchyRecord(id="child-1")
+        child2 = HierarchyRecord(id="child-2")
+        parent = HierarchyRecord(id="parent", children=[child1, child2])
+
+        assert parent.id == "parent"
+        assert len(parent.children) == 2
+        assert parent.children[0].id == "child-1"
+        assert parent.children[1].id == "child-2"
+
+    def test_nested_hierarchy(self):
+        """Test creating a deeply nested hierarchy."""
+        grandchild = HierarchyRecord(id="grandchild")
+        child = HierarchyRecord(id="child", children=[grandchild])
+        root = HierarchyRecord(id="root", children=[child])
+
+        assert root.id == "root"
+        assert root.children[0].id == "child"
+        assert root.children[0].children[0].id == "grandchild"
+
+    def test_metadata(self):
+        """Test HierarchyRecord with metadata."""
+        record = HierarchyRecord(
+            id="node-1", metadata={"custom_field": "value", "count": 5}
+        )
+        assert record.metadata["custom_field"] == "value"
+        assert record.metadata["count"] == 5
+
+
 class TestHierarchy:
     """Test Hierarchy model validation."""
 
     def test_hierarchy_creation(self):
         """Test creating a Hierarchy object."""
+        root = HierarchyRecord(
+            id="root",
+            children=[
+                HierarchyRecord(id="child1"),
+                HierarchyRecord(id="child2"),
+            ],
+        )
         hierarchy = Hierarchy(
             stage="original",
             source_type="node",
-            tree={"root": ["child1", "child2"]},
-            root_id="root",
+            root=root,
         )
         assert hierarchy.stage == "original"
         assert hierarchy.source_type == "node"
-        assert hierarchy.tree == {"root": ["child1", "child2"]}
-        assert hierarchy.root_id == "root"
+        assert hierarchy.root.id == "root"
+        assert len(hierarchy.root.children) == 2
 
 
 class TestDualRepresentation:
@@ -102,14 +154,16 @@ class TestDualRepresentation:
             "original": Hierarchy(
                 stage="original",
                 source_type="node",
-                tree={"node-1": ["node-2"]},
-                root_id="node-1",
+                root=HierarchyRecord(
+                    id="node-1", children=[HierarchyRecord(id="node-2")]
+                ),
             ),
             "organized": Hierarchy(
                 stage="organized",
                 source_type="category",
-                tree={"category-1": ["node-2"]},
-                root_id="category-1",
+                root=HierarchyRecord(
+                    id="category-1", children=[HierarchyRecord(id="node-2")]
+                ),
             ),
         }
 
@@ -134,8 +188,7 @@ class TestDualRepresentation:
             "original": Hierarchy(
                 stage="original",
                 source_type="node",
-                tree={"node-1": []},
-                root_id="node-1",
+                root=HierarchyRecord(id="node-1"),
             ),
         }
         dual_rep = DualRepresentation(
@@ -148,6 +201,7 @@ class TestDualRepresentation:
         assert "hierarchies" in data
         assert data["items"]["node-1"]["name"] == "root"
         assert data["hierarchies"]["original"]["stage"] == "original"
+        assert data["hierarchies"]["original"]["root"]["id"] == "node-1"
 
 
 class TestHierarchyDiff:

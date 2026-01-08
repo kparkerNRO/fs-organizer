@@ -128,8 +128,11 @@ class TestBuildDualRepresentation:
 
         # Should have hierarchy entry for root
         assert "original" in dual_rep.hierarchies
-        orig_tree = dual_rep.hierarchies["original"].tree
-        assert node_key in orig_tree["original-root"]
+        orig_hierarchy = dual_rep.hierarchies["original"]
+        assert orig_hierarchy.root.id == "original-root"
+        # Check that node is in root's children
+        child_ids = [child.id for child in orig_hierarchy.root.children]
+        assert node_key in child_ids
 
     def test_with_full_data_both_stages(self, storage_manager, setup_test_data):
         """Test building dual representation with complete data for both stages."""
@@ -148,11 +151,11 @@ class TestBuildDualRepresentation:
 
         # Check original hierarchy
         assert dual_rep.hierarchies["original"].source_type == "node"
-        assert dual_rep.hierarchies["original"].root_id == "original-root"
+        assert dual_rep.hierarchies["original"].root.id == "original-root"
 
         # Check organized hierarchy
         assert dual_rep.hierarchies["organized"].source_type == "category"
-        assert dual_rep.hierarchies["organized"].root_id == "organized-root"
+        assert dual_rep.hierarchies["organized"].root.id == "organized-root"
 
         # Should have items from both stages
         assert "original-root" in dual_rep.items

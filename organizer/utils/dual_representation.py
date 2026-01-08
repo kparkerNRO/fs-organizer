@@ -8,7 +8,7 @@ into the DualRepresentation format for the v2 API.
 import logging
 from typing import Dict, List
 
-from api.models import DualRepresentation, Hierarchy, HierarchyItem
+from api.models import DualRepresentation, Hierarchy, HierarchyItem, HierarchyRecord
 from data_models.pipeline import PipelineStage
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -23,6 +23,27 @@ from storage.work_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_hierarchy_tree(tree: Dict[str, List[str]], root_id: str) -> HierarchyRecord:
+    """
+    Convert a flat tree structure to a recursive HierarchyRecord tree.
+
+    Args:
+        tree: Dictionary mapping parent_id -> list of child_ids
+        root_id: ID of the root node
+
+    Returns:
+        HierarchyRecord root node with recursive children
+    """
+
+    def build_node(node_id: str) -> HierarchyRecord:
+        """Recursively build HierarchyRecord from flat tree."""
+        children_ids = tree.get(node_id, [])
+        children = [build_node(child_id) for child_id in children_ids]
+        return HierarchyRecord(id=node_id, children=children)
+
+    return build_node(root_id)
 
 
 def dual_representation_to_folder_structure(
@@ -47,10 +68,9 @@ def dual_representation_to_folder_structure(
 
     hierarchy = dual_rep.hierarchies[stage_name]
 
-    def build_tree(item_id: str) -> dict:
-        """Recursively build FolderV2-style tree from flat representation."""
-        item = dual_rep.items[item_id]
-        children_ids = hierarchy.tree.get(item_id, [])
+    def build_tree(record: HierarchyRecord) -> dict:
+        """Recursively build FolderV2-style tree from HierarchyRecord."""
+        item = dual_rep.items[record.id]
 
         result = {
             "id": item.id,
@@ -66,14 +86,14 @@ def dual_representation_to_folder_structure(
         if item.newPath:
             result["newPath"] = item.newPath
 
-        if children_ids:
-            result["children"] = [build_tree(child_id) for child_id in children_ids]
+        if record.children:
+            result["children"] = [build_tree(child) for child in record.children]
         else:
             result["children"] = []
 
         return result
 
-    return build_tree(hierarchy.root_id)
+    return build_tree(hierarchy.root)
 
 
 def build_dual_representation(
@@ -129,13 +149,15 @@ def _build_original_stage(
         tree: Dict[str, List[str]] = {}
         _build_node_items_and_tree(index_session, snapshot_id, items, tree)
 
-        # Create hierarchy object for original stage
+        # Convert flat tree to HierarchyRecord tree
         root_id = "original-root"
+        root_record = _build_hierarchy_tree(tree, root_id)
+
+        # Create hierarchy object for original stage
         hierarchies["original"] = Hierarchy(
             stage="original",
             source_type="node",
-            tree=tree,
-            root_id=root_id,
+            root=root_record,
         )
 
 
@@ -152,13 +174,15 @@ def _build_organized_stage(
         tree: Dict[str, List[str]] = {}
         _build_category_items_and_tree(work_session, run_id, items, tree)
 
-        # Create hierarchy object for organized stage
+        # Convert flat tree to HierarchyRecord tree
         root_id = "organized-root"
+        root_record = _build_hierarchy_tree(tree, root_id)
+
+        # Create hierarchy object for organized stage
         hierarchies["organized"] = Hierarchy(
             stage="organized",
             source_type="category",
-            tree=tree,
-            root_id=root_id,
+            root=root_record,
         )
 
         # TODO: Save to FolderStructure if save_to_db is True
