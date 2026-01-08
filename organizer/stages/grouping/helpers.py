@@ -1,5 +1,6 @@
 import re
 from typing import Optional
+from functools import wraps
 
 from rapidfuzz import fuzz
 from rapidfuzz.distance import Levenshtein
@@ -13,6 +14,37 @@ from utils.filename_processing import (
 
 common_words = {"the", "a", "an", "of", "in", "on", "at"}
 
+def new_grouping_iteration(description: str):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            work_session = kwargs.get("work_session")
+            run_id = kwargs.get("run_id")
+            snapshot_id = kwargs.get("snapshot_id")
+
+            if not all([work_session, run_id is not None, snapshot_id is not None]):
+                raise ValueError(
+                    "work_session, run_id, and snapshot_id must be provided as keyword arguments"
+                )
+
+            iteration_id = get_next_iteration_id(work_session)
+            iteration = GroupIteration(
+                id=iteration_id,
+                run_id=run_id,
+                snapshot_id=snapshot_id,
+                description=description,
+            )
+            work_session.add(iteration)
+            work_session.flush()
+
+            kwargs["iteration_id"] = iteration_id
+            result = func(*args, **kwargs)
+            work_session.commit()
+            return result
+
+        return wrapper
+
+    return decorator
 
 def split_category(target_name, category, clean_result: bool = True):
     """
