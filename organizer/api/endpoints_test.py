@@ -94,25 +94,25 @@ class TestGetDualRepresentationEndpoint:
 
         # Verify hierarchies have correct keys
         hierarchies_dict = model_data["hierarchies"]
-        assert "original" in hierarchies_dict
-        assert "organized" in hierarchies_dict
+        assert "old" in hierarchies_dict  # PipelineStage.original.value
+        assert "new" in hierarchies_dict  # PipelineStage.organized.value
 
         # Verify hierarchy structure
         for stage_name, hierarchy in hierarchies_dict.items():
             assert "stage" in hierarchy
             assert "source_type" in hierarchy
             assert "root" in hierarchy
-            # Verify root is a HierarchyRecord with id and children
-            assert "id" in hierarchy["root"]
+            # Verify root is a HierarchyRecord with itemId and children
+            assert "itemId" in hierarchy["root"]
             assert "children" in hierarchy["root"]
 
         # Verify items have correct keys
         items_dict = model_data["items"]
         for item_id, item in items_dict.items():
             assert "id" in item
-            assert "name" in item
             assert "type" in item
             assert item["type"] in ["node", "category"]
+            # Note: "name" is in HierarchyRecord, not HierarchyItem
 
     def test_error_handling(self):
         """Test error handling for invalid snapshot_id."""
@@ -263,7 +263,7 @@ class TestDualRepresentationIntegration:
         )
         assert dual_rep is not None
         assert len(dual_rep.items) > 0
-        assert "organized" in dual_rep.hierarchies
+        assert "new" in dual_rep.hierarchies  # PipelineStage.organized.value
 
         # 2. Simulate user making changes (create a diff)
         diff = HierarchyDiff(
