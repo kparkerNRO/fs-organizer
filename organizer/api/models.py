@@ -1,10 +1,10 @@
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any
+
 from pydantic import BaseModel
 
 from api.tasks import TaskStatus
-from data_models.pipeline import Category
-from data_models.pipeline import FolderV2
+from data_models.pipeline import Category, FolderV2, PipelineStage
 
 
 class GatherRequest(BaseModel):
@@ -33,7 +33,7 @@ class ProcessResponse(BaseModel):
 
 
 class CategoryResponse(BaseModel):
-    data: List[Category] = []
+    data: list[Category] = []
     totalItems: int = 0
     totalPages: int = 1
     currentPage: int = 1
@@ -59,69 +59,78 @@ class FolderViewResponse(BaseModel):
 # Dual Representation Models (for v2 API)
 
 
-class HierarchyItem(BaseModel):
-    """Represents either a file/directory from the filesystem (Node) or a semantic category."""
+class ItemType(str, Enum):
+    """Type of item in the hierarchy."""
 
-    id: str  # e.g., "node-123", "category-456"
-    name: str
-    type: Literal["node", "category"]
-    originalPath: Optional[str] = None  # For nodes
-    # Fields for compatibility with FolderV2/File
-    confidence: float = 1.0  # Confidence score for classification
-    possibleClassifications: list[str] = []  # Possible classifications for this item
-    newPath: Optional[str] = None  # New path for files after organization
-    count: int = 0  # Number of children (for folders/categories)
+    NODE = "node"
+    CATEGORY = "category"
+
+
+class HierarchyItem(BaseModel):
+    """
+    Intrinsic, shared data for an underlying file, folder, or category.
+
+    Lives in the ItemStore. This data is considered context-independent.
+    The same item can appear in multiple hierarchies with different names/contexts.
+    """
+
+    id: str  # Unique, persistent ID (e.g., "node-123", "category-456")
+    type: ItemType
+    originalPath: str | None = None  # Immutable property of a file node
 
 
 class HierarchyRecord(BaseModel):
     """
-    Represents a node in a hierarchical tree structure.
+    Represents an item's instance within a specific tree.
 
     This is a recursive structure where each record can have children.
-    Metadata dict is provided for future extensibility.
+    It holds context-dependent properties, like the item's name in that tree.
     """
 
-    id: str  # Item ID (e.g., "node-123", "category-456")
-    children: List["HierarchyRecord"] = []  # Child records
-    metadata: Dict[str, Any] = {}  # Extensible metadata for future use
+    itemId: str  # Foreign key pointing to HierarchyItem in ItemStore
+    name: str  # The name of this item in this tree (contextual, can be mutated)
+    children: list["HierarchyRecord"] = []  # Child records
+    metadata: dict[str, Any] = {}  # Tree-specific metadata
 
 
 class Hierarchy(BaseModel):
     """
-    Represents a single hierarchy for a specific pipeline stage.
+    A complete, self-contained hierarchy for a specific pipeline stage.
 
-    A hierarchy defines parent-child relationships between items using a tree structure.
-    The same items can appear in multiple hierarchies with different relationships.
+    Analogous to FolderV2 - represents one tree structure.
+    Multiple hierarchies can reference the same items in the ItemStore.
     """
 
-    contained_ids: set[int] # set of all of the database record ids contained in the heirarchy
-    structure_id: int
-    run_id: int | None
-    stage: str  # Pipeline stage name (e.g., "original", "organized", "grouped")
-    source_type: Literal["node", "category"]  # Database table this was built from
+    contained_ids: set[int]  # Database record IDs contained in this hierarchy
+    structure_id: int  # ID of FolderStructure record if saved to DB
+    run_id: int | None  # Associated run ID
+    stage: PipelineStage  # Pipeline stage (e.g., ORIGINAL, ORGANIZED)
+    source_type: ItemType  # Database table this was built from (NODE or CATEGORY)
     root: HierarchyRecord  # Root of the hierarchy tree
 
 
 class DualRepresentation(BaseModel):
     """
-    The complete data structure containing items and multiple stage-based hierarchies.
+    API-level payload containing shared items and multiple hierarchies.
 
-    This design supports:
-    - Multiple pipeline stages (original, organized, grouped, etc.)
-    - Each stage having its own hierarchy structure
-    - Stages can be built from different source types (nodes or categories)
-    - Shared item pool across all hierarchies for efficiency
+    This is only used at the API boundary. Internal functions work with
+    individual Hierarchy objects.
     """
 
-    items: Dict[str, HierarchyItem]  # Shared pool of all items
-    hierarchies: Dict[str, Hierarchy]  # stage_name -> Hierarchy
+    items: dict[str, HierarchyItem]  # Shared pool (ItemStore)
+    hierarchies: dict[str, Hierarchy]  # stage_name -> Hierarchy
 
 
 class HierarchyDiff(BaseModel):
-    """Represents changes made by the user on the frontend (moving nodes between categories)."""
+    """
+    Lightweight object describing changes made to a Hierarchy.
 
-    added: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were added
-    deleted: Dict[str, List[str]]  # Key: Parent ID, Value: Child IDs that were removed
+    Analogous to a git diff or commit. Allows efficient transmission
+    of hierarchy modifications without sending the entire tree.
+    """
+
+    added: dict[str, list[str]]  # Key: Parent ID, Value: Child IDs to add
+    deleted: dict[str, list[str]]  # Key: Parent ID, Value: Child IDs to remove
 
 
 # Rebuild model to handle forward references (recursive HierarchyRecord)
