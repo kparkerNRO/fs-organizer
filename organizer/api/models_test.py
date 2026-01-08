@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from api.models import DualRepresentation, HierarchyDiff, HierarchyItem
+from api.models import DualRepresentation, Hierarchy, HierarchyDiff, HierarchyItem
 
 
 class TestHierarchyItem:
@@ -58,6 +58,23 @@ class TestHierarchyItem:
         assert item.originalPath is None
 
 
+class TestHierarchy:
+    """Test Hierarchy model validation."""
+
+    def test_hierarchy_creation(self):
+        """Test creating a Hierarchy object."""
+        hierarchy = Hierarchy(
+            stage="original",
+            source_type="node",
+            tree={"root": ["child1", "child2"]},
+            root_id="root",
+        )
+        assert hierarchy.stage == "original"
+        assert hierarchy.source_type == "node"
+        assert hierarchy.tree == {"root": ["child1", "child2"]}
+        assert hierarchy.root_id == "root"
+
+
 class TestDualRepresentation:
     """Test DualRepresentation model validation."""
 
@@ -65,12 +82,10 @@ class TestDualRepresentation:
         """Test creating an empty dual representation."""
         dual_rep = DualRepresentation(
             items={},
-            node_hierarchy={},
-            category_hierarchy={},
+            hierarchies={},
         )
         assert dual_rep.items == {}
-        assert dual_rep.node_hierarchy == {}
-        assert dual_rep.category_hierarchy == {}
+        assert dual_rep.hierarchies == {}
 
     def test_dual_representation_with_data(self):
         """Test creating a dual representation with actual data."""
@@ -83,37 +98,56 @@ class TestDualRepresentation:
             ),
             "category-1": HierarchyItem(id="category-1", name="Work", type="category"),
         }
-        node_hierarchy = {"node-1": ["node-2"]}
-        category_hierarchy = {"category-1": ["node-2"]}
+        hierarchies = {
+            "original": Hierarchy(
+                stage="original",
+                source_type="node",
+                tree={"node-1": ["node-2"]},
+                root_id="node-1",
+            ),
+            "organized": Hierarchy(
+                stage="organized",
+                source_type="category",
+                tree={"category-1": ["node-2"]},
+                root_id="category-1",
+            ),
+        }
 
         dual_rep = DualRepresentation(
             items=items,
-            node_hierarchy=node_hierarchy,
-            category_hierarchy=category_hierarchy,
+            hierarchies=hierarchies,
         )
 
         assert len(dual_rep.items) == 3
         assert "node-1" in dual_rep.items
         assert "category-1" in dual_rep.items
-        assert dual_rep.node_hierarchy["node-1"] == ["node-2"]
-        assert dual_rep.category_hierarchy["category-1"] == ["node-2"]
+        assert len(dual_rep.hierarchies) == 2
+        assert "original" in dual_rep.hierarchies
+        assert "organized" in dual_rep.hierarchies
 
     def test_model_serialization(self):
         """Test that model can be serialized to dict."""
         items = {
             "node-1": HierarchyItem(id="node-1", name="root", type="node"),
         }
+        hierarchies = {
+            "original": Hierarchy(
+                stage="original",
+                source_type="node",
+                tree={"node-1": []},
+                root_id="node-1",
+            ),
+        }
         dual_rep = DualRepresentation(
             items=items,
-            node_hierarchy={"node-1": []},
-            category_hierarchy={},
+            hierarchies=hierarchies,
         )
 
         data = dual_rep.model_dump()
         assert "items" in data
-        assert "node_hierarchy" in data
-        assert "category_hierarchy" in data
+        assert "hierarchies" in data
         assert data["items"]["node-1"]["name"] == "root"
+        assert data["hierarchies"]["original"]["stage"] == "original"
 
 
 class TestHierarchyDiff:

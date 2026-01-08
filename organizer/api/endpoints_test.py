@@ -76,16 +76,33 @@ class TestGetDualRepresentationEndpoint:
     def test_response_structure(self, storage_manager, setup_complete_data):
         """Test that response has correct structure."""
         # Direct test of the logic without HTTP layer
+        from data_models.pipeline import PipelineStage
         from utils.dual_representation import build_dual_representation
 
         snapshot_id, run_id = setup_complete_data
-        dual_rep = build_dual_representation(storage_manager, snapshot_id, run_id)
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id,
+            run_id,
+            stages=[PipelineStage.original, PipelineStage.organized],
+        )
 
         # Verify structure
         model_data = dual_rep.model_dump()
         assert "items" in model_data
-        assert "node_hierarchy" in model_data
-        assert "category_hierarchy" in model_data
+        assert "hierarchies" in model_data
+
+        # Verify hierarchies have correct keys
+        hierarchies_dict = model_data["hierarchies"]
+        assert "original" in hierarchies_dict
+        assert "organized" in hierarchies_dict
+
+        # Verify hierarchy structure
+        for stage_name, hierarchy in hierarchies_dict.items():
+            assert "stage" in hierarchy
+            assert "source_type" in hierarchy
+            assert "tree" in hierarchy
+            assert "root_id" in hierarchy
 
         # Verify items have correct keys
         items_dict = model_data["items"]
@@ -228,6 +245,7 @@ class TestDualRepresentationIntegration:
     ):
         """Test the complete workflow from building to applying diffs."""
         from api.models import HierarchyDiff
+        from data_models.pipeline import PipelineStage
         from sqlalchemy import select
         from storage.work_models import HierarchyDiffLog
         from utils.dual_representation import build_dual_representation
@@ -235,14 +253,20 @@ class TestDualRepresentationIntegration:
         snapshot_id, run_id = setup_complete_data
 
         # 1. Build dual representation
-        dual_rep = build_dual_representation(storage_manager, snapshot_id, run_id)
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id,
+            run_id,
+            stages=[PipelineStage.organized],
+        )
         assert dual_rep is not None
         assert len(dual_rep.items) > 0
+        assert "organized" in dual_rep.hierarchies
 
         # 2. Simulate user making changes (create a diff)
         diff = HierarchyDiff(
             added={"category-1": ["node-2"]},
-            deleted={"category-root": ["node-2"]},
+            deleted={"organized-root": ["node-2"]},
         )
 
         # 3. Log the diff
@@ -258,5 +282,10 @@ class TestDualRepresentationIntegration:
 
         # 5. Build representation again (should reflect changes in future implementation)
         # TODO: Implement diff application logic to modify the dual representation
-        dual_rep_after = build_dual_representation(storage_manager, snapshot_id, run_id)
+        dual_rep_after = build_dual_representation(
+            storage_manager,
+            snapshot_id,
+            run_id,
+            stages=[PipelineStage.organized],
+        )
         assert dual_rep_after is not None

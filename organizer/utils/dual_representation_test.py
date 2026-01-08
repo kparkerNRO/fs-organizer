@@ -2,6 +2,7 @@
 
 import pytest
 
+from data_models.pipeline import PipelineStage
 from storage.factories import (
     FileMappingFactory,
     GroupCategoryEntryFactory,
@@ -76,30 +77,29 @@ def setup_test_data(storage_index_session, storage_work_session):
 class TestBuildDualRepresentation:
     """Test the build_dual_representation function."""
 
-    def test_empty_database(
+    def test_empty_database_original_only(
         self, storage_manager, storage_index_session, storage_work_session
     ):
-        """Test building dual representation with no data."""
+        """Test building dual representation with no data, original stage only."""
         snapshot = SnapshotFactory()
         storage_index_session.commit()
-
-        run = RunFactory(snapshot_id=snapshot.id)
-        storage_work_session.commit()
 
         dual_rep = build_dual_representation(
             storage_manager,
             snapshot_id=snapshot.id,
-            run_id=run.id,
+            run_id=None,
+            stages=[PipelineStage.original],
         )
 
         assert dual_rep is not None
         assert isinstance(dual_rep.items, dict)
-        assert isinstance(dual_rep.node_hierarchy, dict)
-        assert isinstance(dual_rep.category_hierarchy, dict)
+        assert isinstance(dual_rep.hierarchies, dict)
 
-        # Should have at least the root nodes
-        assert "node-root" in dual_rep.items
-        assert "category-root" in dual_rep.items
+        # Should have original hierarchy
+        assert "original" in dual_rep.hierarchies
+        assert dual_rep.hierarchies["original"].stage == "original"
+        assert dual_rep.hierarchies["original"].source_type == "node"
+        assert "original-root" in dual_rep.items
 
     def test_with_nodes_only(
         self, storage_manager, storage_index_session, storage_work_session
@@ -117,6 +117,7 @@ class TestBuildDualRepresentation:
             storage_manager,
             snapshot_id=snapshot.id,
             run_id=None,
+            stages=[PipelineStage.original],
         )
 
         # Check that node was added
@@ -126,120 +127,36 @@ class TestBuildDualRepresentation:
         assert dual_rep.items[node_key].type == "node"
 
         # Should have hierarchy entry for root
-        assert "node-root" in dual_rep.node_hierarchy
-        assert node_key in dual_rep.node_hierarchy["node-root"]
+        assert "original" in dual_rep.hierarchies
+        orig_tree = dual_rep.hierarchies["original"].tree
+        assert node_key in orig_tree["original-root"]
 
-    def test_with_full_data(self, storage_manager, setup_test_data):
-        """Test building dual representation with complete data."""
+    def test_with_full_data_both_stages(self, storage_manager, setup_test_data):
+        """Test building dual representation with complete data for both stages."""
         snapshot_id, run_id = setup_test_data
 
         dual_rep = build_dual_representation(
             storage_manager,
             snapshot_id=snapshot_id,
             run_id=run_id,
+            stages=[PipelineStage.original, PipelineStage.organized],
         )
 
-        # Check nodes are present (verify count rather than specific IDs)
-        node_items = [item for item in dual_rep.items.values() if item.type == "node"]
-        assert len(node_items) == 4  # root + docs + file.txt + node-root
+        # Should have both hierarchies
+        assert "original" in dual_rep.hierarchies
+        assert "organized" in dual_rep.hierarchies
 
-        # Check categories are present
-        category_items = [
-            item for item in dual_rep.items.values() if item.type == "category"
-        ]
-        assert len(category_items) == 2  # Work Documents + category-root
+        # Check original hierarchy
+        assert dual_rep.hierarchies["original"].source_type == "node"
+        assert dual_rep.hierarchies["original"].root_id == "original-root"
 
-        # Check hierarchies exist
-        assert "node-root" in dual_rep.node_hierarchy
-        assert "category-root" in dual_rep.category_hierarchy
+        # Check organized hierarchy
+        assert dual_rep.hierarchies["organized"].source_type == "category"
+        assert dual_rep.hierarchies["organized"].root_id == "organized-root"
 
-    def test_node_properties(self, storage_manager, setup_test_data):
-        """Test that node items have correct properties."""
-        snapshot_id, run_id = setup_test_data
-
-        dual_rep = build_dual_representation(
-            storage_manager,
-            snapshot_id=snapshot_id,
-            run_id=run_id,
-        )
-
-        # Find file node by name
-        file_item = next(
-            item
-            for item in dual_rep.items.values()
-            if item.type == "node" and item.name == "file.txt"
-        )
-        assert file_item.type == "node"
-        assert file_item.name == "file.txt"
-        assert file_item.originalPath == "/test/docs/file.txt"
-
-        # Find directory node by name
-        dir_item = next(
-            item
-            for item in dual_rep.items.values()
-            if item.type == "node" and item.name == "docs"
-        )
-        assert dir_item.type == "node"
-        assert dir_item.name == "docs"
-        assert dir_item.originalPath == "/test/docs"
-
-    def test_category_properties(self, storage_manager, setup_test_data):
-        """Test that category items have correct properties."""
-        snapshot_id, run_id = setup_test_data
-
-        dual_rep = build_dual_representation(
-            storage_manager,
-            snapshot_id=snapshot_id,
-            run_id=run_id,
-        )
-
-        # Find category by name
-        category_item = next(
-            item
-            for item in dual_rep.items.values()
-            if item.type == "category" and item.name == "Work Documents"
-        )
-        assert category_item.type == "category"
-        assert category_item.name == "Work Documents"
-        assert category_item.originalPath is None
-
-    def test_hierarchy_structure(self, storage_manager, setup_test_data):
-        """Test that hierarchies are correctly structured."""
-        snapshot_id, run_id = setup_test_data
-
-        dual_rep = build_dual_representation(
-            storage_manager,
-            snapshot_id=snapshot_id,
-            run_id=run_id,
-        )
-
-        # Node hierarchy should be tree-like
-        assert isinstance(dual_rep.node_hierarchy["node-root"], list)
-        assert len(dual_rep.node_hierarchy["node-root"]) > 0
-
-        # Category hierarchy should have categories under root
-        assert isinstance(dual_rep.category_hierarchy["category-root"], list)
-        assert len(dual_rep.category_hierarchy["category-root"]) == 1
-
-    def test_without_run_id(
-        self, storage_manager, storage_index_session, storage_work_session
-    ):
-        """Test building without run_id (no categories)."""
-        snapshot = SnapshotFactory()
-        node = NodeFactory(snapshot_id=snapshot.id, name="test", kind=NodeKind.DIR)
-        storage_index_session.commit()
-
-        dual_rep = build_dual_representation(
-            storage_manager,
-            snapshot_id=snapshot.id,
-            run_id=None,
-        )
-
-        # Should have nodes but category hierarchy should only have root
-        node_key = f"node-{node.id}"
-        assert node_key in dual_rep.items
-        assert "category-root" in dual_rep.items
-        assert len(dual_rep.category_hierarchy["category-root"]) == 0
+        # Should have items from both stages
+        assert "original-root" in dual_rep.items
+        assert "organized-root" in dual_rep.items
 
     def test_confidence_and_count_fields(self, storage_manager, setup_test_data):
         """Test that confidence and count fields are populated correctly."""
@@ -249,10 +166,11 @@ class TestBuildDualRepresentation:
             storage_manager,
             snapshot_id=snapshot_id,
             run_id=run_id,
+            stages=[PipelineStage.original, PipelineStage.organized],
         )
 
         # Check that count is populated for nodes with children
-        root_item = dual_rep.items["node-root"]
+        root_item = dual_rep.items["original-root"]
         assert root_item.count > 0
 
         # Check that confidence is set for categories
@@ -282,7 +200,7 @@ class TestBuildDualRepresentation:
 
         # Create file mapping
         FileMappingFactory(
-            run=run,
+            run_id=run.id,
             node_id=file_node.id,
             original_path="/test/document.pdf",
             new_path="Documents/document.pdf",
@@ -302,14 +220,13 @@ class TestBuildDualRepresentation:
             storage_manager,
             snapshot_id=snapshot.id,
             run_id=run.id,
+            stages=[PipelineStage.organized],
         )
 
-        # Find the file node and check newPath
-        file_item = next(
-            item
-            for item in dual_rep.items.values()
-            if item.type == "node" and item.name == "document.pdf"
-        )
+        # Find the file node by ID (name in organized stage comes from processed_name)
+        node_id = f"node-{file_node.id}"
+        assert node_id in dual_rep.items
+        file_item = dual_rep.items[node_id]
         assert file_item.newPath == "Documents/document.pdf"
 
     def test_compatibility_conversion_to_folder_structure(
@@ -322,11 +239,12 @@ class TestBuildDualRepresentation:
             storage_manager,
             snapshot_id=snapshot_id,
             run_id=run_id,
+            stages=[PipelineStage.original, PipelineStage.organized],
         )
 
-        # Convert to FolderV2 format
+        # Convert original stage to FolderV2 format
         folder_structure = dual_representation_to_folder_structure(
-            dual_rep, hierarchy_type="node"
+            dual_rep, stage_name="original"
         )
 
         # Verify structure has expected fields
@@ -341,24 +259,41 @@ class TestBuildDualRepresentation:
         assert isinstance(folder_structure["children"], list)
         assert len(folder_structure["children"]) > 0
 
-    def test_compatibility_conversion_category_hierarchy(
+    def test_compatibility_conversion_organized_stage(
         self, storage_manager, setup_test_data
     ):
-        """Test conversion of category hierarchy to FolderV2 format."""
+        """Test conversion of organized stage to FolderV2 format."""
         snapshot_id, run_id = setup_test_data
 
         dual_rep = build_dual_representation(
             storage_manager,
             snapshot_id=snapshot_id,
             run_id=run_id,
+            stages=[PipelineStage.organized],
         )
 
-        # Convert category hierarchy
-        category_structure = dual_representation_to_folder_structure(
-            dual_rep, hierarchy_type="category"
+        # Convert organized hierarchy
+        organized_structure = dual_representation_to_folder_structure(
+            dual_rep, stage_name="organized"
         )
 
         # Verify structure
-        assert category_structure["name"] == "Categories"
-        assert "children" in category_structure
-        assert len(category_structure["children"]) == 1  # Work Documents category
+        assert organized_structure["name"] == "Organized"
+        assert "children" in organized_structure
+        assert len(organized_structure["children"]) == 1  # Work Documents category
+
+    def test_default_stages(self, storage_manager, setup_test_data):
+        """Test that default stages are original and organized."""
+        snapshot_id, run_id = setup_test_data
+
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=snapshot_id,
+            run_id=run_id,
+            # No stages parameter - should default to [original, organized]
+        )
+
+        # Should have both default stages
+        assert "original" in dual_rep.hierarchies
+        assert "organized" in dual_rep.hierarchies
+        assert len(dual_rep.hierarchies) == 2

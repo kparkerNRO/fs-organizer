@@ -73,12 +73,33 @@ class HierarchyItem(BaseModel):
     count: int = 0  # Number of children (for folders/categories)
 
 
-class DualRepresentation(BaseModel):
-    """The complete data structure sent from the backend containing dual hierarchies."""
+class Hierarchy(BaseModel):
+    """
+    Represents a single hierarchy for a specific pipeline stage.
 
-    items: Dict[str, HierarchyItem]
-    node_hierarchy: Dict[str, List[str]]
-    category_hierarchy: Dict[str, List[str]]
+    A hierarchy defines parent-child relationships between items.
+    The same items can appear in multiple hierarchies with different relationships.
+    """
+
+    stage: str  # Pipeline stage name (e.g., "original", "organized", "grouped")
+    source_type: Literal["node", "category"]  # Database table this was built from
+    tree: Dict[str, List[str]]  # parent_id -> list of child_ids
+    root_id: str  # ID of the root item for this hierarchy
+
+
+class DualRepresentation(BaseModel):
+    """
+    The complete data structure containing items and multiple stage-based hierarchies.
+
+    This design supports:
+    - Multiple pipeline stages (original, organized, grouped, etc.)
+    - Each stage having its own hierarchy structure
+    - Stages can be built from different source types (nodes or categories)
+    - Shared item pool across all hierarchies for efficiency
+    """
+
+    items: Dict[str, HierarchyItem]  # Shared pool of all items
+    hierarchies: Dict[str, Hierarchy]  # stage_name -> Hierarchy
 
 
 class HierarchyDiff(BaseModel):

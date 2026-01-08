@@ -541,15 +541,31 @@ async def api_folders(
 
 @app.get("/api/v2/folder-structure")
 async def get_dual_representation(
+    stages: str = "original,organized",  # Comma-separated list of stages
     storage_manager: StorageManager = Depends(get_storage_manager),
 ) -> DualRepresentation:
     """
-    Get the dual representation of folder hierarchies.
+    Get the dual representation of folder hierarchies for specified pipeline stages.
 
-    Returns both the original filesystem structure (nodes) and the
-    categorized structure in a unified format.
+    Args:
+        stages: Comma-separated list of stages to include (e.g., "original,organized")
+
+    Returns:
+        DualRepresentation with items and hierarchies for the requested stages
     """
-    logger.info("GET /api/v2/folder-structure")
+    logger.info(f"GET /api/v2/folder-structure?stages={stages}")
+
+    # Parse stages parameter
+    requested_stages = []
+    for stage_name in stages.split(","):
+        stage_name = stage_name.strip()
+        try:
+            requested_stages.append(PipelineStage(stage_name))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid stage name: {stage_name}. Valid stages: {[s.value for s in PipelineStage]}",
+            )
 
     with storage_manager.get_work_session() as session:
         latest_run = get_latest_run(session)
@@ -564,6 +580,7 @@ async def get_dual_representation(
             storage_manager,
             snapshot_id=latest_run.snapshot_id,
             run_id=latest_run.id,
+            stages=requested_stages,
         )
         return dual_rep
     except Exception as e:

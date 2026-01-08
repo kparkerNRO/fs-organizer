@@ -307,8 +307,9 @@ class FolderStructureFactory(BaseFactory):
     class Meta:
         model = FolderStructure
 
-    run = factory.SubFactory(RunFactory)
-    run_id = SelfAttribute("run.id")
+    run_id = Sequence(lambda n: n + 1)
+    snapshot_id = Sequence(lambda n: n + 1)
+    total_nodes = 0
     structure_type = PipelineStage.organized.value
     structure = {"name": "root", "children": []}
     created_at = None
@@ -320,8 +321,7 @@ class FileMappingFactory(BaseFactory):
     class Meta:
         model = FileMapping
 
-    run = factory.SubFactory(RunFactory)
-    run_id = SelfAttribute("run.id")
+    run_id = Sequence(lambda n: n + 1)
     node_id = Sequence(lambda n: n + 1)
     original_path = LazyAttribute(lambda obj: f"/test/file_{obj.node_id}.txt")
     new_path = None
@@ -344,6 +344,5 @@ class HierarchyDiffLogFactory(BaseFactory):
     class Meta:
         model = HierarchyDiffLog
 
-    run = factory.SubFactory(RunFactory)
-    run_id = SelfAttribute("run.id")
+    run_id = Sequence(lambda n: n + 1)
     diff = {"added": {}, "deleted": {}}
