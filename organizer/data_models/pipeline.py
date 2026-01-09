@@ -116,7 +116,7 @@ class Hierarchy(BaseModel):
     """
 
     contained_ids: set[int]  # Database record IDs contained in this hierarchy
-    structure_id: int  # ID of FolderStructure record if saved to DB
+    structure_id: int | None = None  # ID of FolderStructure record if saved to DB
     run_id: int | None  # Associated run ID
     stage: PipelineStage  # Pipeline stage (e.g., ORIGINAL, ORGANIZED)
     source_type: ItemType  # Database table this was built from (NODE or CATEGORY)

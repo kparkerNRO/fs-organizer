@@ -8,6 +8,7 @@ validated at the application level, not by database constraints.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from sqlalchemy import Float, ForeignKey, Index, String
@@ -17,6 +18,13 @@ from storage.db_types import DateTime, JsonDict, JsonList
 
 # Schema version (increment on breaking changes)
 WORK_SCHEMA_VERSION = "1.0.0"
+
+
+class StructureFormatType(str, Enum):
+    """Format type for FolderStructure serialization."""
+
+    HIERARCHY = "hierarchy"
+    FOLDER_V2 = "folderv2"
 
 
 class WorkBase(DeclarativeBase):
@@ -251,8 +259,8 @@ class FolderStructure(WorkBase):
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # New fields for Hierarchy format support
-    format_type: Mapped[Optional[str]] = mapped_column(
-        String
+    format_type: Mapped[str] = mapped_column(
+        String, default=StructureFormatType.FOLDER_V2.value
     )  # "hierarchy" or "folderv2"
     contained_ids: Mapped[Optional[dict]] = mapped_column(
         JsonDict

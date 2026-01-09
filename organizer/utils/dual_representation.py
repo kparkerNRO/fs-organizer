@@ -15,6 +15,7 @@ import logging
 
 from api.models import DualRepresentation
 from data_models.pipeline import (
+    FolderV2,
     Hierarchy,
     HierarchyItem,
     HierarchyRecord,
@@ -29,6 +30,7 @@ from storage.work_models import (
     GroupCategory,
     GroupCategoryEntry,
     GroupIteration,
+    StructureFormatType,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,7 +125,6 @@ def create_hierarchy_from_nodes(
         # Create hierarchy
         hierarchy = Hierarchy(
             contained_ids=contained_ids,
-            structure_id=0,  # Not saved to DB yet
             run_id=None,  # No run for original stage
             stage=PipelineStage.original,
             source_type=ItemType.NODE,
@@ -174,7 +175,6 @@ def create_hierarchy_from_categories(
             )
             hierarchy = Hierarchy(
                 contained_ids=set(),
-                structure_id=0,
                 run_id=run_id,
                 stage=stage,
                 source_type=ItemType.CATEGORY,
@@ -298,7 +298,6 @@ def create_hierarchy_from_categories(
         # Create hierarchy
         hierarchy = Hierarchy(
             contained_ids=contained_ids,
-            structure_id=0,  # Not saved to DB yet
             run_id=run_id,
             stage=stage,
             source_type=ItemType.CATEGORY,
@@ -310,9 +309,9 @@ def create_hierarchy_from_categories(
 
 def convert_hierarchy_to_folder_structure(
     hierarchy: Hierarchy, items: dict[str, HierarchyItem]
-) -> dict:
+) -> FolderV2:
     """
-    Convert a Hierarchy to FolderV2-compatible structure.
+    Convert a Hierarchy to FolderV2 structure.
 
     This provides backward compatibility for code expecting the old FolderV2 format.
 
@@ -321,29 +320,29 @@ def convert_hierarchy_to_folder_structure(
         items: The ItemStore containing shared item data
 
     Returns:
-        Dict compatible with FolderV2 structure (can be parsed with FolderV2.model_validate)
+        FolderV2 object
     """
 
-    def build_tree(record: HierarchyRecord) -> dict:
-        """Recursively build FolderV2-style tree from HierarchyRecord."""
+    def build_tree(record: HierarchyRecord) -> FolderV2:
+        """Recursively build FolderV2 tree from HierarchyRecord."""
         item = items[record.itemId]
 
-        result = {
-            "id": item.id,
-            "name": record.name,  # Get name from record (contextual)
-            "type": "folder"
-            if item.type in [ItemType.NODE, ItemType.CATEGORY]
-            else "file",
-            "children": [],
-        }
+        # Extract integer ID from item.id string (e.g., "node-123" -> 123)
+        item_id = None
+        if item.id.startswith("node-"):
+            try:
+                item_id = int(item.id.split("-")[1])
+            except (IndexError, ValueError):
+                item_id = None
 
-        if item.originalPath:
-            result["originalPath"] = item.originalPath
+        folder = FolderV2(
+            id=item_id,
+            name=record.name,  # Get name from record (contextual)
+            originalPath=item.originalPath,
+            children=[build_tree(child) for child in record.children],
+        )
 
-        if record.children:
-            result["children"] = [build_tree(child) for child in record.children]
-
-        return result
+        return folder
 
     return build_tree(hierarchy.root)
 
@@ -376,7 +375,7 @@ def _save_hierarchy_to_db(
             structure=hierarchy.root.model_dump(
                 mode="json"
             ),  # Store root HierarchyRecord
-            format_type="hierarchy",  # Indicates this is Hierarchy format, not FolderV2
+            format_type=StructureFormatType.HIERARCHY.value,  # Use enum value
             contained_ids={
                 "ids": list(hierarchy.contained_ids)
             },  # Set as list for JSON
@@ -410,7 +409,7 @@ def _load_hierarchy_from_db(
         query = (
             select(FolderStructure)
             .where(FolderStructure.structure_type == stage.value)
-            .where(FolderStructure.format_type == "hierarchy")
+            .where(FolderStructure.format_type == StructureFormatType.HIERARCHY.value)
         )
 
         if run_id is not None:
@@ -461,6 +460,7 @@ def build_dual_representation(
     snapshot_id: int,
     run_id: int | None = None,
     stages: list[PipelineStage] | None = None,
+    use_cache: bool = False,
 ) -> DualRepresentation:
     """
     Build a DualRepresentation from the database for one or more pipeline stages.
@@ -474,6 +474,7 @@ def build_dual_representation(
         snapshot_id: Snapshot ID to build representation for
         run_id: Optional run ID for category/organized data
         stages: List of pipeline stages to include (defaults to [ORIGINAL, ORGANIZED])
+        use_cache: If True, try to load from cache before computing (default: False)
 
     Returns:
         DualRepresentation with items and hierarchies for requested stages
@@ -487,14 +488,20 @@ def build_dual_representation(
 
     # Build each requested stage
     for stage in stages:
-        # Try loading from cache first
-        cached = _load_hierarchy_from_db(snapshot_id, stage, run_id, storage_manager)
+        hierarchy: Hierarchy | None = None
+        items: dict[str, HierarchyItem] | None = None
 
-        if cached:
-            hierarchy, items = cached
-            logger.info(f"Using cached hierarchy for stage={stage.value}")
-        else:
-            # Compute hierarchy if not cached
+        # Try loading from cache if requested
+        if use_cache:
+            cached = _load_hierarchy_from_db(
+                snapshot_id, stage, run_id, storage_manager
+            )
+            if cached:
+                hierarchy, items = cached
+                logger.info(f"Using cached hierarchy for stage={stage.value}")
+
+        # Compute hierarchy if not cached or cache not used
+        if hierarchy is None:
             if stage == PipelineStage.original:
                 hierarchy, items = create_hierarchy_from_nodes(
                     snapshot_id, storage_manager
@@ -504,6 +511,9 @@ def build_dual_representation(
                     run_id, snapshot_id, stage, storage_manager
                 )
             else:
+                logger.warning(
+                    f"Skipping stage={stage.value}: cannot compute (run_id={run_id})"
+                )
                 continue  # Skip stages that can't be computed
 
             # Save computed hierarchy to database for future use
@@ -513,7 +523,9 @@ def build_dual_representation(
             hierarchy.structure_id = structure_id
             logger.info(f"Computed and saved hierarchy for stage={stage.value}")
 
+        # At this point, both hierarchy and items are guaranteed to be non-None
         hierarchies[stage.value] = hierarchy
-        all_items.update(items)  # Merge into shared ItemStore
+        if items:  # Add type guard for type checker
+            all_items.update(items)  # Merge into shared ItemStore
 
     return DualRepresentation(items=all_items, hierarchies=hierarchies)

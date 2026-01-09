@@ -24,6 +24,7 @@ from storage.work_models import (
     PartialNameCategory,
     Run,
     StageState,
+    StructureFormatType,
 )
 from storage.work_models import (
     Meta as WorkMeta,
@@ -316,8 +317,8 @@ class FolderStructureFactory(BaseFactory):
     structure = {"name": "root", "children": []}
     created_at = None
 
-    # New fields for Hierarchy format (default to None for legacy FolderV2 format)
-    format_type = None  # "hierarchy" or "folderv2" or None
+    # New fields for Hierarchy format
+    format_type = StructureFormatType.FOLDER_V2.value  # Default to folderv2
     contained_ids = None
     source_type = None
     items = None

@@ -5,7 +5,7 @@ in notes/dual_representation_design.md and test cases in
 notes/dual_representation_test_cases.md.
 """
 
-from data_models.pipeline import ItemType, PipelineStage
+from data_models.pipeline import FolderV2, ItemType, PipelineStage
 from storage.factories import (
     GroupCategoryEntryFactory,
     GroupCategoryFactory,
@@ -340,16 +340,15 @@ class TestConvertHierarchyToFolderStructure:
         # Convert to FolderV2 format
         folder_v2 = convert_hierarchy_to_folder_structure(hierarchy, items)
 
-        # Verify structure
-        assert "name" in folder_v2
-        assert "children" in folder_v2
-        assert folder_v2["name"] == "root"
+        # Verify structure - FolderV2 object
+        assert isinstance(folder_v2, FolderV2)
+        assert folder_v2.name == "root"
 
         # Find the child node
-        assert len(folder_v2["children"]) == 1
-        child = folder_v2["children"][0]
-        assert child["name"] == "test.txt"
-        assert child["originalPath"] == "/test/test.txt"
+        assert len(folder_v2.children) == 1
+        child = folder_v2.children[0]
+        assert child.name == "test.txt"
+        assert child.originalPath == "/test/test.txt"
 
 
 class TestDataIntegrity:
