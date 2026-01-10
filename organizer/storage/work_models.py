@@ -8,6 +8,7 @@ validated at the application level, not by database constraints.
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from sqlalchemy import Float, ForeignKey, Index, String
@@ -17,6 +18,13 @@ from storage.db_types import DateTime, JsonDict, JsonList
 
 # Schema version (increment on breaking changes)
 WORK_SCHEMA_VERSION = "1.0.0"
+
+
+class StructureFormatType(str, Enum):
+    """Format type for FolderStructure serialization."""
+
+    HIERARCHY = "hierarchy"
+    FOLDER_V2 = "folderv2"
 
 
 class WorkBase(DeclarativeBase):
@@ -231,10 +239,13 @@ class Classification(WorkBase):
 
 class FolderStructure(WorkBase):
     """
-    Represents the most-recently calculated folder structure
-    for the old and new structures. This should be serializable into
-    data_models.api.FolderV2 and data_models.api.File objects via
-    pydantic
+    Represents the most-recently calculated folder structure.
+
+    Can serialize to either:
+    - FolderV2 format (legacy, for old/new structures)
+    - Hierarchy format (new dual representation with ItemStore)
+
+    Use format_type field to distinguish between formats.
     """
 
     __tablename__ = "out_folder_structure"
@@ -243,9 +254,21 @@ class FolderStructure(WorkBase):
     run_id: Mapped[int | None] = mapped_column(ForeignKey("run.id"))
     snapshot_id: Mapped[int]  # FK to index.db (cross-database)
     total_nodes: Mapped[int]
-    structure_type: Mapped[str] = mapped_column(String)
-    structure: Mapped[dict] = mapped_column(JsonDict)
+    structure_type: Mapped[str] = mapped_column(String)  # e.g., "old", "new", "grouped"
+    structure: Mapped[dict] = mapped_column(JsonDict)  # Main structure data
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # New fields for Hierarchy format support
+    format_type: Mapped[str] = mapped_column(
+        String, default=StructureFormatType.FOLDER_V2.value
+    )  # "hierarchy" or "folderv2"
+    contained_ids: Mapped[Optional[dict]] = mapped_column(
+        JsonDict
+    )  # Set serialized as list in JSON
+    source_type: Mapped[Optional[str]] = mapped_column(String)  # "node" or "category"
+    items: Mapped[Optional[dict]] = mapped_column(
+        JsonDict
+    )  # ItemStore for Hierarchy format
 
 
 class FileMapping(WorkBase):
@@ -268,6 +291,20 @@ class FileMapping(WorkBase):
         Index("idx_file_mapping_node", "node_id"),
         Index("idx_file_mapping_run_node", "run_id", "node_id", unique=True),
     )
+
+
+class HierarchyDiffLog(WorkBase):
+    """Log of hierarchy diffs applied by users.
+
+    Stores user modifications to the category hierarchy for analytics and tracking.
+    """
+
+    __tablename__ = "log_hierarchy_diff"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    diff: Mapped[dict] = mapped_column(JsonDict)  # The HierarchyDiff object
 
 
 class Meta(WorkBase):

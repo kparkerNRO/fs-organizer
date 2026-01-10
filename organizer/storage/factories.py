@@ -20,9 +20,11 @@ from storage.work_models import (
     GroupCategoryEntry,
     GroupEntry,
     GroupIteration,
+    HierarchyDiffLog,
     PartialNameCategory,
     Run,
     StageState,
+    StructureFormatType,
 )
 from storage.work_models import (
     Meta as WorkMeta,
@@ -305,12 +307,21 @@ class FolderStructureFactory(BaseFactory):
 
     class Meta:
         model = FolderStructure
+        exclude = ("run",)  # Don't pass 'run' to model constructor
 
     run = factory.SubFactory(RunFactory)
     run_id = SelfAttribute("run.id")
+    snapshot_id = SelfAttribute("run.snapshot_id")
+    total_nodes = 0
     structure_type = PipelineStage.organized.value
     structure = {"name": "root", "children": []}
     created_at = None
+
+    # New fields for Hierarchy format
+    format_type = StructureFormatType.FOLDER_V2.value  # Default to folderv2
+    contained_ids = None
+    source_type = None
+    items = None
 
 
 class FileMappingFactory(BaseFactory):
@@ -318,6 +329,7 @@ class FileMappingFactory(BaseFactory):
 
     class Meta:
         model = FileMapping
+        exclude = ("run",)  # Don't pass 'run' to model constructor
 
     run = factory.SubFactory(RunFactory)
     run_id = SelfAttribute("run.id")
@@ -335,3 +347,15 @@ class WorkMetaFactory(BaseFactory):
 
     key = Sequence(lambda n: f"key_{n}")
     value = None
+
+
+class HierarchyDiffLogFactory(BaseFactory):
+    """Factory for creating HierarchyDiffLog instances"""
+
+    class Meta:
+        model = HierarchyDiffLog
+        exclude = ("run",)  # Don't pass 'run' to model constructor
+
+    run = factory.SubFactory(RunFactory)
+    run_id = SelfAttribute("run.id")
+    diff = {"added": {}, "deleted": {}}

@@ -4,8 +4,10 @@ import styled from "styled-components";
 import { CategoriesPage } from "./pages/CategoriesPage";
 import { FolderStructurePage } from "./pages/FolderStructurePage";
 import { ImportWizardPage } from "./pages/ImportWizardPage";
+import { DualRepresentationImportWizard } from "./pages/DualRepresentationImportWizard";
 import { NavBar, NavItem } from "./components/NavBar";
 import { getPipelineStatus } from "./api";
+import { featureFlags } from "./config/featureFlags";
 
 // Navigation items
 const navItems: NavItem[] = [
@@ -69,6 +71,11 @@ function App() {
     );
   }
 
+  // Choose which import wizard to use based on feature flag
+  const ImportWizard = featureFlags.useDualRepresentation
+    ? DualRepresentationImportWizard
+    : ImportWizardPage;
+
   return (
     <AppContainer>
       <NavBar
@@ -82,7 +89,7 @@ function App() {
         ) : activeView === "folders" ? (
           <FolderStructurePage />
         ) : (
-          <ImportWizardPage />
+          <ImportWizard />
         )}
       </MainContent>
     </AppContainer>

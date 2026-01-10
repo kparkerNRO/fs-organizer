@@ -1,10 +1,9 @@
 from enum import Enum
-from typing import List
+
 from pydantic import BaseModel
 
 from api.tasks import TaskStatus
-from data_models.pipeline import Category
-from data_models.pipeline import FolderV2
+from data_models.pipeline import Category, FolderV2, Hierarchy, HierarchyItem
 
 
 class GatherRequest(BaseModel):
@@ -33,7 +32,7 @@ class ProcessResponse(BaseModel):
 
 
 class CategoryResponse(BaseModel):
-    data: List[Category] = []
+    data: list[Category] = []
     totalItems: int = 0
     totalPages: int = 1
     currentPage: int = 1
@@ -54,3 +53,30 @@ class SortOrder(str, Enum):
 class FolderViewResponse(BaseModel):
     original: FolderV2
     new: FolderV2
+
+
+# Dual Representation API Models
+
+
+class DualRepresentation(BaseModel):
+    """
+    API-level payload containing shared items and multiple hierarchies.
+
+    This is only used at the API boundary. Internal functions work with
+    individual Hierarchy objects.
+    """
+
+    items: dict[str, HierarchyItem]  # Shared pool (ItemStore)
+    hierarchies: dict[str, Hierarchy]  # stage_name -> Hierarchy
+
+
+class HierarchyDiff(BaseModel):
+    """
+    Lightweight object describing changes made to a Hierarchy.
+
+    Analogous to a git diff or commit. Allows efficient transmission
+    of hierarchy modifications without sending the entire tree.
+    """
+
+    added: dict[str, list[str]]  # Key: Parent ID, Value: Child IDs to add
+    deleted: dict[str, list[str]]  # Key: Parent ID, Value: Child IDs to remove

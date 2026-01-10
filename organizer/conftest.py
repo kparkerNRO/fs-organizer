@@ -15,6 +15,7 @@ from storage.factories import (
     GroupCategoryFactory,
     GroupEntryFactory,
     GroupIterationFactory,
+    HierarchyDiffLogFactory,
     LabelRunFactory,
     ModelRunFactory,
     NodeFactory,
@@ -84,6 +85,7 @@ def storage_work_session(storage_manager):
         FolderStructureFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         FileMappingFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         WorkMetaFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
+        HierarchyDiffLogFactory._meta.sqlalchemy_session = session  # type: ignore[misc]
         yield session
 
 

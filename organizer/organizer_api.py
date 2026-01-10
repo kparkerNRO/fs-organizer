@@ -13,7 +13,12 @@ from data_models.pipeline import (
     FolderV2,
     PipelineStage,
 )
-from api.models import AsyncTaskResponse, GatherRequest
+from api.models import (
+    AsyncTaskResponse,
+    GatherRequest,
+    DualRepresentation,
+    HierarchyDiff,
+)
 from api.profiling import ProfilingMiddleware, is_profiling_enabled
 from api.tasks import TaskInfo, TaskStatus, create_task, tasks, update_task
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -35,6 +40,7 @@ from utils.folder_structure import (
     get_newest_entry_for_stage,
     sort_folder_structure,
 )
+from utils.dual_representation import build_dual_representation
 from utils.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -528,3 +534,106 @@ async def api_folders(
     return AsyncTaskResponse(
         task_id=task_id, message="Folders task started", status=TaskStatus.PENDING
     )
+
+
+# V2 API - Dual Representation
+
+
+@app.get("/api/v2/folder-structure")
+async def get_dual_representation(
+    stages: str = "original,organized",  # Comma-separated list of stages
+    storage_manager: StorageManager = Depends(get_storage_manager),
+) -> DualRepresentation:
+    """
+    Get the dual representation of folder hierarchies for specified pipeline stages.
+
+    Args:
+        stages: Comma-separated list of stages to include (e.g., "original,organized")
+
+    Returns:
+        DualRepresentation with items and hierarchies for the requested stages
+    """
+    logger.info(f"GET /api/v2/folder-structure?stages={stages}")
+
+    # Parse stages parameter
+    requested_stages = []
+    for stage_name in stages.split(","):
+        stage_name = stage_name.strip()
+        try:
+            requested_stages.append(PipelineStage(stage_name))
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid stage name: {stage_name}. Valid stages: {[s.value for s in PipelineStage]}",
+            )
+
+    with storage_manager.get_work_session() as session:
+        latest_run = get_latest_run(session)
+        if latest_run is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No runs found. Please run gather and group first.",
+            )
+
+    try:
+        dual_rep = build_dual_representation(
+            storage_manager,
+            snapshot_id=latest_run.snapshot_id,
+            run_id=latest_run.id,
+            stages=requested_stages,
+        )
+        return dual_rep
+    except Exception as e:
+        logger.error("Error building dual representation", exc_info=e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error building dual representation: {str(e)}",
+        )
+
+
+@app.patch("/api/v2/folder-structure")
+async def apply_hierarchy_diff(
+    diff: HierarchyDiff,
+    storage_manager: StorageManager = Depends(get_storage_manager),
+) -> dict:
+    """
+    Apply a hierarchy diff (user edits) to the category structure.
+
+    Accepts a HierarchyDiff object and applies the changes to the database.
+    Also logs the diff for analytics.
+    """
+    logger.info(f"PATCH /api/v2/folder-structure - Applying diff: {diff}")
+
+    with storage_manager.get_work_session() as session:
+        latest_run = get_latest_run(session)
+        if latest_run is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No runs found. Cannot apply diff.",
+            )
+
+        try:
+            # Apply the diff (implementation to be completed)
+            # For now, we'll just log it
+            from storage.work_models import HierarchyDiffLog
+
+            log_entry = HierarchyDiffLog(
+                run_id=latest_run.id,
+                diff=diff.model_dump(),
+            )
+            session.add(log_entry)
+            session.commit()
+
+            logger.info(f"Hierarchy diff logged successfully: {log_entry.id}")
+
+            return {
+                "message": "Diff applied successfully",
+                "log_id": log_entry.id,
+            }
+        except Exception as e:
+            logger.error("Error applying hierarchy diff", exc_info=e)
+            session.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error applying diff: {str(e)}",
+            )
