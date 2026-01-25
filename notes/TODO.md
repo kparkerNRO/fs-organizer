@@ -7,6 +7,7 @@ End state:
 # Next steps
 * Feature: Folder structure
     * Rework API to use the node/hierarchy split - send nodes and multiple hierarchys. Think github diff traking for the structures
+        * Partial progress - Dual Representation implemented, but not integrated
     * Implement sync between the two views
 
 * Feature: manual review
@@ -28,6 +29,7 @@ End state:
     * rework grouping to a very basic "common token" grouping - rather than a full NLP grouping, do common token string match 
         * explore normalizing before grouping
         * confidence is probably the ratio of First part: second part (second part should be < 50%)
+            * There's a branch for this: kp/refine-folder-grouping
     * Add some additional heuristic categorizing to filter out things we know for sure
     * Train model on the remaining data
         * I suspect "term count" is a useful feature for the model to use
