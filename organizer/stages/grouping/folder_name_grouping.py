@@ -13,6 +13,88 @@ from stages.grouping.constants import STOP_WORDS
 
 logger = getLogger(__name__)
 
+# A confidence threshold to decide whether to accept a split
+DECOMPOSITION_CONFIDENCE_THRESHOLD = 0.6
+
+
+def calculate_split_confidence(part1: str, part2: str, original_name: str) -> float:
+    """
+    Calculates a confidence score for a proposed binary split of a name.
+    The score is based on a set of heuristic rules.
+
+    Args:
+        part1: The first part (prefix) of the split
+        part2: The second part (suffix) of the split
+        original_name: The original unsplit name
+
+    Returns:
+        A confidence score between 0.0 and 1.0
+    """
+    score = 1.0
+
+    # Rule: First part should generally be longer than the second
+    if len(part1) <= len(part2):
+        # Apply a penalty, stronger if the first part is much shorter
+        score *= 0.8 * (len(part1) / (len(part2) + 1e-6))
+
+    # Rule: The last section should not be more than 50% of the original length
+    if len(part2) > 0.5 * len(original_name):
+        score *= 0.7
+
+    # Rule: Penalize groups that are mostly stopwords
+    part1_words = [w for w in part1.lower().split() if w not in STOP_WORDS]
+    part2_words = [w for w in part2.lower().split() if w not in STOP_WORDS]
+
+    # The prefix (part1) must contain non-stopwords
+    if not part1_words:
+        return 0.0  # A prefix of only stopwords is invalid
+
+    # Penalize if the second part has more meaningful content than the first
+    if len(" ".join(part1_words)) < len(" ".join(part2_words)):
+        score *= 0.9
+
+    return score
+
+
+def decompose_name(name: str) -> List[str]:
+    """
+    Recursively decomposes a name into its best constituent parts based on a confidence score.
+
+    This function implements hierarchical name decomposition by repeatedly finding
+    the highest-confidence binary split point in a name.
+
+    Args:
+        name: The name to decompose
+
+    Returns:
+        A list of strings representing the decomposed parts
+    """
+    words = name.split()
+    if len(words) <= 1:
+        return [name]
+
+    best_split = None
+    max_confidence = -1.0
+
+    # Find the best binary split for the current name
+    for i in range(1, len(words)):
+        part1 = " ".join(words[:i])
+        part2 = " ".join(words[i:])
+
+        confidence = calculate_split_confidence(part1, part2, name)
+
+        if confidence > max_confidence:
+            max_confidence = confidence
+            best_split = (part1, part2)
+
+    # If the best split is good enough, recurse on the second part
+    if max_confidence > DECOMPOSITION_CONFIDENCE_THRESHOLD and best_split:
+        # Return the first part, plus the result of decomposing the second part
+        return [best_split[0]] + decompose_name(best_split[1])
+    else:
+        # If no split is confident enough, do not decompose the name further
+        return [name]
+
 
 def _get_folder_groups(session: Session) -> Dict[int, List[Node]]:
     """
@@ -102,17 +184,83 @@ def _is_valid_group_prefix(prefix: str) -> bool:
     return len(non_stopwords) > 0
 
 
-def apply_folder_name_grouping(
+def apply_hierarchical_decomposition(
+    session: Session,
+    run_id: int,
+    snapshot_id: int,
+) -> None:
+    """
+    Apply hierarchical name decomposition to break down folder names into meaningful parts.
+
+    This is a more flexible, rule-based decomposition that is applied to each name
+    individually. Similar folder names will be decomposed into similar sets of parts,
+    achieving grouping as an emergent property.
+    """
+    logger.info("Applying hierarchical folder name decomposition")
+
+    # Get the current iteration ID and create a new iteration
+    iteration_id = get_next_iteration_id(session)
+
+    iteration = GroupIteration(
+        id=iteration_id,
+        run_id=run_id,
+        snapshot_id=snapshot_id,
+        description="Hierarchical name decomposition",
+    )
+    session.add(iteration)
+    session.flush()
+
+    # Get entries from the previous iteration
+    stmt = select(GroupCategoryEntry).where(
+        GroupCategoryEntry.iteration_id == iteration_id - 1
+    )
+    previous_entries = session.scalars(stmt).all()
+
+    if not previous_entries:
+        logger.info("No entries to process")
+        return
+
+    for entry in previous_entries:
+        processed_name = entry.processed_name or entry.pre_processed_name
+        if not processed_name:
+            continue
+
+        # Decompose the name into its constituent parts
+        decomposed_parts = decompose_name(processed_name)
+
+        # Create new entries for each decomposed part
+        for part in decomposed_parts:
+            if not part or not part.strip():
+                continue
+
+            new_entry = GroupCategoryEntry(
+                folder_id=entry.folder_id,
+                iteration_id=iteration_id,
+                pre_processed_name=entry.pre_processed_name,
+                processed_name=part,
+                path=entry.path,
+                confidence=entry.confidence,
+                processed=False,
+                derived_names=entry.derived_names,
+            )
+            session.add(new_entry)
+
+    session.commit()
+    logger.info("Hierarchical folder name decomposition complete")
+
+
+def apply_common_prefix_grouping(
     session: Session,
     run_id: int,
     snapshot_id: int,
 ) -> None:
     """
     Apply folder name grouping to identify common prefixes and create hierarchical groups.
+
     This step processes groups from the previous iteration and uses common_token_grouping
-    to identify folder names that share common prefixes.
+    to identify folder names that share common prefixes across multiple names.
     """
-    logger.info("Applying folder name grouping")
+    logger.info("Applying common prefix grouping")
 
     # Get the current iteration ID and create a new iteration
     iteration_id = get_next_iteration_id(session)
@@ -214,4 +362,4 @@ def apply_folder_name_grouping(
                 session.add(new_entry)
 
     session.commit()
-    logger.info("Folder name grouping complete")
+    logger.info("Common prefix grouping complete")
